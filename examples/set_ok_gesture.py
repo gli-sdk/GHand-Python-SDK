@@ -1,7 +1,7 @@
 # set_ok_gesture.py
 import sys
 import time
-from xiaoyao_sdk_mock import XiaoyaoClient, GestureType, RobotError # 导入模拟SDK客户端和枚举
+from xiaoyao_sdk_mock import XiaoyaoClient, GestureType, RobotError  # 导入模拟SDK客户端和枚举
 
 print("--- 示例 2: 设置手部预设手势 (比OK) ---")
 
@@ -16,7 +16,7 @@ if not client.connect():
 try:
     print("尝试设置手势为 'OK'...")
     result_code = client.hand.set_preset_gesture(GestureType.OK_SIGN)
-    
+
     if result_code == GestureType.OK_SIGN.value:
         print(f"成功设置手势为 'OK' ({result_code})。")
     elif result_code == RobotError.INVALID_PARAMETER.value:
@@ -30,4 +30,4 @@ except Exception as e:
 finally:
     # 断开设备连接
     client.disconnect()
-    print("\n示例 2 运行完毕。")
+    print("\n示例 2 运行完毕!")
