@@ -26,4 +26,4 @@ except Exception as e:
 finally:
     # 断开设备连接
     client.disconnect()
-    print("\n示例 1 运行完毕。")
+    print("\n示例 1 运行完毕!!!")
