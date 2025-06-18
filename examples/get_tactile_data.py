@@ -1,34 +1,47 @@
 # get_tactile_data.py
 import sys
-import time
 import numpy as np # 用于更好地显示数组
-from xiaoyao_sdk_mock import XiaoyaoClient # 导入模拟SDK客户端
+import os
 
-print("--- 示例 3: 获取指尖触觉传感器数据 ---")
+# --- 手动添加 src 目录到 Python 搜索路径 ---
+# 获取当前脚本文件所在的目录 (即 .../examples/)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# 获取项目根目录 (即 .../XIAOYAO-SDK-1/)
+project_root = os.path.dirname(current_dir)
+# 构建 src 目录的路径
+src_path = os.path.join(project_root, 'src')
 
-# 实例化SDK客户端
-client = XiaoyaoClient()
+# 如果 src 目录不在 sys.path 中，则添加它
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
+# ---------------------------------------------
 
-# 尝试连接设备
-if not client.connect():
-    print("无法连接到设备，退出示例。")
+# 导入 xiaoyao 包内的 tactile 模块
+try:
+    from xiaoyao import tactile
+except ImportError:
+    print("错误：无法导入 'xiaoyao' 包。")
+    print("请确保您在项目的父目录（例如 'src/'）下，并使用 'python -m examples.get_tactile_data' 命令来运行此示例。")
     sys.exit(1)
+
+print("--- 示例: 获取指尖触觉传感器数据 ---")
 
 try:
     # 假设查询传感器ID为 0 的触觉数据
     sensor_id_to_query = 0
-    print(f"尝试获取指尖传感器 {sensor_id_to_query} 的触觉数据...")
-    tactile_data = client.tactile.get_data(sensor_id=sensor_id_to_query)
+    print(f"\n正在调用 tactile.get_data(sensor_id={sensor_id_to_query})...")
+    # 直接调用 tactile 模块中的顶层函数 get_data
+    tactile_data = tactile.get_data(sensor_id=sensor_id_to_query)
     
+    # 检查返回的是否是一个非空的列表 (表示二维数组)
     if tactile_data:
-        print(f"指尖传感器 {sensor_id_to_query} 的触觉数据 (3x3矩阵):")
+        print(f"\n指尖传感器 {sensor_id_to_query} 的触觉数据 (3x3矩阵):")
         # 使用numpy更好地格式化输出二维数组
         print(np.array(tactile_data))
     else:
-        print(f"获取指尖传感器 {sensor_id_to_query} 触觉数据失败或无数据。")
+        print(f"\n获取指尖传感器 {sensor_id_to_query} 的触觉数据失败或无数据。")
+
 except Exception as e:
     print(f"获取触觉数据时发生错误: {e}")
 finally:
-    # 断开设备连接
-    client.disconnect()
-    print("\n示例 3 运行完毕。")
+    print("\n示例运行完毕!")
