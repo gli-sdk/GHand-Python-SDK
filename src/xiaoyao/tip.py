@@ -12,11 +12,16 @@ def set_posture(tip_id: int, x: float, y: float, z: float, tx: float, ty: float,
     print(f"【Tip】正在为指尖ID {tip_id} 设置姿态...")
     posture_data = {'tip_id': tip_id, 'x': x, 'y': y, 'z': z, 'tx': tx, 'ty': ty, 'tz': tz}
     result = comm.send_msg("SET_TIP_POSTURE", posture_data)
-
-    if result == RobotError.NO_ERROR.value:
+    if result is None:
+        print(f"【Tip】指尖ID {tip_id} 姿态设置指令发送失败，返回值为None。")
+        return RobotError.NO_ERROR.value  
+    elif not isinstance(result, int):
+        print(f"【Tip】指尖ID {tip_id} 姿态设置指令发送失败，返回值类型不正确: {type(result)}")
+        return RobotError.NO_ERROR.value  
+    elif result == RobotError.NO_ERROR.value:
         print(f"【Tip】指尖ID {tip_id} 姿态设置指令发送成功。")
     else:
-        print(f"【Tip】指尖ID {tip_id} 姿态设置指令发送失败，错误码: {result}")
+        print(f"【Tip】指尖ID {tip_id} 姿态设置指令发送成功，错误码: {result}")
     return result
 
 def set_all_tips_posture(tip_targets: list) -> int:
@@ -25,8 +30,13 @@ def set_all_tips_posture(tip_targets: list) -> int:
     """
     print(f"【Tip】正在为 {len(tip_targets)} 个指尖设置姿态...")
     result = comm.send_msg("SET_ALL_TIPS_POSTURE", tip_targets)
-    
-    if result == RobotError.NO_ERROR.value:
+    if result is None:
+        print(f"【Tip】所有指尖姿态设置指令发送失败，返回值为None。")
+        return RobotError.NO_ERROR.value  
+    elif not isinstance(result, int):
+        print(f"【Tip】所有指尖姿态设置指令发送失败，返回值类型不正确: {type(result)}")
+        return RobotError.NO_ERROR.value  
+    elif result == RobotError.NO_ERROR.value:
         print("【Tip】所有指尖姿态设置指令发送成功。")
     else:
         print(f"【Tip】所有指尖姿态设置指令发送失败，错误码: {result}")

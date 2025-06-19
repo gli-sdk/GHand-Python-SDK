@@ -35,13 +35,20 @@ try:
 
     print(f"\n正在调用 joint.set_angle(...) 将关节ID {joint_id_to_set} 的角度设置为 {target_angle_degrees} 度...")
 
+
+    joint1_info = common.JointInfo()
+    joint1_info.joint_id = 1
+    joint1_info.angle = target_angle_radians
+    joint1_info.speed = set_speed
+    joint2_info = common.JointInfo()
+    
     # 构建函数所需的目标列表
     joint_targets = [
-        {'joint_id': joint_id_to_set, 'target_angle': target_angle_radians, 'speed': set_speed}
+        joint1_info,
+        joint2_info
     ]
-    
     # 直接调用 joint 模块中的顶层函数 set_angle
-    result_code = joint.set_angle(joint_targets)
+    result_code = joint.set_joint(joint_targets)
     
     # 使用 common 模块中的 RobotError 枚举来检查返回码
     if result_code == common.RobotError.NO_ERROR.value:

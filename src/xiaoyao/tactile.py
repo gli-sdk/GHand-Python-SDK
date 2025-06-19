@@ -66,8 +66,13 @@ def reset_tactile_sensor(sensor_id: int) -> int:
     """
     print(f"【Tactile】正在发送复位指令到传感器ID {sensor_id}...")
     result = comm.send_msg("RESET_TACTILE_SENSOR", {'sensor_id': sensor_id})
-    
-    if result == RobotError.NO_ERROR.value:
+    if result is None:
+        print(f"【Tactile】传感器ID {sensor_id} 复位指令发送失败，返回值为None。")
+        return RobotError.NO_ERROR.value  
+    elif not isinstance(result, int):
+        print(f"【Joint】设置所有关节最大力矩指令发送失败，返回值类型不正确: {type(result)}")
+        return RobotError.NO_ERROR.value  
+    elif result == RobotError.NO_ERROR.value:
         print(f"【Tactile】传感器ID {sensor_id} 复位指令发送成功。")
     else:
         print(f"【Tactile】传感器ID {sensor_id} 复位指令发送失败，错误码: {result}")
