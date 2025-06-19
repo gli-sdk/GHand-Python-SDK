@@ -4,6 +4,7 @@ import time
 import math
 import numpy as np
 from enum import IntEnum
+from typing import Optional, Dict, Union, Any
 
 # --- SDK 枚举定义 (为了 comm.py 独立模拟运行，这里暂时将枚举定义再次包含。)
 class RobotStatus(IntEnum):
@@ -18,8 +19,7 @@ class Message:
     def __init__(self, msg_type, data=None):
         self.msg_type = msg_type
         self.data = data
-        self.result = None
-
+        self.result: Optional[Union[int, float, Dict[str, Any]]] = None
 class Dispatcher:
     """SDK内部事件调度器"""
     _instance = None
@@ -40,6 +40,7 @@ class Dispatcher:
 
         # --- Hand 模块消息处理 ---
         if msg.msg_type == "GET_ALL_BASIC_INFO":
+
             msg.result = {
                 'current_temperature': 38,
                 'operation_status_code': RobotStatus.IDLE.value,
@@ -78,6 +79,9 @@ class Dispatcher:
             msg.result = RobotError.NOT_SUPPORTED.value
         
         return msg.result
+    def recv(self, msg_type: str, timeout: float = 1.0):
+        return 
+
 
     def subscribe(self, msg_type, callback):
         self._subscription_counter += 1

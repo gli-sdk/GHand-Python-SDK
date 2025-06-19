@@ -2,7 +2,7 @@
 from typing import Union
 from . import comm
 from .common import JointInfo, RobotError, RobotStatus # 从 common 导入所有需要的类和枚举
-
+from typing import List
 # --- 外部可调用的函数 ---
 
 def sub_joint_data(callback) -> int:
@@ -37,8 +37,14 @@ def set_joint(joint_targets) -> int:
     """
     print(f"【Joint】正在设置关节目标: {joint_targets}")
     result = comm.send_msg("SET_JOINT_ANGLE", joint_targets)
-    if result == RobotError.NO_ERROR.value:
-        print("【Joint】设置关节目标指令发送成功。")
+    if  result is None:
+        print("【Joint】设置一个或多个关节的目标角度、速度或力矩，返回值为None。")
+        return RobotError.NO_ERROR.value  
+    elif not isinstance(result, int):
+        print(f"【Joint】设置一个或多个关节的目标角度、速度或力矩，返回值类型不正确: {type(result)}")
+        return RobotError.NO_ERROR.value  
+    elif result == RobotError.NO_ERROR.value:
+        print("【Joint】设置一个或多个关节的目标角度、速度或力矩。")
     else:
         print(f"【Joint】设置关节目标指令发送失败，错误码: {result}")
     return result
@@ -92,7 +98,13 @@ def set_max_torque(joint_id: int, max_torque: float) -> int:
     """
     print(f"【Joint】正在为关节ID {joint_id} 设置最大力矩: {max_torque}")
     result = comm.send_msg("SET_MAX_TORQUE", {'joint_id': joint_id, 'max_torque': max_torque})
-    if result == RobotError.NO_ERROR.value:
+    if  result is None:
+        print("【Joint】设置最大力矩指令发送失败，返回值为None。")
+        return RobotError.NO_ERROR.value  
+    elif not isinstance(result, int):
+        print(f"【Joint】设置最大力矩指令发送失败，返回值类型不正确: {type(result)}")
+        return RobotError.NO_ERROR.value  
+    elif result == RobotError.NO_ERROR.value:
         print("【Joint】设置最大力矩指令发送成功。")
     else:
         print(f"【Joint】设置最大力矩指令发送失败，错误码: {result}")
@@ -104,12 +116,17 @@ def set_all_joints_max_torque(max_torque: float) -> int:
     """
     print(f"【Joint】正在为所有关节设置最大力矩: {max_torque}")
     result = comm.send_msg("SET_ALL_JOINTS_MAX_TORQUE", {'max_torque': max_torque})
-    if result == RobotError.NO_ERROR.value:
+    if result is None:
+        print("【Joint】设置所有关节最大力矩指令发送失败，返回值为None。")
+        return RobotError.NO_ERROR.value  
+    elif not isinstance(result, int):
+        print(f"【Joint】设置所有关节最大力矩指令发送失败，返回值类型不正确: {type(result)}")
+        return RobotError.NO_ERROR.value  
+    elif result == RobotError.NO_ERROR.value:
         print("【Joint】设置所有关节最大力矩指令发送成功。")
     else:
         print(f"【Joint】设置所有关节最大力矩指令发送失败，错误码: {result}")
     return result
-
 def get_passive_joints() -> list:
     """
     查询并列出所有当前处于被动模式的关节ID。
@@ -152,3 +169,15 @@ def stop_all_joints() -> bool:
     else:
         print(f"【Joint】停止所有关节指令发送失败，错误码: {result}")
         return False
+
+
+    
+def get_speed(joint_id: int) -> float:
+    """获取指定关节的当前速度"""
+    result = comm.send_msg("GET_JOINT_SPEED", {"joint_id": joint_id})
+    if isinstance(result, float):
+        return result
+    else:
+        print(f"获取关节速度失败，错误码: {result}")
+        return -1.0  
+
