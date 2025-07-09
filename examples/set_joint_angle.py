@@ -43,11 +43,11 @@ try:
     # 直接调用 joint 模块中的顶层函数 set_angle
     result_code = joint.set_angle(joint_targets)
     
-    # 使用 common 模块中的 RobotError 枚举来检查返回码
-    if result_code == common.RobotError.NO_ERROR.value:
+    # 使用 common 模块中的 HandError 枚举来检查返回码
+    if result_code == common.HandError.NO_ERROR.value:
         print("\n关节角度设置指令发送成功。")
         # 在实际SDK中，这里可以等待运动完成或使用订阅来确认状态
-    elif result_code == common.RobotError.INVALID_PARAMETER.value:
+    elif result_code == common.HandError.INVALID_PARAMETER.value:
         print(f"\n关节角度设置失败: 参数无效。错误码: {result_code}")
     else:
         print(f"\n关节角度设置失败，未知错误码: {result_code}")
