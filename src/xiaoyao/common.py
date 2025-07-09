@@ -5,18 +5,44 @@ class GestureType(Enum):
     FIST = 3
     THUMBS_UP = 4
     GRIP_SIX = 5
+
+class ObjectDictionary:
+    class Identity:
+        """对象 0x1018: 设备身份信息"""
+        INDEX = 0x1018
+        SUB_VERSION_INFO = 0x03
+        SUB_SERIAL_NUMBER = 0x04
+
+    class ManufacturerCustom:
+        """对象 0x2000: 制造商自定义区域"""
+        INDEX = 0x2000
+        SUB_HAND_ID = 0x01
+        SUB_REBOOT = 0x02
+
+    class Protection:
+        """对象 0x2001: 保护功能相关"""
+        INDEX = 0x2001
+        SUB_PROTECTION_TEMP = 0x01
+
+    class HandInfo:
+        """对象 0x2012: 手部基本信息"""
+        INDEX = 0x2012
+        SUB_HAND_TYPE = 0x00
+
+    class SystemControl:
+        """对象 0x1011: 系统控制相关"""
+        INDEX = 0x1011
+        SUB_FACTORY_RESET = 0x01    
 class HandError(Enum):
     NO_ERROR = 0
     COMMUNICATION_ERROR = 1
 class HandState(Enum):
-    """
-    根据硬件协议文档定义的设备运行状态。
-    """
-    IDLE = 0            # 对应协议中的 "0: 空闲"
-    RUNNING = 1         # 对应协议中的 "1: 运行中"
-    PROTECTIVE_STOP = 2 # 对应协议中的 "2: 保护性停止"
-    ERROR = 3           # 对应协议中的 "3: 错误"
-    UNKNOWN = -1        # 对应协议中的 "255: 未知"
+    NORMAL_STOP = 0
+    NORMAL_RUNNING = 1
+    PROTECTIVE_STOP = 2
+    ABNORMAL_RUNNING = 3
+    UNKNOWN = -1
+    
 class TipPose:
     """
     表示指尖的位姿信息，包括位置和姿态。

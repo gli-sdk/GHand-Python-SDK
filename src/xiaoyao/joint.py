@@ -5,35 +5,6 @@ import time
 from ._internal.ethercat_client import EtherCATClient
 from .common import JointInfo, HandError, HandState
 
-# RPDO (PC接收, 来自灵巧手 - 0x6001)
-RPDO_FORMAT = (
-    '< 18h 18H 18H 5x 30h B b H'
-)
-RPDO_STRUCT = struct.Struct(RPDO_FORMAT)
-
-# TPDO (PC发送, 去往灵巧手)
-# 假设第一个字节为控制模式: 1=单关节, 2=所有关节
-TPDO_BUFFER = bytearray(1 + 8 + 78) # 1(mode) + 8(single) + 78(all) = 87 bytes
-
-def _update_and_get_rpdo_data() -> tuple:
-    """执行一个PDO通信周期，并返回解析后的RPDO数据元组。"""
-    client = EtherCATClient.get_instance()
-    if not client.is_op_state():
-        print("警告: PDO通信需要设备处于OP状态。")
-        return None
-        
-    client.send_processdata()
-    input_data = client.receive_processdata()
-
-    if not input_data or len(input_data) < RPDO_STRUCT.size:
-        # print(f"【PDO调试】: 长度不匹配! 期望: {RPDO_STRUCT.size}, 实际: {len(input_data)}")
-        return None
-
-    try:
-        return RPDO_STRUCT.unpack(input_data[:RPDO_STRUCT.size])
-    except struct.error as e:
-        print(f"【PDO调试】: 数据解析错误: {e}.")
-        return None
 
 def sub_joint_data(callback) -> int:
     """
@@ -60,23 +31,6 @@ def unsub_joint_data(subscription_id: int) -> bool:
         print(f"【Joint】取消订阅失败，未找到ID {subscription_id}。")
     return success
 
-def _send_pdo_command(target_index_start: int, data_format: str, *data_args):
-    """【内部函数】用于构造并发送一个通用的TPDO指令。"""
-    client = EtherCATClient.get_instance()
-    if not client.is_op_state():
-        print("错误：设置关节需要设备处于OP状态。")
-        return False
-
-    try:
-        command_type = 0x01 # 关节指令
-        buffer = struct.pack(f'<BH{data_format}', command_type, target_index_start, *data_args)
-        
-        client.set_output(buffer)
-        client.send_processdata()
-        return True
-    except struct.error as e:
-        print(f"打包PDO指令时发生错误: {e}")
-        return False
 
 def set_joint(joint_targets: list) -> HandError:
     """
