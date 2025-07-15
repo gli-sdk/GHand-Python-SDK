@@ -1,4 +1,4 @@
-# src/xiaoyao/joint.py
+# src/xiaoyao/joint.py.
 
 import struct
 import time

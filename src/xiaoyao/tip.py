@@ -1,4 +1,4 @@
-# src/xiaoyao/tip.py
+# src/xiaoyao/tip.py。
 
 import struct
 from ._internal.ethercat_client import EtherCATClient

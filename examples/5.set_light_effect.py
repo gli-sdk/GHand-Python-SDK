@@ -1,4 +1,4 @@
-# examples/set_light_effect.py
+# examples/set_light_effect.py。
 
 import sys
 import os

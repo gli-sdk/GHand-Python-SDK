@@ -1,4 +1,4 @@
-# tactile.py
+# tactile.py。
 import numpy as np
 from . import comm
 from .common import RobotError
