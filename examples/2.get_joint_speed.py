@@ -1,4 +1,4 @@
-# examples/get_joint_speed.py (已按新风格重构)
+# examples/get_joint_speed.py
 
 import sys
 import os

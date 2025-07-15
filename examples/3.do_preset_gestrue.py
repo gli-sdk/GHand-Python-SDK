@@ -1,4 +1,4 @@
-# examples/do_preset_gesture.py
+# examples/do_preset_gesture.py。
 
 import sys
 import os

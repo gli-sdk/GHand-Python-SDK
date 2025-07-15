@@ -1,4 +1,4 @@
-# src/xiaoyao/hand.py
+# src/xiaoyao/hand.py。
 import struct
 import time
 from ._internal.ethercat_client import EtherCATClient

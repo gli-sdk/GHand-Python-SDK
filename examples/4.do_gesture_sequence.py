@@ -1,4 +1,4 @@
-# examples/do_gesture_sequence.py
+# examples/do_gesture_sequence.py。
 
 import sys
 import os

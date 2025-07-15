@@ -1,4 +1,4 @@
-# examples/get_basic_info.py
+# examples/get_basic_info.py。
 
 import sys
 import os

@@ -14,7 +14,7 @@ class ObjectDictionary:
         SUB_SERIAL_NUMBER = 0x04
 
     class ManufacturerCustom:
-        """对象 0x2000: 制造商自定义区域"""
+        """对象 0x2000: 自定义区域"""
         INDEX = 0x2000
         SUB_HAND_ID = 0x01
         SUB_REBOOT = 0x02

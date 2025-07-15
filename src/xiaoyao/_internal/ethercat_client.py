@@ -1,4 +1,4 @@
-# src/xiaoyao/_internal/ethercat_client.py (最终版本)
+# src/xiaoyao/_internal/ethercat_client.py
 
 import pysoem
 import struct
