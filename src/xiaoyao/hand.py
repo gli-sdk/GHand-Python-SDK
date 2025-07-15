@@ -1,8 +1,7 @@
 # src/xiaoyao/hand.py
-
 import struct
 import time
-from ._internal.ethercat_client import EtherCATClient,execute_command,get_realtime_data, start_pdo_communication,find_adapters, auto_connect_to_hand
+from ._internal.ethercat_client import EtherCATClient
 from .common import GestureType, HandError, HandState, ObjectDictionary
 
 def close_device():
@@ -10,9 +9,9 @@ def close_device():
     EtherCATClient.get_instance().disconnect()
 
 def get_operation_state() -> HandState:
-    data = get_realtime_data()
+    data = EtherCATClient.get_instance().get_latest_parsed_data()
     if data:
-        state_code = data.get('operation_state_code')
+        state_code = data.get('hand_state')
         if state_code is not None:
             try:
                 return HandState(state_code)
@@ -22,12 +21,11 @@ def get_operation_state() -> HandState:
     return HandState.UNKNOWN
 
 def get_temperature() -> int:
-    """获取手部当前的温度。"""
-    data = EtherCATClient.get_realtime_data()
-    return data.get('hand_temperature', 999) # 999 代表无效值
+    data = EtherCATClient.get_instance().get_latest_parsed_data()
+    return data.get('hand_temperature', 999) 
 
 def do_preset_gesture(gesture_type: GestureType) -> HandError:
-    
+    client = EtherCATClient.get_instance()
     print(f"【Hand】正在请求执行预设手势: {gesture_type.name}...")
     command_code_map = {
         GestureType.OK: 1, 
@@ -36,30 +34,18 @@ def do_preset_gesture(gesture_type: GestureType) -> HandError:
         GestureType.THUMBS_UP: 4,
         GestureType.GRIP_SIX: 5,
     }
-
-    # 获取对应手势的指令码
     command_code = command_code_map.get(gesture_type)
-    
-    # 检查手势是否被支持
     if command_code is None:
         print(f"错误: 不支持的手势类型 {gesture_type.name}")
         return HandError.INVALID_PARAMETER
-
-    # 调用内部函数发送指令码
-    if execute_command(command_code):
+    if client.execute_command(command_code):
         print(f"  -> 指令码 {command_code} 已成功发送。")
         return HandError.NO_ERROR
     else:
         print(f"  -> 指令码 {command_code} 发送失败。")
-        return HandError.COMMUNICATION_ERROR
+        return HandError.COMMUNICATION_FAILURE
 
 def get_all_basic_info() -> dict:
-    """获取静态SDO信息。此函数必须在PRE-OP状态下调用。"""
-    client = EtherCATClient.get_instance()
-    if client.is_op_state():
-        print("警告: 已处于OP运行状态，不应再调用此函数获取静态信息。")
-        return {}
-    
     info = {
         'device_id': get_device_id(),
         'software_version': get_software_version(),
@@ -68,7 +54,6 @@ def get_all_basic_info() -> dict:
     return info
 
 def get_device_id() -> str:
-    """【SDO】获取设备序列号。"""
     data_bytes = EtherCATClient.get_instance().sdo_read(
         ObjectDictionary.Identity.INDEX, 
         ObjectDictionary.Identity.SUB_SERIAL_NUMBER
@@ -76,7 +61,6 @@ def get_device_id() -> str:
     return data_bytes.decode('utf-8', errors='ignore').strip('\x00') if data_bytes else ""
 
 def get_software_version() -> str:
-    """【SDO】获取设备软件版本。"""
     data_bytes = EtherCATClient.get_instance().sdo_read(
         ObjectDictionary.Identity.INDEX, 
         ObjectDictionary.Identity.SUB_VERSION_INFO
@@ -84,9 +68,6 @@ def get_software_version() -> str:
     return data_bytes.decode('utf-8', errors='ignore').strip('\x00') if data_bytes else ""
 
 def get_hand_type() -> int:
-    """
-    此函数通过 SDO 读取手部类型。
-    """
     try:
         data_bytes = EtherCATClient.get_instance().sdo_read(
             ObjectDictionary.HandInfo.INDEX, 
@@ -105,7 +86,6 @@ def get_hand_type() -> int:
         return -1            
 
 def set_hand_id(hand_id: int) -> bool:
-    """【SDO】通过SDO写入手的节点ID。"""
     if not (0 <= hand_id <= 255):
         print(f"错误: hand_id ({hand_id}) 必须在 0-255 之间。")
         return False
@@ -121,7 +101,6 @@ def set_hand_id(hand_id: int) -> bool:
         return False
 
 def get_hand_id() -> int:
-    """【SDO】通过SDO读取当前设置的手的ID。"""
     data_bytes = EtherCATClient.get_instance().sdo_read(
         ObjectDictionary.ManufacturerCustom.INDEX, 
         ObjectDictionary.ManufacturerCustom.SUB_HAND_ID
@@ -132,7 +111,6 @@ def get_hand_id() -> int:
     return -1
 
 def set_temperature_threshold(min_temp: int, max_temp: int) -> bool:
-    """【SDO】通过SDO同时设置最低和最高保护温度。"""
     if not (-30 <= min_temp <= 0 and 50 <= max_temp <= 90):
         print(f"错误: 温度值必须在 -30 到 0 之间 (最低) 和 50 到 90 之间 (最高)。")
         return False
@@ -145,7 +123,7 @@ def set_temperature_threshold(min_temp: int, max_temp: int) -> bool:
         )
         return True
     except Exception as e:
-        print(f"  -> SDO写入失败，硬件返回异常: {e}")
+        print(f"  -> 写入失败，硬件返回异常: {e}")
         return False
     
 def initialize() -> bool:
@@ -156,10 +134,9 @@ def initialize() -> bool:
     print("【警告】在执行此操作时，请确保机器人工作区域内无障碍物。")
     INITIALIZE_COMMAND_CODE = 10 
     
-    return execute_command(INITIALIZE_COMMAND_CODE)
+    return EtherCATClient.execute_command(INITIALIZE_COMMAND_CODE)
 
 def reboot() -> bool:
-    """【SDO】通过SDO发送重启指令。"""
     print("【Hand】正在发送重启指令...")
     reboot_cmd = struct.pack('<B', 1)
     try:
@@ -173,22 +150,16 @@ def reboot() -> bool:
         return False
 
 def release_protection() -> bool:
-    """
-    尝试解除手部模块的保护状态。
-    """
     print("【Hand】正在尝试解除设备保护状态...")
     RELEASE_PROTECTION_CODE = 11
     
-    return execute_command(RELEASE_PROTECTION_CODE)
+    return EtherCATClient.execute_command(RELEASE_PROTECTION_CODE)
 
 def test_sensors() -> int:
-    """
-    请求对所有传感器执行自检。
-    """
     print("【Hand】正在请求传感器自检...")
     CHECK_SENSORS_CODE = 12
     
-    if execute_command(CHECK_SENSORS_CODE):
+    if EtherCATClient.execute_command(CHECK_SENSORS_CODE):
         print("  -> 传感器自检指令已发送。请稍后查询设备状态。")
         return 0
     else:
@@ -196,13 +167,10 @@ def test_sensors() -> int:
         return -1 # 表示指令发送失败
 
 def test_motors() -> int:
-    """
-    请求对所有电机执行自检。
-    """
     print("【Hand】正在请求电机自检...")
     CHECK_MOTORS_CODE = 13
     
-    if execute_command(CHECK_MOTORS_CODE):
+    if EtherCATClient.execute_command(CHECK_MOTORS_CODE):
         print("  -> 电机自检指令已发送。请稍后查询设备状态。")
         return 0
     else:
@@ -215,11 +183,7 @@ def update_firmware(firmware_path: str) -> bool:
     return False
 
 def set_light(mode: int, color: tuple, frequency_ms: int = 1000) -> bool:
-    """
-    设置灵巧手上的状态指示灯。
-    """
     print(f"【Hand】正在设置灯光: 模式={mode}, 颜色={color}, 频率={frequency_ms}ms")
-    
     client = EtherCATClient.get_instance()
     # 【注意】这个索引是假设的，需要确认
     OD_INDEX_LIGHT_CONTROL = 0x2100
