@@ -1,0 +1,285 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="zh-CN" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>xiaoyao.joint &mdash; XIAOYAO-SDK 1.0.0 文档</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=34088549"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/translations.js?v=beaddf03"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="索引" href="../../genindex.html" />
+    <link rel="search" title="搜索" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            XIAOYAO-SDK
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="搜索文档" aria-label="搜索文档" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="导航菜单">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">xiaoyao</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="移动版导航菜单" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">XIAOYAO-SDK</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="页面导航">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">模块代码</a></li>
+      <li class="breadcrumb-item active">xiaoyao.joint</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>xiaoyao.joint 源代码</h1><div class="highlight"><pre>
+<span></span><span class="c1"># src/xiaoyao/joint.py.</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">struct</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">._internal.ethercat_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">EtherCATClient</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">JointInfo</span><span class="p">,</span> <span class="n">HandError</span><span class="p">,</span> <span class="n">HandState</span>
+
+
+<div class="viewcode-block" id="sub_joint_data">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.joint.sub_joint_data">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">sub_joint_data</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    订阅所有关节的实时数据更新。</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">callable</span><span class="p">(</span><span class="n">callback</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;错误: 提供的 &#39;callback&#39; 不是一个可调用的函数。&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="o">-</span><span class="mi">1</span>
+    
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;【Joint】正在注册关节数据回调...&quot;</span><span class="p">)</span>
+    <span class="n">sub_id</span> <span class="o">=</span> <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">get_instance</span><span class="p">()</span><span class="o">.</span><span class="n">add_subscriber</span><span class="p">(</span><span class="s1">&#39;joint_data&#39;</span><span class="p">,</span> <span class="n">callback</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;【Joint】关节数据订阅成功，订阅ID: </span><span class="si">{</span><span class="n">sub_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">sub_id</span></div>
+
+
+<div class="viewcode-block" id="unsub_joint_data">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.joint.unsub_joint_data">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">unsub_joint_data</span><span class="p">(</span><span class="n">subscription_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    根据订阅ID，取消对关节数据的订阅。</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;【Joint】正在取消订阅ID </span><span class="si">{</span><span class="n">subscription_id</span><span class="si">}</span><span class="s2"> ...&quot;</span><span class="p">)</span>
+    <span class="n">success</span> <span class="o">=</span> <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">get_instance</span><span class="p">()</span><span class="o">.</span><span class="n">remove_subscriber</span><span class="p">(</span><span class="n">subscription_id</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">success</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;【Joint】订阅ID </span><span class="si">{</span><span class="n">subscription_id</span><span class="si">}</span><span class="s2"> 已成功取消。&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;【Joint】取消订阅失败，未找到ID </span><span class="si">{</span><span class="n">subscription_id</span><span class="si">}</span><span class="s2">。&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">success</span></div>
+
+
+
+<div class="viewcode-block" id="set_joint">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.joint.set_joint">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">set_joint</span><span class="p">(</span><span class="n">joint_targets</span><span class="p">:</span> <span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">HandError</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    设置一个或多个主动关节的目标。</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">client</span> <span class="o">=</span> <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">get_instance</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">client</span><span class="o">.</span><span class="n">is_op_state</span><span class="p">():</span>
+        <span class="k">return</span> <span class="n">HandError</span><span class="o">.</span><span class="n">NOT_INITIALIZED</span>
+    
+    <span class="c1"># 【注意】这里的TPDO布局需要与固件工程师最终确认</span>
+    <span class="c1"># TPDO总大小: 13个主动关节 * 每个关节(angle,speed,torque都是float) 12字节 = 156字节</span>
+    <span class="n">tpdo_buffer</span> <span class="o">=</span> <span class="nb">bytearray</span><span class="p">(</span><span class="mi">13</span> <span class="o">*</span> <span class="mi">12</span><span class="p">)</span> 
+
+    <span class="c1"># 遍历用户传入的目标，填充缓冲区</span>
+    <span class="k">for</span> <span class="n">target</span> <span class="ow">in</span> <span class="n">joint_targets</span><span class="p">:</span>
+        <span class="c1"># 【注意】这里的 joint_id 需要是从0开始的、代表13个主动关节的逻辑ID</span>
+        <span class="n">joint_id</span> <span class="o">=</span> <span class="n">target</span><span class="o">.</span><span class="n">joint_id</span>
+        <span class="k">if</span> <span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">joint_id</span> <span class="o">&lt;</span> <span class="mi">13</span><span class="p">:</span>
+            <span class="n">offset</span> <span class="o">=</span> <span class="n">joint_id</span> <span class="o">*</span> <span class="mi">12</span> <span class="c1"># 每个关节目标占12字节 (3个float)</span>
+            <span class="n">struct</span><span class="o">.</span><span class="n">pack_into</span><span class="p">(</span><span class="s1">&#39;&lt;fff&#39;</span><span class="p">,</span> <span class="n">tpdo_buffer</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span>
+                             <span class="n">target</span><span class="o">.</span><span class="n">angle</span><span class="p">,</span> <span class="n">target</span><span class="o">.</span><span class="n">speed</span><span class="p">,</span> <span class="n">target</span><span class="o">.</span><span class="n">torque</span><span class="p">)</span>
+    
+    <span class="n">client</span><span class="o">.</span><span class="n">set_output</span><span class="p">(</span><span class="n">tpdo_buffer</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">HandError</span><span class="o">.</span><span class="n">NO_ERROR</span></div>
+
+
+<div class="viewcode-block" id="stop_all_joints">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.joint.stop_all_joints">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">stop_all_joints</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;停止所有关节运动。通过发送速度为0的指令实现。&quot;&quot;&quot;</span>
+    <span class="n">targets</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">13</span><span class="p">):</span> <span class="c1"># 13个主动关节</span>
+        <span class="n">info</span> <span class="o">=</span> <span class="n">JointInfo</span><span class="p">()</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">joint_id</span> <span class="o">=</span> <span class="n">i</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">speed</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="c1"># 理想情况下，目标角度应设为当前角度，但为简化，设为0</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">angle</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">torque</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="n">targets</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">info</span><span class="p">)</span>
+    
+    <span class="k">return</span> <span class="n">set_joint</span><span class="p">(</span><span class="n">targets</span><span class="p">)</span> <span class="o">==</span> <span class="n">HandError</span><span class="o">.</span><span class="n">NO_ERROR</span></div>
+
+
+<div class="viewcode-block" id="get_all_joints">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.joint.get_all_joints">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_all_joints</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    从缓存中获取所有18个关节的最新信息列表。</span>
+<span class="sd">    此函数执行速度极快，因为它不涉及任何IO操作。</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">all_data</span> <span class="o">=</span> <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">get_instance</span><span class="p">()</span><span class="o">.</span><span class="n">get_latest_parsed_data</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">all_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;joints&#39;</span><span class="p">,</span> <span class="p">[])</span></div>
+
+
+<div class="viewcode-block" id="get_joint_info">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.joint.get_joint_info">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_joint_info</span><span class="p">(</span><span class="n">joint_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JointInfo</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;获取指定ID的单个关节的完整信息。&quot;&quot;&quot;</span>
+    <span class="n">all_joints_data</span> <span class="o">=</span> <span class="n">get_all_joints</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">all_joints_data</span> <span class="ow">and</span> <span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">joint_id</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">all_joints_data</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">all_joints_data</span><span class="p">[</span><span class="n">joint_id</span><span class="p">]</span>
+    <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="set_max_torque">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.joint.set_max_torque">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">set_max_torque</span><span class="p">(</span><span class="n">joint_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">max_torque</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;设置指定关节的最大力矩。&quot;&quot;&quot;</span>
+    <span class="n">target</span> <span class="o">=</span> <span class="n">JointInfo</span><span class="p">()</span>
+    <span class="n">target</span><span class="o">.</span><span class="n">joint_id</span> <span class="o">=</span> <span class="n">joint_id</span>
+    <span class="n">target</span><span class="o">.</span><span class="n">torque</span> <span class="o">=</span> <span class="n">max_torque</span>
+    <span class="c1"># 保持角度和速度为当前值是最佳实践，简化为0</span>
+    <span class="n">target</span><span class="o">.</span><span class="n">angle</span> <span class="o">=</span> <span class="mf">0.0</span> 
+    <span class="n">target</span><span class="o">.</span><span class="n">speed</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="k">return</span> <span class="n">set_joint</span><span class="p">([</span><span class="n">target</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="set_all_joints_max_torque">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.joint.set_all_joints_max_torque">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">set_all_joints_max_torque</span><span class="p">(</span><span class="n">max_torque</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;设置所有关节的最大力矩。协议中此功能在 set_joint 中实现。&quot;&quot;&quot;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;【Joint】信息: 设置所有关节最大力矩请使用 set_joint 函数。&quot;</span><span class="p">)</span>
+    <span class="n">targets</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">13</span><span class="p">):</span>
+        <span class="n">info</span> <span class="o">=</span> <span class="n">JointInfo</span><span class="p">()</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">joint_id</span> <span class="o">=</span> <span class="n">i</span>
+        <span class="n">info</span><span class="o">.</span><span class="n">torque</span> <span class="o">=</span> <span class="n">max_torque</span>
+        <span class="n">targets</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">info</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">set_joint</span><span class="p">(</span><span class="n">targets</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="get_passive_joints">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.joint.get_passive_joints">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_passive_joints</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    查询并列出所有被动关节的ID。</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;【Joint】正在根据开发规范查询被动关节...&quot;</span><span class="p">)</span>
+    <span class="c1"># 2,3,4,5 (Thumb), 8,9,10 (FF), 13,14 (MF), 17,18 (RF), 21,22 (LF)</span>
+    <span class="n">active_joint_ids</span> <span class="o">=</span> <span class="p">{</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">9</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">13</span><span class="p">,</span> <span class="mi">14</span><span class="p">,</span> <span class="mi">17</span><span class="p">,</span> <span class="mi">18</span><span class="p">,</span> <span class="mi">21</span><span class="p">,</span> <span class="mi">22</span><span class="p">}</span>
+    
+    <span class="c1"># 总关节ID范围是 0-22</span>
+    <span class="n">all_joint_ids</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">23</span><span class="p">))</span>
+    
+    <span class="c1"># 从所有关节中减去主动关节，剩下的就是被动关节</span>
+    <span class="n">passive_joint_ids_int</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">all_joint_ids</span> <span class="o">-</span> <span class="n">active_joint_ids</span><span class="p">))</span>
+    
+    <span class="c1"># 转换为字符串列表</span>
+    <span class="n">passive_joint_ids_str</span> <span class="o">=</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">passive_joint_ids_int</span><span class="p">]</span>
+    
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;【Joint】查询到被动关节列表: </span><span class="si">{</span><span class="n">passive_joint_ids_str</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">passive_joint_ids_str</span></div>
+
+
+<div class="viewcode-block" id="query_linked_joint">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.joint.query_linked_joint">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">query_linked_joint</span><span class="p">(</span><span class="n">joint_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    查询与指定关节存在联动关系的关节ID。</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;【Joint】正在查询关节ID </span><span class="si">{</span><span class="n">joint_id</span><span class="si">}</span><span class="s2"> 的联动关系...&quot;</span><span class="p">)</span>
+    <span class="n">LINKAGE_MAP</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="c1"># 食指: FF2(8) 带动 FF1(7)</span>
+        <span class="mi">8</span><span class="p">:</span> <span class="mi">7</span><span class="p">,</span>
+        <span class="c1"># 中指: MF2(13) 带动 MF1(12)</span>
+        <span class="mi">13</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span>
+        <span class="c1"># 无名指: RF2(17) 带动 RF1(16)</span>
+        <span class="mi">17</span><span class="p">:</span> <span class="mi">16</span><span class="p">,</span>
+        <span class="c1"># 小拇指: LF2(21) 带动 LF1(20)</span>
+        <span class="mi">21</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
+        <span class="c1"># 拇指的联动关系通常更复杂，此处暂不猜测</span>
+    <span class="p">}</span>
+    
+    <span class="n">linked_id</span> <span class="o">=</span> <span class="n">LINKAGE_MAP</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">joint_id</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    
+    <span class="k">if</span> <span class="n">linked_id</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;【Joint】关节ID </span><span class="si">{</span><span class="n">joint_id</span><span class="si">}</span><span class="s2"> 的联动关节为: </span><span class="si">{</span><span class="n">linked_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;【Joint】关节ID </span><span class="si">{</span><span class="n">joint_id</span><span class="si">}</span><span class="s2"> 没有在预设的联动表中找到关系。&quot;</span><span class="p">)</span>
+        
+    <span class="k">return</span> <span class="n">linked_id</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; 版权所有 2025, GLI。</p>
+  </div>
+
+  利用 <a href="https://www.sphinx-doc.org/">Sphinx</a> 构建，使用的 
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">主题</a>
+    由 <a href="https://readthedocs.org">Read the Docs</a> 开发.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

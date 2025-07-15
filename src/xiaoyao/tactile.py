@@ -1,74 +1,69 @@
-# tactile.py。
-import numpy as np
-from . import comm
-from .common import RobotError
+# src/xiaoyao/tactile.py
+
+import struct
+from ._internal.ethercat_client import EtherCATClient
+from .common import HandError, ObjectDictionary
 
 # --- 外部可调用的函数 ---
 
-def get_data(sensor_id: int) -> list:
-    """
-    获取指定触觉传感器的当前数据。此函数通常用于获取具有空间分布特性的传感器数据，例如压力矩阵。
-    """
-    print(f"【Tactile】正在获取传感器ID {sensor_id} 的数据...")
-    response = comm.send_msg("GET_TACTILE_DATA", {'sensor_id': sensor_id})
-    
-    # 确保返回的是一个列表（即使是空的）
-    if isinstance(response, list) and response:
-        print(f"【Tactile】成功获取传感器ID {sensor_id} 的数据。")
-        return response
-    else:
-        print(f"【Tactile】获取传感器ID {sensor_id} 的数据失败。")
-        return []
-
 def get_all_tactile_data() -> list:
-    """
-    获取所有可用触觉传感器的当前数据。
-    """
-    print("【Tactile】正在获取所有触觉传感器的数据...")
-    response = comm.send_msg("GET_ALL_TACTILE_DATA")
     
-    if isinstance(response, list):
-        print(f"【Tactile】成功获取 {len(response)} 个传感器的数据。")
-        return response
-    else:
-        print("【Tactile】获取所有触觉传感器数据失败。")
-        return []
+    all_data = EtherCATClient.get_instance().get_latest_parsed_data()
+    # .get() 方法确保即使没有触觉数据，也能安全地返回一个空列表
+    return all_data.get('tactile_data', [])
+
+def get_data(sensor_id: int) -> list:
+    
+    all_tactile_data = get_all_tactile_data()
+    for sensor_data in all_tactile_data:
+        if sensor_data.get('sensor_id') == sensor_id:
+            return sensor_data.get('data', [])
+    
+    # 如果循环结束仍未找到
+    return []
 
 def sub_tactile_data(callback) -> int:
-    """
-    订阅所有触觉传感器数据的实时更新。当有新数据可用时，系统将定期调用提供的回调函数。
-    """
-    print("【Tactile】正在订阅触觉数据...")
-    subscription_id = comm.subscribe("tactile_data_stream", callback)
     
-    if subscription_id > 0:
-        print(f"【Tactile】触觉数据订阅成功，订阅ID: {subscription_id}")
-    else:
-        print("【Tactile】触觉数据订阅失败。")
-    return subscription_id
+    if not callable(callback):
+        print("错误: 提供的 'callback' 不是一个可调用的函数。")
+        return -1
+    
+    client = EtherCATClient.get_instance()
+    # 使用客户端的通用订阅机制，为 'tactile_data' 类型添加订阅者
+    return client.add_subscriber('tactile_data', callback)
 
 def unsub_tactile_data(subscription_id: int) -> bool:
-    """
-    取消指定ID的触觉传感器数据订阅。
-    """
-    print(f"【Tactile】正在取消订阅ID为 {subscription_id} 的触觉数据...")
-    success = comm.unsubscribe(subscription_id)
     
-    if success:
-        print(f"【Tactile】订阅ID {subscription_id} 已成功取消。")
-    else:
-        print(f"【Tactile】取消订阅ID {subscription_id} 失败。")
-    return success
+    return EtherCATClient.get_instance().remove_subscriber(subscription_id)
 
-def reset_tactile_sensor(sensor_id: int) -> int:
-    """
-    复位指定触觉传感器，将其内部状态（如累计读数、错误标志等）重置为初始状态。
-    """
-    print(f"【Tactile】正在发送复位指令到传感器ID {sensor_id}...")
-    result = comm.send_msg("RESET_TACTILE_SENSOR", {'sensor_id': sensor_id})
+def reset_tactile_sensor(sensor_id: int) -> bool:
     
-    if result == RobotError.NO_ERROR.value:
-        print(f"【Tactile】传感器ID {sensor_id} 复位指令发送成功。")
+    print(f"【Tactile】正在通过SDO发送复位指令到传感器ID {sensor_id}...")
+    client = EtherCATClient.get_instance()
+    
+    try:
+        # 将传感器ID打包成一个字节 (假设协议要求)
+        reset_payload = struct.pack('<B', sensor_id)
+        
+        # 使用 ObjectDictionary 中定义的常量进行SDO写操作
+        client.sdo_write(
+            ObjectDictionary.TactileControl.INDEX,
+            ObjectDictionary.TactileControl.SUB_RESET,
+            reset_payload
+        )
+        print(f"【Tactile】传感器ID {sensor_id} 复位指令已成功发送。")
+        return True
+    except Exception as e:
+        print(f"【Tactile】传感器ID {sensor_id} 复位指令发送失败: {e}")
+        return False
+
+def tactile_sensors_selftest() -> int:
+    print("【Tactile】正在请求传感器自检...")
+    CHECK_SENSORS_CODE = 12
+    
+    if EtherCATClient.execute_command(CHECK_SENSORS_CODE):
+        print("  -> 传感器自检指令已发送。请稍后查询设备状态。")
+        return 0
     else:
-        print(f"【Tactile】传感器ID {sensor_id} 复位指令发送失败，错误码: {result}")
-    return result
+        print("  -> 传感器自检指令发送失败。")
+        return -1 # 表示指令发送失败

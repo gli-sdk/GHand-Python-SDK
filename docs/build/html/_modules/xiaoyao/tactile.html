@@ -1,0 +1,175 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="zh-CN" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>xiaoyao.tactile &mdash; XIAOYAO-SDK 1.0.0 文档</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=34088549"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/translations.js?v=beaddf03"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="索引" href="../../genindex.html" />
+    <link rel="search" title="搜索" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            XIAOYAO-SDK
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="搜索文档" aria-label="搜索文档" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="导航菜单">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">xiaoyao</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="移动版导航菜单" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">XIAOYAO-SDK</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="页面导航">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">模块代码</a></li>
+      <li class="breadcrumb-item active">xiaoyao.tactile</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>xiaoyao.tactile 源代码</h1><div class="highlight"><pre>
+<span></span><span class="c1"># src/xiaoyao/tactile.py</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">struct</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">._internal.ethercat_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">EtherCATClient</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">HandError</span><span class="p">,</span> <span class="n">ObjectDictionary</span>
+
+<span class="c1"># --- 外部可调用的函数 ---</span>
+
+<div class="viewcode-block" id="get_all_tactile_data">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.tactile.get_all_tactile_data">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_all_tactile_data</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+    
+    <span class="n">all_data</span> <span class="o">=</span> <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">get_instance</span><span class="p">()</span><span class="o">.</span><span class="n">get_latest_parsed_data</span><span class="p">()</span>
+    <span class="c1"># .get() 方法确保即使没有触觉数据，也能安全地返回一个空列表</span>
+    <span class="k">return</span> <span class="n">all_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;tactile_data&#39;</span><span class="p">,</span> <span class="p">[])</span></div>
+
+
+<div class="viewcode-block" id="get_data">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.tactile.get_data">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_data</span><span class="p">(</span><span class="n">sensor_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+    
+    <span class="n">all_tactile_data</span> <span class="o">=</span> <span class="n">get_all_tactile_data</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">sensor_data</span> <span class="ow">in</span> <span class="n">all_tactile_data</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">sensor_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;sensor_id&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="n">sensor_id</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">sensor_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;data&#39;</span><span class="p">,</span> <span class="p">[])</span>
+    
+    <span class="c1"># 如果循环结束仍未找到</span>
+    <span class="k">return</span> <span class="p">[]</span></div>
+
+
+<div class="viewcode-block" id="sub_tactile_data">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.tactile.sub_tactile_data">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">sub_tactile_data</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">callable</span><span class="p">(</span><span class="n">callback</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;错误: 提供的 &#39;callback&#39; 不是一个可调用的函数。&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="o">-</span><span class="mi">1</span>
+    
+    <span class="n">client</span> <span class="o">=</span> <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">get_instance</span><span class="p">()</span>
+    <span class="c1"># 使用客户端的通用订阅机制，为 &#39;tactile_data&#39; 类型添加订阅者</span>
+    <span class="k">return</span> <span class="n">client</span><span class="o">.</span><span class="n">add_subscriber</span><span class="p">(</span><span class="s1">&#39;tactile_data&#39;</span><span class="p">,</span> <span class="n">callback</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="unsub_tactile_data">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.tactile.unsub_tactile_data">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">unsub_tactile_data</span><span class="p">(</span><span class="n">subscription_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    
+    <span class="k">return</span> <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">get_instance</span><span class="p">()</span><span class="o">.</span><span class="n">remove_subscriber</span><span class="p">(</span><span class="n">subscription_id</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="reset_tactile_sensor">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.tactile.reset_tactile_sensor">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">reset_tactile_sensor</span><span class="p">(</span><span class="n">sensor_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;【Tactile】正在通过SDO发送复位指令到传感器ID </span><span class="si">{</span><span class="n">sensor_id</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+    <span class="n">client</span> <span class="o">=</span> <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">get_instance</span><span class="p">()</span>
+    
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># 将传感器ID打包成一个字节 (假设协议要求)</span>
+        <span class="n">reset_payload</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="s1">&#39;&lt;B&#39;</span><span class="p">,</span> <span class="n">sensor_id</span><span class="p">)</span>
+        
+        <span class="c1"># 使用 ObjectDictionary 中定义的常量进行SDO写操作</span>
+        <span class="n">client</span><span class="o">.</span><span class="n">sdo_write</span><span class="p">(</span>
+            <span class="n">ObjectDictionary</span><span class="o">.</span><span class="n">TactileControl</span><span class="o">.</span><span class="n">INDEX</span><span class="p">,</span>
+            <span class="n">ObjectDictionary</span><span class="o">.</span><span class="n">TactileControl</span><span class="o">.</span><span class="n">SUB_RESET</span><span class="p">,</span>
+            <span class="n">reset_payload</span>
+        <span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;【Tactile】传感器ID </span><span class="si">{</span><span class="n">sensor_id</span><span class="si">}</span><span class="s2"> 复位指令已成功发送。&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;【Tactile】传感器ID </span><span class="si">{</span><span class="n">sensor_id</span><span class="si">}</span><span class="s2"> 复位指令发送失败: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; 版权所有 2025, GLI。</p>
+  </div>
+
+  利用 <a href="https://www.sphinx-doc.org/">Sphinx</a> 构建，使用的 
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">主题</a>
+    由 <a href="https://readthedocs.org">Read the Docs</a> 开发.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

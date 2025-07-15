@@ -1,0 +1,593 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="zh-CN" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>xiaoyao package &mdash; XIAOYAO-SDK 1.0.0 文档</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=34088549"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/translations.js?v=beaddf03"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="索引" href="genindex.html" />
+    <link rel="search" title="搜索" href="search.html" />
+    <link rel="prev" title="xiaoyao" href="modules.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            XIAOYAO-SDK
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="搜索文档" aria-label="搜索文档" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="导航菜单">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">xiaoyao</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">xiaoyao package</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#submodules">Submodules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-xiaoyao.common">xiaoyao.common module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.common.GestureType"><code class="docutils literal notranslate"><span class="pre">GestureType</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.common.HandError"><code class="docutils literal notranslate"><span class="pre">HandError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.common.HandState"><code class="docutils literal notranslate"><span class="pre">HandState</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.common.JointInfo"><code class="docutils literal notranslate"><span class="pre">JointInfo</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.common.ObjectDictionary"><code class="docutils literal notranslate"><span class="pre">ObjectDictionary</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.common.TipPose"><code class="docutils literal notranslate"><span class="pre">TipPose</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#module-xiaoyao.hand">xiaoyao.hand module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.hand.close_device"><code class="docutils literal notranslate"><span class="pre">close_device()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.hand.do_preset_gesture"><code class="docutils literal notranslate"><span class="pre">do_preset_gesture()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.hand.get_all_basic_info"><code class="docutils literal notranslate"><span class="pre">get_all_basic_info()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.hand.get_device_id"><code class="docutils literal notranslate"><span class="pre">get_device_id()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.hand.get_hand_id"><code class="docutils literal notranslate"><span class="pre">get_hand_id()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.hand.get_hand_type"><code class="docutils literal notranslate"><span class="pre">get_hand_type()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.hand.get_operation_state"><code class="docutils literal notranslate"><span class="pre">get_operation_state()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.hand.get_software_version"><code class="docutils literal notranslate"><span class="pre">get_software_version()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.hand.get_temperature"><code class="docutils literal notranslate"><span class="pre">get_temperature()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.hand.initialize"><code class="docutils literal notranslate"><span class="pre">initialize()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.hand.reboot"><code class="docutils literal notranslate"><span class="pre">reboot()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.hand.release_protection"><code class="docutils literal notranslate"><span class="pre">release_protection()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.hand.set_hand_id"><code class="docutils literal notranslate"><span class="pre">set_hand_id()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.hand.set_light"><code class="docutils literal notranslate"><span class="pre">set_light()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.hand.set_temperature_threshold"><code class="docutils literal notranslate"><span class="pre">set_temperature_threshold()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.hand.test_motors"><code class="docutils literal notranslate"><span class="pre">test_motors()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.hand.test_sensors"><code class="docutils literal notranslate"><span class="pre">test_sensors()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.hand.update_firmware"><code class="docutils literal notranslate"><span class="pre">update_firmware()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#module-xiaoyao.joint">xiaoyao.joint module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.joint.get_all_joints"><code class="docutils literal notranslate"><span class="pre">get_all_joints()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.joint.get_joint_info"><code class="docutils literal notranslate"><span class="pre">get_joint_info()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.joint.get_passive_joints"><code class="docutils literal notranslate"><span class="pre">get_passive_joints()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.joint.query_linked_joint"><code class="docutils literal notranslate"><span class="pre">query_linked_joint()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.joint.set_all_joints_max_torque"><code class="docutils literal notranslate"><span class="pre">set_all_joints_max_torque()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.joint.set_joint"><code class="docutils literal notranslate"><span class="pre">set_joint()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.joint.set_max_torque"><code class="docutils literal notranslate"><span class="pre">set_max_torque()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.joint.stop_all_joints"><code class="docutils literal notranslate"><span class="pre">stop_all_joints()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.joint.sub_joint_data"><code class="docutils literal notranslate"><span class="pre">sub_joint_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.joint.unsub_joint_data"><code class="docutils literal notranslate"><span class="pre">unsub_joint_data()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#module-xiaoyao.tactile">xiaoyao.tactile module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.tactile.get_all_tactile_data"><code class="docutils literal notranslate"><span class="pre">get_all_tactile_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.tactile.get_data"><code class="docutils literal notranslate"><span class="pre">get_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.tactile.reset_tactile_sensor"><code class="docutils literal notranslate"><span class="pre">reset_tactile_sensor()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.tactile.sub_tactile_data"><code class="docutils literal notranslate"><span class="pre">sub_tactile_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.tactile.unsub_tactile_data"><code class="docutils literal notranslate"><span class="pre">unsub_tactile_data()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#module-xiaoyao.tip">xiaoyao.tip module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.tip.set_all_tips_pose"><code class="docutils literal notranslate"><span class="pre">set_all_tips_pose()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.tip.set_tip_pose"><code class="docutils literal notranslate"><span class="pre">set_tip_pose()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.tip.sub_tip_position"><code class="docutils literal notranslate"><span class="pre">sub_tip_position()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#xiaoyao.tip.unsub_tip_position"><code class="docutils literal notranslate"><span class="pre">unsub_tip_position()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#module-xiaoyao.version">xiaoyao.version module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-xiaoyao">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="移动版导航菜单" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">XIAOYAO-SDK</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="页面导航">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">xiaoyao</a></li>
+      <li class="breadcrumb-item active">xiaoyao package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/xiaoyao.rst.txt" rel="nofollow"> 查看页面源码</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="xiaoyao-package">
+<h1>xiaoyao package<a class="headerlink" href="#xiaoyao-package" title="Link to this heading"></a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+</section>
+<section id="module-xiaoyao.common">
+<span id="xiaoyao-common-module"></span><h2>xiaoyao.common module<a class="headerlink" href="#module-xiaoyao.common" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="xiaoyao.common.GestureType">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">xiaoyao.common.</span></span><span class="sig-name descname"><span class="pre">GestureType</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">values</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/xiaoyao/common.html#GestureType"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.common.GestureType" title="Link to this definition"></a></dt>
+<dd><p>基类：<code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.GestureType.FIST">
+<span class="sig-name descname"><span class="pre">FIST</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">3</span></em><a class="headerlink" href="#xiaoyao.common.GestureType.FIST" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.GestureType.GRIP_SIX">
+<span class="sig-name descname"><span class="pre">GRIP_SIX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">5</span></em><a class="headerlink" href="#xiaoyao.common.GestureType.GRIP_SIX" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.GestureType.OK">
+<span class="sig-name descname"><span class="pre">OK</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></em><a class="headerlink" href="#xiaoyao.common.GestureType.OK" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.GestureType.OPEN_ALL_FINGERS">
+<span class="sig-name descname"><span class="pre">OPEN_ALL_FINGERS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2</span></em><a class="headerlink" href="#xiaoyao.common.GestureType.OPEN_ALL_FINGERS" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.GestureType.THUMBS_UP">
+<span class="sig-name descname"><span class="pre">THUMBS_UP</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">4</span></em><a class="headerlink" href="#xiaoyao.common.GestureType.THUMBS_UP" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="xiaoyao.common.HandError">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">xiaoyao.common.</span></span><span class="sig-name descname"><span class="pre">HandError</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">values</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/xiaoyao/common.html#HandError"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.common.HandError" title="Link to this definition"></a></dt>
+<dd><p>基类：<code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.HandError.COMMUNICATION_ERROR">
+<span class="sig-name descname"><span class="pre">COMMUNICATION_ERROR</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></em><a class="headerlink" href="#xiaoyao.common.HandError.COMMUNICATION_ERROR" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.HandError.NO_ERROR">
+<span class="sig-name descname"><span class="pre">NO_ERROR</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#xiaoyao.common.HandError.NO_ERROR" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="xiaoyao.common.HandState">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">xiaoyao.common.</span></span><span class="sig-name descname"><span class="pre">HandState</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">values</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/xiaoyao/common.html#HandState"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.common.HandState" title="Link to this definition"></a></dt>
+<dd><p>基类：<code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.HandState.ABNORMAL_RUNNING">
+<span class="sig-name descname"><span class="pre">ABNORMAL_RUNNING</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">3</span></em><a class="headerlink" href="#xiaoyao.common.HandState.ABNORMAL_RUNNING" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.HandState.NORMAL_RUNNING">
+<span class="sig-name descname"><span class="pre">NORMAL_RUNNING</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></em><a class="headerlink" href="#xiaoyao.common.HandState.NORMAL_RUNNING" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.HandState.NORMAL_STOP">
+<span class="sig-name descname"><span class="pre">NORMAL_STOP</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#xiaoyao.common.HandState.NORMAL_STOP" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.HandState.PROTECTIVE_STOP">
+<span class="sig-name descname"><span class="pre">PROTECTIVE_STOP</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2</span></em><a class="headerlink" href="#xiaoyao.common.HandState.PROTECTIVE_STOP" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.HandState.UNKNOWN">
+<span class="sig-name descname"><span class="pre">UNKNOWN</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">-1</span></em><a class="headerlink" href="#xiaoyao.common.HandState.UNKNOWN" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="xiaoyao.common.JointInfo">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">xiaoyao.common.</span></span><span class="sig-name descname"><span class="pre">JointInfo</span></span><a class="reference internal" href="_modules/xiaoyao/common.html#JointInfo"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.common.JointInfo" title="Link to this definition"></a></dt>
+<dd><p>基类：<code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>用于存储单个关节完整信息的数据结构。</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="xiaoyao.common.ObjectDictionary">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">xiaoyao.common.</span></span><span class="sig-name descname"><span class="pre">ObjectDictionary</span></span><a class="reference internal" href="_modules/xiaoyao/common.html#ObjectDictionary"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.common.ObjectDictionary" title="Link to this definition"></a></dt>
+<dd><p>基类：<code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py class">
+<dt class="sig sig-object py" id="xiaoyao.common.ObjectDictionary.HandInfo">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">HandInfo</span></span><a class="reference internal" href="_modules/xiaoyao/common.html#ObjectDictionary.HandInfo"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.common.ObjectDictionary.HandInfo" title="Link to this definition"></a></dt>
+<dd><p>基类：<code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>对象 0x2012: 手部基本信息</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.ObjectDictionary.HandInfo.INDEX">
+<span class="sig-name descname"><span class="pre">INDEX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">8210</span></em><a class="headerlink" href="#xiaoyao.common.ObjectDictionary.HandInfo.INDEX" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.ObjectDictionary.HandInfo.SUB_HAND_TYPE">
+<span class="sig-name descname"><span class="pre">SUB_HAND_TYPE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0</span></em><a class="headerlink" href="#xiaoyao.common.ObjectDictionary.HandInfo.SUB_HAND_TYPE" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="xiaoyao.common.ObjectDictionary.Identity">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Identity</span></span><a class="reference internal" href="_modules/xiaoyao/common.html#ObjectDictionary.Identity"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.common.ObjectDictionary.Identity" title="Link to this definition"></a></dt>
+<dd><p>基类：<code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>对象 0x1018: 设备身份信息</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.ObjectDictionary.Identity.INDEX">
+<span class="sig-name descname"><span class="pre">INDEX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">4120</span></em><a class="headerlink" href="#xiaoyao.common.ObjectDictionary.Identity.INDEX" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.ObjectDictionary.Identity.SUB_SERIAL_NUMBER">
+<span class="sig-name descname"><span class="pre">SUB_SERIAL_NUMBER</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">4</span></em><a class="headerlink" href="#xiaoyao.common.ObjectDictionary.Identity.SUB_SERIAL_NUMBER" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.ObjectDictionary.Identity.SUB_VERSION_INFO">
+<span class="sig-name descname"><span class="pre">SUB_VERSION_INFO</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">3</span></em><a class="headerlink" href="#xiaoyao.common.ObjectDictionary.Identity.SUB_VERSION_INFO" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="xiaoyao.common.ObjectDictionary.ManufacturerCustom">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">ManufacturerCustom</span></span><a class="reference internal" href="_modules/xiaoyao/common.html#ObjectDictionary.ManufacturerCustom"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.common.ObjectDictionary.ManufacturerCustom" title="Link to this definition"></a></dt>
+<dd><p>基类：<code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>对象 0x2000: 自定义区域</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.ObjectDictionary.ManufacturerCustom.INDEX">
+<span class="sig-name descname"><span class="pre">INDEX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">8192</span></em><a class="headerlink" href="#xiaoyao.common.ObjectDictionary.ManufacturerCustom.INDEX" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.ObjectDictionary.ManufacturerCustom.SUB_HAND_ID">
+<span class="sig-name descname"><span class="pre">SUB_HAND_ID</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></em><a class="headerlink" href="#xiaoyao.common.ObjectDictionary.ManufacturerCustom.SUB_HAND_ID" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.ObjectDictionary.ManufacturerCustom.SUB_REBOOT">
+<span class="sig-name descname"><span class="pre">SUB_REBOOT</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2</span></em><a class="headerlink" href="#xiaoyao.common.ObjectDictionary.ManufacturerCustom.SUB_REBOOT" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="xiaoyao.common.ObjectDictionary.Protection">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Protection</span></span><a class="reference internal" href="_modules/xiaoyao/common.html#ObjectDictionary.Protection"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.common.ObjectDictionary.Protection" title="Link to this definition"></a></dt>
+<dd><p>基类：<code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>对象 0x2001: 保护功能相关</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.ObjectDictionary.Protection.INDEX">
+<span class="sig-name descname"><span class="pre">INDEX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">8193</span></em><a class="headerlink" href="#xiaoyao.common.ObjectDictionary.Protection.INDEX" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.ObjectDictionary.Protection.SUB_PROTECTION_TEMP">
+<span class="sig-name descname"><span class="pre">SUB_PROTECTION_TEMP</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></em><a class="headerlink" href="#xiaoyao.common.ObjectDictionary.Protection.SUB_PROTECTION_TEMP" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="xiaoyao.common.ObjectDictionary.SystemControl">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">SystemControl</span></span><a class="reference internal" href="_modules/xiaoyao/common.html#ObjectDictionary.SystemControl"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.common.ObjectDictionary.SystemControl" title="Link to this definition"></a></dt>
+<dd><p>基类：<code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>对象 0x1011: 系统控制相关</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.ObjectDictionary.SystemControl.INDEX">
+<span class="sig-name descname"><span class="pre">INDEX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">4113</span></em><a class="headerlink" href="#xiaoyao.common.ObjectDictionary.SystemControl.INDEX" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="xiaoyao.common.ObjectDictionary.SystemControl.SUB_FACTORY_RESET">
+<span class="sig-name descname"><span class="pre">SUB_FACTORY_RESET</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></em><a class="headerlink" href="#xiaoyao.common.ObjectDictionary.SystemControl.SUB_FACTORY_RESET" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="xiaoyao.common.TipPose">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">xiaoyao.common.</span></span><span class="sig-name descname"><span class="pre">TipPose</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">roll</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pitch</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">yaw</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/xiaoyao/common.html#TipPose"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.common.TipPose" title="Link to this definition"></a></dt>
+<dd><p>基类：<code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>表示指尖的位姿信息，包括位置和姿态。</p>
+</dd></dl>
+
+</section>
+<section id="module-xiaoyao.hand">
+<span id="xiaoyao-hand-module"></span><h2>xiaoyao.hand module<a class="headerlink" href="#module-xiaoyao.hand" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.hand.close_device">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.hand.</span></span><span class="sig-name descname"><span class="pre">close_device</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/xiaoyao/hand.html#close_device"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.hand.close_device" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.hand.do_preset_gesture">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.hand.</span></span><span class="sig-name descname"><span class="pre">do_preset_gesture</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">gesture_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#xiaoyao.common.GestureType" title="xiaoyao.common.GestureType"><span class="pre">GestureType</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#xiaoyao.common.HandError" title="xiaoyao.common.HandError"><span class="pre">HandError</span></a></span></span><a class="reference internal" href="_modules/xiaoyao/hand.html#do_preset_gesture"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.hand.do_preset_gesture" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.hand.get_all_basic_info">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.hand.</span></span><span class="sig-name descname"><span class="pre">get_all_basic_info</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/xiaoyao/hand.html#get_all_basic_info"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.hand.get_all_basic_info" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.hand.get_device_id">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.hand.</span></span><span class="sig-name descname"><span class="pre">get_device_id</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/xiaoyao/hand.html#get_device_id"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.hand.get_device_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.hand.get_hand_id">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.hand.</span></span><span class="sig-name descname"><span class="pre">get_hand_id</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="_modules/xiaoyao/hand.html#get_hand_id"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.hand.get_hand_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.hand.get_hand_type">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.hand.</span></span><span class="sig-name descname"><span class="pre">get_hand_type</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="_modules/xiaoyao/hand.html#get_hand_type"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.hand.get_hand_type" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.hand.get_operation_state">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.hand.</span></span><span class="sig-name descname"><span class="pre">get_operation_state</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#xiaoyao.common.HandState" title="xiaoyao.common.HandState"><span class="pre">HandState</span></a></span></span><a class="reference internal" href="_modules/xiaoyao/hand.html#get_operation_state"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.hand.get_operation_state" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.hand.get_software_version">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.hand.</span></span><span class="sig-name descname"><span class="pre">get_software_version</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/xiaoyao/hand.html#get_software_version"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.hand.get_software_version" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.hand.get_temperature">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.hand.</span></span><span class="sig-name descname"><span class="pre">get_temperature</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="_modules/xiaoyao/hand.html#get_temperature"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.hand.get_temperature" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.hand.initialize">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.hand.</span></span><span class="sig-name descname"><span class="pre">initialize</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/xiaoyao/hand.html#initialize"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.hand.initialize" title="Link to this definition"></a></dt>
+<dd><p>对手部进行初始化。</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.hand.reboot">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.hand.</span></span><span class="sig-name descname"><span class="pre">reboot</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/xiaoyao/hand.html#reboot"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.hand.reboot" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.hand.release_protection">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.hand.</span></span><span class="sig-name descname"><span class="pre">release_protection</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/xiaoyao/hand.html#release_protection"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.hand.release_protection" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.hand.set_hand_id">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.hand.</span></span><span class="sig-name descname"><span class="pre">set_hand_id</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hand_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/xiaoyao/hand.html#set_hand_id"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.hand.set_hand_id" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.hand.set_light">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.hand.</span></span><span class="sig-name descname"><span class="pre">set_light</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tuple</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frequency_ms</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1000</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/xiaoyao/hand.html#set_light"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.hand.set_light" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.hand.set_temperature_threshold">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.hand.</span></span><span class="sig-name descname"><span class="pre">set_temperature_threshold</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">min_temp</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_temp</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/xiaoyao/hand.html#set_temperature_threshold"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.hand.set_temperature_threshold" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.hand.test_motors">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.hand.</span></span><span class="sig-name descname"><span class="pre">test_motors</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="_modules/xiaoyao/hand.html#test_motors"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.hand.test_motors" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.hand.test_sensors">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.hand.</span></span><span class="sig-name descname"><span class="pre">test_sensors</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="_modules/xiaoyao/hand.html#test_sensors"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.hand.test_sensors" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.hand.update_firmware">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.hand.</span></span><span class="sig-name descname"><span class="pre">update_firmware</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">firmware_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/xiaoyao/hand.html#update_firmware"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.hand.update_firmware" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</section>
+<section id="module-xiaoyao.joint">
+<span id="xiaoyao-joint-module"></span><h2>xiaoyao.joint module<a class="headerlink" href="#module-xiaoyao.joint" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.joint.get_all_joints">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.joint.</span></span><span class="sig-name descname"><span class="pre">get_all_joints</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="reference internal" href="_modules/xiaoyao/joint.html#get_all_joints"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.joint.get_all_joints" title="Link to this definition"></a></dt>
+<dd><p>从缓存中获取所有18个关节的最新信息列表。
+此函数执行速度极快，因为它不涉及任何IO操作。</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.joint.get_joint_info">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.joint.</span></span><span class="sig-name descname"><span class="pre">get_joint_info</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">joint_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#xiaoyao.common.JointInfo" title="xiaoyao.common.JointInfo"><span class="pre">JointInfo</span></a></span></span><a class="reference internal" href="_modules/xiaoyao/joint.html#get_joint_info"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.joint.get_joint_info" title="Link to this definition"></a></dt>
+<dd><p>获取指定ID的单个关节的完整信息。</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.joint.get_passive_joints">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.joint.</span></span><span class="sig-name descname"><span class="pre">get_passive_joints</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="reference internal" href="_modules/xiaoyao/joint.html#get_passive_joints"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.joint.get_passive_joints" title="Link to this definition"></a></dt>
+<dd><p>查询并列出所有被动关节的ID。</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.joint.query_linked_joint">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.joint.</span></span><span class="sig-name descname"><span class="pre">query_linked_joint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">joint_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="_modules/xiaoyao/joint.html#query_linked_joint"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.joint.query_linked_joint" title="Link to this definition"></a></dt>
+<dd><p>查询与指定关节存在联动关系的关节ID。</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.joint.set_all_joints_max_torque">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.joint.</span></span><span class="sig-name descname"><span class="pre">set_all_joints_max_torque</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">max_torque</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="_modules/xiaoyao/joint.html#set_all_joints_max_torque"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.joint.set_all_joints_max_torque" title="Link to this definition"></a></dt>
+<dd><p>设置所有关节的最大力矩。协议中此功能在 set_joint 中实现。</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.joint.set_joint">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.joint.</span></span><span class="sig-name descname"><span class="pre">set_joint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">joint_targets</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#xiaoyao.common.HandError" title="xiaoyao.common.HandError"><span class="pre">HandError</span></a></span></span><a class="reference internal" href="_modules/xiaoyao/joint.html#set_joint"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.joint.set_joint" title="Link to this definition"></a></dt>
+<dd><p>设置一个或多个主动关节的目标。</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.joint.set_max_torque">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.joint.</span></span><span class="sig-name descname"><span class="pre">set_max_torque</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">joint_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_torque</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="_modules/xiaoyao/joint.html#set_max_torque"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.joint.set_max_torque" title="Link to this definition"></a></dt>
+<dd><p>设置指定关节的最大力矩。</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.joint.stop_all_joints">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.joint.</span></span><span class="sig-name descname"><span class="pre">stop_all_joints</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/xiaoyao/joint.html#stop_all_joints"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.joint.stop_all_joints" title="Link to this definition"></a></dt>
+<dd><p>停止所有关节运动。通过发送速度为0的指令实现。</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.joint.sub_joint_data">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.joint.</span></span><span class="sig-name descname"><span class="pre">sub_joint_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="_modules/xiaoyao/joint.html#sub_joint_data"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.joint.sub_joint_data" title="Link to this definition"></a></dt>
+<dd><p>订阅所有关节的实时数据更新。</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.joint.unsub_joint_data">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.joint.</span></span><span class="sig-name descname"><span class="pre">unsub_joint_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">subscription_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/xiaoyao/joint.html#unsub_joint_data"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.joint.unsub_joint_data" title="Link to this definition"></a></dt>
+<dd><p>根据订阅ID，取消对关节数据的订阅。</p>
+</dd></dl>
+
+</section>
+<section id="module-xiaoyao.tactile">
+<span id="xiaoyao-tactile-module"></span><h2>xiaoyao.tactile module<a class="headerlink" href="#module-xiaoyao.tactile" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.tactile.get_all_tactile_data">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.tactile.</span></span><span class="sig-name descname"><span class="pre">get_all_tactile_data</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="reference internal" href="_modules/xiaoyao/tactile.html#get_all_tactile_data"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.tactile.get_all_tactile_data" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.tactile.get_data">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.tactile.</span></span><span class="sig-name descname"><span class="pre">get_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sensor_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span></span></span><a class="reference internal" href="_modules/xiaoyao/tactile.html#get_data"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.tactile.get_data" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.tactile.reset_tactile_sensor">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.tactile.</span></span><span class="sig-name descname"><span class="pre">reset_tactile_sensor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sensor_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/xiaoyao/tactile.html#reset_tactile_sensor"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.tactile.reset_tactile_sensor" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.tactile.sub_tactile_data">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.tactile.</span></span><span class="sig-name descname"><span class="pre">sub_tactile_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="_modules/xiaoyao/tactile.html#sub_tactile_data"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.tactile.sub_tactile_data" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.tactile.unsub_tactile_data">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.tactile.</span></span><span class="sig-name descname"><span class="pre">unsub_tactile_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">subscription_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/xiaoyao/tactile.html#unsub_tactile_data"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.tactile.unsub_tactile_data" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</section>
+<section id="module-xiaoyao.tip">
+<span id="xiaoyao-tip-module"></span><h2>xiaoyao.tip module<a class="headerlink" href="#module-xiaoyao.tip" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.tip.set_all_tips_pose">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.tip.</span></span><span class="sig-name descname"><span class="pre">set_all_tips_pose</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tip_targets</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#xiaoyao.common.HandError" title="xiaoyao.common.HandError"><span class="pre">HandError</span></a></span></span><a class="reference internal" href="_modules/xiaoyao/tip.html#set_all_tips_pose"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.tip.set_all_tips_pose" title="Link to this definition"></a></dt>
+<dd><p>为多个指尖设置其在机器人坐标系中的精确姿态。</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.tip.set_tip_pose">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.tip.</span></span><span class="sig-name descname"><span class="pre">set_tip_pose</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tip_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#xiaoyao.common.TipPose" title="xiaoyao.common.TipPose"><span class="pre">TipPose</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#xiaoyao.common.HandError" title="xiaoyao.common.HandError"><span class="pre">HandError</span></a></span></span><a class="reference internal" href="_modules/xiaoyao/tip.html#set_tip_pose"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.tip.set_tip_pose" title="Link to this definition"></a></dt>
+<dd><p>设置单个指尖的目标位姿。(对应 0x7021-0x7025)</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.tip.sub_tip_position">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.tip.</span></span><span class="sig-name descname"><span class="pre">sub_tip_position</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="_modules/xiaoyao/tip.html#sub_tip_position"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.tip.sub_tip_position" title="Link to this definition"></a></dt>
+<dd><p>订阅指尖位置数据。在当前SDK模式下不受支持。</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="xiaoyao.tip.unsub_tip_position">
+<span class="sig-prename descclassname"><span class="pre">xiaoyao.tip.</span></span><span class="sig-name descname"><span class="pre">unsub_tip_position</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">subscription_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="_modules/xiaoyao/tip.html#unsub_tip_position"><span class="viewcode-link"><span class="pre">[源代码]</span></span></a><a class="headerlink" href="#xiaoyao.tip.unsub_tip_position" title="Link to this definition"></a></dt>
+<dd><p>取消订阅。</p>
+</dd></dl>
+
+</section>
+<section id="module-xiaoyao.version">
+<span id="xiaoyao-version-module"></span><h2>xiaoyao.version module<a class="headerlink" href="#module-xiaoyao.version" title="Link to this heading"></a></h2>
+</section>
+<section id="module-xiaoyao">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-xiaoyao" title="Link to this heading"></a></h2>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="页脚">
+        <a href="modules.html" class="btn btn-neutral float-left" title="xiaoyao" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> 上一页</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; 版权所有 2025, GLI。</p>
+  </div>
+
+  利用 <a href="https://www.sphinx-doc.org/">Sphinx</a> 构建，使用的 
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">主题</a>
+    由 <a href="https://readthedocs.org">Read the Docs</a> 开发.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

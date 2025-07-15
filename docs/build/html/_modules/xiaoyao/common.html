@@ -1,0 +1,232 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="zh-CN" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>xiaoyao.common &mdash; XIAOYAO-SDK 1.0.0 文档</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=34088549"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/translations.js?v=beaddf03"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="索引" href="../../genindex.html" />
+    <link rel="search" title="搜索" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            XIAOYAO-SDK
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="搜索文档" aria-label="搜索文档" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="导航菜单">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">xiaoyao</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="移动版导航菜单" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">XIAOYAO-SDK</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="页面导航">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">模块代码</a></li>
+      <li class="breadcrumb-item active">xiaoyao.common</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>xiaoyao.common 源代码</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
+<div class="viewcode-block" id="GestureType">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.common.GestureType">[文档]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">GestureType</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="n">OK</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">OPEN_ALL_FINGERS</span> <span class="o">=</span> <span class="mi">2</span>
+    <span class="n">FIST</span> <span class="o">=</span> <span class="mi">3</span>
+    <span class="n">THUMBS_UP</span> <span class="o">=</span> <span class="mi">4</span>
+    <span class="n">GRIP_SIX</span> <span class="o">=</span> <span class="mi">5</span></div>
+
+
+<div class="viewcode-block" id="ObjectDictionary">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.common.ObjectDictionary">[文档]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ObjectDictionary</span><span class="p">:</span>
+<div class="viewcode-block" id="ObjectDictionary.Identity">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.common.ObjectDictionary.Identity">[文档]</a>
+    <span class="k">class</span><span class="w"> </span><span class="nc">Identity</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;对象 0x1018: 设备身份信息&quot;&quot;&quot;</span>
+        <span class="n">INDEX</span> <span class="o">=</span> <span class="mh">0x1018</span>
+        <span class="n">SUB_VERSION_INFO</span> <span class="o">=</span> <span class="mh">0x03</span>
+        <span class="n">SUB_SERIAL_NUMBER</span> <span class="o">=</span> <span class="mh">0x04</span></div>
+
+
+<div class="viewcode-block" id="ObjectDictionary.ManufacturerCustom">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.common.ObjectDictionary.ManufacturerCustom">[文档]</a>
+    <span class="k">class</span><span class="w"> </span><span class="nc">ManufacturerCustom</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;对象 0x2000: 自定义区域&quot;&quot;&quot;</span>
+        <span class="n">INDEX</span> <span class="o">=</span> <span class="mh">0x2000</span>
+        <span class="n">SUB_HAND_ID</span> <span class="o">=</span> <span class="mh">0x01</span>
+        <span class="n">SUB_REBOOT</span> <span class="o">=</span> <span class="mh">0x02</span></div>
+
+
+<div class="viewcode-block" id="ObjectDictionary.Protection">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.common.ObjectDictionary.Protection">[文档]</a>
+    <span class="k">class</span><span class="w"> </span><span class="nc">Protection</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;对象 0x2001: 保护功能相关&quot;&quot;&quot;</span>
+        <span class="n">INDEX</span> <span class="o">=</span> <span class="mh">0x2001</span>
+        <span class="n">SUB_PROTECTION_TEMP</span> <span class="o">=</span> <span class="mh">0x01</span></div>
+
+
+<div class="viewcode-block" id="ObjectDictionary.HandInfo">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.common.ObjectDictionary.HandInfo">[文档]</a>
+    <span class="k">class</span><span class="w"> </span><span class="nc">HandInfo</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;对象 0x2012: 手部基本信息&quot;&quot;&quot;</span>
+        <span class="n">INDEX</span> <span class="o">=</span> <span class="mh">0x2012</span>
+        <span class="n">SUB_HAND_TYPE</span> <span class="o">=</span> <span class="mh">0x00</span></div>
+
+
+<div class="viewcode-block" id="ObjectDictionary.SystemControl">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.common.ObjectDictionary.SystemControl">[文档]</a>
+    <span class="k">class</span><span class="w"> </span><span class="nc">SystemControl</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;对象 0x1011: 系统控制相关&quot;&quot;&quot;</span>
+        <span class="n">INDEX</span> <span class="o">=</span> <span class="mh">0x1011</span>
+        <span class="n">SUB_FACTORY_RESET</span> <span class="o">=</span> <span class="mh">0x01</span>    </div>
+</div>
+
+<div class="viewcode-block" id="HandError">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.common.HandError">[文档]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">HandError</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="n">NO_ERROR</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">COMMUNICATION_ERROR</span> <span class="o">=</span> <span class="mi">1</span></div>
+
+<div class="viewcode-block" id="HandState">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.common.HandState">[文档]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">HandState</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="n">NORMAL_STOP</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">NORMAL_RUNNING</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">PROTECTIVE_STOP</span> <span class="o">=</span> <span class="mi">2</span>
+    <span class="n">ABNORMAL_RUNNING</span> <span class="o">=</span> <span class="mi">3</span>
+    <span class="n">UNKNOWN</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span></div>
+
+    
+<div class="viewcode-block" id="TipPose">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.common.TipPose">[文档]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TipPose</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    表示指尖的位姿信息，包括位置和姿态。</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">z</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">roll</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">pitch</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">yaw</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="n">x</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">=</span> <span class="n">y</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">z</span> <span class="o">=</span> <span class="n">z</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">roll</span> <span class="o">=</span> <span class="n">roll</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pitch</span> <span class="o">=</span> <span class="n">pitch</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">yaw</span> <span class="o">=</span> <span class="n">yaw</span></div>
+
+
+<div class="viewcode-block" id="JointInfo">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.common.JointInfo">[文档]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">JointInfo</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    用于存储单个关节完整信息的数据结构。</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">joint_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">angle</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">speed</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">torque</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span> <span class="c1"># 使用整数以匹配 HandState 枚举的 .value</span>
+    
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># 提供一个友好的打印输出格式，便于调试</span>
+        <span class="k">return</span> <span class="p">(</span><span class="sa">f</span><span class="s2">&quot;JointInfo(id=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">joint_id</span><span class="si">}</span><span class="s2">, angle=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">angle</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;speed=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">speed</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">, torque=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">torque</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;status=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span></div>
+
+
+<span class="n">JOINT_NAMES</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="c1"># 拇指 (Thumb)</span>
+    <span class="s1">&#39;Thumb_J1&#39;</span><span class="p">,</span> <span class="s1">&#39;Thumb_J2&#39;</span><span class="p">,</span> <span class="s1">&#39;Thumb_J3&#39;</span><span class="p">,</span> <span class="s1">&#39;Thumb_J4&#39;</span><span class="p">,</span> <span class="s1">&#39;Thumb_J5&#39;</span><span class="p">,</span>
+    <span class="c1"># 食指 (Forefinger, FF)</span>
+    <span class="s1">&#39;FF_J1&#39;</span><span class="p">,</span> <span class="s1">&#39;FF_J2&#39;</span><span class="p">,</span> <span class="s1">&#39;FF_J3&#39;</span><span class="p">,</span> <span class="s1">&#39;FF_J4&#39;</span><span class="p">,</span>
+    <span class="c1"># 中指 (Middle Finger, MF)</span>
+    <span class="s1">&#39;MF_J1&#39;</span><span class="p">,</span> <span class="s1">&#39;MF_J2&#39;</span><span class="p">,</span> <span class="s1">&#39;MF_J3&#39;</span><span class="p">,</span> <span class="s1">&#39;MF_J4&#39;</span><span class="p">,</span>
+    <span class="c1"># 无名指 (Ring Finger, RF)</span>
+    <span class="s1">&#39;RF_J1&#39;</span><span class="p">,</span> <span class="s1">&#39;RF_J2&#39;</span><span class="p">,</span> <span class="s1">&#39;RF_J3&#39;</span><span class="p">,</span> <span class="s1">&#39;RF_J4&#39;</span><span class="p">,</span>
+    <span class="c1"># 小指 (Little Finger, LF)</span>
+    <span class="s1">&#39;LF_J1&#39;</span><span class="p">,</span> <span class="s1">&#39;LF_J2&#39;</span><span class="p">,</span> <span class="s1">&#39;LF_J3&#39;</span><span class="p">,</span> <span class="s1">&#39;LF_J4&#39;</span><span class="p">,</span>
+<span class="p">]</span>
+
+<span class="c1"># 关节总数</span>
+<span class="n">NUM_JOINTS</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">JOINT_NAMES</span><span class="p">)</span> <span class="c1"># 结果应该是 18</span>
+
+<span class="c1"># --- 其他可能需要的公共定义 ---</span>
+<span class="c1"># 例如可以把 HandState, HandError, GestureType 等枚举也放在这里</span>
+<span class="c1"># from enum import IntEnum</span>
+<span class="c1"># class HandState(IntEnum):</span>
+<span class="c1">#     ...</span>
+
+<span class="c1"># ... 文件的其他内容 ...    </span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; 版权所有 2025, GLI。</p>
+  </div>
+
+  利用 <a href="https://www.sphinx-doc.org/">Sphinx</a> 构建，使用的 
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">主题</a>
+    由 <a href="https://readthedocs.org">Read the Docs</a> 开发.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

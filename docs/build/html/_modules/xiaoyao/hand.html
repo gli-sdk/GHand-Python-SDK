@@ -1,0 +1,368 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="zh-CN" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>xiaoyao.hand &mdash; XIAOYAO-SDK 1.0.0 文档</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=34088549"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/translations.js?v=beaddf03"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="索引" href="../../genindex.html" />
+    <link rel="search" title="搜索" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            XIAOYAO-SDK
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="搜索文档" aria-label="搜索文档" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="导航菜单">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules.html">xiaoyao</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="移动版导航菜单" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">XIAOYAO-SDK</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="页面导航">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">模块代码</a></li>
+      <li class="breadcrumb-item active">xiaoyao.hand</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>xiaoyao.hand 源代码</h1><div class="highlight"><pre>
+<span></span><span class="c1"># src/xiaoyao/hand.py。</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">struct</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">._internal.ethercat_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">EtherCATClient</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.common</span><span class="w"> </span><span class="kn">import</span> <span class="n">GestureType</span><span class="p">,</span> <span class="n">HandError</span><span class="p">,</span> <span class="n">HandState</span><span class="p">,</span> <span class="n">ObjectDictionary</span>
+
+<div class="viewcode-block" id="close_device">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.hand.close_device">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">close_device</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;【Hand】正在关闭设备连接...&quot;</span><span class="p">)</span>
+    <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">get_instance</span><span class="p">()</span><span class="o">.</span><span class="n">disconnect</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="get_operation_state">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.hand.get_operation_state">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_operation_state</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">HandState</span><span class="p">:</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">get_instance</span><span class="p">()</span><span class="o">.</span><span class="n">get_latest_parsed_data</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">data</span><span class="p">:</span>
+        <span class="n">state_code</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;hand_state&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">state_code</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">HandState</span><span class="p">(</span><span class="n">state_code</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;【Hand】警告: 从设备收到一个未在协议中定义的未知状态码: </span><span class="si">{</span><span class="n">state_code</span><span class="si">}</span><span class="s2">。&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">HandState</span><span class="o">.</span><span class="n">UNKNOWN</span>
+    <span class="k">return</span> <span class="n">HandState</span><span class="o">.</span><span class="n">UNKNOWN</span></div>
+
+
+<div class="viewcode-block" id="get_temperature">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.hand.get_temperature">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_temperature</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">get_instance</span><span class="p">()</span><span class="o">.</span><span class="n">get_latest_parsed_data</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;hand_temperature&#39;</span><span class="p">,</span> <span class="mi">999</span><span class="p">)</span> </div>
+
+
+<div class="viewcode-block" id="do_preset_gesture">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.hand.do_preset_gesture">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">do_preset_gesture</span><span class="p">(</span><span class="n">gesture_type</span><span class="p">:</span> <span class="n">GestureType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">HandError</span><span class="p">:</span>
+    <span class="n">client</span> <span class="o">=</span> <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">get_instance</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;【Hand】正在请求执行预设手势: </span><span class="si">{</span><span class="n">gesture_type</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+    <span class="n">command_code_map</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">GestureType</span><span class="o">.</span><span class="n">OK</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> 
+        <span class="n">GestureType</span><span class="o">.</span><span class="n">OPEN_ALL_FINGERS</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+        <span class="n">GestureType</span><span class="o">.</span><span class="n">FIST</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span>
+        <span class="n">GestureType</span><span class="o">.</span><span class="n">THUMBS_UP</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span>
+        <span class="n">GestureType</span><span class="o">.</span><span class="n">GRIP_SIX</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="n">command_code</span> <span class="o">=</span> <span class="n">command_code_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">gesture_type</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">command_code</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;错误: 不支持的手势类型 </span><span class="si">{</span><span class="n">gesture_type</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">HandError</span><span class="o">.</span><span class="n">INVALID_PARAMETER</span>
+    <span class="k">if</span> <span class="n">client</span><span class="o">.</span><span class="n">execute_command</span><span class="p">(</span><span class="n">command_code</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  -&gt; 指令码 </span><span class="si">{</span><span class="n">command_code</span><span class="si">}</span><span class="s2"> 已成功发送。&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">HandError</span><span class="o">.</span><span class="n">NO_ERROR</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  -&gt; 指令码 </span><span class="si">{</span><span class="n">command_code</span><span class="si">}</span><span class="s2"> 发送失败。&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">HandError</span><span class="o">.</span><span class="n">COMMUNICATION_FAILURE</span></div>
+
+
+<div class="viewcode-block" id="get_all_basic_info">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.hand.get_all_basic_info">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_all_basic_info</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+    <span class="n">info</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;device_id&#39;</span><span class="p">:</span> <span class="n">get_device_id</span><span class="p">(),</span>
+        <span class="s1">&#39;software_version&#39;</span><span class="p">:</span> <span class="n">get_software_version</span><span class="p">(),</span>
+        <span class="s1">&#39;hand_type&#39;</span><span class="p">:</span> <span class="n">get_hand_type</span><span class="p">()</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">info</span></div>
+
+
+<div class="viewcode-block" id="get_device_id">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.hand.get_device_id">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_device_id</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="n">data_bytes</span> <span class="o">=</span> <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">get_instance</span><span class="p">()</span><span class="o">.</span><span class="n">sdo_read</span><span class="p">(</span>
+        <span class="n">ObjectDictionary</span><span class="o">.</span><span class="n">Identity</span><span class="o">.</span><span class="n">INDEX</span><span class="p">,</span> 
+        <span class="n">ObjectDictionary</span><span class="o">.</span><span class="n">Identity</span><span class="o">.</span><span class="n">SUB_SERIAL_NUMBER</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">data_bytes</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s1">&#39;ignore&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\x00</span><span class="s1">&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="n">data_bytes</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="get_software_version">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.hand.get_software_version">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_software_version</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="n">data_bytes</span> <span class="o">=</span> <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">get_instance</span><span class="p">()</span><span class="o">.</span><span class="n">sdo_read</span><span class="p">(</span>
+        <span class="n">ObjectDictionary</span><span class="o">.</span><span class="n">Identity</span><span class="o">.</span><span class="n">INDEX</span><span class="p">,</span> 
+        <span class="n">ObjectDictionary</span><span class="o">.</span><span class="n">Identity</span><span class="o">.</span><span class="n">SUB_VERSION_INFO</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">data_bytes</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s1">&#39;ignore&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\x00</span><span class="s1">&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="n">data_bytes</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="get_hand_type">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.hand.get_hand_type">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_hand_type</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">data_bytes</span> <span class="o">=</span> <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">get_instance</span><span class="p">()</span><span class="o">.</span><span class="n">sdo_read</span><span class="p">(</span>
+            <span class="n">ObjectDictionary</span><span class="o">.</span><span class="n">HandInfo</span><span class="o">.</span><span class="n">INDEX</span><span class="p">,</span> 
+            <span class="n">ObjectDictionary</span><span class="o">.</span><span class="n">HandInfo</span><span class="o">.</span><span class="n">SUB_HAND_TYPE</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">data_bytes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> <span class="k">return</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data_bytes</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;【Hand】警告: 获取手部类型时，期望1字节，收到 </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">data_bytes</span><span class="p">)</span><span class="si">}</span><span class="s2"> 字节。&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="o">-</span><span class="mi">1</span>
+        
+        <span class="n">hand_type_val</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">data_bytes</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">hand_type_val</span> <span class="k">if</span> <span class="n">hand_type_val</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="k">else</span> <span class="o">-</span><span class="mi">1</span>
+
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;【Hand】错误: 在 get_hand_type() 中发生未知异常: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="o">-</span><span class="mi">1</span>            </div>
+
+
+<div class="viewcode-block" id="set_hand_id">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.hand.set_hand_id">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">set_hand_id</span><span class="p">(</span><span class="n">hand_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">hand_id</span> <span class="o">&lt;=</span> <span class="mi">255</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;错误: hand_id (</span><span class="si">{</span><span class="n">hand_id</span><span class="si">}</span><span class="s2">) 必须在 0-255 之间。&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="n">id_data</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="s1">&#39;&lt;B&#39;</span><span class="p">,</span> <span class="n">hand_id</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">get_instance</span><span class="p">()</span><span class="o">.</span><span class="n">sdo_write</span><span class="p">(</span>
+            <span class="n">ObjectDictionary</span><span class="o">.</span><span class="n">ManufacturerCustom</span><span class="o">.</span><span class="n">INDEX</span><span class="p">,</span> 
+            <span class="n">ObjectDictionary</span><span class="o">.</span><span class="n">ManufacturerCustom</span><span class="o">.</span><span class="n">SUB_HAND_ID</span><span class="p">,</span> 
+            <span class="n">id_data</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span></div>
+
+
+<div class="viewcode-block" id="get_hand_id">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.hand.get_hand_id">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_hand_id</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="n">data_bytes</span> <span class="o">=</span> <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">get_instance</span><span class="p">()</span><span class="o">.</span><span class="n">sdo_read</span><span class="p">(</span>
+        <span class="n">ObjectDictionary</span><span class="o">.</span><span class="n">ManufacturerCustom</span><span class="o">.</span><span class="n">INDEX</span><span class="p">,</span> 
+        <span class="n">ObjectDictionary</span><span class="o">.</span><span class="n">ManufacturerCustom</span><span class="o">.</span><span class="n">SUB_HAND_ID</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">data_bytes</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">data_bytes</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">struct</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="s1">&#39;&lt;B&#39;</span><span class="p">,</span> <span class="n">data_bytes</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  -&gt; 【警告】读回Hand ID失败，从站返回的数据无效。&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="o">-</span><span class="mi">1</span></div>
+
+
+<div class="viewcode-block" id="set_temperature_threshold">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.hand.set_temperature_threshold">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">set_temperature_threshold</span><span class="p">(</span><span class="n">min_temp</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">max_temp</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="o">-</span><span class="mi">30</span> <span class="o">&lt;=</span> <span class="n">min_temp</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">and</span> <span class="mi">50</span> <span class="o">&lt;=</span> <span class="n">max_temp</span> <span class="o">&lt;=</span> <span class="mi">90</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;错误: 温度值必须在 -30 到 0 之间 (最低) 和 50 到 90 之间 (最高)。&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="n">temp_data</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="s1">&#39;&lt;bb&#39;</span><span class="p">,</span> <span class="n">min_temp</span><span class="p">,</span> <span class="n">max_temp</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">get_instance</span><span class="p">()</span><span class="o">.</span><span class="n">sdo_write</span><span class="p">(</span>
+            <span class="n">ObjectDictionary</span><span class="o">.</span><span class="n">Protection</span><span class="o">.</span><span class="n">INDEX</span><span class="p">,</span> 
+            <span class="n">ObjectDictionary</span><span class="o">.</span><span class="n">Protection</span><span class="o">.</span><span class="n">SUB_PROTECTION_TEMP</span><span class="p">,</span> 
+            <span class="n">temp_data</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  -&gt; 写入失败，硬件返回异常: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span></div>
+
+    
+<div class="viewcode-block" id="initialize">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.hand.initialize">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">initialize</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    对手部进行初始化。</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;【Hand】正在请求初始化校准...&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;【警告】在执行此操作时，请确保机器人工作区域内无障碍物。&quot;</span><span class="p">)</span>
+    <span class="n">INITIALIZE_COMMAND_CODE</span> <span class="o">=</span> <span class="mi">10</span> 
+    
+    <span class="k">return</span> <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">execute_command</span><span class="p">(</span><span class="n">INITIALIZE_COMMAND_CODE</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="reboot">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.hand.reboot">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">reboot</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;【Hand】正在发送重启指令...&quot;</span><span class="p">)</span>
+    <span class="n">reboot_cmd</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="s1">&#39;&lt;B&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">get_instance</span><span class="p">()</span><span class="o">.</span><span class="n">sdo_write</span><span class="p">(</span>
+            <span class="n">ObjectDictionary</span><span class="o">.</span><span class="n">ManufacturerCustom</span><span class="o">.</span><span class="n">INDEX</span><span class="p">,</span> 
+            <span class="n">ObjectDictionary</span><span class="o">.</span><span class="n">ManufacturerCustom</span><span class="o">.</span><span class="n">SUB_REBOOT</span><span class="p">,</span> 
+            <span class="n">reboot_cmd</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span></div>
+
+
+<div class="viewcode-block" id="release_protection">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.hand.release_protection">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">release_protection</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;【Hand】正在尝试解除设备保护状态...&quot;</span><span class="p">)</span>
+    <span class="n">RELEASE_PROTECTION_CODE</span> <span class="o">=</span> <span class="mi">11</span>
+    
+    <span class="k">return</span> <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">execute_command</span><span class="p">(</span><span class="n">RELEASE_PROTECTION_CODE</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="test_sensors">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.hand.test_sensors">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">test_sensors</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;【Hand】正在请求传感器自检...&quot;</span><span class="p">)</span>
+    <span class="n">CHECK_SENSORS_CODE</span> <span class="o">=</span> <span class="mi">12</span>
+    
+    <span class="k">if</span> <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">execute_command</span><span class="p">(</span><span class="n">CHECK_SENSORS_CODE</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  -&gt; 传感器自检指令已发送。请稍后查询设备状态。&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  -&gt; 传感器自检指令发送失败。&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="o">-</span><span class="mi">1</span> <span class="c1"># 表示指令发送失败</span></div>
+
+
+<div class="viewcode-block" id="test_motors">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.hand.test_motors">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">test_motors</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;【Hand】正在请求电机自检...&quot;</span><span class="p">)</span>
+    <span class="n">CHECK_MOTORS_CODE</span> <span class="o">=</span> <span class="mi">13</span>
+    
+    <span class="k">if</span> <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">execute_command</span><span class="p">(</span><span class="n">CHECK_MOTORS_CODE</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  -&gt; 电机自检指令已发送。请稍后查询设备状态。&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  -&gt; 电机自检指令发送失败。&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="o">-</span><span class="mi">1</span></div>
+
+
+<div class="viewcode-block" id="update_firmware">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.hand.update_firmware">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">update_firmware</span><span class="p">(</span><span class="n">firmware_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;【Hand】固件升级功能 (</span><span class="si">{</span><span class="n">firmware_path</span><span class="si">}</span><span class="s2">) 当前版本不支持。&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">False</span></div>
+
+
+<div class="viewcode-block" id="set_light">
+<a class="viewcode-back" href="../../xiaoyao.html#xiaoyao.hand.set_light">[文档]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">set_light</span><span class="p">(</span><span class="n">mode</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">color</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">frequency_ms</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;【Hand】正在设置灯光: 模式=</span><span class="si">{</span><span class="n">mode</span><span class="si">}</span><span class="s2">, 颜色=</span><span class="si">{</span><span class="n">color</span><span class="si">}</span><span class="s2">, 频率=</span><span class="si">{</span><span class="n">frequency_ms</span><span class="si">}</span><span class="s2">ms&quot;</span><span class="p">)</span>
+    <span class="n">client</span> <span class="o">=</span> <span class="n">EtherCATClient</span><span class="o">.</span><span class="n">get_instance</span><span class="p">()</span>
+    <span class="c1"># 【注意】这个索引是假设的，需要确认</span>
+    <span class="n">OD_INDEX_LIGHT_CONTROL</span> <span class="o">=</span> <span class="mh">0x2100</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># 1. 写入灯光模式 (Subindex 1, uint8)</span>
+        <span class="n">mode_data</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="s1">&#39;&lt;B&#39;</span><span class="p">,</span> <span class="n">mode</span><span class="p">)</span>
+        <span class="n">client</span><span class="o">.</span><span class="n">sdo_write</span><span class="p">(</span><span class="n">OD_INDEX_LIGHT_CONTROL</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">mode_data</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  -&gt; 模式写入成功。&quot;</span><span class="p">)</span>
+
+        <span class="c1"># 2. 写入颜色RGB值 (Subindex 2, uint8[3])</span>
+        <span class="n">r</span><span class="p">,</span> <span class="n">g</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">color</span>
+        <span class="n">color_data</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="s1">&#39;&lt;BBB&#39;</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">g</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>
+        <span class="n">client</span><span class="o">.</span><span class="n">sdo_write</span><span class="p">(</span><span class="n">OD_INDEX_LIGHT_CONTROL</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">color_data</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  -&gt; 颜色写入成功。&quot;</span><span class="p">)</span>
+
+        <span class="c1"># 3. 写入频率 (Subindex 3, uint16)</span>
+        <span class="n">freq_data</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="s1">&#39;&lt;H&#39;</span><span class="p">,</span> <span class="n">frequency_ms</span><span class="p">)</span>
+        <span class="n">client</span><span class="o">.</span><span class="n">sdo_write</span><span class="p">(</span><span class="n">OD_INDEX_LIGHT_CONTROL</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">freq_data</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;  -&gt; 频率写入成功。&quot;</span><span class="p">)</span>
+        
+        <span class="c1"># 所有写入都未抛出异常，则视为成功</span>
+        <span class="k">return</span> <span class="kc">True</span>
+        
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;【Hand】设置灯光失败: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; 版权所有 2025, GLI。</p>
+  </div>
+
+  利用 <a href="https://www.sphinx-doc.org/">Sphinx</a> 构建，使用的 
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">主题</a>
+    由 <a href="https://readthedocs.org">Read the Docs</a> 开发.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

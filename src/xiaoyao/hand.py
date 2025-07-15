@@ -1,4 +1,4 @@
-# src/xiaoyao/hand.py。
+# src/xiaoyao/hand.py
 import struct
 import time
 from ._internal.ethercat_client import EtherCATClient
@@ -47,13 +47,13 @@ def do_preset_gesture(gesture_type: GestureType) -> HandError:
 
 def get_all_basic_info() -> dict:
     info = {
-        'device_id': get_device_id(),
+        'serial_number': get_serial_number(),
         'software_version': get_software_version(),
         'hand_type': get_hand_type()
     }
     return info
 
-def get_device_id() -> str:
+def get_serial_number() -> str:
     data_bytes = EtherCATClient.get_instance().sdo_read(
         ObjectDictionary.Identity.INDEX, 
         ObjectDictionary.Identity.SUB_SERIAL_NUMBER
@@ -85,21 +85,6 @@ def get_hand_type() -> int:
         print(f"【Hand】错误: 在 get_hand_type() 中发生未知异常: {e}")
         return -1            
 
-def set_hand_id(hand_id: int) -> bool:
-    if not (0 <= hand_id <= 255):
-        print(f"错误: hand_id ({hand_id}) 必须在 0-255 之间。")
-        return False
-    id_data = struct.pack('<B', hand_id)
-    try:
-        EtherCATClient.get_instance().sdo_write(
-            ObjectDictionary.ManufacturerCustom.INDEX, 
-            ObjectDictionary.ManufacturerCustom.SUB_HAND_ID, 
-            id_data
-        )
-        return True
-    except Exception:
-        return False
-
 def get_hand_id() -> int:
     data_bytes = EtherCATClient.get_instance().sdo_read(
         ObjectDictionary.ManufacturerCustom.INDEX, 
@@ -110,26 +95,7 @@ def get_hand_id() -> int:
     print(f"  -> 【警告】读回Hand ID失败，从站返回的数据无效。")
     return -1
 
-def set_temperature_threshold(min_temp: int, max_temp: int) -> bool:
-    if not (-30 <= min_temp <= 0 and 50 <= max_temp <= 90):
-        print(f"错误: 温度值必须在 -30 到 0 之间 (最低) 和 50 到 90 之间 (最高)。")
-        return False
-    temp_data = struct.pack('<bb', min_temp, max_temp)
-    try:
-        EtherCATClient.get_instance().sdo_write(
-            ObjectDictionary.Protection.INDEX, 
-            ObjectDictionary.Protection.SUB_PROTECTION_TEMP, 
-            temp_data
-        )
-        return True
-    except Exception as e:
-        print(f"  -> 写入失败，硬件返回异常: {e}")
-        return False
-    
 def initialize() -> bool:
-    """
-    对手部进行初始化。
-    """
     print("【Hand】正在请求初始化校准...")
     print("【警告】在执行此操作时，请确保机器人工作区域内无障碍物。")
     INITIALIZE_COMMAND_CODE = 10 
@@ -155,30 +121,7 @@ def release_protection() -> bool:
     
     return EtherCATClient.execute_command(RELEASE_PROTECTION_CODE)
 
-def test_sensors() -> int:
-    print("【Hand】正在请求传感器自检...")
-    CHECK_SENSORS_CODE = 12
-    
-    if EtherCATClient.execute_command(CHECK_SENSORS_CODE):
-        print("  -> 传感器自检指令已发送。请稍后查询设备状态。")
-        return 0
-    else:
-        print("  -> 传感器自检指令发送失败。")
-        return -1 # 表示指令发送失败
-
-def test_motors() -> int:
-    print("【Hand】正在请求电机自检...")
-    CHECK_MOTORS_CODE = 13
-    
-    if EtherCATClient.execute_command(CHECK_MOTORS_CODE):
-        print("  -> 电机自检指令已发送。请稍后查询设备状态。")
-        return 0
-    else:
-        print("  -> 电机自检指令发送失败。")
-        return -1
-
 def update_firmware(firmware_path: str) -> bool:
-
     print(f"【Hand】固件升级功能 ({firmware_path}) 当前版本不支持。")
     return False
 

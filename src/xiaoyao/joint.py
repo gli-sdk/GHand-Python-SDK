@@ -151,3 +151,14 @@ def query_linked_joint(joint_id: int) -> int:
         print(f"【Joint】关节ID {joint_id} 没有在预设的联动表中找到关系。")
         
     return linked_id
+
+def motors_selftest() -> int:
+    print("【Joint】正在请求电机自检...")
+    CHECK_MOTORS_CODE = 13
+    
+    if EtherCATClient.execute_command(CHECK_MOTORS_CODE):
+        print("  -> 电机自检指令已发送。请稍后查询设备状态。")
+        return 0
+    else:
+        print("  -> 电机自检指令发送失败。")
+        return -1
