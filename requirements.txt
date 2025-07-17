@@ -1,5 +1,2 @@
-numpy
-# 您可能根据实际通讯方式和需求添加其他依赖，例如：
-# pyserial # 如果RS485通讯通过串口实现
-# python-can # 如果CAN通讯通过特定库实现
-# lxml # 如果需要解析XML配置
+pysoem
+netifaces
