@@ -23,9 +23,9 @@ def main():
     print(f"ver: {ver}; hand_type: {hand_type.value}")
 
 
-    # sub_id = hand.sub_hand_data(callback=process_data)
-    # time.sleep(0.1)
-    # hand.unsub_hand_data(sub_id)
+    sub_id = hand.sub_hand_data(callback=process_data)
+    time.sleep(3)
+    hand.unsub_hand_data(sub_id)
     hand.close()
 
 if __name__ == "__main__":

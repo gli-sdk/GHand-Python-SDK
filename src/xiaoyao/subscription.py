@@ -7,7 +7,6 @@ class SubscriptionManager:
         self._lock = threading.Lock()
         self._running = False
         self._thread = None
-        # self._client = MockData()
         self._client = Client()
         self._data = None
         self._sub_id_counter = 0
@@ -18,6 +17,8 @@ class SubscriptionManager:
     def start(self):
         if not self._running:
             self._running = True
+            res = self._client.pdo_init()
+            print(f"PDO initialized: {res}")
             self._thread = threading.Thread(target=self._data_producer, daemon=True)
             self._thread.start()
             self._dispatcher_thread = threading.Thread(target=self._data_dispatcher, daemon=True)
