@@ -1,1 +1,6 @@
-__version__ = "1.0.1"
+SDK_VERSION_MAJOR = 0
+SDK_VERSION_MINOR = 0
+SDK_VERSION_REVISION = 1
+
+__version__ = "{}.{}.{}".format(
+    SDK_VERSION_MAJOR, SDK_VERSION_MINOR, SDK_VERSION_REVISION)

@@ -1,339 +1,212 @@
-import os
-from . import comm   # 从comm模块导入通讯相关的全局函数
-from .common import GestureType, RobotError, RobotStatus # 从 common 导入所有需要的枚举
+# src/xiaoyao/hand.py。
+import struct
+import time
+from ._internal.ethercat_client import EtherCATClient
+from .common import GestureType, HandError, HandState, ObjectDictionary
 
-"""整手控制模块"""
-    
-def open_ethercat(device_id: str) -> bool:
-    """
-    设置指定设备 ID 的手部模块 EtherCAT 通讯的相关参数。
-    此函数用于针对特定设备调整其 EtherCAT 接口的具体行为。
-    请注意，此函数不用于切换通讯协议类型，仅用于配置已连接或预设的 EtherCAT 接口。
-    """
-    print(f"【Hand】尝试设置 EtherCAT 通讯参数，设备ID: {device_id}")
-    result = comm.send_msg("SET_COMM_ETHERCAT", {'device_id': device_id})
-    
-    if result == RobotError.NO_ERROR.value:
-        print(f"【Hand】EtherCAT 通讯参数设置指令发送成功。")
-        return True
-    else:
-        print(f"【Hand】EtherCAT 通讯参数设置指令发送失败，错误码: {result}")
-        return False
+def close_device():
+    print("【Hand】正在关闭设备连接...")
+    EtherCATClient.get_instance().disconnect()
 
-def open_rs485(port: str, baud_rate: int = 115200) -> bool:
-    """
-    设置手部模块 RS485 串行通讯的相关参数。
-    此函数用于调整 RS485 接口的具体行为。
-    请注意，此函数不用于切换通讯协议类型，仅用于配置已连接或预设的 RS485 接口。
-    设置后可能需要重启模块才能生效。
-    """
-    print(f"【Hand】尝试设置 RS485 通讯参数，端口: {port}, 波特率: {baud_rate}")
-    result = comm.send_msg("SET_COMM_RS485", {'port': port, 'baud_rate': baud_rate})
-    
-    if result == RobotError.NO_ERROR.value:
-        print(f"【Hand】RS485 通讯参数设置指令发送成功。")
-        return True
-    else:
-        print(f"【Hand】RS485 通讯参数设置指令发送失败，错误码: {result}")
-        return False
-
-def close_device() -> bool:
-    print("【Hand】正在关闭设备...")
-    result = comm.send_msg("CLOSE_DEVICE")
-    return True if result == RobotError.NO_ERROR.value else False
-
-def do_preset_gesture(gesture_type: GestureType) -> RobotError:
-    """
-    手部执行预定义的预设手势。此函数将指令发送至手部，并立即返回操作结果状态码。
-    """
-    print(f"【Hand】尝试执行预设手势: {gesture_type.name} (值: {gesture_type.value})...")
-    result = comm.send_msg("DO_PRESET_GESTURE", gesture_type.value)
-    
-    # 模拟返回，如果成功，返回手势的value；否则返回错误码
-    if result == gesture_type.value: 
-        return RobotError.NO_ERROR # 成功执行手势，视为无错误
-    elif result in [e.value for e in RobotError]:
-        return RobotError(result)
-    else:
-        return RobotError.GENERAL_ERROR # 默认错误
-    
-def get_all_basic_info() -> dict:
-    """
-    获取手部模块的所有可用的基本信息，包括设备 ID、软件版本以及手部类型。
-    """
-    print("【Hand】正在请求手部所有基本信息...")
-    response = comm.send_msg("GET_ALL_BASIC_INFO") 
-    
-    if isinstance(response, dict):
-        print("【Hand】成功获取手部基本信息。")
-        return response
-    else:
-        error_code = response if isinstance(response, int) else RobotError.GENERAL_ERROR.value
-        print(f"【Hand】获取手部基本信息失败，错误码: {RobotError(error_code).name} ({error_code})")
-        return {} # 保持返回类型为 dict
-
-def get_operation_status() -> RobotStatus:
-    """
-    获取手部模块的当前运行状态。
-    """
-    print("【Hand】获取手部当前运行状态...")
-    result = comm.send_msg("GET_OPERATION_STATUS")
-    if result in [s.value for s in RobotStatus]:
-        return RobotStatus(result)
-    else:
-        return RobotStatus.UNKNOWN # 无法识别的状态 
+def get_operation_state() -> HandState:
+    data = EtherCATClient.get_instance().get_latest_parsed_data()
+    if data:
+        state_code = data.get('hand_state')
+        if state_code is not None:
+            try:
+                return HandState(state_code)
+            except ValueError:
+                print(f"【Hand】警告: 从设备收到一个未在协议中定义的未知状态码: {state_code}。")
+                return HandState.UNKNOWN
+    return HandState.UNKNOWN
 
 def get_temperature() -> int:
-    """获取手部传感器的当前温度。"""
-    print("【Temperature】正在获取手部温度...")  
-     # 发送获取温度的命令
-    result = comm.send_msg("GET_TEMPERATURE")
-        
-        # 检查返回结果是否为有效整数
-    if isinstance(result, int):
-            # 简单验证温度范围
-        if -30 <= result <= 80:
-            print(f"【Temperature】当前温度: {result}°C")
-            return result
-        else:
-            print(f"【Temperature】获取温度失败，值超出合理范围: {result}°C")
-            return 999
-    else:
-        print(f"【Temperature】获取温度失败，返回非整数值: {result}")
-        return 999
-    
-def set_temperature_threshold(self, min_temp: int, max_temp: int) -> int:
-    """设置温度阈值"""
-    if min_temp >= max_temp:
-        print(f"【Temperature】设置失败：最低温度({min_temp})必须低于最高温度({max_temp})")
-        return RobotError.INVALID_PARAMETER
-    if not (-30 <= min_temp <= 10):
-        print(f"【Temperature】设置失败：最低温度({min_temp})超出有效范围(-30~10)")
-        return RobotError.INVALID_PARAMETER 
-    if not (40 <= max_temp <= 80):
-        print(f"【Temperature】设置失败：最高温度({max_temp})超出有效范围(40~80)")
-        return RobotError.INVALID_PARAMETER
-    
-    data = {
-        "min_temp": min_temp,
-        "max_temp": max_temp
-    }
-    
-    print(f"【Temperature】设置温度阈值：{min_temp}°C ~ {max_temp}°C")
-    result = comm.send_msg("SET_TEMPERATURE_THRESHOLD", data)  
-    if result == RobotError.NO_ERROR.value:
-        print(f"【Temperature】温度阈值设置成功")
-        return RobotError.NO_ERROR
-    else:
-        error_name = RobotError(result).name if result in RobotError.__members__.values() else "未知错误"
-        print(f"【Temperature】温度阈值设置失败，错误码: {result} ({error_name})")
-        return RobotError(result)
+    data = EtherCATClient.get_instance().get_latest_parsed_data()
+    return data.get('hand_temperature', 999) 
 
-def release_protection() -> bool:
-    print("【Hand】正在解除保护状态...")
-    result = comm.send_msg("RELEASE_PROTECTION")
-    return True if result == RobotError.NO_ERROR.value else False
+def do_preset_gesture(gesture_type: GestureType) -> HandError:
+    client = EtherCATClient.get_instance()
+    print(f"【Hand】正在请求执行预设手势: {gesture_type.name}...")
+    command_code_map = {
+        GestureType.OK: 1, 
+        GestureType.OPEN_ALL_FINGERS: 2,
+        GestureType.FIST: 3,
+        GestureType.THUMBS_UP: 4,
+        GestureType.GRIP_SIX: 5,
+    }
+    command_code = command_code_map.get(gesture_type)
+    if command_code is None:
+        print(f"错误: 不支持的手势类型 {gesture_type.name}")
+        return HandError.INVALID_PARAMETER
+    if client.execute_command(command_code):
+        print(f"  -> 指令码 {command_code} 已成功发送。")
+        return HandError.NO_ERROR
+    else:
+        print(f"  -> 指令码 {command_code} 发送失败。")
+        return HandError.COMMUNICATION_FAILURE
+
+def get_all_basic_info() -> dict:
+    info = {
+        'device_id': get_device_id(),
+        'software_version': get_software_version(),
+        'hand_type': get_hand_type()
+    }
+    return info
+
+def get_device_id() -> str:
+    data_bytes = EtherCATClient.get_instance().sdo_read(
+        ObjectDictionary.Identity.INDEX, 
+        ObjectDictionary.Identity.SUB_SERIAL_NUMBER
+    )
+    return data_bytes.decode('utf-8', errors='ignore').strip('\x00') if data_bytes else ""
+
+def get_software_version() -> str:
+    data_bytes = EtherCATClient.get_instance().sdo_read(
+        ObjectDictionary.Identity.INDEX, 
+        ObjectDictionary.Identity.SUB_VERSION_INFO
+    )
+    return data_bytes.decode('utf-8', errors='ignore').strip('\x00') if data_bytes else ""
+
+def get_hand_type() -> int:
+    try:
+        data_bytes = EtherCATClient.get_instance().sdo_read(
+            ObjectDictionary.HandInfo.INDEX, 
+            ObjectDictionary.HandInfo.SUB_HAND_TYPE
+        )
+        if data_bytes is None: return -1
+        if len(data_bytes) != 1:
+            print(f"【Hand】警告: 获取手部类型时，期望1字节，收到 {len(data_bytes)} 字节。")
+            return -1
+        
+        hand_type_val = int(data_bytes[0])
+        return hand_type_val if hand_type_val in [0, 1] else -1
+
+    except Exception as e:
+        print(f"【Hand】错误: 在 get_hand_type() 中发生未知异常: {e}")
+        return -1            
+
+def set_hand_id(hand_id: int) -> bool:
+    if not (0 <= hand_id <= 255):
+        print(f"错误: hand_id ({hand_id}) 必须在 0-255 之间。")
+        return False
+    id_data = struct.pack('<B', hand_id)
+    try:
+        EtherCATClient.get_instance().sdo_write(
+            ObjectDictionary.ManufacturerCustom.INDEX, 
+            ObjectDictionary.ManufacturerCustom.SUB_HAND_ID, 
+            id_data
+        )
+        return True
+    except Exception:
+        return False
+
+def get_hand_id() -> int:
+    data_bytes = EtherCATClient.get_instance().sdo_read(
+        ObjectDictionary.ManufacturerCustom.INDEX, 
+        ObjectDictionary.ManufacturerCustom.SUB_HAND_ID
+    )
+    if data_bytes and len(data_bytes) == 1:
+        return struct.unpack('<B', data_bytes)[0]
+    print(f"  -> 【警告】读回Hand ID失败，从站返回的数据无效。")
+    return -1
+
+def set_temperature_threshold(min_temp: int, max_temp: int) -> bool:
+    if not (-30 <= min_temp <= 0 and 50 <= max_temp <= 90):
+        print(f"错误: 温度值必须在 -30 到 0 之间 (最低) 和 50 到 90 之间 (最高)。")
+        return False
+    temp_data = struct.pack('<bb', min_temp, max_temp)
+    try:
+        EtherCATClient.get_instance().sdo_write(
+            ObjectDictionary.Protection.INDEX, 
+            ObjectDictionary.Protection.SUB_PROTECTION_TEMP, 
+            temp_data
+        )
+        return True
+    except Exception as e:
+        print(f"  -> 写入失败，硬件返回异常: {e}")
+        return False
+    
+def initialize() -> bool:
+    """
+    对手部进行初始化。
+    """
+    print("【Hand】正在请求初始化校准...")
+    print("【警告】在执行此操作时，请确保机器人工作区域内无障碍物。")
+    INITIALIZE_COMMAND_CODE = 10 
+    
+    return EtherCATClient.execute_command(INITIALIZE_COMMAND_CODE)
 
 def reboot() -> bool:
-    """重启设备"""
-    print("【Device】正在发送重启命令...")   
-    result = comm.send_msg("REBOOT_DEVICE")
-    
-    if result == RobotError.NO_ERROR.value:
-        print("【Device】重启命令发送成功，设备将在几秒后重启")
+    print("【Hand】正在发送重启指令...")
+    reboot_cmd = struct.pack('<B', 1)
+    try:
+        EtherCATClient.get_instance().sdo_write(
+            ObjectDictionary.ManufacturerCustom.INDEX, 
+            ObjectDictionary.ManufacturerCustom.SUB_REBOOT, 
+            reboot_cmd
+        )
         return True
-    else:
-        error_name = RobotError(result).name if result in RobotError.__members__.values() else "未知错误"
-        print(f"【Device】重启命令发送失败，错误码: {result} ({error_name})")
+    except Exception:
         return False
 
-def initialize() -> bool:
-    """设备初始化"""
-    print("【Device】重置设备状态...")
-    result = comm.send_msg("RESET_DEVICE")
-    if result != RobotError.NO_ERROR.value:
-        error_name = RobotError(result).name if result in RobotError.__members__.values() else "未知错误"
-        print(f"【Device】重置失败，错误码: {result} ({error_name})")
-        return False
+def release_protection() -> bool:
+    print("【Hand】正在尝试解除设备保护状态...")
+    RELEASE_PROTECTION_CODE = 11
     
-    print("【Device】检查连接状态...")
-    status = get_operation_status()
-    if status != RobotStatus.CALIBRATING:
-        print(f"【Device】连接状态异常: {status.name}")
-        return False
-    
-    print("【Device】初始化成功")
-    return True
+    return EtherCATClient.execute_command(RELEASE_PROTECTION_CODE)
 
-def check_sensors() -> int:
-    """对手部所有传感器执行自检，检查其功能是否正常。"""
-    print("【Sensors】开始传感器自检...")    
-        # 发送传感器自检命令
-    result = comm.send_msg("CHECK_SENSORS")
-        
-        # 检查返回结果
-    if isinstance(result, int):
-        if result == 0:
-            print("【Sensors】所有传感器自检通过")
-            return 0
-        elif result < 0:
-            # 负整数表示特定传感器故障
-            sensor_id = abs(result)
-            print(f"【Sensors】传感器 {sensor_id} 自检失败")
-            return result
-        else:
-            print(f"【Sensors】自检返回无效状态码: {result}")
-            return -999 
-    else:
-        print(f"【Sensors】自检返回非整数值: {result}")
-        return -999
+def test_sensors() -> int:
+    print("【Hand】正在请求传感器自检...")
+    CHECK_SENSORS_CODE = 12
     
-def can_com(baud_rate: int, node_id: int) -> bool:
-    """
-    设置手部模块 CAN 总线通讯的相关参数。
-    此函数用于调整 CAN 接口的具体行为。
-    请注意，此函数不用于切换通讯协议类型，仅用于配置已连接或预设的 CAN 接口。
-    设置后可能需要重启模块才能生效。
-    """
-    print(f"【Hand】尝试设置 CAN 通讯参数，波特率: {baud_rate}, 节点ID: {node_id}")
-    result = comm.send_msg("SET_COMM_CAN", {'baud_rate': baud_rate, 'node_id': node_id})
-    
-    if result == RobotError.NO_ERROR.value:
-        print(f"【Hand】CAN 通讯参数设置指令发送成功。")
-        return True
-    else:
-        print(f"【Hand】CAN 通讯参数设置指令发送失败，错误码: {result}")
-        return False
-
-
-     
-def get_device_id(self) -> str:
-    print("【Device】正在获取设备序列号...")
-    result = comm.send_msg("GET_DEVICE_ID")
-    if isinstance(result, dict) and "device_id" in result:
-        device_id = result["device_id"]
-        print(f"【Device】设备序列号: {device_id}")
-        return device_id
-    elif isinstance(result, int):
-        error_name = RobotError(result).name if result in RobotError.__members__.values() else "未知错误"
-        print(f"【Device】获取设备序列号失败，错误码: {result} ({error_name})")
-    else:
-        print(f"【Device】获取设备序列号失败，未知返回类型: {type(result)}")
-    
-    return ""
-
-    
-def get_software_version(self) -> str:
-    result = comm.send_msg("GET_SOFTWARE_VERSION")
-    if isinstance(result, str):
-        if '.' in result:
-            print(f"【Device】软件版本号: {result}")
-            return result
-        else:
-            print(f"【Device】获取软件版本号失败，无效格式: {result}")
-    elif isinstance(result, int):
-        error_name = RobotError(result).name if result in RobotError.__members__.values() else "未知错误"
-        print(f"【Device】获取软件版本号失败，错误码: {result} ({error_name})")
-    else:
-        print(f"【Device】获取软件版本号失败，未知返回类型: {type(result)}")
-    
-    return ""
-    
-def check_motors() -> int:
-    """电机自检"""
-    result = comm.send_msg("CHECK_MOTORS")
-    
-    if result == RobotError.NO_ERROR.value:
-        print("【Motors】电机自检完成：所有电机正常")
+    if EtherCATClient.execute_command(CHECK_SENSORS_CODE):
+        print("  -> 传感器自检指令已发送。请稍后查询设备状态。")
         return 0
-    
-    elif isinstance(result, int):
-        motor_id = (result >> 8) & 0xFF
-        error_type = result & 0xFF
-        error_name = RobotError(result).name if result in RobotError.__members__.values() else "未知错误"
-        
-        if motor_id < 0:
-            print(f"【Motors】电机自检失败：电机ID={motor_id}，错误类型={error_type} ({error_name})")
-        else:
-            print(f"【Motors】电机自检失败，错误码: {result} ({error_name})")
-        
-        return result
-    
     else:
-        print(f"【Motors】电机自检失败，未知返回类型: {type(result)}")
-        return RobotError.COMMUNICATION_FAILURE.value   
+        print("  -> 传感器自检指令发送失败。")
+        return -1 # 表示指令发送失败
 
-def upgrade_firmware(self, firmware_path: str) -> bool:
-    """固件升级"""
-    print(f"【Firmware】开始固件升级，文件: {firmware_path}")
+def test_motors() -> int:
+    print("【Hand】正在请求电机自检...")
+    CHECK_MOTORS_CODE = 13
     
-    # 1. 检查固件文件是否存在
-    if not os.path.exists(firmware_path):
-        print(f"【Firmware】错误：固件文件不存在: {firmware_path}")
-        return False
-    
-    # 2. 获取固件文件大小
+    if EtherCATClient.execute_command(CHECK_MOTORS_CODE):
+        print("  -> 电机自检指令已发送。请稍后查询设备状态。")
+        return 0
+    else:
+        print("  -> 电机自检指令发送失败。")
+        return -1
+
+def update_firmware(firmware_path: str) -> bool:
+
+    print(f"【Hand】固件升级功能 ({firmware_path}) 当前版本不支持。")
+    return False
+
+def set_light(mode: int, color: tuple, frequency_ms: int = 1000) -> bool:
+    print(f"【Hand】正在设置灯光: 模式={mode}, 颜色={color}, 频率={frequency_ms}ms")
+    client = EtherCATClient.get_instance()
+    # 【注意】这个索引是假设的，需要确认
+    OD_INDEX_LIGHT_CONTROL = 0x2100
     try:
-        file_size = os.path.getsize(firmware_path)
-        print(f"【Firmware】固件文件大小: {file_size} 字节")
-    except OSError as e:
-        print(f"【Firmware】无法获取文件大小: {e}")
-        return False
-    
-    # 3. 准备升级（发送开始命令）
-    print("【Firmware】准备升级...")
-    result = comm.send_msg("START_FIRMWARE_UPGRADE", {
-        "file_size": file_size
-    })
-    
-    if result != RobotError.NO_ERROR.value:
-        error_name = RobotError(result).name if result in RobotError.__members__.values() else "未知错误"
-        print(f"【Firmware】升级准备失败，错误码: {result} ({error_name})")
-        return False
-    
-    # 4. 分块发送固件数据
-    CHUNK_SIZE = 4096  # 每次发送4KB
-    total_chunks = (file_size + CHUNK_SIZE - 1) // CHUNK_SIZE
-    print(f"【Firmware】开始发送固件数据，共{total_chunks}块")
-    
-    try:
-        with open(firmware_path, 'rb') as f:
-            for chunk_idx in range(total_chunks):
-                # 读取一块数据
-                data = f.read(CHUNK_SIZE)
-                
-                # 发送数据块
-                chunk_info = {
-                    "chunk_index": chunk_idx,
-                    "total_chunks": total_chunks,
-                    "data": data
-                }
-                
-                result = comm.send_msg("UPLOAD_FIRMWARE_CHUNK", chunk_info)
-                
-                if result != RobotError.NO_ERROR.value:
-                    error_name = RobotError(result).name if result in RobotError.__members__.values() else "未知错误"
-                    print(f"【Firmware】发送块 {chunk_idx+1}/{total_chunks} 失败，错误码: {result} ({error_name})")
-                    return False
-                
-                # 打印进度
-                progress = (chunk_idx + 1) / total_chunks * 100
-                print(f"【Firmware】进度: {progress:.1f}% ({chunk_idx+1}/{total_chunks})")
-    
+        # 1. 写入灯光模式 (Subindex 1, uint8)
+        mode_data = struct.pack('<B', mode)
+        client.sdo_write(OD_INDEX_LIGHT_CONTROL, 1, mode_data)
+        print("  -> 模式写入成功。")
+
+        # 2. 写入颜色RGB值 (Subindex 2, uint8[3])
+        r, g, b = color
+        color_data = struct.pack('<BBB', r, g, b)
+        client.sdo_write(OD_INDEX_LIGHT_CONTROL, 2, color_data)
+        print("  -> 颜色写入成功。")
+
+        # 3. 写入频率 (Subindex 3, uint16)
+        freq_data = struct.pack('<H', frequency_ms)
+        client.sdo_write(OD_INDEX_LIGHT_CONTROL, 3, freq_data)
+        print("  -> 频率写入成功。")
+        
+        # 所有写入都未抛出异常，则视为成功
+        return True
+        
     except Exception as e:
-        print(f"【Firmware】发送固件过程中发生异常: {e}")
+        print(f"【Hand】设置灯光失败: {e}")
         return False
-    
-    # 5. 完成升级（发送结束命令）
-    print("【Firmware】固件数据发送完成，开始安装...")
-    result = comm.send_msg("FINISH_FIRMWARE_UPGRADE")
-    
-    if result != RobotError.NO_ERROR.value:
-        error_name = RobotError(result).name if result in RobotError.__members__.values() else "未知错误"
-        print(f"【Firmware】固件安装失败，错误码: {result} ({error_name})")
-        return False
-    
-    # 6. 等待升级完成（设备重启）
-    print("【Firmware】固件升级已提交，设备将重启并完成安装")
-    print("【Firmware】请等待几分钟后再尝试连接")
-    return True

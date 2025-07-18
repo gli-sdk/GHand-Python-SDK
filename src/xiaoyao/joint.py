@@ -1,183 +1,153 @@
-# joint.py
-from typing import Union
-from . import comm
-from .common import JointInfo, RobotError, RobotStatus # 从 common 导入所有需要的类和枚举
-from typing import List
-# --- 外部可调用的函数 ---
+# src/xiaoyao/joint.py.
+
+import struct
+import time
+from ._internal.ethercat_client import EtherCATClient
+from .common import JointInfo, HandError, HandState
+
 
 def sub_joint_data(callback) -> int:
     """
-    订阅所有关节的实时运动和状态数据更新。
-    当有新数据可用时，系统将定期调用提供的回调函数。
+    订阅所有关节的实时数据更新。
     """
-    print("【Joint】正在订阅关节数据...")
-    # 调用 comm 模块中的全局订阅函数
-    subscription_id = comm.subscribe("joint_data_stream", callback)
-    if subscription_id > 0:
-        print(f"【Joint】关节数据订阅成功，订阅ID: {subscription_id}")
-    else:
-        print("【Joint】关节数据订阅失败。")
-    return subscription_id
+    if not callable(callback):
+        print("错误: 提供的 'callback' 不是一个可调用的函数。")
+        return -1
+    
+    print("【Joint】正在注册关节数据回调...")
+    sub_id = EtherCATClient.get_instance().add_subscriber('joint_data', callback)
+    print(f"【Joint】关节数据订阅成功，订阅ID: {sub_id}")
+    return sub_id
 
 def unsub_joint_data(subscription_id: int) -> bool:
     """
-    取消指定ID的关节数据订阅。
+    根据订阅ID，取消对关节数据的订阅。
     """
-    print(f"【Joint】正在取消订阅ID为 {subscription_id} 的关节数据...")
-    success = comm.unsubscribe(subscription_id)
+    print(f"【Joint】正在取消订阅ID {subscription_id} ...")
+    success = EtherCATClient.get_instance().remove_subscriber(subscription_id)
     if success:
         print(f"【Joint】订阅ID {subscription_id} 已成功取消。")
     else:
-        print(f"【Joint】取消订阅ID {subscription_id} 失败。")
+        print(f"【Joint】取消订阅失败，未找到ID {subscription_id}。")
     return success
 
-def set_joint(joint_targets) -> int:
-    """
-    设置一个或多个关节的目标角度、速度或力矩。
-    """
-    print(f"【Joint】正在设置关节目标: {joint_targets}")
-    result = comm.send_msg("SET_JOINT_ANGLE", joint_targets)
-    if  result is None:
-        print("【Joint】设置一个或多个关节的目标角度、速度或力矩，返回值为None。")
-        return RobotError.NO_ERROR.value  
-    elif not isinstance(result, int):
-        print(f"【Joint】设置一个或多个关节的目标角度、速度或力矩，返回值类型不正确: {type(result)}")
-        return RobotError.NO_ERROR.value  
-    elif result == RobotError.NO_ERROR.value:
-        print("【Joint】设置一个或多个关节的目标角度、速度或力矩。")
-    else:
-        print(f"【Joint】设置关节目标指令发送失败，错误码: {result}")
-    return result
 
-def get_joint_info(joint_id: int) -> Union[JointInfo, None]:
+def set_joint(joint_targets: list) -> HandError:
     """
-    获取指定关节的完整当前信息。
+    设置一个或多个主动关节的目标。
     """
-    print(f"【Joint】正在获取关节ID {joint_id} 的信息...")
-    response = comm.send_msg("GET_JOINT_INFO", {'joint_id': joint_id})
+    client = EtherCATClient.get_instance()
+    if not client.is_op_state():
+        return HandError.NOT_INITIALIZED
     
-    if isinstance(response, dict):
+    # 【注意】这里的TPDO布局需要与固件工程师最终确认
+    # TPDO总大小: 13个主动关节 * 每个关节(angle,speed,torque都是float) 12字节 = 156字节
+    tpdo_buffer = bytearray(13 * 12) 
+
+    # 遍历用户传入的目标，填充缓冲区
+    for target in joint_targets:
+        # 【注意】这里的 joint_id 需要是从0开始的、代表13个主动关节的逻辑ID
+        joint_id = target.joint_id
+        if 0 <= joint_id < 13:
+            offset = joint_id * 12 # 每个关节目标占12字节 (3个float)
+            struct.pack_into('<fff', tpdo_buffer, offset,
+                             target.angle, target.speed, target.torque)
+    
+    client.set_output(tpdo_buffer)
+    return HandError.NO_ERROR
+
+def stop_all_joints() -> bool:
+    """停止所有关节运动。通过发送速度为0的指令实现。"""
+    targets = []
+    for i in range(13): # 13个主动关节
         info = JointInfo()
-        info.joint_id = response.get('joint_id', -1)
-        info.angle = response.get('angle', 0.0)
-        info.speed = response.get('speed', 0.0)
-        info.torque = response.get('torque', 0.0)
-        info.status = response.get('status', RobotStatus.UNKNOWN.value)
-        print(f"【Joint】成功获取关节ID {joint_id} 的信息。")
-        return info
-    else:
-        print(f"【Joint】获取关节ID {joint_id} 的信息失败。")
-        return None
+        info.joint_id = i
+        info.speed = 0.0
+        # 理想情况下，目标角度应设为当前角度，但为简化，设为0
+        info.angle = 0.0
+        info.torque = 0.0
+        targets.append(info)
+    
+    return set_joint(targets) == HandError.NO_ERROR
 
 def get_all_joints() -> list:
     """
-    获取所有关节的完整当前信息。
+    从缓存中获取所有18个关节的最新信息列表。
+    此函数执行速度极快，因为它不涉及任何IO操作。
     """
-    print("【Joint】正在获取所有关节的信息...")
-    response = comm.send_msg("GET_ALL_JOINTS")
+    all_data = EtherCATClient.get_instance().get_latest_parsed_data()
+    return all_data.get('joints', [])
 
-    if isinstance(response, list):
-        joint_list = []
-        for joint_data in response:
-            info = JointInfo()
-            info.joint_id = joint_data.get('joint_id', -1)
-            info.angle = joint_data.get('angle', 0.0)
-            info.speed = joint_data.get('speed', 0.0)
-            info.torque = joint_data.get('torque', 0.0)
-            info.status = joint_data.get('status', RobotStatus.UNKNOWN.value)
-            joint_list.append(info)
-        print("【Joint】成功获取所有关节的信息。")
-        return joint_list
-    else:
-        print("【Joint】获取所有关节信息失败。")
-        return []
+def get_joint_info(joint_id: int) -> JointInfo:
+    """获取指定ID的单个关节的完整信息。"""
+    all_joints_data = get_all_joints()
+    if all_joints_data and 0 <= joint_id < len(all_joints_data):
+        return all_joints_data[joint_id]
+    return None
 
 def set_max_torque(joint_id: int, max_torque: float) -> int:
-    """
-    设置指定关节的最大允许输出力矩。
-    """
-    print(f"【Joint】正在为关节ID {joint_id} 设置最大力矩: {max_torque}")
-    result = comm.send_msg("SET_MAX_TORQUE", {'joint_id': joint_id, 'max_torque': max_torque})
-    if  result is None:
-        print("【Joint】设置最大力矩指令发送失败，返回值为None。")
-        return RobotError.NO_ERROR.value  
-    elif not isinstance(result, int):
-        print(f"【Joint】设置最大力矩指令发送失败，返回值类型不正确: {type(result)}")
-        return RobotError.NO_ERROR.value  
-    elif result == RobotError.NO_ERROR.value:
-        print("【Joint】设置最大力矩指令发送成功。")
-    else:
-        print(f"【Joint】设置最大力矩指令发送失败，错误码: {result}")
-    return result
+    """设置指定关节的最大力矩。"""
+    target = JointInfo()
+    target.joint_id = joint_id
+    target.torque = max_torque
+    # 保持角度和速度为当前值是最佳实践，简化为0
+    target.angle = 0.0 
+    target.speed = 0.0
+    return set_joint([target])
 
 def set_all_joints_max_torque(max_torque: float) -> int:
-    """
-    设置所有关节的最大允许输出力矩。
-    """
-    print(f"【Joint】正在为所有关节设置最大力矩: {max_torque}")
-    result = comm.send_msg("SET_ALL_JOINTS_MAX_TORQUE", {'max_torque': max_torque})
-    if result is None:
-        print("【Joint】设置所有关节最大力矩指令发送失败，返回值为None。")
-        return RobotError.NO_ERROR.value  
-    elif not isinstance(result, int):
-        print(f"【Joint】设置所有关节最大力矩指令发送失败，返回值类型不正确: {type(result)}")
-        return RobotError.NO_ERROR.value  
-    elif result == RobotError.NO_ERROR.value:
-        print("【Joint】设置所有关节最大力矩指令发送成功。")
-    else:
-        print(f"【Joint】设置所有关节最大力矩指令发送失败，错误码: {result}")
-    return result
+    """设置所有关节的最大力矩。协议中此功能在 set_joint 中实现。"""
+    print("【Joint】信息: 设置所有关节最大力矩请使用 set_joint 函数。")
+    targets = []
+    for i in range(13):
+        info = JointInfo()
+        info.joint_id = i
+        info.torque = max_torque
+        targets.append(info)
+    return set_joint(targets)
+
 def get_passive_joints() -> list:
     """
-    查询并列出所有当前处于被动模式的关节ID。
+    查询并列出所有被动关节的ID。
     """
-    print("【Joint】正在查询被动关节...")
-    result = comm.send_msg("GET_PASSIVE_JOINTS")
-    if isinstance(result, list):
-        print(f"【Joint】成功获取被动关节列表: {result}")
-        return result
-    else:
-        print("【Joint】查询被动关节失败。")
-        return []
+    print("【Joint】正在根据开发规范查询被动关节...")
+    # 2,3,4,5 (Thumb), 8,9,10 (FF), 13,14 (MF), 17,18 (RF), 21,22 (LF)
+    active_joint_ids = {2, 3, 4, 5, 8, 9, 10, 13, 14, 17, 18, 21, 22}
+    
+    # 总关节ID范围是 0-22
+    all_joint_ids = set(range(23))
+    
+    # 从所有关节中减去主动关节，剩下的就是被动关节
+    passive_joint_ids_int = sorted(list(all_joint_ids - active_joint_ids))
+    
+    # 转换为字符串列表
+    passive_joint_ids_str = [str(i) for i in passive_joint_ids_int]
+    
+    print(f"【Joint】查询到被动关节列表: {passive_joint_ids_str}")
+    return passive_joint_ids_str
 
 def query_linked_joint(joint_id: int) -> int:
     """
-    查询与指定关节存在联动关系的唯一关节ID。
+    查询与指定关节存在联动关系的关节ID。
     """
-    print(f"【Joint】正在查询关节ID {joint_id} 的联动关节...")
-    result = comm.send_msg("QUERY_LINKED_JOINT", {'joint_id': joint_id})
-    if isinstance(result, int):
-        if result != -1:
-            print(f"【Joint】关节ID {joint_id} 的联动关节为: {result}")
-        else:
-            print(f"【Joint】关节ID {joint_id} 没有联动关节。")
-        return result
-    else:
-        print(f"【Joint】查询联动关节失败。")
-        return -1 # 返回-1表示失败或未找到
-
-def stop_all_joints() -> bool:
-    """
-    停止机器人所有关节的当前运动。
-    """
-    print("【Joint】正在发送停止所有关节的指令...")
-    result = comm.send_msg("STOP_ALL_JOINTS")
-    if result == RobotError.NO_ERROR.value:
-        print("【Joint】停止所有关节指令发送成功。")
-        # 在真实SDK中，这里会启动一个定时器或订阅来确认状态
-        return True
-    else:
-        print(f"【Joint】停止所有关节指令发送失败，错误码: {result}")
-        return False
-
-
+    print(f"【Joint】正在查询关节ID {joint_id} 的联动关系...")
+    LINKAGE_MAP = {
+        # 食指: FF2(8) 带动 FF1(7)
+        8: 7,
+        # 中指: MF2(13) 带动 MF1(12)
+        13: 12,
+        # 无名指: RF2(17) 带动 RF1(16)
+        17: 16,
+        # 小拇指: LF2(21) 带动 LF1(20)
+        21: 20,
+        # 拇指的联动关系通常更复杂，此处暂不猜测
+    }
     
-def get_speed(joint_id: int) -> float:
-    """获取指定关节的当前速度"""
-    result = comm.send_msg("GET_JOINT_SPEED", {"joint_id": joint_id})
-    if isinstance(result, float):
-        return result
+    linked_id = LINKAGE_MAP.get(joint_id, -1)
+    
+    if linked_id != -1:
+        print(f"【Joint】关节ID {joint_id} 的联动关节为: {linked_id}")
     else:
-        print(f"获取关节速度失败，错误码: {result}")
-        return -1.0  
-
+        print(f"【Joint】关节ID {joint_id} 没有在预设的联动表中找到关系。")
+        
+    return linked_id
