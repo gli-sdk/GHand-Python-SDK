@@ -3,15 +3,15 @@ import time
 import pysoem
 import netifaces
 import struct
-from message import Message
+from data import Rpdo, Tpdo
+
 class Client(object):
-    _connected = False
     _instance_lock = threading.Lock()
-    _master = pysoem.Master()
-    _slave = None
 
     def __init__(self):
-        pass
+        self._connected = False
+        self._master = pysoem.Master()
+        self._slave = None
 
     def __new__(cls, *args, **kwargs):
         if not hasattr(cls, '_instance'):
@@ -32,6 +32,7 @@ class Client(object):
             return True
         try:
             self._master.open(id)
+            self._master.sdo_read_timeout = 1000
         except:
             return False
         if self._master.config_init() <= 0:
@@ -64,14 +65,6 @@ class Client(object):
             return False
         return True
 
-
-
-    def send(self, message: Message):
-        pass
-
-    def recv(self, message: Message):
-        pass
-
     def sdo_read(self, index, subindex=0):
         return self._slave.sdo_read(index, subindex,)
     
@@ -85,16 +78,8 @@ class Client(object):
             self._master.send_processdata()
             self._master.receive_processdata()
             data = self._slave.input
-            joint_name = ["Thumb1", "Thumb2", "Thumb3", "Thumb4", "Thumb5","FF1", "FF2", "FF3", "FF4", "MF1", "MF2", "MF3", "RF1", "RF2", "RF3", "LF1", "LF2", "LF3"]
-            for i in range(18):
-                offset = i * 14
-                state, error,angle,speed,torque = struct.unpack_from('<BBfff', data, offset)
-                print(f"{joint_name[i]} state: {state}, error: {error}, angle: {angle}, speed: {speed}, torque: {torque}")
-
-            return {
-            "temp": 25, 
-            "thumb1": {"state": 0, "error": 0, "angle": 0, "speed": 0,"torque": 0}, 
-            "thumb2": {"state": 0, "error": 0, "angle": 0, "speed": 0,"torque": 0}}
+            tpdo = Tpdo().from_bytes(data)
+            return tpdo
 
     def send_thread(self):
         pass
