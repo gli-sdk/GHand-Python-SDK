@@ -1,14 +1,16 @@
 import enum
 from typing import Optional
-from client import Client
-from subscription import SubscriptionManager
-from data import JointRpdo, Rpdo
 from dataclasses import dataclass
+from .ecatclient import EthercatClient
+from .subscription import SubscriptionManager
+from .data import JointRpdo, Rpdo
+
 
 class HandType(enum.Enum):
     UNKNOWN = "unknown"
     LEFT_HAND = "left_hand"
     RIGHT_HAND = "right_hand"
+
 
 class CommType(enum.Enum):
     UNKNOWN = "unknown"
@@ -16,9 +18,11 @@ class CommType(enum.Enum):
     CANFD = "canfd"
     RS485 = "rs485"
 
+
 class CtrlMode(enum.Enum):
     POSITION = 0
     TORQUE = 1
+
 
 @dataclass
 class Joint:
@@ -27,12 +31,15 @@ class Joint:
     speed: float = 0.0
     torque: float = 0.0
 
+
 class GestureType(enum.Enum):
     HAND_OPEN = "hand_open"
 
+
 class DexHand(object):
     def __init__(self):
-        self._client = Client()
+        # self._client = Client()
+        self._client = EthercatClient()
         self._hand_type = HandType.UNKNOWN
         self._firmware_version = ""
         self._sub_manager = SubscriptionManager()
@@ -69,15 +76,15 @@ class DexHand(object):
                 for id in id_list:
                     connected = self._client.connect(id)
                     if connected:
+                        self._client.run()
                         break
             else:
                 connected = self._client.connect(id)
         elif type == CommType.CANFD:
-            connected = self._client.connect(id)
+            pass
         elif type == CommType.RS485:
-            connected = self._client.connect(id)
+            pass
         return connected
-
 
     def close(self):
         self._client.disconnect()
@@ -85,11 +92,12 @@ class DexHand(object):
 
     def get_firmware_version(self):
         if self._firmware_version == "":
-            self._firmware_version = self._client.sdo_read(0x100A, 0x00).decode('utf-8')
+            self._firmware_version = self._client.sdo_read(
+                0x100A, 0x00).decode('utf-8')
         return self._firmware_version
 
-
     # 解除保护
+
     def release_protection(self):
         self._client.sdo_write(0x2001, 0x00, b'\x01')
         return True
@@ -147,7 +155,8 @@ class DexHand(object):
     def get_hand_type(self):
         if self._hand_type == HandType.UNKNOWN:
             try:
-                type = int.from_bytes(self._client.sdo_read(0x2011), byteorder='little')
+                type = int.from_bytes(
+                    self._client.sdo_read(0x2011), byteorder='little')
             except Exception:
                 return HandType.UNKNOWN
             if type == 0x01:
@@ -169,7 +178,7 @@ class DexHand(object):
         pdo.speed = joint.speed
         pdo.torque = joint.torque
 
-    def move_joints(self, th_pip: Optional[Joint]=None, th_mcp: Optional[Joint]=None, th_swing: Optional[Joint]=None, th_rot: Optional[Joint]=None, ff_pip: Optional[Joint]=None,ff_mcp: Optional[Joint]=None,ff_swing: Optional[Joint]=None, mf_pip: Optional[Joint]=None,mf_mcp: Optional[Joint]=None, rf_pip: Optional[Joint]=None, rf_mcp: Optional[Joint]=None, lf_pip: Optional[Joint]=None, lf_mcp: Optional[Joint]=None, ctrl_mode=CtrlMode.POSITION):
+    def move_joints(self, th_pip: Optional[Joint] = None, th_mcp: Optional[Joint] = None, th_swing: Optional[Joint] = None, th_rot: Optional[Joint] = None, ff_pip: Optional[Joint] = None, ff_mcp: Optional[Joint] = None, ff_swing: Optional[Joint] = None, mf_pip: Optional[Joint] = None, mf_mcp: Optional[Joint] = None, rf_pip: Optional[Joint] = None, rf_mcp: Optional[Joint] = None, lf_pip: Optional[Joint] = None, lf_mcp: Optional[Joint] = None, ctrl_mode=CtrlMode.POSITION):
         if not self._client._connected:
             return False
         rpdo = Rpdo(mode=ctrl_mode.value)
