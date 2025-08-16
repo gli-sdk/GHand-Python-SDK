@@ -16,6 +16,7 @@ class EthercatClient(object):
         self._pd_thread_stop_event = threading.Event()
         self._ch_thread_stop_event = threading.Event()
         self._connected = False
+        self._slave = None
 
     def __new__(cls, *args, **kwargs):
         if not hasattr(cls, '_instance'):
@@ -67,13 +68,13 @@ class EthercatClient(object):
                         self._check_slave(slave)
             time.sleep(0.01)
 
-    def recv_data(self):
+    def recv_data(self) -> bytes:
         if self._slave is not None:
             return self._slave.input
         else:
-            return None
+            return bytes()
 
-    def send_data(self, data):
+    def send_data(self, data: bytes):
         if self._slave is not None:
             self._slave.output = data
 

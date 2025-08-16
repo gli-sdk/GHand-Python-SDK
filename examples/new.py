@@ -1,5 +1,5 @@
 import time
-from xiaoyao.dexhand import DexHand, CommType, Joint
+from xiaoyao.dexhand import DexHand, CommType, Joint, JointId
 
 
 def get_temprature(data):
@@ -23,7 +23,12 @@ def main():
     # hand_type = hand.get_hand_type()
     # print(f"ver: {ver}; hand_type: {hand_type.value}")
 
-    hand.move_joints(th_pip=Joint(angle=0), th_mcp=Joint(angle=0))
+    th_pip = Joint(id=JointId.THUMB_PIP, angle=0)
+    th_mcp = Joint(id=JointId.THUMB_MCP, angle=0)
+    joints = [th_pip, th_mcp]
+    hand.move_joints(joints=joints)
+    joints = hand.get_joints()
+    print(joints)
     # sub_id = hand.sub_hand_data(callback=process_data)
     # time.sleep(3)
     # hand.unsub_hand_data(sub_id)
