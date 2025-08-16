@@ -32,12 +32,9 @@
 --------
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 0
    
-   sdk/hand
-   sdk/joint
-   sdk/tip
-   sdk/tactile
+   python/api.rst
 
 索引和搜索
 ==========

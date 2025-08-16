@@ -38,11 +38,11 @@ class GestureType(enum.Enum):
 
 class DexHand(object):
     def __init__(self):
-        # self._client = Client()
         self._client = EthercatClient()
         self._hand_type = HandType.UNKNOWN
         self._firmware_version = ""
         self._sub_manager = SubscriptionManager()
+        self._opened = False
         self._set_joint_limit()
 
     def __del__(self):
@@ -68,26 +68,35 @@ class DexHand(object):
             return False
         return True
 
-    def open(self, type=CommType.ETHERCAT, id="auto"):
-        connected = False
+    def open(self, type: CommType = CommType.ETHERCAT, id: str = "auto"):
+        """
+        打开灵巧手设备连接
+
+        :param type: 通信类型，默认为ETHERCAT
+        :param id: 设备ID，当设置为"auto"时自动搜索设备，默认为"auto"
+        :return: 连接成功返回True，否则返回False
+        """
+        if self._opened:
+            return True
         if type == CommType.ETHERCAT:
             if id == "auto":
                 id_list = self._client.search()
                 for id in id_list:
-                    connected = self._client.connect(id)
-                    if connected:
+                    self._opened = self._client.connect(id)
+                    if self._opened:
                         self._client.run()
                         break
             else:
-                connected = self._client.connect(id)
+                self._opened = self._client.connect(id)
         elif type == CommType.CANFD:
             pass
         elif type == CommType.RS485:
             pass
-        return connected
+        return self._opened
 
     def close(self):
-        self._client.disconnect()
+        if self._opened:
+            self._client.disconnect()
         return True
 
     def get_firmware_version(self):
@@ -96,41 +105,54 @@ class DexHand(object):
                 0x100A, 0x00).decode('utf-8')
         return self._firmware_version
 
-    # 解除保护
+    def release_protection(self) -> bool:
+        """
+        解除保护
 
-    def release_protection(self):
-        self._client.sdo_write(0x2001, 0x00, b'\x01')
+        Returns:
+            bool: 解除成功返回True，失败返回False
+        """
+        try:
+            self._client.sdo_write(0x2001, 0x00, b'\x01')
+        except Exception:
+            return False
         return True
 
-    def reboot(self):
+    def reboot(self) -> bool:
+        """
+        重启设备
+
+        Returns:
+            bool: 重启成功返回True，失败返回False
+        """
         try:
             self._client.sdo_write(0x2002, 0x01, b'\x01')
         except Exception:
             return False
         return True
 
-    def joint_init(self):
+    def joint_init(self) -> bool:
         try:
             self._client.sdo_write(0x2003, 0x00, b'\x01')
         except Exception:
             return False
         return True
 
-    def tactile_self_test(self):
+    def tactile_self_test(self) -> bool:
         try:
             self._client.sdo_write(0x2005, 0x00, b'\x01')
         except Exception:
             return False
         return True
 
-    def tactile_reset(self):
+    def tactile_reset(self) -> bool:
         try:
             self._client.sdo_write(0x2006, 0x00, b'\x01')
         except Exception:
             return False
         return True
 
-    def motor_self_test(self):
+    def motor_self_test(self) -> bool:
         try:
             self._client.sdo_write(0x2007, 0x00, b'\x01')
         except Exception:
