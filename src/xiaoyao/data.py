@@ -1,5 +1,5 @@
 import struct
-from dataclasses import dataclass
+from dataclasses import dataclass, field  # 添加field导入
 
 
 @dataclass
@@ -167,23 +167,23 @@ class JointRpdo:
 class Rpdo:
     mode: int = 0
     # thumb
-    th_pip: JointRpdo = JointRpdo()
-    th_mcp: JointRpdo = JointRpdo()
-    th_swing: JointRpdo = JointRpdo()
-    th_rot: JointRpdo = JointRpdo()
+    th_pip: JointRpdo = field(default_factory=JointRpdo)
+    th_mcp: JointRpdo = field(default_factory=JointRpdo)
+    th_swing: JointRpdo = field(default_factory=JointRpdo)
+    th_rot: JointRpdo = field(default_factory=JointRpdo)
     # ff
-    ff_pip: JointRpdo = JointRpdo()
-    ff_mcp: JointRpdo = JointRpdo()
-    ff_swing: JointRpdo = JointRpdo()
+    ff_pip: JointRpdo = field(default_factory=JointRpdo)
+    ff_mcp: JointRpdo = field(default_factory=JointRpdo)
+    ff_swing: JointRpdo = field(default_factory=JointRpdo)
     # mf
-    mf_pip: JointRpdo = JointRpdo()
-    mf_mcp: JointRpdo = JointRpdo()
+    mf_pip: JointRpdo = field(default_factory=JointRpdo)
+    mf_mcp: JointRpdo = field(default_factory=JointRpdo)
     # rf
-    rf_pip: JointRpdo = JointRpdo()
-    rf_mcp: JointRpdo = JointRpdo()
+    rf_pip: JointRpdo = field(default_factory=JointRpdo)
+    rf_mcp: JointRpdo = field(default_factory=JointRpdo)
     # lf
-    lf_pip: JointRpdo = JointRpdo()
-    lf_mcp: JointRpdo = JointRpdo()
+    lf_pip: JointRpdo = field(default_factory=JointRpdo)
+    lf_mcp: JointRpdo = field(default_factory=JointRpdo)
 
     def to_bytes(self) -> bytes:
         # control mode

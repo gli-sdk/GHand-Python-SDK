@@ -15,7 +15,7 @@ def process_data(data):
 
 def main():
     hand = DexHand()
-    connected = hand.open(CommType.ETHERCAT, "auto")
+    connected = hand.open(CommType.ETHERCAT, r"\Device\NPF_{22F450DC-244F-47FA-A538-CBD0142495BE}")
     # if not connected:
     #     print("connect failed")
     #     return
@@ -28,9 +28,9 @@ def main():
     joints = [th_pip, th_mcp]
     hand.move_joints(joints=joints)
     joints = hand.get_joints()
-    print(joints)
+    # print(joints)
     # sub_id = hand.sub_hand_data(callback=process_data)
-    # time.sleep(3)
+    time.sleep(5)
     # hand.unsub_hand_data(sub_id)
     hand.close()
 

@@ -112,6 +112,8 @@ class DexHand(object):
                         break
             else:
                 self._opened = self._client.connect(id)
+                if self._opened:
+                    self._client.run()
         elif type == CommType.CANFD:
             pass
         elif type == CommType.RS485:
@@ -296,6 +298,7 @@ class DexHand(object):
                 print(f"【Joint】无效的关节ID: {joint.id}")
                 return False
         self._client.send_data(rpdo.to_bytes())
+        print(f"【Joint】发送 PDO 数据成功")
         return True
 
     def get_joints(self) -> list[Joint]:
@@ -303,17 +306,25 @@ class DexHand(object):
         获取所有关节状态及运动信息
 
         Returns:
-          list[Joint]: 连接成功返回True，否则返回False
+        list[Joint]: 连接成功返回True，否则返回False
         """
         data = self._client.recv_data()
+        print(f"Received data length: {len(data)} bytes")  # 调试信息：打印接收到的数据长度
+        print(f"Received raw data: {data}")  # 调试信息：打印原始数据
+        
         if len(data) < 235:
+            print(f"Data length insufficient. Expected at least 235 bytes, got {len(data)} bytes")  # 调试信息：数据长度不足时的提示
             return []
+        
         tpdo = Tpdo.from_bytes(data)
-        print(tpdo)
+        print(f"Parsed TPDO: {tpdo}")  # 调试信息：打印解析后的TPDO对象
+        
         joints = []
         for i in range(18):
             joint = Joint(id=i, angle=i)
             joints.append(joint)
+        
+        print(f"Returning {len(joints)} joints")  # 调试信息：打印返回的关节数量
         return joints
 
     # def move_joints(self, th_pip: Optional[Joint] = None, th_mcp: Optional[Joint] = None, th_swing: Optional[Joint] = None, th_rot: Optional[Joint] = None, ff_pip: Optional[Joint] = None, ff_mcp: Optional[Joint] = None, ff_swing: Optional[Joint] = None, mf_pip: Optional[Joint] = None, mf_mcp: Optional[Joint] = None, rf_pip: Optional[Joint] = None, rf_mcp: Optional[Joint] = None, lf_pip: Optional[Joint] = None, lf_mcp: Optional[Joint] = None, ctrl_mode=CtrlMode.POSITION):
