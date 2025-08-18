@@ -89,6 +89,7 @@ class EthercatClient(object):
             self._connected = True
             print("Connected to device with id: ", id)
             self._slave = self._master.slaves[0]
+            self._slave.is_lost = False
             return True
         except Exception as e:
             print(e)
@@ -103,18 +104,33 @@ class EthercatClient(object):
     def run(self):
         self._master.config_map()
         if self._master.state_check(pysoem.SAFEOP_STATE, timeout=50_000) != pysoem.SAFEOP_STATE:
+            print("Failed to enter SAFEOP state")
+            for slave in self._master.slaves:
+                if not slave.state == pysoem.SAFEOP_STATE:
+                    print('{} did not reach SAFEOP state'.format(slave.name))
+                    print('al status code {} ({})'.format(hex(slave.al_status),
+                          pysoem.al_status_code_to_string(slave.al_status)))
             self._master.close()
+            return False
         self._master.state = pysoem.OP_STATE
-        self._master.write_state()
         self.check_thread = threading.Thread(target=self._check_thread)
         self.check_thread.start()
         self.proc_thread = threading.Thread(target=self._processdata_thread)
         self.proc_thread.start()
+        self._master.send_processdata()
+        self._master.receive_processdata(timeout=2000)
+        self._master.write_state()
+        slave_reached_op = False
         for i in range(40):
             self._master.state_check(pysoem.OP_STATE, timeout=50_000)
             if self._master.state == pysoem.OP_STATE:
-                self._master.in_op = True
-            break
+                # self._master.in_op = True
+                slave_reached_op = True
+                break
+        if slave_reached_op:
+            self._master.in_op = True
+        else:
+            print("no op reached")
 
     def disconnect(self):
         if self._connected:
