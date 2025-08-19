@@ -45,6 +45,13 @@ class JointId(enum.IntEnum):
     LF_MCP = 17
 
 
+class LightEffect(enum.Enum):
+    ON = 'on'
+    OFF = "off"
+    BREATH = "breath"
+    FLASH = "flash"
+
+
 @dataclass
 class Joint:
     id: int = JointId.THUMB_DIP
@@ -316,6 +323,28 @@ class DexHand(object):
             joints.append(joint)
         return joints
 
+    def set_light(self, color: tuple = (0, 0, 0), effect: str = 'on', T: int = 1000) -> bool:
+        """
+        设置灯光效果
+
+        Args:
+            color (tuple): 灯颜色(R, G, B)，R:[0~255], G:[0~255], [0~255],
+            effect (str): 灯效，"on":开启灯光, "off":关闭灯光, "flash":灯光闪烁, "breath":呼吸灯
+            T (int): 灯效周期，呼吸的时间范围为[500,2000], 闪烁的时间范围为[100,1000]
+
+        Returns:
+            bool: 成功返回True，失败返回False
+        """
+        if min(color) < 0 or max(color) > 255:
+            return False
+        if effect == 'breath':
+            if T > 2000 or T < 500:
+                return False
+        elif effect == 'flash':
+            if T > 1000 or T < 100:
+                return False
+        # TODO
+        return True
     # def move_joints(self, th_pip: Optional[Joint] = None, th_mcp: Optional[Joint] = None, th_swing: Optional[Joint] = None, th_rot: Optional[Joint] = None, ff_pip: Optional[Joint] = None, ff_mcp: Optional[Joint] = None, ff_swing: Optional[Joint] = None, mf_pip: Optional[Joint] = None, mf_mcp: Optional[Joint] = None, rf_pip: Optional[Joint] = None, rf_mcp: Optional[Joint] = None, lf_pip: Optional[Joint] = None, lf_mcp: Optional[Joint] = None, ctrl_mode=CtrlMode.POSITION):
     #     if not self._client._connected:
     #         return False
