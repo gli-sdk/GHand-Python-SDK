@@ -1,7 +1,7 @@
 环境设置
 ==============
 
-安装Python
+检查Python版本
 ----------
 Xiaoyao SDK需要Python 3.8或更高版本。
 
@@ -10,7 +10,7 @@ Xiaoyao SDK需要Python 3.8或更高版本。
    # 检查Python版本
    python --version
 
-   # 如果版本低于3.8，请升级Python
+   # 如果版本低于3.9，请升级Python
 
 安装依赖
 --------

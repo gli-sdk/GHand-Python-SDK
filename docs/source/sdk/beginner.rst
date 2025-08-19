@@ -1,38 +1,38 @@
 .. _beginner:
 
-初学者指南
-============
+####################################
+新手入门
+####################################
 
-本指南将帮助您快速开始使用Xiaoyao灵巧手SDK。
+本指南将帮助您快速开始使用Xiaoyao Python SDK。
 
 第一步：安装SDK
----------------
+------------------------
 .. code-block:: bash
 
-   pip install xiaoyao-sdk
+   pip install xiaoyao
 
 第二步：连接设备
-----------------
+------------------------
 参考 :ref:`connection` 指南
 
 第三步：运行示例代码
--------------------
+------------------------
 .. code-block:: python
 
-   from xiaoyao.hand import Hand
+   from xiaoyao.dexhand import DexHand, CommType
    
-   # 初始化手部控制
-   hand = Hand()
+   # 创建灵巧手对象
+   hand = DexHand()
    
-   # 执行预设手势
-   hand.do_preset_gesture(hand.GestureType.FIST)
+   # 连接灵巧手设备
+   hand.open(CommType.ETHERCAT, "your device id")
    
-   print("手势执行完成！")
+   # 获取手部类型（左手/右手）并打印
+   hand_type = hand.get_hand_type()
+   print(hand.get_operation_status())
 
-常见问题
---------
-问：如何获取设备状态？
-答：使用 ``get_operation_status()`` 方法
 
-问：如何更新固件？
-答：参考 :ref:`installs` 指南
+使用示例程序
+------------------------
+更多示例程序在``/xiaoyao/examples``目录下。

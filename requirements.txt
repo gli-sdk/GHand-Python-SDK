@@ -1,3 +1,4 @@
 pysoem
 netifaces
 setuptools
+sphinx

@@ -9,27 +9,27 @@ EtherCAT连接
 ------------
 .. code-block:: python
 
-   from xiaoyao.hand import Hand
+   from xiaoyao.hand import DexHand, CommType
    
-   hand = Hand()
-   hand.open_ethercat("device_id_123")
+   hand = DexHand()
+   hand.open_ethercat(CommType.ETHERCAT, "device_id_123")
 
 CAN总线连接
 -----------
 .. code-block:: python
 
-   from xiaoyao.hand import Hand
+   from xiaoyao.hand import DexHand, CommType
    
-   hand = Hand()
+   hand = DexHand()
    hand.set_can_com(baud_rate=1000000, node_id=1)
 
 RS485连接
 ---------
 .. code-block:: python
 
-   from xiaoyao.hand import Hand
+   from xiaoyao.hand import DexHand, CommType
    
-   hand = Hand()
+   hand = DexHand()
    hand.set_rs485_com(baud_rate=115200, data_bits=8, stop_bits=1, parity='none')
 
 连接故障排除

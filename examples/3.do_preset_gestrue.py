@@ -6,6 +6,7 @@ import time
 from xiaoyao import hand, common
 from xiaoyao._internal.ethercat_client import auto_connect_to_hand
 
+
 def main():
     """主执行函数，演示如何执行预设手势。"""
     print("***** 枭尧灵巧手 SDK - 预设手势功能演示 *****\n")
@@ -20,11 +21,11 @@ def main():
             return
 
         print("\n--- 设备已就绪，将开始依次演示预设手势 ---\n")
-        time.sleep(1) 
-        
+        time.sleep(1)
+
         print("演示1: [张开所有手指]")
         hand.do_preset_gesture(common.GestureType.OPEN_ALL_FINGERS)
-        time.sleep(3) 
+        time.sleep(3)
 
         print("演示2: [握拳]")
         hand.do_preset_gesture(common.GestureType.FIST)
