@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.abspath('../../src'))
 project = 'Xiaoyao灵巧手SDK'
 copyright = '2025, 深圳果力智能科技有限公司'
 author = '果力智能科技'
+autodoc_member_order = 'bysource'
 
 # The short X.Y version
 version = '1.0'

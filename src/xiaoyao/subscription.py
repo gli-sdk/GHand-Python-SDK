@@ -1,7 +1,9 @@
 import threading
 import time
-from client import Client
+from .client import Client
 from typing import Callable, Optional
+
+
 class SubscriptionManager:
     def __init__(self):
         self._lock = threading.Lock()
@@ -12,16 +14,17 @@ class SubscriptionManager:
         self._sub_id_counter = 0
         self._lock = threading.Lock()
         self._subscribers = {}
-        
 
     def start(self):
         if not self._running:
             self._running = True
             res = self._client.pdo_init()
             print(f"PDO initialized: {res}")
-            self._thread = threading.Thread(target=self._data_producer, daemon=True)
+            self._thread = threading.Thread(
+                target=self._data_producer, daemon=True)
             self._thread.start()
-            self._dispatcher_thread = threading.Thread(target=self._data_dispatcher, daemon=True)
+            self._dispatcher_thread = threading.Thread(
+                target=self._data_dispatcher, daemon=True)
             self._dispatcher_thread.start()
 
     def stop(self):
@@ -38,7 +41,6 @@ class SubscriptionManager:
             data = self._client.recv_data()
             self._data = data
             time.sleep(0.1)
-        
 
     def _data_dispatcher(self):
         while self._running:

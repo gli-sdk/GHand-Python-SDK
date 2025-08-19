@@ -3,7 +3,8 @@ import time
 import pysoem
 import netifaces
 import struct
-from data import Rpdo, Tpdo
+from .data import Rpdo, Tpdo
+
 
 class Client(object):
     _instance_lock = threading.Lock()
@@ -24,8 +25,7 @@ class Client(object):
         ids = netifaces.interfaces()
         for i, v in enumerate(ids):
             ids[i] = "\\Device\\NPF_" + v
-        return  ids
-
+        return ids
 
     def connect(self, id):
         if self._connected:
@@ -66,8 +66,8 @@ class Client(object):
         return True
 
     def sdo_read(self, index, subindex=0):
-        return self._slave.sdo_read(index, subindex,)
-    
+        return self._slave.sdo_read(index, subindex)
+
     def sdo_write(self, index, subindex, value):
         return self._slave.sdo_write(index, subindex, value)
 
@@ -83,5 +83,6 @@ class Client(object):
 
     def send_thread(self):
         pass
+
     def recv_thread(self):
         pass

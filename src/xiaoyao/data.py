@@ -1,15 +1,21 @@
 import struct
 from dataclasses import dataclass
 
+
 @dataclass
 class HandTpdo:
     state: int
     error: int
     temp: int
+
     @classmethod
     def from_bytes(cls, data: bytes):
-        state, error, temp = struct.unpack_from('<BBf', data, 0)
+        expected_size = struct.calcsize('<BBB')
+        if not data or len(data) < expected_size:
+            return cls(0, 0, 0)
+        state, error, temp = struct.unpack_from('<BBB', data, 0)
         return cls(state, error, temp)
+
 
 @dataclass
 class JointTpdo:
@@ -18,20 +24,31 @@ class JointTpdo:
     angle: float
     speed: float
     torque: float
+
     @classmethod
     def from_bytes(cls, data: bytes):
-        state, error, angle, speed, torque = struct.unpack_from('<BBfff', data, 0)
+        expected_size = struct.calcsize('<BBfff')
+        if not data or len(data) < expected_size:
+            return cls(0, 0, 0.0, 0.0, 0.0)
+        state, error, angle, speed, torque = struct.unpack_from(
+            '<BBfff', data, 0)
         return cls(state, error, angle, speed, torque)
+
 
 @dataclass
 class TactileTpdo:
     state: int
     error: int
     tactile: list[int]
+
     @classmethod
     def from_bytes(cls, data: bytes):
+        expected_size = struct.calcsize('<BB18B')
+        if not data or len(data) < expected_size:
+            return cls(0, 0, [0] * 18)
         state, error, *tactile = struct.unpack_from('<BB18B', data, 0)
         return cls(state, error, tactile)
+
 
 @dataclass
 class Tpdo:
@@ -65,8 +82,43 @@ class Tpdo:
     tac_mf: TactileTpdo
     tac_rf: TactileTpdo
     tac_lf: TactileTpdo
+
     @classmethod
     def from_bytes(cls, data: bytes):
+        if not data:
+            # 返回所有字段的默认实例
+            return cls(
+                HandTpdo(0, 0, 0),
+                # thumb
+                JointTpdo(0, 0, 0.0, 0.0, 0.0),
+                JointTpdo(0, 0, 0.0, 0.0, 0.0),
+                JointTpdo(0, 0, 0.0, 0.0, 0.0),
+                JointTpdo(0, 0, 0.0, 0.0, 0.0),
+                JointTpdo(0, 0, 0.0, 0.0, 0.0),
+                # ff
+                JointTpdo(0, 0, 0.0, 0.0, 0.0),
+                JointTpdo(0, 0, 0.0, 0.0, 0.0),
+                JointTpdo(0, 0, 0.0, 0.0, 0.0),
+                JointTpdo(0, 0, 0.0, 0.0, 0.0),
+                # mf
+                JointTpdo(0, 0, 0.0, 0.0, 0.0),
+                JointTpdo(0, 0, 0.0, 0.0, 0.0),
+                JointTpdo(0, 0, 0.0, 0.0, 0.0),
+                # rf
+                JointTpdo(0, 0, 0.0, 0.0, 0.0),
+                JointTpdo(0, 0, 0.0, 0.0, 0.0),
+                JointTpdo(0, 0, 0.0, 0.0, 0.0),
+                # lf
+                JointTpdo(0, 0, 0.0, 0.0, 0.0),
+                JointTpdo(0, 0, 0.0, 0.0, 0.0),
+                JointTpdo(0, 0, 0.0, 0.0, 0.0),
+                # tactile
+                TactileTpdo(0, 0, [0] * 18),
+                TactileTpdo(0, 0, [0] * 18),
+                TactileTpdo(0, 0, [0] * 18),
+                TactileTpdo(0, 0, [0] * 18),
+                TactileTpdo(0, 0, [0] * 18)
+            )
         # hand
         hand = HandTpdo.from_bytes(data[0:4])
         # thumb
@@ -100,11 +152,13 @@ class Tpdo:
         tac_lf = TactileTpdo.from_bytes(data[224:234])
         return cls(hand, th_dip, th_pip, th_mcp, th_swing, th_rot, ff_dip, ff_pip, ff_mcp, ff_swing, mf_dip, mf_pip, mf_mcp, rf_dip, rf_pip, rf_mcp, lf_dip, lf_pip, lf_mcp, tac_th, tac_ff, tac_mf, tac_rf, tac_lf)
 
+
 @dataclass
 class JointRpdo:
     angle: float = 0.0
     speed: float = 0.0
     torque: float = 0.0
+
     def to_bytes(self) -> bytes:
         return struct.pack('<fff', self.angle, self.speed, self.torque)
 
@@ -153,4 +207,3 @@ class Rpdo:
         lf_pip = self.lf_pip.to_bytes()
         lf_mcp = self.lf_mcp.to_bytes()
         return mode + th_pip + th_mcp + th_swing + th_rot + ff_pip + ff_mcp + ff_swing + mf_pip + mf_mcp + rf_pip + rf_mcp + lf_pip + lf_mcp
-
