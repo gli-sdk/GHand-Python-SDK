@@ -16,12 +16,12 @@ def process_data(data):
 def main():
     hand = DexHand()
     connected = hand.open(CommType.ETHERCAT, r"\Device\NPF_{22F450DC-244F-47FA-A538-CBD0142495BE}")
-    # if not connected:
-    #     print("connect failed")
-    #     return
-    # ver = hand.get_firmware_version()
-    # hand_type = hand.get_hand_type()
-    # print(f"ver: {ver}; hand_type: {hand_type.value}")
+    if not connected:
+        print("connect failed")
+        return
+    ver = hand.get_firmware_version()
+    hand_type = hand.get_hand_type()
+    print(f"ver: {ver}; hand_type: {hand_type.value}")
 
     th_pip = Joint(id=JointId.THUMB_PIP, angle=0)
     th_mcp = Joint(id=JointId.THUMB_MCP, angle=0)

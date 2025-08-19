@@ -310,7 +310,6 @@ class DexHand(object):
         """
         data = self._client.recv_data()
         print(f"Received data length: {len(data)} bytes")  # 调试信息：打印接收到的数据长度
-        print(f"Received raw data: {data}")  # 调试信息：打印原始数据
         
         if len(data) < 235:
             print(f"Data length insufficient. Expected at least 235 bytes, got {len(data)} bytes")  # 调试信息：数据长度不足时的提示

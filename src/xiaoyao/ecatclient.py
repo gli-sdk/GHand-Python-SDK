@@ -70,7 +70,6 @@ class EthercatClient(object):
 
     def recv_data(self) -> bytes:
         if self._slave is not None:
-            print(f"Slave input data: {self._slave.input} (length: {len(self._slave.input)})")
             return self._slave.input
         else:
             print("No slave connected")
@@ -80,30 +79,6 @@ class EthercatClient(object):
         if self._slave is not None:
             print(f"Sending {len(data)} bytes: {data}")
             self._slave.output = data
-
-    # def connect(self, id):
-    #     if self._connected:
-    #         return True
-    #     try:
-    #         self._master.open(r"\Device\NPF_{22F450DC-244F-47FA-A538-CBD0142495BE}")
-    #         if not self._master.config_init() > 0:
-    #             self._master.close()
-    #             return False
-    #         self._connected = True
-    #         print("Connected to device with id: ", id)
-    #         self._slave = self._master.slaves[0]
-    #         self._slave.is_lost = False
-    #         return True
-    #     except Exception as e:
-    #         print(e)
-    #         return False
-
-    def search(self) -> list[str]:
-        ids = netifaces.interfaces()
-        for i, v in enumerate(ids):
-            ids[i] = "\\Device\\NPF_" + v
-        return ids
-
     def connect(self, id):
         if self._connected:
             return True
@@ -120,44 +95,13 @@ class EthercatClient(object):
         except Exception as e:
             print(e)
             return False
-        
-    #     for i, slave in enumerate(self._master.slaves):
-    #         slave.is_lost = False
 
-    # # def run(self):
-    #     # self._master.open(r"\Device\NPF_{22F450DC-244F-47FA-A538-CBD0142495BE}")
-    #     # self._master.config_init()
-    #     self._master.config_map()
-    #     if self._master.state_check(pysoem.SAFEOP_STATE, timeout=500_000) != pysoem.SAFEOP_STATE:
-    #         print("Failed to enter SAFEOP state")
-    #         for slave in self._master.slaves:
-    #             if not slave.state == pysoem.SAFEOP_STATE:
-    #                 print('{} did not reach SAFEOP state'.format(slave.name))
-    #                 print('al status code {} ({})'.format(hex(slave.al_status),
-    #                       pysoem.al_status_code_to_string(slave.al_status)))
-    #         self._master.close()
-    #         return False
-    #     print('Switching to OP state...')
-    #     self._master.state = pysoem.OP_STATE
-    #     self.check_thread = threading.Thread(target=self._check_thread)
-    #     self.check_thread.start()
-    #     self.proc_thread = threading.Thread(target=self._processdata_thread)
-    #     self.proc_thread.start()
-    #     self._master.send_processdata()
-    #     self._master.receive_processdata(timeout=2000)
-    #     self._master.write_state()
-    #     slave_reached_op = False
-    #     for i in range(40):
-    #         self._master.state_check(pysoem.OP_STATE, timeout=50_000)
-    #         if self._master.state == pysoem.OP_STATE:
-    #             # self._master.in_op = True
-    #             slave_reached_op = True
-    #             break
-    #     if slave_reached_op:
-    #         self._master.in_op = True
-    #         print("op reached")
-    #     else:
-    #         print("no op reached")
+    def search(self) -> list[str]:
+        ids = netifaces.interfaces()
+        for i, v in enumerate(ids):
+            ids[i] = "\\Device\\NPF_" + v
+        return ids
+        
     def run(self):
         if not self._connected or self._slave is None:
             print("Not connected or no slave configured")
@@ -231,7 +175,29 @@ class EthercatClient(object):
             self._master.close()
             self._slave = None
     def sdo_read(self, index, subindex=0):
-        return self._slave.sdo_read(self._slave, index, subindex)
+        """
+        读取SDO对象字典中的值
+        
+        Args:
+            index: 对象字典索引
+            subindex: 子索引，默认为0
+        
+        Returns:
+            读取到的数据
+        """
+        if self._slave is None:
+            raise RuntimeError("No slave connected")
+        return self._slave.sdo_read(index, subindex)
 
     def sdo_write(self, index, subindex, value):
-        return self._master.sdo_write(self._slave, index, subindex, value)
+        """
+        写入SDO对象字典中的值
+        
+        Args:
+            index: 对象字典索引
+            subindex: 子索引
+            value: 要写入的值
+        """
+        if self._slave is None:
+            raise RuntimeError("No slave connected")
+        return self._slave.sdo_write(index, subindex, value)

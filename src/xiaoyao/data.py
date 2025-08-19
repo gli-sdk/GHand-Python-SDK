@@ -30,8 +30,7 @@ class JointTpdo:
         expected_size = struct.calcsize('<BBfff')
         if not data or len(data) < expected_size:
             return cls(0, 0, 0.0, 0.0, 0.0)
-        state, error, angle, speed, torque = struct.unpack_from(
-            '<BBfff', data, 0)
+        state, error, angle, speed, torque = struct.unpack_from('<BBfff', data, 0)
         return cls(state, error, angle, speed, torque)
 
 
@@ -39,14 +38,14 @@ class JointTpdo:
 class TactileTpdo:
     state: int
     error: int
-    tactile: list[int]
+    tactile: list[int]  # 存储8个uint16值
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        expected_size = struct.calcsize('<BB18B')
+        expected_size = struct.calcsize('<BB8H')  # B(1字节) + B(1字节) + 8H(16字节)
         if not data or len(data) < expected_size:
-            return cls(0, 0, [0] * 18)
-        state, error, *tactile = struct.unpack_from('<BB18B', data, 0)
+            return cls(0, 0, [0] * 8)
+        state, error, *tactile = struct.unpack_from('<BB8H', data, 0)
         return cls(state, error, tactile)
 
 
@@ -113,43 +112,44 @@ class Tpdo:
                 JointTpdo(0, 0, 0.0, 0.0, 0.0),
                 JointTpdo(0, 0, 0.0, 0.0, 0.0),
                 # tactile
-                TactileTpdo(0, 0, [0] * 18),
-                TactileTpdo(0, 0, [0] * 18),
-                TactileTpdo(0, 0, [0] * 18),
-                TactileTpdo(0, 0, [0] * 18),
-                TactileTpdo(0, 0, [0] * 18)
+                TactileTpdo(0, 0, [0] * 8),
+                TactileTpdo(0, 0, [0] * 8),
+                TactileTpdo(0, 0, [0] * 8),
+                TactileTpdo(0, 0, [0] * 8),
+                TactileTpdo(0, 0, [0] * 8)
             )
-        # hand
-        hand = HandTpdo.from_bytes(data[0:4])
-        # thumb
-        th_dip = JointTpdo.from_bytes(data[4:14])
-        th_pip = JointTpdo.from_bytes(data[14:24])
-        th_mcp = JointTpdo.from_bytes(data[24:34])
-        th_swing = JointTpdo.from_bytes(data[34:44])
-        th_rot = JointTpdo.from_bytes(data[44:54])
-        # ff
-        ff_dip = JointTpdo.from_bytes(data[54:64])
-        ff_pip = JointTpdo.from_bytes(data[64:74])
-        ff_mcp = JointTpdo.from_bytes(data[74:84])
-        ff_swing = JointTpdo.from_bytes(data[84:94])
-        # mf
-        mf_dip = JointTpdo.from_bytes(data[94:104])
-        mf_pip = JointTpdo.from_bytes(data[104:114])
-        mf_mcp = JointTpdo.from_bytes(data[114:124])
-        # rf
-        rf_dip = JointTpdo.from_bytes(data[124:134])
-        rf_pip = JointTpdo.from_bytes(data[134:144])
-        rf_mcp = JointTpdo.from_bytes(data[144:154])
-        # lf
-        lf_dip = JointTpdo.from_bytes(data[154:164])
-        lf_pip = JointTpdo.from_bytes(data[164:174])
-        lf_mcp = JointTpdo.from_bytes(data[174:184])
-        # tactile
-        tac_th = TactileTpdo.from_bytes(data[184:194])
-        tac_ff = TactileTpdo.from_bytes(data[194:204])
-        tac_mf = TactileTpdo.from_bytes(data[204:214])
-        tac_rf = TactileTpdo.from_bytes(data[214:224])
-        tac_lf = TactileTpdo.from_bytes(data[224:234])
+        
+        # hand (3 bytes)
+        hand = HandTpdo.from_bytes(data[0:4])  # 实际使用4个字节（索引0-3）
+        # thumb (5 joints × 14 bytes = 70 bytes)
+        th_dip = JointTpdo.from_bytes(data[4:18])    # bytes 4-17
+        th_pip = JointTpdo.from_bytes(data[18:32])   # bytes 18-31
+        th_mcp = JointTpdo.from_bytes(data[32:46])   # bytes 32-45
+        th_swing = JointTpdo.from_bytes(data[46:60]) # bytes 46-59
+        th_rot = JointTpdo.from_bytes(data[60:74])   # bytes 60-73
+        # ff (4 joints × 14 bytes = 56 bytes)
+        ff_dip = JointTpdo.from_bytes(data[74:88])   # bytes 74-87
+        ff_pip = JointTpdo.from_bytes(data[88:102])  # bytes 88-101
+        ff_mcp = JointTpdo.from_bytes(data[102:116]) # bytes 102-115
+        ff_swing = JointTpdo.from_bytes(data[116:130]) # bytes 116-129
+        # mf (3 joints × 14 bytes = 42 bytes)
+        mf_dip = JointTpdo.from_bytes(data[130:144]) # bytes 130-143
+        mf_pip = JointTpdo.from_bytes(data[144:158]) # bytes 144-157
+        mf_mcp = JointTpdo.from_bytes(data[158:172]) # bytes 158-171
+        # rf (3 joints × 14 bytes = 42 bytes)
+        rf_dip = JointTpdo.from_bytes(data[172:186]) # bytes 172-185
+        rf_pip = JointTpdo.from_bytes(data[186:200]) # bytes 186-199
+        rf_mcp = JointTpdo.from_bytes(data[200:214]) # bytes 200-213
+        # lf (3 joints × 14 bytes = 42 bytes)
+        lf_dip = JointTpdo.from_bytes(data[214:228]) # bytes 214-227
+        lf_pip = JointTpdo.from_bytes(data[228:242]) # bytes 228-241
+        lf_mcp = JointTpdo.from_bytes(data[242:256]) # bytes 242-255
+        # tactile (5 sensors × 18 bytes = 90 bytes)
+        tac_th = TactileTpdo.from_bytes(data[256:274])  # bytes 256-273
+        tac_ff = TactileTpdo.from_bytes(data[274:292])  # bytes 274-291
+        tac_mf = TactileTpdo.from_bytes(data[292:310])  # bytes 292-309
+        tac_rf = TactileTpdo.from_bytes(data[310:328])  # bytes 310-327
+        tac_lf = TactileTpdo.from_bytes(data[328:346])  # bytes 328-345
         return cls(hand, th_dip, th_pip, th_mcp, th_swing, th_rot, ff_dip, ff_pip, ff_mcp, ff_swing, mf_dip, mf_pip, mf_mcp, rf_dip, rf_pip, rf_mcp, lf_dip, lf_pip, lf_mcp, tac_th, tac_ff, tac_mf, tac_rf, tac_lf)
 
 
