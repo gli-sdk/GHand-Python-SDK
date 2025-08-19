@@ -52,7 +52,7 @@ class EthercatClient(object):
     def _processdata_thread(self):
         while not self._pd_thread_stop_event.is_set():
             self._master.send_processdata()
-            self._actual_wkc = self._master.receive_processdata(10_000)
+            self._actual_wkc = self._master.receive_processdata(15_000)
             if self._actual_wkc < 1:
                 print("no wkc")
             time.sleep(0.01)
@@ -72,17 +72,18 @@ class EthercatClient(object):
         if self._slave is not None:
             return self._slave.input
         else:
+            print("No slave connected")
             return bytes()
 
     def send_data(self, data: bytes):
         if self._slave is not None:
+            print(f"Sending {len(data)} bytes: {data}")
             self._slave.output = data
-
     def connect(self, id):
         if self._connected:
             return True
         try:
-            self._master.open(id)
+            self._master.open(r"\Device\NPF_{22F450DC-244F-47FA-A538-CBD0142495BE}")
             if not self._master.config_init() > 0:
                 self._master.close()
                 return False
@@ -100,38 +101,69 @@ class EthercatClient(object):
         for i, v in enumerate(ids):
             ids[i] = "\\Device\\NPF_" + v
         return ids
-
+        
     def run(self):
+        if not self._connected or self._slave is None:
+            print("Not connected or no slave configured")
+            return False
+        
+        print(f"Number of slaves: {len(self._master.slaves)}")
+        for i, slave in enumerate(self._master.slaves):
+            print(f"Slave {i}:")
+            print(f"  Name: {slave.name}")
+            print(f"  Input size: {len(slave.input)} bytes")
+            print(f"  Output size: {len(slave.output)} bytes")
+            print(f"  State: {slave.state}")
+        
         self._master.config_map()
-        if self._master.state_check(pysoem.SAFEOP_STATE, timeout=50_000) != pysoem.SAFEOP_STATE:
+        
+        print("PDO mapping information:")
+        for i, slave in enumerate(self._master.slaves):
+            print(f"Slave {i}:")
+            print(f"  Input size after config_map: {len(slave.input)} bytes")
+            print(f"  Output size after config_map: {len(slave.output)} bytes")
+        
+        # 检查是否进入SAFEOP状态
+        if self._master.state_check(pysoem.SAFEOP_STATE, timeout=500_000) != pysoem.SAFEOP_STATE:
             print("Failed to enter SAFEOP state")
             for slave in self._master.slaves:
                 if not slave.state == pysoem.SAFEOP_STATE:
                     print('{} did not reach SAFEOP state'.format(slave.name))
                     print('al status code {} ({})'.format(hex(slave.al_status),
-                          pysoem.al_status_code_to_string(slave.al_status)))
+                        pysoem.al_status_code_to_string(slave.al_status)))
             self._master.close()
             return False
+        print('Switching to OP state...')
+        
+        # 设置OP状态
         self._master.state = pysoem.OP_STATE
+        self._master.write_state()
+        
+        # 启动处理线程
         self.check_thread = threading.Thread(target=self._check_thread)
         self.check_thread.start()
         self.proc_thread = threading.Thread(target=self._processdata_thread)
         self.proc_thread.start()
-        self._master.send_processdata()
-        self._master.receive_processdata(timeout=2000)
-        self._master.write_state()
+        
+        # 等待进入OP状态
         slave_reached_op = False
         for i in range(40):
             self._master.state_check(pysoem.OP_STATE, timeout=50_000)
             if self._master.state == pysoem.OP_STATE:
-                # self._master.in_op = True
                 slave_reached_op = True
                 break
+                
         if slave_reached_op:
             self._master.in_op = True
+            print("op reached")
         else:
             print("no op reached")
-
+            
+        # 打印配置后的从站信息
+        print(f"After configuration - Slave input size: {len(self._slave.input)} bytes")
+        print(f"After configuration - Slave output size: {len(self._slave.output)} bytes")
+        
+        return slave_reached_op
     def disconnect(self):
         if self._connected:
             self._pd_thread_stop_event.set()
@@ -142,9 +174,30 @@ class EthercatClient(object):
             self._master.write_state()
             self._master.close()
             self._slave = None
-
     def sdo_read(self, index, subindex=0):
-        return self._slave.sdo_read(self._slave, index, subindex)
+        """
+        读取SDO对象字典中的值
+        
+        Args:
+            index: 对象字典索引
+            subindex: 子索引，默认为0
+        
+        Returns:
+            读取到的数据
+        """
+        if self._slave is None:
+            raise RuntimeError("No slave connected")
+        return self._slave.sdo_read(index, subindex)
 
     def sdo_write(self, index, subindex, value):
-        return self._master.sdo_write(self._slave, index, subindex, value)
+        """
+        写入SDO对象字典中的值
+        
+        Args:
+            index: 对象字典索引
+            subindex: 子索引
+            value: 要写入的值
+        """
+        if self._slave is None:
+            raise RuntimeError("No slave connected")
+        return self._slave.sdo_write(index, subindex, value)
