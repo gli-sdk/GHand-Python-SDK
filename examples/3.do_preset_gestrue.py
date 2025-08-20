@@ -3,10 +3,10 @@
 import sys
 import os
 import time
-from xiaoyao import hand, common
+# from xiaoyao import hand, common
 from xiaoyao.dexhand import DexHand, CommType, Joint, JointId
 
-def open_hand():
+def open_hand(hand):
     
     # 创建所有关节列表，角度都设为0
     joints = []
@@ -50,12 +50,9 @@ def open_hand():
     # 等待一段时间确保动作完成
     time.sleep(2)
     
-    # 关闭连接
-    hand.close()
-    
     return result
 
-def make_fist():
+def make_fist(hand):
     
     # 创建所有关节列表，角度都设为0
     joints = []
@@ -92,19 +89,16 @@ def make_fist():
     result = hand.move_joints(joints)
     
     if result:
-        print("手部张开指令发送成功")
+        print("握拳指令发送成功")
     else:
-        print("手部张开指令发送失败")
+        print("握拳指令发送失败")
     
     # 等待一段时间确保动作完成
     time.sleep(2)
     
-    # 关闭连接
-    hand.close()
-    
     return result
 
-def make_ok():
+def make_ok(hand):
     
     # 创建所有关节列表，角度都设为0
     joints = []
@@ -147,13 +141,10 @@ def make_ok():
     
     # 等待一段时间确保动作完成
     time.sleep(2)
-    
-    # 关闭连接
-    hand.close()
-    
+        
     return result
 
-def thumbs_up():
+def thumbs_up(hand):
     
     # 创建所有关节列表，角度都设为0
     joints = []
@@ -197,12 +188,9 @@ def thumbs_up():
     # 等待一段时间确保动作完成
     time.sleep(2)
     
-    # 关闭连接
-    hand.close()
-    
     return result
 
-def make_six_sign():
+def make_six_sign(hand):
     
     # 创建所有关节列表，角度都设为0
     joints = []
@@ -245,10 +233,7 @@ def make_six_sign():
     
     # 等待一段时间确保动作完成
     time.sleep(2)
-    
-    # 关闭连接
-    hand.close()
-    
+        
     return result
 
 def main():
@@ -265,27 +250,27 @@ def main():
         time.sleep(1)
 
         print("演示1: [张开所有手指]")
-        hand.do_preset_gesture(common.GestureType.OPEN_ALL_FINGERS)
+        open_hand(hand)
         time.sleep(3)
 
         print("演示2: [握拳]")
-        hand.do_preset_gesture(common.GestureType.FIST)
+        make_fist(hand)
         time.sleep(3)
 
         print("演示3: [OK 手势]")
-        hand.do_preset_gesture(common.GestureType.OK)
+        make_ok(hand)
         time.sleep(3)
 
         print("演示4: [竖大拇指]")
-        hand.do_preset_gesture(common.GestureType.THUMBS_UP)
+        thumbs_up(hand)
         time.sleep(3)
 
         print("演示5: [六抓握]")
-        hand.do_preset_gesture(common.GestureType.GRIP_SIX)
+        make_six_sign(hand)
         time.sleep(3)
 
         print("恢复: [张开所有手指]")
-        hand.do_preset_gesture(common.GestureType.OPEN_ALL_FINGERS)
+        open_hand(hand)
         time.sleep(2)
 
     except KeyboardInterrupt:
@@ -294,7 +279,7 @@ def main():
         print(f"\n[严重错误] {e}")
     finally:
         print("\n--- 演示结束，断开连接 ---")
-        hand.close_device()
+        hand.close()
 
 
 if __name__ == "__main__":
