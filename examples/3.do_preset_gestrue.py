@@ -1,9 +1,4 @@
-# examples/do_preset_gesture.py。
-
-import sys
-import os
 import time
-# from xiaoyao import hand, common
 from xiaoyao.dexhand import DexHand, CommType, Joint, JointId
 
 def open_hand(hand):
@@ -12,30 +7,25 @@ def open_hand(hand):
     joints = []
     
     # 拇指关节
-    joints.append(Joint(id=JointId.THUMB_DIP, angle=0))
     joints.append(Joint(id=JointId.THUMB_PIP, angle=0))
     joints.append(Joint(id=JointId.THUMB_MCP, angle=0))
     joints.append(Joint(id=JointId.THUMB_SWING, angle=0))
     joints.append(Joint(id=JointId.THUMB_ROTATION, angle=0))
     
     # 食指关节
-    joints.append(Joint(id=JointId.FF_DIP, angle=0))
     joints.append(Joint(id=JointId.FF_PIP, angle=0))
     joints.append(Joint(id=JointId.FF_MCP, angle=0))
     joints.append(Joint(id=JointId.FF_SWING, angle=0))
     
     # 中指关节
-    joints.append(Joint(id=JointId.MF_DIP, angle=0))
     joints.append(Joint(id=JointId.MF_PIP, angle=0))
     joints.append(Joint(id=JointId.MF_MCP, angle=0))
     
     # 无名指关节
-    joints.append(Joint(id=JointId.RF_DIP, angle=0))
     joints.append(Joint(id=JointId.RF_PIP, angle=0))
     joints.append(Joint(id=JointId.RF_MCP, angle=0))
     
     # 小指关节
-    joints.append(Joint(id=JointId.LF_DIP, angle=0))
     joints.append(Joint(id=JointId.LF_PIP, angle=0))
     joints.append(Joint(id=JointId.LF_MCP, angle=0))
     
@@ -54,34 +44,29 @@ def open_hand(hand):
 
 def make_fist(hand):
     
-    # 创建所有关节列表，角度都设为0
+    # 创建所有关节列表，角度应设为预设值
     joints = []
     
     # 拇指关节
-    joints.append(Joint(id=JointId.THUMB_DIP, angle=0))
     joints.append(Joint(id=JointId.THUMB_PIP, angle=0))
     joints.append(Joint(id=JointId.THUMB_MCP, angle=0))
     joints.append(Joint(id=JointId.THUMB_SWING, angle=0))
     joints.append(Joint(id=JointId.THUMB_ROTATION, angle=0))
     
     # 食指关节
-    joints.append(Joint(id=JointId.FF_DIP, angle=0))
     joints.append(Joint(id=JointId.FF_PIP, angle=0))
     joints.append(Joint(id=JointId.FF_MCP, angle=0))
     joints.append(Joint(id=JointId.FF_SWING, angle=0))
     
     # 中指关节
-    joints.append(Joint(id=JointId.MF_DIP, angle=0))
     joints.append(Joint(id=JointId.MF_PIP, angle=0))
     joints.append(Joint(id=JointId.MF_MCP, angle=0))
     
     # 无名指关节
-    joints.append(Joint(id=JointId.RF_DIP, angle=0))
     joints.append(Joint(id=JointId.RF_PIP, angle=0))
     joints.append(Joint(id=JointId.RF_MCP, angle=0))
     
     # 小指关节
-    joints.append(Joint(id=JointId.LF_DIP, angle=0))
     joints.append(Joint(id=JointId.LF_PIP, angle=0))
     joints.append(Joint(id=JointId.LF_MCP, angle=0))
     
@@ -100,34 +85,29 @@ def make_fist(hand):
 
 def make_ok(hand):
     
-    # 创建所有关节列表，角度都设为0
+    # 创建所有关节列表，角度应设为预设值
     joints = []
     
     # 拇指关节
-    joints.append(Joint(id=JointId.THUMB_DIP, angle=0))
     joints.append(Joint(id=JointId.THUMB_PIP, angle=0))
     joints.append(Joint(id=JointId.THUMB_MCP, angle=0))
     joints.append(Joint(id=JointId.THUMB_SWING, angle=0))
     joints.append(Joint(id=JointId.THUMB_ROTATION, angle=0))
     
     # 食指关节
-    joints.append(Joint(id=JointId.FF_DIP, angle=0))
     joints.append(Joint(id=JointId.FF_PIP, angle=0))
     joints.append(Joint(id=JointId.FF_MCP, angle=0))
     joints.append(Joint(id=JointId.FF_SWING, angle=0))
     
     # 中指关节
-    joints.append(Joint(id=JointId.MF_DIP, angle=0))
     joints.append(Joint(id=JointId.MF_PIP, angle=0))
     joints.append(Joint(id=JointId.MF_MCP, angle=0))
     
     # 无名指关节
-    joints.append(Joint(id=JointId.RF_DIP, angle=0))
     joints.append(Joint(id=JointId.RF_PIP, angle=0))
     joints.append(Joint(id=JointId.RF_MCP, angle=0))
     
     # 小指关节
-    joints.append(Joint(id=JointId.LF_DIP, angle=0))
     joints.append(Joint(id=JointId.LF_PIP, angle=0))
     joints.append(Joint(id=JointId.LF_MCP, angle=0))
     
@@ -146,34 +126,29 @@ def make_ok(hand):
 
 def thumbs_up(hand):
     
-    # 创建所有关节列表，角度都设为0
+    # 创建所有关节列表，角度应设为预设值
     joints = []
     
     # 拇指关节
-    joints.append(Joint(id=JointId.THUMB_DIP, angle=0))
     joints.append(Joint(id=JointId.THUMB_PIP, angle=0))
     joints.append(Joint(id=JointId.THUMB_MCP, angle=0))
     joints.append(Joint(id=JointId.THUMB_SWING, angle=0))
     joints.append(Joint(id=JointId.THUMB_ROTATION, angle=0))
     
     # 食指关节
-    joints.append(Joint(id=JointId.FF_DIP, angle=0))
     joints.append(Joint(id=JointId.FF_PIP, angle=0))
     joints.append(Joint(id=JointId.FF_MCP, angle=0))
     joints.append(Joint(id=JointId.FF_SWING, angle=0))
     
     # 中指关节
-    joints.append(Joint(id=JointId.MF_DIP, angle=0))
     joints.append(Joint(id=JointId.MF_PIP, angle=0))
     joints.append(Joint(id=JointId.MF_MCP, angle=0))
     
     # 无名指关节
-    joints.append(Joint(id=JointId.RF_DIP, angle=0))
     joints.append(Joint(id=JointId.RF_PIP, angle=0))
     joints.append(Joint(id=JointId.RF_MCP, angle=0))
     
     # 小指关节
-    joints.append(Joint(id=JointId.LF_DIP, angle=0))
     joints.append(Joint(id=JointId.LF_PIP, angle=0))
     joints.append(Joint(id=JointId.LF_MCP, angle=0))
     
@@ -192,34 +167,29 @@ def thumbs_up(hand):
 
 def make_six_sign(hand):
     
-    # 创建所有关节列表，角度都设为0
+    # 创建所有关节列表，角度应设为预设值
     joints = []
     
     # 拇指关节
-    joints.append(Joint(id=JointId.THUMB_DIP, angle=0))
     joints.append(Joint(id=JointId.THUMB_PIP, angle=0))
     joints.append(Joint(id=JointId.THUMB_MCP, angle=0))
     joints.append(Joint(id=JointId.THUMB_SWING, angle=0))
     joints.append(Joint(id=JointId.THUMB_ROTATION, angle=0))
     
     # 食指关节
-    joints.append(Joint(id=JointId.FF_DIP, angle=0))
     joints.append(Joint(id=JointId.FF_PIP, angle=0))
     joints.append(Joint(id=JointId.FF_MCP, angle=0))
     joints.append(Joint(id=JointId.FF_SWING, angle=0))
     
     # 中指关节
-    joints.append(Joint(id=JointId.MF_DIP, angle=0))
     joints.append(Joint(id=JointId.MF_PIP, angle=0))
     joints.append(Joint(id=JointId.MF_MCP, angle=0))
     
     # 无名指关节
-    joints.append(Joint(id=JointId.RF_DIP, angle=0))
     joints.append(Joint(id=JointId.RF_PIP, angle=0))
     joints.append(Joint(id=JointId.RF_MCP, angle=0))
     
     # 小指关节
-    joints.append(Joint(id=JointId.LF_DIP, angle=0))
     joints.append(Joint(id=JointId.LF_PIP, angle=0))
     joints.append(Joint(id=JointId.LF_MCP, angle=0))
     
