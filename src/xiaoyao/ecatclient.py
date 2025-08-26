@@ -52,6 +52,7 @@ class EthercatClient(object):
     def _processdata_thread(self):
         while not self._pd_thread_stop_event.is_set():
             self._master.send_processdata()
+            print("send processdata")
             self._actual_wkc = self._master.receive_processdata(15_000)
             if self._actual_wkc < 1:
                 print("no wkc")
@@ -135,15 +136,18 @@ class EthercatClient(object):
             return False
         print('Switching to OP state...')
         
-        # 设置OP状态
-        self._master.state = pysoem.OP_STATE
-        self._master.write_state()
-        
-        # 启动处理线程
+        # 先启动处理线程以维持通信
         self.check_thread = threading.Thread(target=self._check_thread)
         self.check_thread.start()
         self.proc_thread = threading.Thread(target=self._processdata_thread)
         self.proc_thread.start()
+        
+        # 稍微延时确保线程开始运行
+        time.sleep(0.01)
+        
+        # 设置OP状态
+        self._master.state = pysoem.OP_STATE
+        self._master.write_state()
         
         # 等待进入OP状态
         slave_reached_op = False
@@ -158,6 +162,11 @@ class EthercatClient(object):
             print("op reached")
         else:
             print("no op reached")
+            # 如果无法进入OP状态，停止线程
+            self._pd_thread_stop_event.set()
+            self._ch_thread_stop_event.set()
+            self.proc_thread.join()
+            self.check_thread.join()
             
         # 打印配置后的从站信息
         print(f"After configuration - Slave input size: {len(self._slave.input)} bytes")

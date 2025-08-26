@@ -10,10 +10,10 @@ class HandTpdo:
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        expected_size = struct.calcsize('<BBB')
+        expected_size = struct.calcsize('<BBH')
         if not data or len(data) < expected_size:
             return cls(0, 0, 0)
-        state, error, temp = struct.unpack_from('<BBB', data, 0)
+        state, error, temp = struct.unpack_from('<BBH', data, 0)
         return cls(state, error, temp)
 
 
@@ -119,7 +119,7 @@ class Tpdo:
                 TactileTpdo(0, 0, [0] * 8)
             )
         
-        # hand (3 bytes)
+        # hand (4 bytes)
         hand = HandTpdo.from_bytes(data[0:4])  # 实际使用4个字节（索引0-3）
         # thumb (5 joints × 14 bytes = 70 bytes)
         th_dip = JointTpdo.from_bytes(data[4:18])    # bytes 4-17
@@ -165,7 +165,8 @@ class JointRpdo:
 
 @dataclass
 class Rpdo:
-    mode: int = 0
+    mode: int = 2
+    stop: int = 0
     # thumb
     th_pip: JointRpdo = field(default_factory=JointRpdo)
     th_mcp: JointRpdo = field(default_factory=JointRpdo)
@@ -188,6 +189,7 @@ class Rpdo:
     def to_bytes(self) -> bytes:
         # control mode
         mode = struct.pack('<B', self.mode)
+        stop = struct.pack('<B', self.stop)
         # thumb
         th_pip = self.th_pip.to_bytes()
         th_mcp = self.th_mcp.to_bytes()
@@ -206,4 +208,4 @@ class Rpdo:
         # lf
         lf_pip = self.lf_pip.to_bytes()
         lf_mcp = self.lf_mcp.to_bytes()
-        return mode + th_pip + th_mcp + th_swing + th_rot + ff_pip + ff_mcp + ff_swing + mf_pip + mf_mcp + rf_pip + rf_mcp + lf_pip + lf_mcp
+        return mode + stop + th_pip + th_mcp + th_swing + th_rot + ff_pip + ff_mcp + ff_swing + mf_pip + mf_mcp + rf_pip + rf_mcp + lf_pip + lf_mcp

@@ -249,14 +249,6 @@ class DexHand(object):
             elif type == 0x02:
                 self._hand_type = HandType.RIGHT_HAND
         return self._hand_type
-
-    def sub_hand_data(self, callback=None, *args, **kw):
-        sub_id = self._sub_manager.subscribe(callback, *args, **kw)
-        return sub_id
-
-    def unsub_hand_data(self, sub_id):
-        return self._sub_manager.unsubscribe(sub_id)
-
     def _joint_to_pdo(self, joint: Joint, pdo: JointRpdo):
         print(joint.angle)
         pdo.angle = joint.angle

@@ -15,6 +15,35 @@ def process_data(data):
 
 def main():
     hand = DexHand()
+
+
+    joints = []
+    
+    # # 拇指关节
+    # joints.append(Joint(id=JointId.THUMB_PIP, angle=1.1, speed=5000.0, torque=90.0))
+    # joints.append(Joint(id=JointId.THUMB_MCP, angle=1.1, speed=5000.0, torque=90.0))
+    # joints.append(Joint(id=JointId.THUMB_SWING, angle=1.1, speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.THUMB_ROTATION, angle=1.1, speed=5000.0, torque=90.0))
+    
+    # # 食指关节
+    # joints.append(Joint(id=JointId.FF_PIP, angle=1.1, speed=5000.0, torque=90.0))
+    # joints.append(Joint(id=JointId.FF_MCP, angle=1.1, speed=5000.0, torque=90.0))
+    # joints.append(Joint(id=JointId.FF_SWING, angle=1.1, speed=5000.0, torque=90.0))
+    
+    # # 中指关节
+    # joints.append(Joint(id=JointId.MF_PIP, angle=1.1, speed=5000.0, torque=90.0))
+    # joints.append(Joint(id=JointId.MF_MCP, angle=1.1, speed=5000.0, torque=90.0))
+    
+    # # 无名指关节
+    # joints.append(Joint(id=JointId.RF_PIP, angle=1.1, speed=5000.0, torque=90.0))
+    # joints.append(Joint(id=JointId.RF_MCP, angle=1.1, speed=5000.0, torque=90.0))
+    
+    # # 小指关节
+    # joints.append(Joint(id=JointId.LF_PIP, angle=1.1, speed=5000.0, torque=90.0))
+    # joints.append(Joint(id=JointId.LF_MCP, angle=1.1, speed=5000.0, torque=90.0))
+
+    
+
     connected = hand.open(CommType.ETHERCAT, r"\Device\NPF_{22F450DC-244F-47FA-A538-CBD0142495BE}")
     if not connected:
         print("connect failed")
@@ -23,16 +52,16 @@ def main():
     hand_type = hand.get_hand_type()
     print(f"ver: {ver}; hand_type: {hand_type.value}")
 
-    th_pip = Joint(id=JointId.THUMB_PIP, angle=0)
-    th_mcp = Joint(id=JointId.THUMB_MCP, angle=0)
-    joints = [th_pip, th_mcp]
-    hand.move_joints(joints=joints)
+    hand.move_joints(joints)
+    time.sleep(0.2)
+        
     joints = hand.get_joints()
-    # print(joints)
-    # sub_id = hand.sub_hand_data(callback=process_data)
-    time.sleep(5)
-    # hand.unsub_hand_data(sub_id)
+
+    time.sleep(0.2)
+
     hand.close()
+    time.sleep(0.5)
+    # print("hand is closed")
 
 
 if __name__ == "__main__":
