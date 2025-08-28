@@ -149,6 +149,85 @@ class DexHand(object):
             self._firmware_version = self._client.sdo_read(
                 0x100A, 0x00).decode('utf-8')
         return self._firmware_version
+    
+    def get_device_name(self):
+        """
+        获取设备name
+
+        Returns:
+            str: 获取成功返回设备ID，失败返回空字符串""
+        """
+        try:
+            device_name = self._client.sdo_read(0x1008, 0x00).decode('utf-8')
+        except Exception:
+            return ""
+        return device_name
+    
+    def get_hardware_version(self):
+        """
+        获取硬件版本号
+
+        Returns:
+            str: 获取成功返回版本号（如："v1.0.0"），失败返回空字符串""
+        """
+        try:
+            hardware_version = self._client.sdo_read(0x1009, 0x00).decode('utf-8')
+        except Exception:
+            return ""
+        return hardware_version
+
+
+    def get_manufacturer_mark(self):
+        """
+        获取厂商标识
+
+        Returns:
+            str: 获取成功返回厂商标识，失败返回空字符串""
+        """
+        try:
+            manufacturer_mark = self._client.sdo_read(0x1018, 0x01)
+        except Exception:
+            return ""
+        return manufacturer_mark
+    
+    def get_product_code(self):
+        """
+        获取产品代码
+
+        Returns:
+            str: 获取成功返回产品代码，失败返回空字符串""
+        """
+        try:
+            product_code = self._client.sdo_read(0x1018, 0x02)
+        except Exception:
+            return ""
+        return product_code
+    
+    def get_revision_number(self):
+        """
+        获取产品修订号
+
+        Returns:
+            str: 获取成功返回产品修订号，失败返回空字符串""
+        """        
+        try:
+            revision_number = self._client.sdo_read(0x1018, 0x03)
+        except Exception:
+            return ""
+        return revision_number
+
+    def get_serial_number(self):
+        """
+        获取产品序列号
+
+        Returns:
+            str: 获取成功返回产品序列号，失败返回空字符串""
+        """        
+        try:
+            serial_number = self._client.sdo_read(0x1018, 0x04)
+        except Exception:
+            return ""
+        return serial_number
 
     def release_protection(self) -> bool:
         """
@@ -297,7 +376,6 @@ class DexHand(object):
                 print(f"【Joint】无效的关节ID: {joint.id}")
                 return False
         self._client.send_data(rpdo.to_bytes())
-        print(f"【Joint】发送 PDO 数据成功")
         return True
 
     def get_joints(self) -> list[Joint]:
@@ -317,10 +395,41 @@ class DexHand(object):
         tpdo = Tpdo.from_bytes(data)
         print(f"Parsed TPDO: {tpdo}")  # 调试信息：打印解析后的TPDO对象
         
+        # 定义关节信息映射
+        joint_mappings = [
+            # thumb
+            (JointId.THUMB_DIP, tpdo.th_dip),
+            (JointId.THUMB_PIP, tpdo.th_pip),
+            (JointId.THUMB_MCP, tpdo.th_mcp),
+            (JointId.THUMB_SWING, tpdo.th_swing),
+            (JointId.THUMB_ROTATION, tpdo.th_rot),
+            # ff
+            (JointId.FF_DIP, tpdo.ff_dip),
+            (JointId.FF_PIP, tpdo.ff_pip),
+            (JointId.FF_MCP, tpdo.ff_mcp),
+            (JointId.FF_SWING, tpdo.ff_swing),
+            # mf
+            (JointId.MF_DIP, tpdo.mf_dip),
+            (JointId.MF_PIP, tpdo.mf_pip),
+            (JointId.MF_MCP, tpdo.mf_mcp),
+            # rf
+            (JointId.RF_DIP, tpdo.rf_dip),
+            (JointId.RF_PIP, tpdo.rf_pip),
+            (JointId.RF_MCP, tpdo.rf_mcp),
+            # lf
+            (JointId.LF_DIP, tpdo.lf_dip),
+            (JointId.LF_PIP, tpdo.lf_pip),
+            (JointId.LF_MCP, tpdo.lf_mcp),
+        ]
+        
         joints = []
-        for i in range(18):
-            joint = Joint(id=i, angle=i)
-            joints.append(joint)
+        for joint_id, joint_tpdo in joint_mappings:
+            joints.append(Joint(
+                id=joint_id,
+                angle=joint_tpdo.angle,
+                speed=joint_tpdo.speed,
+                torque=joint_tpdo.torque
+            ))
         
         print(f"Returning {len(joints)} joints")  # 调试信息：打印返回的关节数量
         return joints
