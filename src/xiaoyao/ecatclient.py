@@ -51,11 +51,14 @@ class EthercatClient(object):
 
     def _processdata_thread(self):
         while not self._pd_thread_stop_event.is_set():
-            self._master.send_processdata()
-            self._actual_wkc = self._master.receive_processdata(15_000)
-            if self._actual_wkc < 1:
-                print("no wkc")
-            time.sleep(0.013)
+            try:
+                self._master.send_processdata()
+                self._actual_wkc = self._master.receive_processdata(15_000)
+                if self._actual_wkc < 1:
+                    print(f"Warning: Invalid working counter (WKC): {self._actual_wkc}")
+            except Exception as e:
+                print(f"Error in process data thread: {e}")
+            time.sleep(0.012)
 
     def _check_thread(self):
         while not self._ch_thread_stop_event.is_set():
@@ -116,9 +119,21 @@ class EthercatClient(object):
             print(f"  Output size: {len(slave.output)} bytes")
             print(f"  State: {slave.state}")
         
-        self._master.config_map()
+        # 增加重试机制来配置映射
+        config_map_success = False
+        for attempt in range(3):
+            try:
+                self._master.config_map()
+                config_map_success = True
+                break
+            except Exception as e:
+                print(f"Config map attempt {attempt + 1} failed: {e}")
+                time.sleep(0.1)
         
-        time.sleep(0.5)
+        if not config_map_success:
+            print("Failed to configure PDO mapping after 3 attempts")
+            self._master.close()
+            return False
         
         print("PDO mapping information:")
         for i, slave in enumerate(self._master.slaves):
@@ -126,46 +141,73 @@ class EthercatClient(object):
             print(f"  Input size after config_map: {len(slave.input)} bytes")
             print(f"  Output size after config_map: {len(slave.output)} bytes")
         
-        # 检查是否进入SAFEOP状态
-        if self._master.state_check(pysoem.SAFEOP_STATE, timeout=500_000) != pysoem.SAFEOP_STATE:
-            print("Failed to enter SAFEOP state")
+        # 检查是否进入PREOP状态
+        if self._master.state_check(pysoem.PREOP_STATE, timeout=500_000) != pysoem.PREOP_STATE:
+            print("Failed to enter PREOP state")
             for slave in self._master.slaves:
-                if not slave.state == pysoem.SAFEOP_STATE:
-                    print('{} did not reach SAFEOP state'.format(slave.name))
-                    print('al status code {} ({})'.format(hex(slave.al_status),
-                        pysoem.al_status_code_to_string(slave.al_status)))
+                print(f'{slave.name} did not reach PREOP state')
+                print(f'al status code {hex(slave.al_status)} ({pysoem.al_status_code_to_string(slave.al_status)})')
             self._master.close()
             return False
+        
+        # 等待并检查PDO映射完成
+        time.sleep(0.1)
+        
+        # 检查是否进入SAFEOP状态 - 增加重试机制
+        safeop_reached = False
+        for attempt in range(5):
+            if self._master.state_check(pysoem.SAFEOP_STATE, timeout=500_000) == pysoem.SAFEOP_STATE:
+                safeop_reached = True
+                break
+            print(f"Waiting for SAFEOP state, attempt {attempt + 1}")
+            time.sleep(0.1)
+            
+        if not safeop_reached:
+            print("Failed to enter SAFEOP state after 5 attempts")
+            for slave in self._master.slaves:
+                if slave.state != pysoem.SAFEOP_STATE:
+                    print(f'{slave.name} did not reach SAFEOP state')
+                    print(f'al status code {hex(slave.al_status)} ({pysoem.al_status_code_to_string(slave.al_status)})')
+            self._master.close()
+            return False
+            
         print('Switching to OP state...')
         
-        # 设置OP状态
+        # 设置OP状态 - 增加重试机制
         self._master.state = pysoem.OP_STATE
         self._master.write_state()
-
+        
         # 启动处理线程
         self.check_thread = threading.Thread(target=self._check_thread)
+        self.check_thread.daemon = True
         self.check_thread.start()
         self.proc_thread = threading.Thread(target=self._processdata_thread)
+        self.proc_thread.daemon = True
         self.proc_thread.start()
+        time.sleep(0.1)
         
-        # 等待进入OP状态
+        # 等待进入OP状态 - 增加重试和超时机制
         slave_reached_op = False
-        for i in range(40):
-            self._master.state_check(pysoem.OP_STATE, timeout=50_000)
+        for i in range(50):  # 增加尝试次数
+            self._master.state_check(pysoem.OP_STATE, timeout=100_000)  # 减少单次超时时间
             if self._master.state == pysoem.OP_STATE:
                 slave_reached_op = True
                 break
+            time.sleep(0.1)
                 
         if slave_reached_op:
             self._master.in_op = True
-            print("op reached")
+            print("OP state reached successfully")
         else:
-            print("no op reached")
+            print("Failed to reach OP state")
             # 如果无法进入OP状态，停止线程
             self._pd_thread_stop_event.set()
             self._ch_thread_stop_event.set()
-            self.proc_thread.join()
-            self.check_thread.join()
+            # 等待线程结束
+            if hasattr(self, 'proc_thread') and self.proc_thread.is_alive():
+                self.proc_thread.join(timeout=1.0)
+            if hasattr(self, 'check_thread') and self.check_thread.is_alive():
+                self.check_thread.join(timeout=1.0)
             
         # 打印配置后的从站信息
         print(f"After configuration - Slave input size: {len(self._slave.input)} bytes")
@@ -176,12 +218,16 @@ class EthercatClient(object):
         if self._connected:
             self._pd_thread_stop_event.set()
             self._ch_thread_stop_event.set()
-            self.proc_thread.join()
-            self.check_thread.join()
+            # 只有在线程存在且活跃时才join
+            if hasattr(self, 'proc_thread') and self.proc_thread.is_alive():
+                self.proc_thread.join(timeout=1.0)
+            if hasattr(self, 'check_thread') and self.check_thread.is_alive():
+                self.check_thread.join(timeout=1.0)
             self._master.state = pysoem.INIT_STATE
             self._master.write_state()
             self._master.close()
             self._slave = None
+            self._connected = False
     def sdo_read(self, index, subindex=0):
         """
         读取SDO对象字典中的值

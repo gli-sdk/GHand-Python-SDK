@@ -113,14 +113,20 @@ class DexHand(object):
             if id == "auto":
                 id_list = self._client.search()
                 for id in id_list:
-                    self._opened = self._client.connect(id)
-                    if self._opened:
-                        self._client.run()
-                        break
+                    connected = self._client.connect(id)
+                    if connected:
+                        run_success = self._client.run()
+                        if run_success:
+                            self._opened = True
+                            break
+                        else:
+                            # 如果run失败，断开连接并尝试下一个设备
+                            self._client.disconnect()
             else:
-                self._opened = self._client.connect(id)
-                if self._opened:
-                    self._client.run()
+                connected = self._client.connect(id)
+                if connected:
+                    run_success = self._client.run()
+                    self._opened = run_success
         elif type == CommType.CANFD:
             pass
         elif type == CommType.RS485:
@@ -329,7 +335,6 @@ class DexHand(object):
                 self._hand_type = HandType.RIGHT_HAND
         return self._hand_type
     def _joint_to_pdo(self, joint: Joint, pdo: JointRpdo):
-        print(joint.angle)
         pdo.angle = joint.angle
         pdo.speed = joint.speed
         pdo.torque = joint.torque
