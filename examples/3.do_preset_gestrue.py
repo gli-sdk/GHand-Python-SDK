@@ -196,35 +196,55 @@ def make_six_sign(hand):
     return result
 
 def test_finger(hand):
-    """食指摇摆动作"""
+    """测试指动作"""
     joints = []
-    joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(75), speed=5000, torque=90))        #角度范围为:0~75(度)
+    joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(0), speed=800, torque=90))   #角度范围为:0~75(度)
+    joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(0), speed=800, torque=90))   #角度范围为:0~70(度)
+    joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(15), speed=800, torque=90)) #角度范围为:-15~15(度)
 
     result = hand.move_joints(joints)
     if result:
         print("指令1发送成功")
     else:
         print("指令1发送失败")
-    time.sleep(5)
+    time.sleep(2)
 
     current_joints  = hand.get_joints()
     if current_joints:
         for joint in current_joints:
-            if joint.id == JointId.FF_MCP:
+            if joint.id == JointId.THUMB_PIP:
                 print(f"当前关节状态 - 角度: {math.degrees(joint.angle):.2f} 度, 速度: {joint.speed}, 扭矩: {joint.torque}")
-
-    joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(0), speed=5000, torque=90))        #角度范围为:0~75(度)
+    
+    joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(0), speed=800, torque=90))   #角度范围为:0~75(度)
+    joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(0), speed=800, torque=90))   #角度范围为:0~70(度)
+    joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(0), speed=800, torque=90)) #角度范围为:-15~15(度)
     result = hand.move_joints(joints)
     if result:
         print("指令2发送成功")
     else:
         print("指令2发送失败")
-    time.sleep(5)
+    time.sleep(2)
 
     current_joints  = hand.get_joints()
     if current_joints:
         for joint in current_joints:
-            if joint.id == JointId.FF_MCP:
+            if joint.id == JointId.THUMB_PIP:
+                print(f"当前关节状态 - 角度: {math.degrees(joint.angle):.2f} 度, 速度: {joint.speed}, 扭矩: {joint.torque}")
+
+    joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(0), speed=800, torque=90))   #角度范围为:0~75(度)
+    joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(0), speed=800, torque=90))   #角度范围为:0~70(度)
+    joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(-15), speed=800, torque=90)) #角度范围为:-15~15(度)
+    result = hand.move_joints(joints)
+    if result:
+        print("指令3发送成功")
+    else:
+        print("指令3发送失败")
+    time.sleep(2)
+
+    current_joints  = hand.get_joints()
+    if current_joints:
+        for joint in current_joints:
+            if joint.id == JointId.THUMB_PIP:
                 print(f"当前关节状态 - 角度: {math.degrees(joint.angle):.2f} 度, 速度: {joint.speed}, 扭矩: {joint.torque}")
     
 
