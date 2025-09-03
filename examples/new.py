@@ -69,7 +69,7 @@ def main():
             hand.move_joints(joints)
             time.sleep(3)
 
-            # 增加角度值，每次增加10度，当达到70度后重新从0度开始
+            # 增加角度值，每次增加1度，当达到15度后重新从0度开始
             test_angle += 1
             if test_angle > 15:
                 test_angle = 0

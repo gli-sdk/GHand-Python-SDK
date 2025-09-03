@@ -195,7 +195,7 @@ def make_six_sign(hand):
         
     return result
 
-def wiggle_forefinger(hand):
+def test_finger(hand):
     """食指摇摆动作"""
     joints = []
     joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(75), speed=5000, torque=90))        #角度范围为:0~75(度)
@@ -275,7 +275,7 @@ def main():
             # time.sleep(3)
 
             print("演示6: [测试]")
-            wiggle_forefinger(hand)
+            test_finger(hand)
 
             # print("恢复: [张开所有手指]")
             # open_hand(hand)
