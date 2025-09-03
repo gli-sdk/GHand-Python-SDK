@@ -198,7 +198,7 @@ def make_six_sign(hand):
 def wiggle_forefinger(hand):
     """食指摇摆动作"""
     joints = []
-    joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(test_angle), speed=5000, torque=90))        #角度范围为:0~75(度)
+    joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(75), speed=5000, torque=90))        #角度范围为:0~75(度)
 
     result = hand.move_joints(joints)
     if result:
@@ -213,7 +213,7 @@ def wiggle_forefinger(hand):
             if joint.id == JointId.FF_MCP:
                 print(f"当前关节状态 - 角度: {math.degrees(joint.angle):.2f} 度, 速度: {joint.speed}, 扭矩: {joint.torque}")
 
-    joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(test_angle), speed=5000, torque=90))        #角度范围为:0~75(度)
+    joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(0), speed=5000, torque=90))        #角度范围为:0~75(度)
     result = hand.move_joints(joints)
     if result:
         print("指令2发送成功")
