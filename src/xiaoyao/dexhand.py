@@ -112,6 +112,7 @@ class DexHand(object):
         if type == CommType.ETHERCAT:
             if id == "auto":
                 id_list = self._client.search()
+                print("搜索到的ID!!!:", id_list)
                 for id in id_list:
                     connected = self._client.connect(id)
                     if connected:
