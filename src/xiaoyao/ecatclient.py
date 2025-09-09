@@ -87,7 +87,7 @@ class EthercatClient(object):
         if self._connected:
             return True
         try:
-            self._master.open(r"\Device\NPF_{22F450DC-244F-47FA-A538-CBD0142495BE}")
+            self._master.open(id)
             if not self._master.config_init() > 0:
                 self._master.close()
                 return False
