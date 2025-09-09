@@ -3,17 +3,6 @@ import math
 from xiaoyao.dexhand import DexHand, CommType, Joint, JointId
 
 
-def get_temprature(data):
-    return data["temp"]
-
-
-def process_data(data):
-    temp = get_temprature(data)
-    print(temp)
-    for key in ["thumb1", "thumb2"]:
-        print(f"{key}: {data[key]}")
-
-
 def main():
     hand = DexHand()
 
