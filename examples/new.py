@@ -24,7 +24,7 @@ def main():
     }
 
 
-    connected = hand.open(CommType.ETHERCAT, r"\Device\NPF_{22F450DC-244F-47FA-A538-CBD0142495BE}")
+    connected = hand.open(CommType.ETHERCAT, "auto")
     if not connected:
         print("connect failed")
         return

@@ -207,7 +207,7 @@ def main():
                                    angle=clip_angle_radians(-(left_hand.thumb.mcp_roll + left_hand.thumb.pip_roll + left_hand.thumb.dip_roll) - 85, 0, 90), 
                                    speed=50, torque=90))    # mcp外展：手背传感器坐标系下，dip传感器绕y轴旋转
                 joints.append(Joint(id=JointId.THUMB_ROTATION, 
-                                   angle=clip_angle_radians(left_hand.thumb.dip_sway, 0, 90), 
+                                   angle=clip_angle_radians(-left_hand.thumb.dip_sway, 0, 90), 
                                    speed=50, torque=90))    # mcp旋转：在mcp传感器坐标系下，dip传感器绕z轴旋转
                 joints.append(Joint(id=JointId.FF_PIP, 
                                    angle=clip_angle_radians(left_hand.index.pip_bend, 0, 75), speed=50, torque=90))

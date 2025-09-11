@@ -195,67 +195,6 @@ def make_six_sign(hand):
         
     return result
 
-def test_finger(hand):
-    """测试指动作"""
-    joints = []
-    # 食指关节
-    joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(5), speed=1000, torque=90))   #角度范围为:0~75(度)
-    joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(5), speed=1000, torque=90))   #角度范围为:0~55(度)
-    joints.append(Joint(id=JointId.THUMB_SWING, angle=math.radians(5), speed=50, torque=90))   #角度范围为:0~90(度)
-    joints.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(5), speed=50, torque=90))   #角度范围为:0~90(度)
-    joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(5), speed=50, torque=90))   #角度范围为:0~75(度)
-    joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(5), speed=50, torque=90))   #角度范围为:0~70(度)
-    joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(5), speed=50, torque=90))   #角度范围为:-15~15(度)
-    joints.append(Joint(id=JointId.MF_PIP, angle=math.radians(5), speed=50, torque=90))   #角度范围为:0~75(度)
-    joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(5), speed=50, torque=90))   #角度范围为:0~70(度)
-    joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(5), speed=50, torque=90))   #角度范围为:0~75(度)
-    joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(5), speed=50, torque=90))   #角度范围为:0~70(度)
-    joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(5), speed=50, torque=90))   #角度范围为:0~75(度)
-    joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(5), speed=50, torque=90))   #角度范围为:0~70(度)
-    result = hand.move_joints(joints)
-    if result:
-        print("指令1发送成功")
-    else:
-        print("指令1发送失败")
-    time.sleep(3)
-
-    current_joints  = hand.get_joints()
-    if current_joints:
-        for joint in current_joints:
-            if joint.id == JointId.FF_MCP:
-                print(f"当前关节状态 - 角度: {math.degrees(joint.angle):.2f} 度, 速度: {joint.speed}, 扭矩: {joint.torque}")
-
-    joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(0), speed=1000, torque=90))   #角度范围为:0~75(度)
-    joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(0), speed=1000, torque=90))   #角度范围为:0~55(度)
-    joints.append(Joint(id=JointId.THUMB_SWING, angle=math.radians(0), speed=50, torque=90))   #角度范围为:0~90(度)
-    joints.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(0), speed=50, torque=90))   #角度范围为:0~90(度)
-    joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(0), speed=50, torque=90))   #角度范围为:0~75(度)
-    joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(0), speed=50, torque=90))   #角度范围为:0~70(度)
-    joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(0), speed=50, torque=90))   #角度范围为:-15~15(度)
-    joints.append(Joint(id=JointId.MF_PIP, angle=math.radians(0), speed=50, torque=90))   #角度范围为:0~75(度)
-    joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(0), speed=50, torque=90))   #角度范围为:0~70(度)
-    joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(0), speed=2000, torque=90))   #角度范围为:0~75(度)
-    joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(0), speed=2000, torque=90))   #角度范围为:0~70(度)
-    joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(0), speed=50, torque=90))   #角度范围为:0~75(度)
-    joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(0), speed=50, torque=90))   #角度范围为:0~70(度)
-
-    result = hand.move_joints(joints)
-    if result:
-        print("指令2发送成功")
-    else:
-        print("指令2发送失败")
-    time.sleep(3)
-
-    current_joints  = hand.get_joints()
-    if current_joints:
-        for joint in current_joints:
-            if joint.id == JointId.FF_MCP:
-                print(f"当前关节状态 - 角度: {math.degrees(joint.angle):.2f} 度, 速度: {joint.speed}, 扭矩: {joint.torque}")
-
-
-    
-    return result
-
 def main():
     """主执行函数，演示如何执行预设手势。"""
     print("***** 枭尧灵巧手 SDK - 预设手势功能演示 *****\n")
@@ -267,7 +206,6 @@ def main():
             return
         
         print("\n--- 设备已就绪，将开始依次演示预设手势 ---\n")
-        time.sleep(3)
 
         # 循环执行手势动作
         gesture_cycle = 0
@@ -280,32 +218,29 @@ def main():
                 
             print(f"\n--- 第 {gesture_cycle} 轮手势演示开始 ---")
             
-            # print("演示1: [张开所有手指]")
-            # open_hand(hand)
-            # time.sleep(3)
+            print("演示1: [张开所有手指]")
+            open_hand(hand)
+            time.sleep(3)
 
-            # print("演示2: [握拳]")
-            # make_fist(hand)
-            # time.sleep(3)
+            print("演示2: [握拳]")
+            make_fist(hand)
+            time.sleep(3)
 
-            # print("演示3: [OK 手势]")
-            # make_ok(hand)
-            # time.sleep(3)
+            print("演示3: [OK 手势]")
+            make_ok(hand)
+            time.sleep(3)
 
-            # print("演示4: [竖大拇指]")
-            # thumbs_up(hand)
-            # time.sleep(3)
+            print("演示4: [竖大拇指]")
+            thumbs_up(hand)
+            time.sleep(3)
 
-            # print("演示5: [六抓握]")
-            # make_six_sign(hand)
-            # time.sleep(3)
+            print("演示5: [六抓握]")
+            make_six_sign(hand)
+            time.sleep(3)
 
-            print("演示6: [测试]")
-            test_finger(hand)
-
-            # print("恢复: [张开所有手指]")
-            # open_hand(hand)
-            # time.sleep(5)
+            print("恢复: [张开所有手指]")
+            open_hand(hand)
+            time.sleep(5)
             
             print(f"--- 第 {gesture_cycle} 轮手势演示结束 ---\n")
             

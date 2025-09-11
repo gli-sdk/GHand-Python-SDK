@@ -58,7 +58,7 @@ class EthercatClient(object):
                     print(f"Warning: Invalid working counter (WKC): {self._actual_wkc}")
             except Exception as e:
                 print(f"Error in process data thread: {e}")
-            time.sleep(0.02)
+            time.sleep(0.015)
 
     def _check_thread(self):
         while not self._ch_thread_stop_event.is_set():
@@ -83,6 +83,12 @@ class EthercatClient(object):
             print(f"Sending {len(data)} bytes: {data}")
             self._slave.output = data
             print(f"【Joint】发送 PDO 数据成功")
+
+    def search(self) -> list[str]:
+        ids = netifaces.interfaces()
+        for i, v in enumerate(ids):
+            ids[i] = "\\Device\\NPF_" + v
+        return ids
     def connect(self, id):
         if self._connected:
             return True
@@ -99,13 +105,7 @@ class EthercatClient(object):
         except Exception as e:
             print(e)
             return False
-
-    def search(self) -> list[str]:
-        ids = netifaces.interfaces()
-        for i, v in enumerate(ids):
-            ids[i] = "\\Device\\NPF_" + v
-        return ids
-        
+              
     def run(self):
         if not self._connected or self._slave is None:
             print("Not connected or no slave configured")
@@ -119,19 +119,12 @@ class EthercatClient(object):
             print(f"  Output size: {len(slave.output)} bytes")
             print(f"  State: {slave.state}")
         
-        # 增加重试机制来配置映射
-        config_map_success = False
-        for attempt in range(3):
-            try:
-                self._master.config_map()
-                config_map_success = True
-                break
-            except Exception as e:
-                print(f"Config map attempt {attempt + 1} failed: {e}")
-                time.sleep(0.1)
-        
-        if not config_map_success:
-            print("Failed to configure PDO mapping after 3 attempts")
+        # 直接配置映射并等待完成
+        try:
+            self._master.config_map()
+            print("PDO mapping configured successfully")
+        except Exception as e:
+            print(f"Failed to configure PDO mapping: {e}")
             self._master.close()
             return False
         
@@ -141,29 +134,24 @@ class EthercatClient(object):
             print(f"  Input size after config_map: {len(slave.input)} bytes")
             print(f"  Output size after config_map: {len(slave.output)} bytes")
         
-        # 检查是否进入PREOP状态
+        # 设置并检查是否进入PREOP状态
+        self._master.state = pysoem.PREOP_STATE
+        self._master.write_state()
+        self._master.read_state()  # 刷新状态
         if self._master.state_check(pysoem.PREOP_STATE, timeout=500_000) != pysoem.PREOP_STATE:
             print("Failed to enter PREOP state")
             for slave in self._master.slaves:
                 print(f'{slave.name} did not reach PREOP state')
                 print(f'al status code {hex(slave.al_status)} ({pysoem.al_status_code_to_string(slave.al_status)})')
             self._master.close()
-            return False
+            return False       
         
-        # 等待并检查PDO映射完成
-        time.sleep(0.1)
-        
-        # 检查是否进入SAFEOP状态 - 增加重试机制
-        safeop_reached = False
-        for attempt in range(5):
-            if self._master.state_check(pysoem.SAFEOP_STATE, timeout=500_000) == pysoem.SAFEOP_STATE:
-                safeop_reached = True
-                break
-            print(f"Waiting for SAFEOP state, attempt {attempt + 1}")
-            time.sleep(0.1)
-            
-        if not safeop_reached:
-            print("Failed to enter SAFEOP state after 5 attempts")
+        # 设置并检查是否进入SAFEOP状态
+        self._master.state = pysoem.SAFEOP_STATE
+        self._master.write_state()
+        self._master.read_state()  # 刷新状态
+        if self._master.state_check(pysoem.SAFEOP_STATE, timeout=1000_000) != pysoem.SAFEOP_STATE:
+            print("Failed to enter SAFEOP state")
             for slave in self._master.slaves:
                 if slave.state != pysoem.SAFEOP_STATE:
                     print(f'{slave.name} did not reach SAFEOP state')
@@ -171,9 +159,9 @@ class EthercatClient(object):
             self._master.close()
             return False
             
+
         print('Switching to OP state...')
-        
-        # 设置OP状态 - 增加重试机制
+        # 设置OP状态
         self._master.state = pysoem.OP_STATE
         self._master.write_state()
         
@@ -184,21 +172,10 @@ class EthercatClient(object):
         self.proc_thread = threading.Thread(target=self._processdata_thread)
         self.proc_thread.daemon = True
         self.proc_thread.start()
-        time.sleep(0.1)
         
-        # 等待进入OP状态 - 增加重试和超时机制
-        slave_reached_op = False
-        for i in range(50):  # 增加尝试次数
-            self._master.state_check(pysoem.OP_STATE, timeout=100_000)  # 减少单次超时时间
-            if self._master.state == pysoem.OP_STATE:
-                slave_reached_op = True
-                break
-            time.sleep(0.1)
-                
-        if slave_reached_op:
-            self._master.in_op = True
-            print("OP state reached successfully")
-        else:
+        # 等待进入OP状态
+        self._master.read_state()  # 刷新状态
+        if self._master.state_check(pysoem.OP_STATE, timeout=500_000) != pysoem.OP_STATE:
             print("Failed to reach OP state")
             # 如果无法进入OP状态，停止线程
             self._pd_thread_stop_event.set()
@@ -208,12 +185,18 @@ class EthercatClient(object):
                 self.proc_thread.join(timeout=1.0)
             if hasattr(self, 'check_thread') and self.check_thread.is_alive():
                 self.check_thread.join(timeout=1.0)
+            self._master.close()
+            return False
+                
+        self._master.in_op = True
+        print("OP state reached successfully")
             
         # 打印配置后的从站信息
         print(f"After configuration - Slave input size: {len(self._slave.input)} bytes")
         print(f"After configuration - Slave output size: {len(self._slave.output)} bytes")
         
-        return slave_reached_op
+        return True
+
     def disconnect(self):
         if self._connected:
             self._pd_thread_stop_event.set()
