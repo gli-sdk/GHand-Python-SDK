@@ -5,7 +5,7 @@ from xiaoyao.dexhand import DexHand, CommType, Joint, JointId
 
 def main():
     hand = DexHand()
-    connected = hand.open(CommType.ETHERCAT,  r"\Device\NPF_{22F450DC-244F-47FA-A538-CBD0142495BE}")      
+    connected = hand.open(CommType.ETHERCAT,  "auto")      
 
     try:
         if not connected:
@@ -49,7 +49,7 @@ def main():
                             print(f"当前关节状态 - 角度: {math.degrees(joint.angle):.2f} 度, 速度: {joint.speed}, 扭矩: {joint.torque}")
             else:
                 print("指令1发送失败")
-            time.sleep(3)
+            time.sleep(0.5)
 
             joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(0), speed=1000, torque=90))   #角度范围为:0~75(度)
             joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(0), speed=1000, torque=90))   #角度范围为:0~55(度)
@@ -75,7 +75,7 @@ def main():
                             print(f"当前关节状态 - 角度: {math.degrees(joint.angle):.2f} 度, 速度: {joint.speed}, 扭矩: {joint.torque}")
             else:
                 print("指令2发送失败")
-            time.sleep(3)
+            time.sleep(0.5)
 
             print(f"--- 第 {gesture_cycle} 轮手指运动结束 ---\n")
             # 提示信息

@@ -340,7 +340,7 @@ class DexHand(object):
         pdo.speed = joint.speed
         pdo.torque = joint.torque
 
-    def move_joints(self, joints: list[Joint]):
+    def move_joints(self, joints: list[Joint], mode: int = 0, stop: int = 0):
         """
         发送多个关节控制指令
 
@@ -351,6 +351,8 @@ class DexHand(object):
           bool: 连接成功返回True，否则返回False
         """
         rpdo = Rpdo()
+        rpdo.mode = mode
+        rpdo.stop = stop
         for joint in joints:
             if joint.id == JointId.THUMB_PIP:
                 self._joint_to_pdo(joint, rpdo.th_pip)
@@ -393,7 +395,7 @@ class DexHand(object):
         """
         data = self._client.recv_data()
         print(f"Received data!!!!!: {' '.join(f'{b:02x}' for b in data)}")
-        # print(f"Received data length: {len(data)} bytes")  # 调试信息：打印接收到的数据长度
+        print(f"Received data length: {len(data)} bytes")  # 调试信息：打印接收到的数据长度
         
         if len(data) < 235:
             print(f"Data length insufficient. Expected at least 235 bytes, got {len(data)} bytes")  # 调试信息：数据长度不足时的提示

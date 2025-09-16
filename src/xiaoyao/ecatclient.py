@@ -1,4 +1,3 @@
-
 import pysoem
 import threading
 import time
@@ -17,7 +16,9 @@ class EthercatClient(object):
         self._ch_thread_stop_event = threading.Event()
         self._connected = False
         self._slave = None
-
+        # 线程安全锁
+        self._data_lock = threading.RLock()
+        
     def __new__(cls, *args, **kwargs):
         if not hasattr(cls, '_instance'):
             with cls._instance_lock:
@@ -52,37 +53,49 @@ class EthercatClient(object):
     def _processdata_thread(self):
         while not self._pd_thread_stop_event.is_set():
             try:
-                self._master.send_processdata()
-                self._actual_wkc = self._master.receive_processdata(15_000)
+                with self._data_lock:
+                    self._master.send_processdata()
+                    self._actual_wkc = self._master.receive_processdata(15_000)
                 if self._actual_wkc < 1:
                     print(f"Warning: Invalid working counter (WKC): {self._actual_wkc}")
             except Exception as e:
                 print(f"Error in process data thread: {e}")
-            time.sleep(0.015)
+            time.sleep(0.01)
 
     def _check_thread(self):
         while not self._ch_thread_stop_event.is_set():
-            if self._master.in_op and (self._actual_wkc < 1 or self._master.do_check_state):
-                self._master.do_check_state = False
-                self._master.read_state()
-                for i, slave in enumerate(self._master.slaves):
-                    if slave.state != pysoem.OP_STATE:
-                        self._master.do_check_state = True
-                        self._check_slave(slave)
+            try:
+                need_check = False
+                with self._data_lock:
+                    if self._master.in_op and (self._actual_wkc < 1 or self._master.do_check_state):
+                        self._master.do_check_state = False
+                        self._master.read_state()
+                        need_check = True
+                
+                if need_check:
+                    with self._data_lock:
+                        for i, slave in enumerate(self._master.slaves):
+                            if slave.state != pysoem.OP_STATE:
+                                self._master.do_check_state = True
+                                self._check_slave(slave)
+            except Exception as e:
+                print(f"Error in check thread: {e}")
             time.sleep(0.01)
 
     def recv_data(self) -> bytes:
-        if self._slave is not None:
-            return self._slave.input
-        else:
-            print("No slave connected")
-            return bytes()
+        with self._data_lock:
+            if self._slave is not None:
+                return self._slave.input
+            else:
+                print("No slave connected")
+                return bytes()
 
     def send_data(self, data: bytes):
-        if self._slave is not None:
-            print(f"Sending {len(data)} bytes: {data}")
-            self._slave.output = data
-            print(f"【Joint】发送 PDO 数据成功")
+        with self._data_lock:
+            if self._slave is not None:
+                print(f"Sending {len(data)} bytes: {' '.join(f'{b:02x}' for b in data)}")
+                self._slave.output = data
+                print(f"【Joint】发送 PDO 数据成功")
 
     def search(self) -> list[str]:
         ids = netifaces.interfaces()
@@ -101,6 +114,7 @@ class EthercatClient(object):
             print("Connected to device with id: ", id)
             self._slave = self._master.slaves[0]
             self._slave.is_lost = False
+            self._master.read_state()  # 刷新状态
             return True
         except Exception as e:
             print(e)
@@ -111,56 +125,142 @@ class EthercatClient(object):
             print("Not connected or no slave configured")
             return False
         
-        print(f"Number of slaves: {len(self._master.slaves)}")
-        for i, slave in enumerate(self._master.slaves):
-            print(f"Slave {i}:")
-            print(f"  Name: {slave.name}")
-            print(f"  Input size: {len(slave.input)} bytes")
-            print(f"  Output size: {len(slave.output)} bytes")
-            print(f"  State: {slave.state}")
+        expected_input_size = 346
+        expected_output_size = 158
         
-        # 直接配置映射并等待完成
+        # 进入初始状态
+        if self._master.state != pysoem.INIT_STATE:
+            self._master.state = pysoem.INIT_STATE
+        
+        # 配置映射并等待完成
         try:
-            self._master.config_map()
-            print("PDO mapping configured successfully")
+            # 确保从站在INIT状态才能进行映射
+            if len(self._master.slaves) > 0:
+                slave = self._master.slaves[0]
+
+                if slave.state != pysoem.INIT_STATE:
+                    slave.state = pysoem.INIT_STATE
+                    slave.write_state()
+                    # 等待状态转换完成
+                    if slave.state_check(pysoem.INIT_STATE, timeout=100_000) != pysoem.INIT_STATE:
+                        print(f"Failed to enter INIT state. Current state: {slave.state}")
+                        self._master.close()
+                        return False
+                
+                # 进行配置初始化
+                config_result = self._master.config_init()
+                if config_result <= 0:
+                    print(f"Config init failed with result: {config_result}")
+                    self._master.close()
+                    return False
+                
+                self._master.config_map()
+
+                # TODO: 增加延迟以确保配置稳定
+                time.sleep(0.5)
+                
+                if len(slave.input) != expected_input_size or len(slave.output) != expected_output_size:
+                    print("Expected size errror!")
+                    print(f"Expected input size: {expected_input_size}, actual input size: {len(slave.input)}") 
+                    print(f"Expected output size: {expected_output_size}, actual output size: {len(slave.output)}")
+            else:
+                print("No slaves found")
+                self._master.close()
+                return False
         except Exception as e:
             print(f"Failed to configure PDO mapping: {e}")
             self._master.close()
             return False
         
-        print("PDO mapping information:")
-        for i, slave in enumerate(self._master.slaves):
-            print(f"Slave {i}:")
-            print(f"  Input size after config_map: {len(slave.input)} bytes")
-            print(f"  Output size after config_map: {len(slave.output)} bytes")
         
-        # 设置并检查是否进入PREOP状态
+        # 设置主站进入PREOP状态
+        print("Attempting to enter PREOP state...")
         self._master.state = pysoem.PREOP_STATE
-        self._master.write_state()
-        self._master.read_state()  # 刷新状态
-        if self._master.state_check(pysoem.PREOP_STATE, timeout=500_000) != pysoem.PREOP_STATE:
+        self._master.write_state() 
+        state_result = self._master.state_check(pysoem.PREOP_STATE, timeout=500_000)
+        
+        if state_result != pysoem.PREOP_STATE:
             print("Failed to enter PREOP state")
             for slave in self._master.slaves:
-                print(f'{slave.name} did not reach PREOP state')
-                print(f'al status code {hex(slave.al_status)} ({pysoem.al_status_code_to_string(slave.al_status)})')
-            self._master.close()
-            return False       
+                print(f'{slave.name} did not reach PREOP state') 
         
-        # 设置并检查是否进入SAFEOP状态
+        # 在主站进入SAFEOP状态之前，确保PDO配置正确
+        all_slaves_in_preop = True
+        pdo_config_ok = True
+        
+        for i, slave in enumerate(self._master.slaves):
+            if slave.state != pysoem.PREOP_STATE:
+                print(f"    Error: Slave {i} did not reach PREOP state")
+                all_slaves_in_preop = False
+            
+            if len(slave.input) != expected_input_size or len(slave.output) != expected_output_size:
+                print(f"    Error: Size mismatch for slave {i}!")
+                pdo_config_ok = False
+                
+        if not pdo_config_ok or not all_slaves_in_preop or self._master.state != pysoem.PREOP_STATE:
+            print("PDO configuration is incorrect. Trying to fix...")
+            # 尝试重新配置PDO
+            try:
+                # 重新配置前确保回到INIT状态
+                self._master.state = pysoem.INIT_STATE
+                self._master.write_state()
+                time.sleep(0.1)
+                
+                # 重新初始化配置
+                self._master.config_init()
+                time.sleep(0.1)
+                
+                # 重新进行PDO映射配置
+                self._master.config_map()
+                time.sleep(0.5)
+                
+                # 再次检查配置
+                self._master.read_state()
+                reconfig_success = True
+                for i, slave in enumerate(self._master.slaves):
+                    if len(slave.input) != expected_input_size or len(slave.output) != expected_output_size:
+                        print(f"    Reconfiguration failed for slave {i}")
+                        print(f"  Slave {i} - Input: {len(slave.input)} bytes, Output: {len(slave.output)} bytes")
+                        reconfig_success = False
+                
+                # 如果重新配置失败，直接返回错误
+                if not reconfig_success:
+                    print("Reconfiguration failed. Cannot proceed.")
+                    self._master.close()
+                    return False
+                    
+                # 重新检查状态
+                self._master.state = pysoem.PREOP_STATE
+                self._master.write_state()
+                self._master.read_state()
+                state_check_result = self._master.state_check(pysoem.PREOP_STATE, timeout=500_000)
+                if state_check_result != pysoem.PREOP_STATE:
+                    print("Failed to re-enter PREOP state after reconfiguration")
+                    self._master.close()
+                    return False
+                    
+            except Exception as e:
+                print(f"Failed to reconfigure PDO mapping: {e}")
+                self._master.close()
+                return False
+        
+        time.sleep(1.0)  # 增加延迟确保配置完成
+        
         self._master.state = pysoem.SAFEOP_STATE
         self._master.write_state()
         self._master.read_state()  # 刷新状态
-        if self._master.state_check(pysoem.SAFEOP_STATE, timeout=1000_000) != pysoem.SAFEOP_STATE:
+        if self._master.state_check(pysoem.SAFEOP_STATE, timeout=500_000) != pysoem.SAFEOP_STATE:
             print("Failed to enter SAFEOP state")
-            for slave in self._master.slaves:
-                if slave.state != pysoem.SAFEOP_STATE:
-                    print(f'{slave.name} did not reach SAFEOP state')
-                    print(f'al status code {hex(slave.al_status)} ({pysoem.al_status_code_to_string(slave.al_status)})')
+            for i, slave in enumerate(self._master.slaves):
+                print(f'Slave {i}: {slave.name}')
+                print(f'  Current state: {slave.state}')
+                print(f'  Expected state: {pysoem.SAFEOP_STATE}')
+                print(f'  AL status code: {hex(slave.al_status)} ({pysoem.al_status_code_to_string(slave.al_status)})')
+                print(f'  Input size: {len(slave.input)} bytes')
+                print(f'  Output size: {len(slave.output)} bytes')
             self._master.close()
             return False
-            
 
-        print('Switching to OP state...')
         # 设置OP状态
         self._master.state = pysoem.OP_STATE
         self._master.write_state()
@@ -173,7 +273,7 @@ class EthercatClient(object):
         self.proc_thread.daemon = True
         self.proc_thread.start()
         
-        # 等待进入OP状态
+        # 等待进入OP状态，增加超时时间
         self._master.read_state()  # 刷新状态
         if self._master.state_check(pysoem.OP_STATE, timeout=500_000) != pysoem.OP_STATE:
             print("Failed to reach OP state")
@@ -181,19 +281,15 @@ class EthercatClient(object):
             self._pd_thread_stop_event.set()
             self._ch_thread_stop_event.set()
             # 等待线程结束
+            thread_join_timeout = 5.0  # 增加超时时间
             if hasattr(self, 'proc_thread') and self.proc_thread.is_alive():
-                self.proc_thread.join(timeout=1.0)
+                self.proc_thread.join(timeout=thread_join_timeout)
             if hasattr(self, 'check_thread') and self.check_thread.is_alive():
-                self.check_thread.join(timeout=1.0)
+                self.check_thread.join(timeout=thread_join_timeout)
             self._master.close()
             return False
                 
         self._master.in_op = True
-        print("OP state reached successfully")
-            
-        # 打印配置后的从站信息
-        print(f"After configuration - Slave input size: {len(self._slave.input)} bytes")
-        print(f"After configuration - Slave output size: {len(self._slave.output)} bytes")
         
         return True
 
@@ -202,15 +298,17 @@ class EthercatClient(object):
             self._pd_thread_stop_event.set()
             self._ch_thread_stop_event.set()
             # 只有在线程存在且活跃时才join
+            thread_join_timeout = 5.0  # 增加超时时间
             if hasattr(self, 'proc_thread') and self.proc_thread.is_alive():
-                self.proc_thread.join(timeout=1.0)
+                self.proc_thread.join(timeout=thread_join_timeout)
             if hasattr(self, 'check_thread') and self.check_thread.is_alive():
-                self.check_thread.join(timeout=1.0)
-            self._master.state = pysoem.INIT_STATE
-            self._master.write_state()
-            self._master.close()
-            self._slave = None
-            self._connected = False
+                self.check_thread.join(timeout=thread_join_timeout)
+            with self._data_lock:
+                self._master.state = pysoem.INIT_STATE
+                self._master.write_state()
+                self._master.close()
+                self._slave = None
+                self._connected = False
     def sdo_read(self, index, subindex=0):
         """
         读取SDO对象字典中的值
@@ -222,9 +320,10 @@ class EthercatClient(object):
         Returns:
             读取到的数据
         """
-        if self._slave is None:
-            raise RuntimeError("No slave connected")
-        return self._slave.sdo_read(index, subindex)
+        with self._data_lock:
+            if self._slave is None:
+                raise RuntimeError("No slave connected")
+            return self._slave.sdo_read(index, subindex)
 
     def sdo_write(self, index, subindex, value):
         """
@@ -235,6 +334,8 @@ class EthercatClient(object):
             subindex: 子索引
             value: 要写入的值
         """
-        if self._slave is None:
-            raise RuntimeError("No slave connected")
-        return self._slave.sdo_write(index, subindex, value)
+        with self._data_lock:
+            if self._slave is None:
+                raise RuntimeError("No slave connected")
+            return self._slave.sdo_write(index, subindex, value)
+        

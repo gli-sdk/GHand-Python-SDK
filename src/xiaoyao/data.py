@@ -165,7 +165,7 @@ class JointRpdo:
 
 @dataclass
 class Rpdo:
-    mode: int = 1
+    mode: int = 0
     stop: int = 0
     # thumb
     th_pip: JointRpdo = field(default_factory=JointRpdo)
