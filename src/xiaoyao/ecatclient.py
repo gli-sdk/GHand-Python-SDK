@@ -155,100 +155,22 @@ class EthercatClient(object):
                     return False
                 
                 self._master.config_map()
-
-                # TODO: 增加延迟以确保配置稳定
-                time.sleep(0.5)
+                print("master state: ", self._master.state)
                 
                 if len(slave.input) != expected_input_size or len(slave.output) != expected_output_size:
                     print("Expected size errror!")
                     print(f"Expected input size: {expected_input_size}, actual input size: {len(slave.input)}") 
                     print(f"Expected output size: {expected_output_size}, actual output size: {len(slave.output)}")
             else:
-                print("No slaves found")
-                self._master.close()
-                return False
+                    print("No slaves found")
+                    self._master.close()
+                    return False
         except Exception as e:
             print(f"Failed to configure PDO mapping: {e}")
             self._master.close()
             return False
         
         
-        # 设置主站进入PREOP状态
-        print("Attempting to enter PREOP state...")
-        self._master.state = pysoem.PREOP_STATE
-        self._master.write_state() 
-        state_result = self._master.state_check(pysoem.PREOP_STATE, timeout=500_000)
-        
-        if state_result != pysoem.PREOP_STATE:
-            print("Failed to enter PREOP state")
-            for slave in self._master.slaves:
-                print(f'{slave.name} did not reach PREOP state') 
-        
-        # 在主站进入SAFEOP状态之前，确保PDO配置正确
-        all_slaves_in_preop = True
-        pdo_config_ok = True
-        
-        for i, slave in enumerate(self._master.slaves):
-            if slave.state != pysoem.PREOP_STATE:
-                print(f"    Error: Slave {i} did not reach PREOP state")
-                all_slaves_in_preop = False
-            
-            if len(slave.input) != expected_input_size or len(slave.output) != expected_output_size:
-                print(f"    Error: Size mismatch for slave {i}!")
-                pdo_config_ok = False
-                
-        if not pdo_config_ok or not all_slaves_in_preop or self._master.state != pysoem.PREOP_STATE:
-            print("PDO configuration is incorrect. Trying to fix...")
-            # 尝试重新配置PDO
-            try:
-                # 重新配置前确保回到INIT状态
-                self._master.state = pysoem.INIT_STATE
-                self._master.write_state()
-                time.sleep(0.1)
-                
-                # 重新初始化配置
-                self._master.config_init()
-                time.sleep(0.1)
-                
-                # 重新进行PDO映射配置
-                self._master.config_map()
-                time.sleep(0.5)
-                
-                # 再次检查配置
-                self._master.read_state()
-                reconfig_success = True
-                for i, slave in enumerate(self._master.slaves):
-                    if len(slave.input) != expected_input_size or len(slave.output) != expected_output_size:
-                        print(f"    Reconfiguration failed for slave {i}")
-                        print(f"  Slave {i} - Input: {len(slave.input)} bytes, Output: {len(slave.output)} bytes")
-                        reconfig_success = False
-                
-                # 如果重新配置失败，直接返回错误
-                if not reconfig_success:
-                    print("Reconfiguration failed. Cannot proceed.")
-                    self._master.close()
-                    return False
-                    
-                # 重新检查状态
-                self._master.state = pysoem.PREOP_STATE
-                self._master.write_state()
-                self._master.read_state()
-                state_check_result = self._master.state_check(pysoem.PREOP_STATE, timeout=500_000)
-                if state_check_result != pysoem.PREOP_STATE:
-                    print("Failed to re-enter PREOP state after reconfiguration")
-                    self._master.close()
-                    return False
-                    
-            except Exception as e:
-                print(f"Failed to reconfigure PDO mapping: {e}")
-                self._master.close()
-                return False
-        
-        time.sleep(1.0)  # 增加延迟确保配置完成
-        
-        self._master.state = pysoem.SAFEOP_STATE
-        self._master.write_state()
-        self._master.read_state()  # 刷新状态
         if self._master.state_check(pysoem.SAFEOP_STATE, timeout=500_000) != pysoem.SAFEOP_STATE:
             print("Failed to enter SAFEOP state")
             for i, slave in enumerate(self._master.slaves):
@@ -304,9 +226,10 @@ class EthercatClient(object):
             if hasattr(self, 'check_thread') and self.check_thread.is_alive():
                 self.check_thread.join(timeout=thread_join_timeout)
             with self._data_lock:
-                self._master.state = pysoem.INIT_STATE
-                self._master.write_state()
-                self._master.close()
+                # 直接关闭主站
+                if self._master:
+                    self._master.close()
+                    print("Master closed")
                 self._slave = None
                 self._connected = False
     def sdo_read(self, index, subindex=0):

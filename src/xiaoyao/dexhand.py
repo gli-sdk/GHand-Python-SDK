@@ -236,25 +236,25 @@ class DexHand(object):
             return ""
         return serial_number
 
-    def release_protection(self) -> bool:
+    def get_hand_type(self) -> bool:
         """
-        解除保护
+        获取设备类型
 
         Returns:
-            bool: 解除成功返回True，失败返回False
+            bool: 获取成功返回True，失败返回False
         """
         try:
-            self._client.sdo_write(0x2001, 0x00, b'\x01')
+            hand_type = self._client.sdo_read(0x2001, 0x00)
         except Exception:
-            return False
-        return True
+            return ""
+        return hand_type
 
-    def reboot(self) -> bool:
+    def fault_clearance(self) -> bool:
         """
-        重启设备
+        故障清除
 
         Returns:
-            bool: 重启成功返回True，失败返回False
+            bool: 清除成功返回True，失败返回False
         """
         try:
             self._client.sdo_write(0x2002, 0x01, b'\x01')
@@ -264,14 +264,7 @@ class DexHand(object):
 
     def joint_init(self) -> bool:
         try:
-            self._client.sdo_write(0x2003, 0x00, b'\x01')
-        except Exception:
-            return False
-        return True
-
-    def tactile_self_test(self) -> bool:
-        try:
-            self._client.sdo_write(0x2005, 0x00, b'\x01')
+            self._client.sdo_write(0x2003, 0x01, b'\x01')
         except Exception:
             return False
         return True
@@ -284,7 +277,7 @@ class DexHand(object):
             bool: 重置成功返回True，失败返回False
         """
         try:
-            self._client.sdo_write(0x2006, 0x00, b'\x01')
+            self._client.sdo_write(0x2004, 0x01, b'\x01')
         except Exception:
             return False
         return True
@@ -327,7 +320,7 @@ class DexHand(object):
         if self._hand_type == HandType.UNKNOWN:
             try:
                 type = int.from_bytes(
-                    self._client.sdo_read(0x2011), byteorder='little')
+                    self._client.sdo_read(0x2001, 0x00), byteorder='little')
             except Exception:
                 return HandType.UNKNOWN
             if type == 0x01:
