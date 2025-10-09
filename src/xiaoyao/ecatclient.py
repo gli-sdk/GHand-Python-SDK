@@ -60,7 +60,7 @@ class EthercatClient(object):
                     print(f"Warning: Invalid working counter (WKC): {self._actual_wkc}")
             except Exception as e:
                 print(f"Error in process data thread: {e}")
-            time.sleep(0.01)
+            time.sleep(0.05)
 
     def _check_thread(self):
         while not self._ch_thread_stop_event.is_set():
@@ -125,8 +125,8 @@ class EthercatClient(object):
             print("Not connected or no slave configured")
             return False
         
-        expected_input_size = 346
-        expected_output_size = 158
+        expected_input_size = 208
+        expected_output_size = 80
         
         # 进入初始状态
         if self._master.state != pysoem.INIT_STATE:
