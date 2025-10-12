@@ -60,7 +60,7 @@ class EthercatClient(object):
                     print(f"Warning: Invalid working counter (WKC): {self._actual_wkc}")
             except Exception as e:
                 print(f"Error in process data thread: {e}")
-            time.sleep(0.05)
+            time.sleep(0.01)
 
     def _check_thread(self):
         while not self._ch_thread_stop_event.is_set():
