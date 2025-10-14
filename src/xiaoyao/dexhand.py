@@ -66,6 +66,9 @@ class GestureType(enum.Enum):
 
 class DexHand(object):
     def __init__(self):
+        """
+        初始化灵巧手对象
+        """
         self._client = EthercatClient()
         self._hand_type = HandType.UNKNOWN
         self._firmware_version = ""
@@ -74,9 +77,15 @@ class DexHand(object):
         self._set_joint_limit()
 
     def __del__(self):
+        """
+        析构函数，关闭灵巧手设备连接
+        """
         self.close()
 
     def _set_joint_limit(self):
+        """
+        设置关节限制参数
+        """
         self._th_pip_limit = (0, 0)
         self._th_mcp_limit = (0, 0)
         self._th_swing_limit = (0, 0)
@@ -92,6 +101,16 @@ class DexHand(object):
         self._lf_mcp_limit = (0, 0)
 
     def _check_joint_limit(self, joint: Joint, limit):
+        """
+        检查关节角度是否超出限制范围
+
+        Args:
+          joint (Joint): 关节对象
+          limit: 关节限制范围
+
+        Returns:
+          bool: 在限制范围内返回True，超出限制返回False
+        """
         if joint.angle < limit[0] or joint.angle > limit[1]:
             return False
         return True
@@ -139,7 +158,7 @@ class DexHand(object):
         关闭灵巧手设备连接
 
         Returns:
-            bool: 关闭成功返回True，失败返回False
+          bool: 关闭成功返回True，失败返回False
         """
         if self._opened:
             self._client.disconnect()
@@ -150,7 +169,7 @@ class DexHand(object):
         获取灵巧手固件版本号
 
         Returns:
-            str: 获取成功返回版本号（如："v1.0.0"），失败返回空字符串""
+            str: 返回版本号（如："v1.0.0"）
         """
         if self._firmware_version == "":
             self._firmware_version = self._client.sdo_read(
@@ -159,7 +178,7 @@ class DexHand(object):
     
     def get_device_name(self):
         """
-        获取设备name
+        获取设备名
 
         Returns:
             str: 获取成功返回设备ID，失败返回空字符串""
@@ -183,46 +202,6 @@ class DexHand(object):
             return ""
         return hardware_version
 
-
-    def get_manufacturer_mark(self):
-        """
-        获取厂商标识
-
-        Returns:
-            str: 获取成功返回厂商标识，失败返回空字符串""
-        """
-        try:
-            manufacturer_mark = self._client.sdo_read(0x1018, 0x01)
-        except Exception:
-            return ""
-        return manufacturer_mark
-    
-    def get_product_code(self):
-        """
-        获取产品代码
-
-        Returns:
-            str: 获取成功返回产品代码，失败返回空字符串""
-        """
-        try:
-            product_code = self._client.sdo_read(0x1018, 0x02)
-        except Exception:
-            return ""
-        return product_code
-    
-    def get_revision_number(self):
-        """
-        获取产品修订号
-
-        Returns:
-            str: 获取成功返回产品修订号，失败返回空字符串""
-        """        
-        try:
-            revision_number = self._client.sdo_read(0x1018, 0x03)
-        except Exception:
-            return ""
-        return revision_number
-
     def get_serial_number(self):
         """
         获取产品序列号
@@ -235,19 +214,6 @@ class DexHand(object):
         except Exception:
             return ""
         return serial_number
-
-    def get_hand_type(self) -> bool:
-        """
-        获取设备类型
-
-        Returns:
-            bool: 获取成功返回True，失败返回False
-        """
-        try:
-            hand_type = self._client.sdo_read(0x2001, 0x00)
-        except Exception:
-            return ""
-        return hand_type
 
     def fault_clearance(self) -> bool:
         """
@@ -263,6 +229,12 @@ class DexHand(object):
         return True
 
     def joint_init(self) -> bool:
+        """
+        关节初始化
+
+        Returns:
+            bool: 初始化成功返回True，失败返回False
+        """
         try:
             self._client.sdo_write(0x2003, 0x01, b'\x01')
         except Exception:
@@ -283,6 +255,12 @@ class DexHand(object):
         return True
 
     def motor_self_test(self) -> bool:
+        """
+        电机自检
+
+        Returns:
+            bool: 自检成功返回True，失败返回False
+        """
         try:
             self._client.sdo_write(0x2007, 0x00, b'\x01')
         except Exception:
@@ -303,6 +281,15 @@ class DexHand(object):
         return True
 
     def do_preset_gesture(self, gesture: GestureType):
+        """
+        执行预设手势动作
+
+        Args:
+            gesture (GestureType): 手势类型
+
+        Returns:
+            bool: 执行成功返回True，失败返回False
+        """
         if gesture == GestureType.HAND_OPEN:
             try:
                 self._client.sdo_write(0x2021, 0x00, b'\x01')
@@ -329,6 +316,13 @@ class DexHand(object):
                 self._hand_type = HandType.RIGHT_HAND
         return self._hand_type
     def _joint_to_pdo(self, joint: Joint, pdo: JointRpdo):
+        """
+        将Joint对象转换为PDO对象
+        
+        Args:
+          joint (Joint): 关节对象
+          pdo (JointRpdo): PDO对象
+        """
         pdo.angle = joint.angle
         pdo.speed = joint.speed
         pdo.torque = joint.torque
@@ -339,6 +333,8 @@ class DexHand(object):
 
         Args:
           joints (list[Joint]): 关节控制指令
+          mode (int, optional): 模式选择。0:位置模式;1:力矩模式。默认为0
+          stop (int, optional): 停止选择。0:运动;1:停止所有关节。默认为0
 
         Returns:
           bool: 连接成功返回True，否则返回False

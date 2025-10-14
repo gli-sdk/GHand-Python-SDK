@@ -8,6 +8,9 @@ class EthercatClient(object):
     _instance_lock = threading.Lock()
 
     def __init__(self):
+        """
+        初始化EtherCAT客户端对象
+        """
         self._master = pysoem.Master()
         self._master.in_op = False
         self._master.do_check_state = False
@@ -20,6 +23,17 @@ class EthercatClient(object):
         self._data_lock = threading.RLock()
         
     def __new__(cls, *args, **kwargs):
+        """
+        创建单例实例
+
+        Args:
+            cls: 类对象
+            *args: 可变位置参数
+            **kwargs: 可变关键字参数
+
+        Returns:
+            EthercatClient: 返回EthercatClient类的单例实例
+        """
         if not hasattr(cls, '_instance'):
             with cls._instance_lock:
                 if not hasattr(cls, '_instance'):
@@ -28,6 +42,12 @@ class EthercatClient(object):
 
     @staticmethod
     def _check_slave(slave):
+        """
+        检查从设备状态并进行相应处理
+
+        Args:
+            slave: 从设备对象
+        """
         if slave.state == (pysoem.SAFEOP_STATE + pysoem.STATE_ERROR):
             slave.state = pysoem.SAFEOP_STATE + pysoem.STATE_ACK
             slave.write_state()
@@ -51,6 +71,9 @@ class EthercatClient(object):
                 slave.is_lost = False
 
     def _processdata_thread(self):
+        """
+        处理数据的线程函数，负责发送和接收过程数据
+        """
         while not self._pd_thread_stop_event.is_set():
             try:
                 with self._data_lock:
@@ -63,6 +86,9 @@ class EthercatClient(object):
             time.sleep(0.01)
 
     def _check_thread(self):
+        """
+        检查线程函数，负责监控和检查从设备状态
+        """
         while not self._ch_thread_stop_event.is_set():
             try:
                 need_check = False
@@ -83,6 +109,12 @@ class EthercatClient(object):
             time.sleep(0.01)
 
     def recv_data(self) -> bytes:
+        """
+        接收数据
+
+        Returns:
+            bytes: 从设备输入数据，如果没有连接从设备则返回空字节
+        """
         with self._data_lock:
             if self._slave is not None:
                 return self._slave.input
@@ -91,6 +123,12 @@ class EthercatClient(object):
                 return bytes()
 
     def send_data(self, data: bytes):
+        """
+        发送数据
+
+        Args:
+            data (bytes): 要发送的数据
+        """
         with self._data_lock:
             if self._slave is not None:
                 print(f"Sending {len(data)} bytes: {' '.join(f'{b:02x}' for b in data)}")
@@ -98,11 +136,26 @@ class EthercatClient(object):
                 print(f"【Joint】发送 PDO 数据成功")
 
     def search(self) -> list[str]:
+        """
+        搜索网络接口设备
+
+        Returns:
+            list[str]: 返回网络接口设备ID列表
+        """
         ids = netifaces.interfaces()
         for i, v in enumerate(ids):
             ids[i] = "\\Device\\NPF_" + v
         return ids
     def connect(self, id):
+        """
+        连接指定ID的设备
+
+        Args:
+            id (str): 设备ID
+
+        Returns:
+            bool: 连接成功返回True，失败返回False
+        """
         if self._connected:
             return True
         try:
@@ -121,6 +174,12 @@ class EthercatClient(object):
             return False
               
     def run(self):
+        """
+        启动EtherCAT主站并进入操作状态
+
+        Returns:
+            bool: 启动成功返回True，失败返回False
+        """
         if not self._connected or self._slave is None:
             print("Not connected or no slave configured")
             return False
@@ -216,6 +275,12 @@ class EthercatClient(object):
         return True
 
     def disconnect(self):
+        """
+        断开设备连接并清理资源
+
+        Returns:
+            None
+        """
         if self._connected:
             self._pd_thread_stop_event.set()
             self._ch_thread_stop_event.set()
@@ -256,6 +321,9 @@ class EthercatClient(object):
             index: 对象字典索引
             subindex: 子索引
             value: 要写入的值
+
+        Returns:
+            写入操作的结果
         """
         with self._data_lock:
             if self._slave is None:
