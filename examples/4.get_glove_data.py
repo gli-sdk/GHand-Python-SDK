@@ -170,7 +170,7 @@ def main():
     """
     # 创建EtherCAT连接
     hand = DexHand()
-    connected = hand.open(CommType.ETHERCAT, r"\Device\NPF_{22F450DC-244F-47FA-A538-CBD0142495BE}")
+    connected = hand.open(CommType.ETHERCAT,  "auto")
     if not connected:
         print("connect failed")
         return
@@ -199,34 +199,36 @@ def main():
             if left_hand:
                 joints = []
                 # 食指关节
+                speed = 100
+                torque = 100
                 joints.append(Joint(id=JointId.THUMB_PIP, 
-                                   angle=clip_angle_radians(left_hand.thumb.pip_bend, 0, 75), speed=1000, torque=90)) # pip弯曲：mcp传感器的坐标系下绕x轴旋转
+                                   angle=clip_angle_radians(left_hand.thumb.pip_bend, 0, 75), speed=speed, torque=torque)) # pip弯曲：mcp传感器的坐标系下绕x轴旋转
                 joints.append(Joint(id=JointId.THUMB_MCP, 
-                                   angle=clip_angle_radians(left_hand.thumb.mcp_bend - 40, 0, 55), speed=1000, torque=90)) # mcp弯曲：手背传感器坐标系下绕z轴旋转
+                                   angle=clip_angle_radians(left_hand.thumb.mcp_bend - 40, 0, 55), speed=speed, torque=torque)) # mcp弯曲：手背传感器坐标系下绕z轴旋转
                 joints.append(Joint(id=JointId.THUMB_SWING, 
                                    angle=clip_angle_radians(-(left_hand.thumb.mcp_roll + left_hand.thumb.pip_roll + left_hand.thumb.dip_roll) - 85, 0, 90), 
-                                   speed=50, torque=90))    # mcp外展：手背传感器坐标系下，dip传感器绕y轴旋转
+                                   speed=speed, torque=90))    # mcp外展：手背传感器坐标系下，dip传感器绕y轴旋转
                 joints.append(Joint(id=JointId.THUMB_ROTATION, 
                                    angle=clip_angle_radians(-left_hand.thumb.dip_sway, -30, 60), 
-                                   speed=50, torque=90))    # mcp旋转：在mcp传感器坐标系下，dip传感器绕z轴旋转
+                                   speed=speed, torque=90))    # mcp旋转：在mcp传感器坐标系下，dip传感器绕z轴旋转
                 joints.append(Joint(id=JointId.FF_PIP, 
-                                   angle=clip_angle_radians(left_hand.index.pip_bend, 0, 75), speed=50, torque=90))
+                                   angle=clip_angle_radians(left_hand.index.pip_bend, 0, 75), speed=speed, torque=torque))
                 joints.append(Joint(id=JointId.FF_MCP, 
-                                   angle=clip_angle_radians(left_hand.index.mcp_bend, 0, 70), speed=50, torque=90))
+                                   angle=clip_angle_radians(left_hand.index.mcp_bend, 0, 70), speed=speed, torque=torque))
                 joints.append(Joint(id=JointId.FF_SWING, 
-                                   angle=clip_angle_radians(left_hand.index.mcp_sway + left_hand.index.pip_sway, -15, 15), speed=50, torque=90))
+                                   angle=clip_angle_radians(left_hand.index.mcp_sway + left_hand.index.pip_sway, -15, 15), speed=speed, torque=torque))
                 joints.append(Joint(id=JointId.MF_PIP, 
-                                   angle=clip_angle_radians(left_hand.middle.pip_bend, 0, 75), speed=50, torque=90))
+                                   angle=clip_angle_radians(left_hand.middle.pip_bend, 0, 75), speed=speed, torque=torque))
                 joints.append(Joint(id=JointId.MF_MCP, 
-                                   angle=clip_angle_radians(left_hand.middle.mcp_bend, 0, 70), speed=50, torque=90))
+                                   angle=clip_angle_radians(left_hand.middle.mcp_bend, 0, 70), speed=speed, torque=torque))
                 joints.append(Joint(id=JointId.RF_PIP, 
-                                   angle=clip_angle_radians(left_hand.ring.pip_bend, 0, 75), speed=50, torque=90))
+                                   angle=clip_angle_radians(left_hand.ring.pip_bend, 0, 75), speed=speed, torque=torque))
                 joints.append(Joint(id=JointId.RF_MCP, 
-                                   angle=clip_angle_radians(left_hand.ring.mcp_bend, 0, 70), speed=50, torque=90))
+                                   angle=clip_angle_radians(left_hand.ring.mcp_bend, 0, 70), speed=speed, torque=torque))
                 joints.append(Joint(id=JointId.LF_PIP, 
-                                   angle=clip_angle_radians(left_hand.pinky.pip_bend, 0, 75), speed=50, torque=90))
+                                   angle=clip_angle_radians(left_hand.pinky.pip_bend, 0, 75), speed=speed, torque=torque))
                 joints.append(Joint(id=JointId.LF_MCP, 
-                                   angle=clip_angle_radians(left_hand.pinky.mcp_bend, 0, 70), speed=50, torque=90)) 
+                                   angle=clip_angle_radians(left_hand.pinky.mcp_bend, 0, 70), speed=speed, torque=torque)) 
     
                 hand.move_joints(joints)
                 hand.get_joints()

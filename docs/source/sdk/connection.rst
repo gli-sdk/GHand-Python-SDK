@@ -14,6 +14,9 @@ EtherCAT连接
    hand = DexHand()
    hand.open_ethercat(CommType.ETHERCAT, "device_id_123")
 
+   # 或自动连接您当前的灵巧手设备
+   hand.open_ethercat(CommType.ETHERCAT, "auto")
+
 CAN总线连接
 -----------
 .. code-block:: python

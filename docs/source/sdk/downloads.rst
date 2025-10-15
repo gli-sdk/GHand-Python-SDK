@@ -5,9 +5,9 @@
 
 SDK安装包
 -----------
-- `Xiaoyao SDK v1.0.1 (Windows) <https://example.com/downloads/xiaoyao-sdk-1.0.1-win.exe>`_
-- `Xiaoyao SDK v1.0.1 (Linux) <https://example.com/downloads/xiaoyao-sdk-1.0.1-linux.tar.gz>`_
-- `Xiaoyao SDK v1.0.1 (macOS) <https://example.com/downloads/xiaoyao-sdk-1.0.1-macos.pkg>`_
+- `Xiaoyao SDK v1.0.0 (Windows) <https://example.com/downloads/xiaoyao-sdk-1.0.0-win.exe>`_
+- `Xiaoyao SDK v1.0.0 (Linux) <https://example.com/downloads/xiaoyao-sdk-1.0.0-linux.tar.gz>`_
+- `Xiaoyao SDK v1.0.0 (macOS) <https://example.com/downloads/xiaoyao-sdk-1.0.0-win-macos.pkg>`_
 
 固件更新
 -----------

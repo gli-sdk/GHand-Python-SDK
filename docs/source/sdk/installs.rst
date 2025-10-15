@@ -5,7 +5,7 @@
 
 系统要求
 --------
-- Python 3.9+
+- Python 3.10 to 3.13
 - Windows 10/Linux Ubuntu 18.04+/macOS 10.15+
 - 推荐内存：8GB+
 - 存储空间：1GB+

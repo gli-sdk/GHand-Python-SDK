@@ -5,30 +5,30 @@ from xiaoyao.dexhand import DexHand, CommType, Joint, JointId
 # 创建所有关节列表，角度应设为预设值
 joints = []
 
-def open_hand(hand):
+def open_hand(hand, speed = 100, torque = 100):
      
     # 拇指关节
-    joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(0), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(0), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.THUMB_SWING,angle=math.radians(0), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(0), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(0), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(0), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.THUMB_SWING,angle=math.radians(0), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(0), speed=speed, torque=torque))
     
     # 食指关节
-    joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(0), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(0), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(0), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(0), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(0), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(0), speed=speed, torque=torque))
     
     # 中指关节
-    joints.append(Joint(id=JointId.MF_PIP, angle=math.radians(0), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(0), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.MF_PIP, angle=math.radians(0), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(0), speed=speed, torque=torque))
     
     # 无名指关节
-    joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(0), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(0), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(0), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(0), speed=speed, torque=torque))
     
     # 小指关节
-    joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(0), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(0), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(0), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(0), speed=speed, torque=torque))
     
     # 发送关节控制指令
     result = hand.move_joints(joints)
@@ -43,30 +43,30 @@ def open_hand(hand):
     
     return result
 
-def make_fist(hand):
+def make_fist(hand, speed = 100, torque = 100):
     
     # 拇指关节
-    joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(2), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(2), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.THUMB_SWING,angle=math.radians(2), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(2), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(2), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(2), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.THUMB_SWING,angle=math.radians(2), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(2), speed=speed, torque=torque))
     
     # 食指关节
-    joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(2), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(2), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(2), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(2), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(2), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(2), speed=speed, torque=torque))
     
     # 中指关节
-    joints.append(Joint(id=JointId.MF_PIP, angle=math.radians(2), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(2), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.MF_PIP, angle=math.radians(2), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(2), speed=speed, torque=torque))
     
     # 无名指关节
-    joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(2), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(2), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(2), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(2), speed=speed, torque=torque))
     
     # 小指关节
-    joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(2), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(2), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(2), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(2), speed=speed, torque=torque))
     
     # 发送关节控制指令
     result = hand.move_joints(joints)
@@ -81,30 +81,30 @@ def make_fist(hand):
     
     return result
 
-def make_ok(hand):
+def make_ok(hand, speed = 100, torque = 100):
     
     # 拇指关节
-    joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(4), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(4), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.THUMB_SWING,angle=math.radians(4), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(4), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(4), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(4), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.THUMB_SWING,angle=math.radians(4), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(4), speed=speed, torque=torque))
     
     # 食指关节
-    joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(4), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(4), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(4), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(4), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(4), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(4), speed=speed, torque=torque))
     
     # 中指关节
-    joints.append(Joint(id=JointId.MF_PIP, angle=math.radians(4), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(4), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.MF_PIP, angle=math.radians(4), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(4), speed=speed, torque=torque))
     
     # 无名指关节
-    joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(4), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(4), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(4), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(4), speed=speed, torque=torque))
     
     # 小指关节
-    joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(4), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(4), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(4), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(4), speed=speed, torque=torque))
     
     # 发送关节控制指令
     result = hand.move_joints(joints)
@@ -119,30 +119,30 @@ def make_ok(hand):
         
     return result
 
-def thumbs_up(hand):
+def thumbs_up(hand, speed = 100, torque = 100):
     
     # 拇指关节
-    joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(6), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(6), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.THUMB_SWING,angle=math.radians(6), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(6), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(6), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(6), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.THUMB_SWING,angle=math.radians(6), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(6), speed=speed, torque=torque))
     
     # 食指关节
-    joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(6), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(6), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(6), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(6), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(6), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(6), speed=speed, torque=torque))
     
     # 中指关节
-    joints.append(Joint(id=JointId.MF_PIP, angle=math.radians(6), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(6), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.MF_PIP, angle=math.radians(6), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(6), speed=speed, torque=torque))
     
     # 无名指关节
-    joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(6), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(6), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(6), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(6), speed=speed, torque=torque))
     
     # 小指关节
-    joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(6), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(6), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(6), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(6), speed=speed, torque=torque))
     
     # 发送关节控制指令
     result = hand.move_joints(joints)
@@ -157,30 +157,30 @@ def thumbs_up(hand):
     
     return result
 
-def make_six_sign(hand):
+def make_six_sign(hand, speed = 100, torque = 100):
     
     # 拇指关节
-    joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(8), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(8), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.THUMB_SWING,angle=math.radians(8), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(8), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(8), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(8), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.THUMB_SWING,angle=math.radians(8), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(8), speed=speed, torque=torque))
     
     # 食指关节
-    joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(8), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(8), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(8), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(8), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(8), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(8), speed=speed, torque=torque))
     
     # 中指关节
-    joints.append(Joint(id=JointId.MF_PIP, angle=math.radians(8), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(8), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.MF_PIP, angle=math.radians(8), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(8), speed=speed, torque=torque))
     
     # 无名指关节
-    joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(8), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(8), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(8), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(8), speed=speed, torque=torque))
     
     # 小指关节
-    joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(8), speed=5000.0, torque=90.0))
-    joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(8), speed=5000.0, torque=90.0))
+    joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(8), speed=speed, torque=torque))
+    joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(8), speed=speed, torque=torque))
     
     # 发送关节控制指令
     result = hand.move_joints(joints)
@@ -199,7 +199,7 @@ def main():
     """主执行函数，演示如何执行预设手势。"""
     print("***** 枭尧灵巧手 SDK - 预设手势功能演示 *****\n")
     hand = DexHand()
-    connected = hand.open(CommType.ETHERCAT, r"\Device\NPF_{22F450DC-244F-47FA-A538-CBD0142495BE}")
+    connected = hand.open(CommType.ETHERCAT,  "auto")
     try:
         if not connected:
             print("\n[扫描结束] 未能连接到灵巧手。")

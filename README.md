@@ -36,7 +36,9 @@ python3 --version
 如果版本不符，请务必升级您的 Python 环境。
 
 ### 2. 安装依赖
-激活虚拟环境后，使用 pip 安装 requirements.txt 中列出的所有依赖：
+正确配置 Python 的环境后，请确保您的系统已安装C/C++编译工具和Npcap库。
+
+使用 pip 安装 requirements.txt 中列出的所有依赖：
 ```bash
 pip install -r requirements.txt
 ```

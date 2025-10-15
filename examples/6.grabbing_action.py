@@ -65,7 +65,7 @@ def hand_zero(hand):
 def main():
     print("***** 枭尧灵巧手 SDK - 抓取功能演示 *****\n")
     hand = DexHand()
-    connected = hand.open(CommType.ETHERCAT, r"\Device\NPF_{22F450DC-244F-47FA-A538-CBD0142495BE}")
+    connected = hand.open(CommType.ETHERCAT,  "auto")
     try:
         if not connected:
             print("\n[扫描结束] 未能连接到灵巧手。")
