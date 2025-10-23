@@ -12,7 +12,7 @@ Xiaoyao SDK支持Python 3.10到3.13版本。
 
    # 如果版本不符，请安装正确的Python版本
 
-安装Npacap库
+安装Npcap库
 --------------
 正确下载并安装Npcap安装程序，Npcap官方网址：https://npcap.com/
 
