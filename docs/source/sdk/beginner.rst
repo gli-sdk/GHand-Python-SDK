@@ -10,7 +10,7 @@
 ------------------------
 .. code-block:: bash
 
-   pip install xiaoyao
+   python setup.py install
 
 第二步：连接设备
 ------------------------

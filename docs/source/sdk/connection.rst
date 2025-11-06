@@ -17,24 +17,6 @@ EtherCAT连接
    # 或自动连接您当前的灵巧手设备
    hand.open_ethercat(CommType.ETHERCAT, "auto")
 
-CAN总线连接
------------
-.. code-block:: python
-
-   from xiaoyao.hand import DexHand, CommType
-   
-   hand = DexHand()
-   hand.set_can_com(baud_rate=1000000, node_id=1)
-
-RS485连接
----------
-.. code-block:: python
-
-   from xiaoyao.hand import DexHand, CommType
-   
-   hand = DexHand()
-   hand.set_rs485_com(baud_rate=115200, data_bits=8, stop_bits=1, parity='none')
-
 连接故障排除
 ------------
 1. 检查物理连接是否正常
