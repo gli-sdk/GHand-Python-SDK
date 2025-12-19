@@ -1,5 +1,5 @@
 import sys
-if sys.version_info < (3, 8):
+if sys.version_info < (3, 10):
     sys.exit("xiaoyao-sdk requires Python 3.8 or higher")
 import logging
 import time
