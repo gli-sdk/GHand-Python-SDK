@@ -1,4 +1,5 @@
 import enum
+import math
 from typing import Optional
 from dataclasses import dataclass
 from .ecatclient import EthercatClient
@@ -109,34 +110,34 @@ class DexHand(object):
         """
         设置关节限制参数
         """
-        self._th_pip_limit = (0, 0)
-        self._th_mcp_limit = (0, 0)
-        self._th_swing_limit = (0, 0)
-        self._th_rot_limit = (0, 0)
-        self._ff_pip_limit = (0, 0)
-        self._ff_mcp_limit = (0, 0)
-        self._ff_swing_limit = (0, 0)
-        self._mf_pip_limit = (0, 0)
-        self._mf_mcp_limit = (0, 0)
-        self._rf_pip_limit = (0, 0)
-        self._rf_mcp_limit = (0, 0)
-        self._lf_pip_limit = (0, 0)
-        self._lf_mcp_limit = (0, 0)
+        self._th_pip_limit = (0, math.radians(75))
+        self._th_mcp_limit = (0, math.radians(75))
+        self._th_swing_limit = (0, math.radians(90))
+        self._th_rot_limit = (0, math.radians(90))
+        self._ff_pip_limit = (0, math.radians(75))
+        self._ff_mcp_limit = (0, math.radians(70))
+        self._ff_swing_limit = (math.radians(-15), math.radians(15))
+        self._mf_pip_limit = (0, math.radians(75))
+        self._mf_mcp_limit = (0, math.radians(70))
+        self._rf_pip_limit = (0, math.radians(75))
+        self._rf_mcp_limit = (0, math.radians(70))
+        self._lf_pip_limit = (0, math.radians(75))
+        self._lf_mcp_limit = (0, math.radians(70))
 
     def _check_joint_limit(self, joint: Joint, limit):
         """
-        检查关节角度是否超出限制范围
+        检查关节角度是否超出限制范围，如果超出则设为边界值
 
         Args:
           joint (Joint): 关节对象
           limit: 关节限制范围
 
-        Returns:
-          bool: 在限制范围内返回True，超出限制返回False
         """
-        if joint.angle < limit[0] or joint.angle > limit[1]:
-            return False
-        return True
+        if joint.angle < limit[0]:
+            joint.angle = limit[0]
+        elif joint.angle > limit[1]:
+            joint.angle = limit[1]
+            print(f"【Joint】关节ID: {joint.id} 角度超出限制范围，已设为最大值 {math.degrees(limit[1]):.2f} 度")
 
     def open(self, type: CommType = CommType.ETHERCAT, id: str = "auto"):
         """
@@ -366,31 +367,45 @@ class DexHand(object):
         rpdo.mode = mode
         rpdo.stop = stop
         for joint in joints:
+            # 应用关节限制检查
             if joint.id == JointId.THUMB_PIP:
+                self._check_joint_limit(joint, self._th_pip_limit)
                 self._joint_to_pdo(joint, rpdo.th_pip)
             elif joint.id == JointId.THUMB_MCP:
+                self._check_joint_limit(joint, self._th_mcp_limit)
                 self._joint_to_pdo(joint, rpdo.th_mcp)
             elif joint.id == JointId.THUMB_SWING:
+                self._check_joint_limit(joint, self._th_swing_limit)
                 self._joint_to_pdo(joint, rpdo.th_swing)
             elif joint.id == JointId.THUMB_ROTATION:
+                self._check_joint_limit(joint, self._th_rot_limit)
                 self._joint_to_pdo(joint, rpdo.th_rot)
             elif joint.id == JointId.FF_PIP:
+                self._check_joint_limit(joint, self._ff_pip_limit)
                 self._joint_to_pdo(joint, rpdo.ff_pip)
             elif joint.id == JointId.FF_MCP:
+                self._check_joint_limit(joint, self._ff_mcp_limit)
                 self._joint_to_pdo(joint, rpdo.ff_mcp)
             elif joint.id == JointId.FF_SWING:
+                self._check_joint_limit(joint, self._ff_swing_limit)
                 self._joint_to_pdo(joint, rpdo.ff_swing)
             elif joint.id == JointId.MF_PIP:
+                self._check_joint_limit(joint, self._mf_pip_limit)
                 self._joint_to_pdo(joint, rpdo.mf_pip)
             elif joint.id == JointId.MF_MCP:
+                self._check_joint_limit(joint, self._mf_mcp_limit)
                 self._joint_to_pdo(joint, rpdo.mf_mcp)
             elif joint.id == JointId.RF_PIP:
+                self._check_joint_limit(joint, self._rf_pip_limit)
                 self._joint_to_pdo(joint, rpdo.rf_pip)
             elif joint.id == JointId.RF_MCP:
+                self._check_joint_limit(joint, self._rf_mcp_limit)
                 self._joint_to_pdo(joint, rpdo.rf_mcp)
             elif joint.id == JointId.LF_PIP:
+                self._check_joint_limit(joint, self._lf_pip_limit)
                 self._joint_to_pdo(joint, rpdo.lf_pip)
             elif joint.id == JointId.LF_MCP:
+                self._check_joint_limit(joint, self._lf_mcp_limit)
                 self._joint_to_pdo(joint, rpdo.lf_mcp)
             else:
                 print(f"【Joint】无效的关节ID: {joint.id}")
