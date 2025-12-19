@@ -1,25 +1,27 @@
 import threading
 import time
-from .client import Client
+import logging
+from .ecatclient import EthercatClient
 from typing import Callable, Optional
 
+logger = logging.getLogger("xiaoyao")
 
 class SubscriptionManager:
-    def __init__(self):
+    def __init__(self, client=None):
         self._lock = threading.Lock()
         self._running = False
         self._thread = None
-        self._client = Client()
+        # 如果提供了客户端实例，则使用它，否则创建新的实例
+        self._client = client if client else EthercatClient()
         self._data = None
         self._sub_id_counter = 0
         self._lock = threading.Lock()
         self._subscribers = {}
+        self._is_client_owner = client is None  # 标记是否拥有客户端实例
 
     def start(self):
         if not self._running:
             self._running = True
-            res = self._client.pdo_init()
-            print(f"PDO initialized: {res}")
             self._thread = threading.Thread(
                 target=self._data_producer, daemon=True)
             self._thread.start()
@@ -38,8 +40,11 @@ class SubscriptionManager:
     def _data_producer(self):
         """数据生产者线程"""
         while self._running:
-            data = self._client.recv_data()
-            self._data = data
+            try:
+                data = self._client.recv_data()
+                self._data = data
+            except Exception as e:
+                logger.error(f"Error receiving data: {e}")
             time.sleep(0.1)
 
     def _data_dispatcher(self):
@@ -52,7 +57,7 @@ class SubscriptionManager:
                         try:
                             callback(self._data, *args, **kwargs)
                         except Exception as e:
-                            print(f"Error in callback {sub_id}: {e}")
+                            logger.error(f"Error in callback {sub_id}: {e}")
             time.sleep(0.1)
 
     def subscribe(self, callback: Optional[Callable] = None, *args, **kwargs):

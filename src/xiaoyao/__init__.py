@@ -4,7 +4,6 @@ if sys.version_info < (3, 8):
 import logging
 import time
 
-from .client import Client
 from .dexhand import DexHand
 from .subscription import SubscriptionManager
 from .version import __version__
