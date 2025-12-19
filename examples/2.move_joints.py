@@ -1,7 +1,9 @@
 import time
 import math
+import logging
 from xiaoyao.dexhand import DexHand, CommType, Joint, JointId
 
+logger = logging.getLogger("xiaoyao")
 
 def main():
     hand = DexHand()
@@ -9,10 +11,10 @@ def main():
 
     try:
         if not connected:
-            print("connect failed")
+            logger.error("connect failed")
             return
-        
-        print("connect successful!")
+
+        logger.info("connect successful!")
         joints = []
 
         # 循环执行手指动作
@@ -23,8 +25,8 @@ def main():
             gesture_cycle += 1
             if max_cycles > 0 and gesture_cycle > max_cycles:
                 break
-                
-            print(f"\n--- 第 {gesture_cycle} 轮手指运动开始 ---")
+
+            logger.info(f"\n--- 第 {gesture_cycle} 轮手指运动开始 ---")
             joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(30), speed=100, torque=100))   #角度范围为:0~75(度)
             joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(30), speed=100, torque=100))   #角度范围为:0~55(度)
             joints.append(Joint(id=JointId.THUMB_SWING, angle=math.radians(15), speed=100, torque=100))   #角度范围为:0~90(度)
@@ -41,17 +43,15 @@ def main():
 
             result = hand.move_joints(joints)
             if result:
-                print("指令1发送成功")
+                logger.info("指令1发送成功")
+                time.sleep(0.7)
                 current_joints  = hand.get_joints()
                 if current_joints:
                     for joint in current_joints:
-                        if joint.id == JointId.THUMB_PIP:
-                            print(f"当前关节状态 - 角度: {math.degrees(joint.angle):.2f} 度, 速度: {joint.speed}, 扭矩: {joint.torque}")
+                        logger.info(f"  {JointId(joint.id).name:<15}- 角度: {math.degrees(joint.angle):.2f} 度,\t速度: {joint.speed},\t扭矩: {joint.torque}")
             else:
-                print("指令1发送失败")
+                logger.error("指令1发送失败")
                 break
-            time.sleep(3)
-
             joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(0), speed=100, torque=100))   #角度范围为:0~75(度)
             joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(0), speed=100, torque=100))   #角度范围为:0~55(度)
             joints.append(Joint(id=JointId.THUMB_SWING, angle=math.radians(0), speed=100, torque=100))   #角度范围为:0~90(度)
@@ -68,16 +68,15 @@ def main():
 
             result = hand.move_joints(joints)
             if result:
-                print("指令2发送成功")
+                logger.info("指令2发送成功")
+                time.sleep(1)
                 current_joints  = hand.get_joints()
-                if current_joints:
-                    for joint in current_joints:
-                        if joint.id == JointId.THUMB_PIP:
-                            print(f"当前关节状态 - 角度: {math.degrees(joint.angle):.2f} 度, 速度: {joint.speed}, 扭矩: {joint.torque}")
+                for joint in current_joints:
+                    logger.info(f"  {JointId(joint.id).name:<15}- 角度: {math.degrees(joint.angle):.2f} 度,\t速度: {joint.speed},\t扭矩: {joint.torque}")
             else:
-                print("指令2发送失败")
+                logger.error("指令2发送失败")
                 break
-            time.sleep(3)
+            
 
             print(f"--- 第 {gesture_cycle} 轮手指运动结束 ---\n")
             # 提示信息
@@ -86,15 +85,13 @@ def main():
                     
     except KeyboardInterrupt:
         hand.close()
-        print("\n\n程序被用户中断。")
+        logger.info("程序被用户中断。")
     except Exception as e:
-        print(f"\n[严重错误] {e}")
+        logger.error(f"[严重错误] {e}")
     finally:
         hand.close()
         time.sleep(0.5)
         print("\n--- 演示结束，断开连接 ---")
-
- 
 
     hand.close()
 
