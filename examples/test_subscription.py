@@ -30,6 +30,10 @@ def main():
     try:
         # 让订阅运行一段时间
         time.sleep(10)
+    except KeyboardInterrupt:
+        print("Stopping subscription")
+    except Exception as e:
+        print(f"An error occurred: {e}")
     finally:
         # 取消订阅并关闭连接
         hand.unsubscribe(sub_id)
