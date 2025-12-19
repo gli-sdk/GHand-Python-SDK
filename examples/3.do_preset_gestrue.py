@@ -1,6 +1,9 @@
 import time
 import math
+import logging
 from xiaoyao.dexhand import DexHand, CommType, Joint, JointId
+
+logger = logging.getLogger("xiaoyao")
 
 # 创建所有关节列表，角度应设为预设值
 joints = []
@@ -34,10 +37,10 @@ def open_hand(hand, speed = 100, torque = 100):
     result = hand.move_joints(joints)
     
     if result:
-        print("手部张开指令发送成功")
+        logger.info("手部张开指令发送成功")
     else:
-        print("手部张开指令发送失败")
-    
+        logger.error("手部张开指令发送失败")
+
     # 等待一段时间确保动作完成
     time.sleep(2)
     
@@ -72,10 +75,10 @@ def make_fist(hand, speed = 100, torque = 100):
     result = hand.move_joints(joints)
     
     if result:
-        print("握拳指令发送成功")
+        logger.info("握拳指令发送成功")
     else:
-        print("握拳指令发送失败")
-    
+        logger.error("握拳指令发送失败")
+
     # 等待一段时间确保动作完成
     time.sleep(2)
     
@@ -110,10 +113,10 @@ def make_ok(hand, speed = 100, torque = 100):
     result = hand.move_joints(joints)
     
     if result:
-        print("OK手势指令发送成功")
+        logger.info("OK手势指令发送成功")
     else:
-        print("OK手势指令发送失败")
-    
+        logger.error("OK手势指令发送失败")
+
     # 等待一段时间确保动作完成
     time.sleep(2)
         
@@ -148,10 +151,10 @@ def thumbs_up(hand, speed = 100, torque = 100):
     result = hand.move_joints(joints)
     
     if result:
-        print("竖大拇指指令发送成功")
+        logger.info("竖大拇指指令发送成功")
     else:
-        print("竖大拇指指令发送失败")
-    
+        logger.error("竖大拇指指令发送失败")
+
     # 等待一段时间确保动作完成
     time.sleep(2)
     
@@ -186,10 +189,10 @@ def make_six_sign(hand, speed = 100, torque = 100):
     result = hand.move_joints(joints)
     
     if result:
-        print("比666指令发送成功")
+        logger.info("比666指令发送成功")
     else:
-        print("比666指令发送失败")
-    
+        logger.error("比666指令发送失败")
+
     # 等待一段时间确保动作完成
     time.sleep(2)
         
@@ -197,15 +200,15 @@ def make_six_sign(hand, speed = 100, torque = 100):
 
 def main():
     """主执行函数，演示如何执行预设手势。"""
-    print("***** 枭尧灵巧手 SDK - 预设手势功能演示 *****\n")
+    logger.info("***** 枭尧灵巧手 SDK - 预设手势功能演示 *****\n")
     hand = DexHand()
     connected = hand.open(CommType.ETHERCAT,  "auto")
     try:
         if not connected:
-            print("\n[扫描结束] 未能连接到灵巧手。")
+            logger.error("[扫描结束] 未能连接到灵巧手。")
             return
         
-        print("\n--- 设备已就绪，将开始依次演示预设手势 ---\n")
+        logger.info("\n--- 设备已就绪，将开始依次演示预设手势 ---\n")
 
         # 循环执行手势动作
         gesture_cycle = 0
@@ -216,61 +219,61 @@ def main():
             if max_cycles > 0 and gesture_cycle > max_cycles:
                 break
                 
-            print(f"\n--- 第 {gesture_cycle} 轮手势演示开始 ---")
-            
-            print("演示1: [张开所有手指]")
+            logger.info(f"\n--- 第 {gesture_cycle} 轮手势演示开始 ---")
+
+            logger.info("演示1: [张开所有手指]")
             if not open_hand(hand):
-                print("打开手部失败，终止演示")
+                logger.error("打开手部失败，终止演示")
                 hand.close()
                 return
             time.sleep(3)
 
-            print("演示2: [握拳]")
+            logger.info("演示2: [握拳]")
             if not make_fist(hand):
-                print("握拳动作失败，终止演示")
+                logger.error("握拳动作失败，终止演示")
                 hand.close()
                 return
             time.sleep(3)
 
-            print("演示3: [OK 手势]")
+            logger.info("演示3: [OK 手势]")
             if not make_ok(hand):
-                print("OK手势失败，终止演示")
+                logger.error("OK手势失败，终止演示")
                 hand.close()
                 return
             time.sleep(3)
 
-            print("演示4: [竖大拇指]")
+            logger.info("演示4: [竖大拇指]")
             if not thumbs_up(hand):
-                print("竖大拇指动作失败，终止演示")
+                logger.error("竖大拇指动作失败，终止演示")
                 hand.close()
                 return
             time.sleep(3)
 
-            print("演示5: [六抓握]")
+            logger.info("演示5: [六抓握]")
             if not make_six_sign(hand):
-                print("比666手势失败，终止演示")
+                logger.error("比666手势失败，终止演示")
                 hand.close()
                 return
             time.sleep(3)
 
-            print("恢复: [张开所有手指]")
+            logger.info("恢复: [张开所有手指]")
             if not open_hand(hand):
-                print("最后打开手部失败")
+                logger.error("最后打开手部失败")
             time.sleep(5)
-            
-            print(f"--- 第 {gesture_cycle} 轮手势演示结束 ---\n")
-            
+
+            logger.info(f"\n--- 第 {gesture_cycle} 轮手势演示结束 ---\n")
+
             # 提示信息
             if max_cycles == 0:
-                print("按 Ctrl+C 停止演示并退出程序\n")
+                logger.info("按 Ctrl+C 停止演示并退出程序\n")
     except KeyboardInterrupt:
-        print("\n\n程序被用户中断。")
+        logger.info("程序被用户中断。")
     except Exception as e:
-        print(f"\n[严重错误] {e}")
+        logger.error(f"[严重错误] {e}")
     finally:
         hand.close()
         time.sleep(0.5)
-        print("\n--- 演示结束，断开连接 ---")
+        logger.info("演示结束，断开连接")
 
 if __name__ == "__main__":
     main()

@@ -1,6 +1,9 @@
 import time
 import math
+import logging
 from xiaoyao.dexhand import DexHand, CommType, Joint, JointId
+
+logger = logging.getLogger("xiaoyao")
 
 hold_tightly = {
     JointId.THUMB_PIP: math.radians(10),
@@ -62,14 +65,14 @@ def hand_zero(hand):
     return result
 
 def main():
-    print("***** 枭尧灵巧手 SDK - 握功能演示 *****\n")
+    logger.info("***** 枭尧灵巧手 SDK - 握功能演示 *****\n")
     hand = DexHand()
     connected = hand.open(CommType.ETHERCAT, "auto")
     try:
         if not connected:
-            print("\n[扫描结束] 未能连接到灵巧手。")
-            return        
-        print("\n--- 设备已就绪，将开始握功能演示 ---\n")
+            logger.error("\n[扫描结束] 未能连接到灵巧手。")
+            return
+        logger.info("\n--- 设备已就绪，将开始握功能演示 ---\n")
 
         # 循环执行手势动作
         gesture_cycle = 0
@@ -79,32 +82,32 @@ def main():
             gesture_cycle += 1
             if max_cycles > 0 and gesture_cycle > max_cycles:
                 break
-                
-            print(f"\n--- 第 {gesture_cycle} 轮功能演示开始 ---")
+
+            logger.info(f"\n--- 第 {gesture_cycle} 轮功能演示开始 ---")
 
             if not hold(hand):
-                print(f"第 {gesture_cycle} 轮演示中的握紧动作执行失败")
+                logger.error(f"第 {gesture_cycle} 轮演示中的握紧动作执行失败")
                 break
             time.sleep(5)
 
             if not hand_zero(hand):
-                print(f"第 {gesture_cycle} 轮演示中的复位动作执行失败")
+                logger.error(f"第 {gesture_cycle} 轮演示中的复位动作执行失败")
                 break
             time.sleep(5)
 
-            print(f"--- 第 {gesture_cycle} 轮功能演示结束 ---\n")
-            
+            logger.info(f"--- 第 {gesture_cycle} 轮功能演示结束 ---\n")
+
             # 提示信息
             if max_cycles == 0:
-                print("按 Ctrl+C 停止演示并退出程序\n")
+                logger.info("按 Ctrl+C 停止演示并退出程序\n")
     except KeyboardInterrupt:
-        print("\n\n程序被用户中断。")
+        logger.info("\n\n程序被用户中断。")
     except Exception as e:
-        print(f"\n[严重错误] {e}")
+        logger.error(f"\n[严重错误] {e}")
     finally:
         hand.close()
         time.sleep(0.5)
-        print("\n--- 演示结束，断开连接 ---")
+        logger.info("\n--- 演示结束，断开连接 ---")
 
 if __name__ == "__main__":
     main()

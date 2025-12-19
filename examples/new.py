@@ -1,6 +1,9 @@
 import time
 import math
+import logging
 from xiaoyao.dexhand import DexHand, CommType, Joint, JointId
+
+logger = logging.getLogger("xiaoyao")
 
 
 def main():
@@ -26,15 +29,15 @@ def main():
 
     connected = hand.open(CommType.ETHERCAT, "auto")
     if not connected:
-        print("connect failed")
+        logger.error("connect failed")
         return
     ver = hand.get_firmware_version()
     hand_name = hand.get_device_name()
     hand_hw_ver = hand.get_hardware_version()
     serial_num = hand.get_serial_number()
     hand_type = hand.get_hand_type()
-    print(f"hand name:{hand_name};H/W ver:{hand_hw_ver};ver: {ver};hand_type: {hand_type.value};")
-    print(f"Serial num:{int.from_bytes(serial_num, 'little')};")
+    logger.info(f"hand name:{hand_name};H/W ver:{hand_hw_ver};ver: {ver};hand_type: {hand_type.value};")
+    logger.info(f"Serial num:{int.from_bytes(serial_num, 'little')};")
 
     try:
         while True:
@@ -60,11 +63,11 @@ def main():
                 while True:
                     # 显示已设置的关节及其参数
                     if set_joints:
-                        print("已设置的关节:")
+                        logger.info("已设置的关节:")
                         for joint_id in set_joints:
                             params = joint_params[joint_id]
-                            print(f"  {JointId(joint_id).name}: 角度={params['angle']}, 速度={params['speed']}, 扭矩={params['torque']}")
-                    
+                            logger.info(f"  {JointId(joint_id).name}: 角度={params['angle']}, 速度={params['speed']}, 扭矩={params['torque']}")
+
                     joint_input = input("请输入关节ID (或直接按回车结束输入): ").strip()
                     if not joint_input:
                         break
@@ -87,12 +90,12 @@ def main():
                             if torque_input:
                                 joint_params[joint_id]["torque"] = int(torque_input)
                         else:
-                            print("无效的关节ID")
+                            logger.error("无效的关节ID")
                     else:
-                        print("请输入有效的关节ID数字")
+                        logger.error("请输入有效的关节ID数字")
             except ValueError:
-                print("输入格式错误，跳过本次设置")
-            
+                logger.error("输入格式错误，跳过本次设置")
+
             joints = []
             
             # 为每个关节创建Joint对象
@@ -106,17 +109,17 @@ def main():
 
             result = hand.move_joints(joints)
             if result:
-                print("指令发送成功")
+                logger.info("指令发送成功")
                 hand.get_joints()
             else:
-                print("指令2发送失败")
-                break                        
+                logger.error("指令2发送失败")
+                break
     except KeyboardInterrupt:
-        print("\n用户中断程序,正在关闭手部连接...")
+        logger.info("\n用户中断程序,正在关闭手部连接...")
     finally:
         hand.close()
         time.sleep(0.5)
-        print("hand is closed")
+        logger.info("hand is closed")
 
 
 if __name__ == "__main__":

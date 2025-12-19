@@ -1,11 +1,13 @@
 import enum
 import math
+import logging
 from typing import Optional
 from dataclasses import dataclass
 from .ecatclient import EthercatClient
 from .subscription import SubscriptionManager
 from .data import JointRpdo, Rpdo, Tpdo
 
+logger = logging.getLogger("xiaoyao")
 
 class HandType(enum.Enum):
     UNKNOWN = "unknown"
@@ -138,7 +140,7 @@ class DexHand(object):
             joint.angle = limit[0]
         elif joint.angle > limit[1]:
             joint.angle = limit[1]
-            print(f"【Joint】关节ID: {joint.id} 角度超出限制范围，已设为最大值 {math.degrees(limit[1]):.2f} 度")
+            logger.warning(f"【Joint】关节ID: {joint.id} 角度超出限制范围，已设为最大值 {math.degrees(limit[1]):.2f} 度")
 
     def open(self, type: CommType = CommType.ETHERCAT, id: str = "auto"):
         """
@@ -156,7 +158,7 @@ class DexHand(object):
         if type == CommType.ETHERCAT:
             if id == "auto":
                 id_list = self._client.search()
-                print("搜索到的ID!!!:", id_list)
+                logger.info("搜索到的ID:\n" + "\n".join([f"{id}" for id in id_list]))
                 for id in id_list:
                     connected = self._client.connect(id)
                     if connected:
@@ -453,12 +455,12 @@ class DexHand(object):
                     self._check_joint_limit(joint, self._lf_mcp_limit)
                     self._joint_to_pdo(joint, rpdo.lf_mcp)
                 else:
-                    print(f"【Joint】无效的关节ID: {joint.id}")
+                    logger.warning(f"【Joint】无效的关节ID: {joint.id}")
                     return False
             self._client.send_data(rpdo.to_bytes())
             return True
         except RuntimeError as e:
-            print(f"Failed to move joints: {e}")
+            logger.error(f"Failed to move joints: {e}")
             return False
 
     def get_joints(self) -> list[Joint]:
@@ -470,15 +472,23 @@ class DexHand(object):
         """
         try:
             data = self._client.recv_data()
-            print(f"Received data!!!!!: {' '.join(f'{b:02x}' for b in data)}")
-            print(f"Received data length: {len(data)} bytes")  # 调试信息：打印接收到的数据长度
-            
-            if len(data) < 208:
-                print(f"Data length insufficient. Expected at least 208 bytes, got {len(data)} bytes")  # 调试信息：数据长度不足时的提示
+            logger.debug(f"Received data: \n{' '.join(f'{b:02x}' for b in data)}")
+            logger.debug(f"Received data length: {len(data)} bytes")  # 调试信息：打印接收到的数据长度
+
+            if len(data) != 208:
+                logger.warning(f"Data length insufficient. Expected 208 bytes, got {len(data)} bytes")  # 数据长度不足时的提示
                 return []
             
             tpdo = Tpdo.from_bytes(data)
-            print(f"Parsed TPDO: {tpdo}")  # 调试信息：打印解析后的TPDO对象
+            logger.debug(f"Parsed TPDO:\n" + "\n".join([f"hand: {tpdo.hand}",
+                           f"th_dip: {tpdo.th_dip}", f"th_pip: {tpdo.th_pip}", f"th_mcp: {tpdo.th_mcp}",
+                           f"th_swing: {tpdo.th_swing}",f"th_rot: {tpdo.th_rot}",
+                           f"ff_dip: {tpdo.ff_dip}",f"ff_pip: {tpdo.ff_pip}",f"ff_mcp: {tpdo.ff_mcp}",f"ff_swing: {tpdo.ff_swing}",
+                           f"mf_dip: {tpdo.mf_dip}",f"mf_pip: {tpdo.mf_pip}",f"mf_mcp: {tpdo.mf_mcp}",
+                           f"rf_dip: {tpdo.rf_dip}",f"rf_pip: {tpdo.rf_pip}",f"rf_mcp: {tpdo.rf_mcp}",
+                           f"lf_dip: {tpdo.lf_dip}",f"lf_pip: {tpdo.lf_pip}",f"lf_mcp: {tpdo.lf_mcp}",
+                           f"tac_th: {tpdo.tac_th}",f"tac_ff: {tpdo.tac_ff}",f"tac_mf: {tpdo.tac_mf}",
+                           f"tac_rf: {tpdo.tac_rf}",f"tac_lf: {tpdo.tac_lf}",f"tac_palm: {tpdo.tac_palm}"]))
             
             # 定义关节信息映射
             joint_mappings = [
@@ -515,10 +525,10 @@ class DexHand(object):
                     speed=joint_tpdo.speed,
                     torque=joint_tpdo.torque
                 ))
-            
-            print(f"Returning {len(joints)} joints")  # 调试信息：打印返回的关节数量
+
             return joints
+        
         except RuntimeError as e:
-            print(f"Failed to get joints: {e}")
+            logger.error(f"Failed to get joints: {e}")
             return []
 

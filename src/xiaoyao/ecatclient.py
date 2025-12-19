@@ -1,8 +1,10 @@
 import pysoem
 import threading
 import time
+import logging
 import netifaces
 
+logger = logging.getLogger("xiaoyao")
 
 class EthercatClient(object):
     _instance_lock = threading.Lock()
@@ -86,11 +88,11 @@ class EthercatClient(object):
                     self._master.send_processdata()
                     self._actual_wkc = self._master.receive_processdata(15_000)
                 if self._actual_wkc < 1:
-                    print(f"Warning: Invalid working counter (WKC): {self._actual_wkc}")
+                    logger.warning(f"Invalid working counter (WKC): {self._actual_wkc}")
                     invalid_wkc_count += 1
                     # 当无效计数超过阈值时，触发断开连接
                     if invalid_wkc_count >= max_invalid_wkc_count:
-                        print(f"Error: Too many invalid WKC counts ({invalid_wkc_count}), disconnecting...")
+                        logger.error(f"Too many invalid WKC counts ({invalid_wkc_count}), disconnecting...")
                         # 设置连接丢失标志
                         self._connection_lost = True
                         # 在另一个线程中执行断开连接操作，避免死锁
@@ -102,7 +104,7 @@ class EthercatClient(object):
                     # 重置计数器
                     invalid_wkc_count = 0
             except Exception as e:
-                print(f"Error in process data thread: {e}")
+                logger.error(f"Error in process data thread: {e}")
             time.sleep(0.01)
 
     def _check_thread(self):
@@ -125,7 +127,7 @@ class EthercatClient(object):
                                 self._master.do_check_state = True
                                 self._check_slave(slave)
             except Exception as e:
-                print(f"Error in check thread: {e}")
+                logger.error(f"Error in check thread: {e}")
             time.sleep(0.01)
 
     def recv_data(self) -> bytes:
@@ -141,7 +143,7 @@ class EthercatClient(object):
             if self._slave is not None:
                 return self._slave.input
             else:
-                print("No slave connected")
+                logger.warning("No slave connected")
                 return bytes()
 
     def send_data(self, data: bytes):
@@ -155,11 +157,11 @@ class EthercatClient(object):
             if self._connection_lost:
                 raise RuntimeError("Connection lost due to too many invalid WKC counts")
             if self._slave is not None:
-                print(f"Sending {len(data)} bytes: {' '.join(f'{b:02x}' for b in data)}")
+                logger.debug(f"Sending {len(data)} bytes: \n{' '.join(f'{b:02x}' for b in data)}")
                 self._slave.output = data
-                print(f"【Joint】发送 PDO 数据成功")
+                logger.debug(f"发送 PDO 数据成功")
             else:
-                print("No slave connected")
+                logger.warning("No slave connected")
 
     def search(self) -> list[str]:
         """
@@ -190,13 +192,13 @@ class EthercatClient(object):
                 self._master.close()
                 return False
             self._connected = True
-            print("Connected to device with id: ", id)
+            logger.info(f"Connected to device with id: {id}")
             self._slave = self._master.slaves[0]
             self._slave.is_lost = False
             self._master.read_state()  # 刷新状态
             return True
         except Exception as e:
-            print(e)
+            logger.error(f"Error connecting to device {id}: {e}")
             return False
               
     def run(self):
@@ -207,7 +209,7 @@ class EthercatClient(object):
             bool: 启动成功返回True，失败返回False
         """
         if not self._connected or self._slave is None:
-            print("Not connected or no slave configured")
+            logger.error("Not connected or no slave configured")
             return False
         
         expected_input_size = 208
@@ -228,43 +230,43 @@ class EthercatClient(object):
                     slave.write_state()
                     # 等待状态转换完成
                     if slave.state_check(pysoem.INIT_STATE, timeout=100_000) != pysoem.INIT_STATE:
-                        print(f"Failed to enter INIT state. Current state: {slave.state}")
+                        logger.error(f"Failed to enter INIT state. Current state: {slave.state}")
                         self._master.close()
                         return False
                 
                 # 进行配置初始化
                 config_result = self._master.config_init()
                 if config_result <= 0:
-                    print(f"Config init failed with result: {config_result}")
+                    logger.error(f"Config init failed with result: {config_result}")
                     self._master.close()
                     return False
                 
                 self._master.config_map()
-                print("master state: ", self._master.state)
+                logger.debug(f"master state: {self._master.state}")
                 
                 if len(slave.input) != expected_input_size or len(slave.output) != expected_output_size:
-                    print("Expected size errror!")
-                    print(f"Expected input size: {expected_input_size}, actual input size: {len(slave.input)}") 
-                    print(f"Expected output size: {expected_output_size}, actual output size: {len(slave.output)}")
+                    logger.error("Expected size error!")
+                    logger.error(f"Expected input size: {expected_input_size}, actual input size: {len(slave.input)}")
+                    logger.error(f"Expected output size: {expected_output_size}, actual output size: {len(slave.output)}")
             else:
-                    print("No slaves found")
-                    self._master.close()
-                    return False
+                logger.warning("No slaves found")
+                self._master.close()
+                return False
         except Exception as e:
-            print(f"Failed to configure PDO mapping: {e}")
+            logger.error(f"Failed to configure PDO mapping: {e}")
             self._master.close()
             return False
         
         
         if self._master.state_check(pysoem.SAFEOP_STATE, timeout=500_000) != pysoem.SAFEOP_STATE:
-            print("Failed to enter SAFEOP state")
+            logger.error("Failed to enter SAFEOP state")
             for i, slave in enumerate(self._master.slaves):
-                print(f'Slave {i}: {slave.name}')
-                print(f'  Current state: {slave.state}')
-                print(f'  Expected state: {pysoem.SAFEOP_STATE}')
-                print(f'  AL status code: {hex(slave.al_status)} ({pysoem.al_status_code_to_string(slave.al_status)})')
-                print(f'  Input size: {len(slave.input)} bytes')
-                print(f'  Output size: {len(slave.output)} bytes')
+                logger.error(f'Slave {i}: {slave.name}')
+                logger.error(f'  Current state: {slave.state}')
+                logger.error(f'  Expected state: {pysoem.SAFEOP_STATE}')
+                logger.error(f'  AL status code: {hex(slave.al_status)} ({pysoem.al_status_code_to_string(slave.al_status)})')
+                logger.error(f'  Input size: {len(slave.input)} bytes')
+                logger.error(f'  Output size: {len(slave.output)} bytes')
             self._master.close()
             return False
 
@@ -283,7 +285,7 @@ class EthercatClient(object):
         # 等待进入OP状态，增加超时时间
         self._master.read_state()  # 刷新状态
         if self._master.state_check(pysoem.OP_STATE, timeout=500_000) != pysoem.OP_STATE:
-            print("Failed to reach OP state")
+            logger.error("Failed to reach OP state")
             # 如果无法进入OP状态，停止线程
             self._pd_thread_stop_event.set()
             self._ch_thread_stop_event.set()
@@ -326,12 +328,12 @@ class EthercatClient(object):
                         time.sleep(0.01)  # 等待状态切换完成
                 except Exception as e:
                     # 如果切换失败，记录警告但继续关闭主站
-                    print(f"Warning: Failed to switch slave to INIT state: {e}")
-                
+                    logger.warning(f"Failed to switch slave to INIT state: {e}")
+
                 # 直接关闭主站
                 if self._master:
                     self._master.close()
-                    print("Master closed")
+                    logger.info("Master closed")
                 self._slave = None
                 self._connected = False
     def sdo_read(self, index, subindex=0):
