@@ -104,15 +104,13 @@ def main():
                     torque=params["torque"]
                 ))
 
-            hand.move_joints(joints)
-            time.sleep(3)
-
-            current_joints  = hand.get_joints()
-            if current_joints:
-                for joint in current_joints:
-                    if joint.id == JointId.FF_MCP:
-                        print(f"当前FF_MCP关节状态 - 角度: {math.degrees(joint.angle):.2f} 度, 速度: {joint.speed}, 扭矩: {joint.torque}")
-                        
+            result = hand.move_joints(joints)
+            if result:
+                print("指令发送成功")
+                hand.get_joints()
+            else:
+                print("指令2发送失败")
+                break                        
     except KeyboardInterrupt:
         print("\n用户中断程序,正在关闭手部连接...")
     finally:

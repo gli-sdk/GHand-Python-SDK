@@ -336,146 +336,219 @@ def thumb_touch_tp(hand):
     # 1: 拇指和小指指尖触碰，其他手指保持在零位
     
     joints = Joint.create_joint_positions(joint_positions_1)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: 拇指和小指指尖触碰动作执行失败")
+        return False
     time.sleep(1)
 
     # 2: 拇指和无名指指尖触碰，其他手指保持在零位
     joints = Joint.create_joint_positions(joint_positions_2)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: 拇指和无名指指尖触碰动作执行失败")
+        return False
     time.sleep(1)
 
     # 3: 拇指和中指指尖触碰，其他手指保持在零位
     joints = Joint.create_joint_positions(joint_positions_3)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: 拇指和中指指尖触碰动作执行失败")
+        return False
     time.sleep(1)
 
     # 4: 拇指和食指指尖触碰，其他手指保持在零位
     joints = Joint.create_joint_positions(joint_positions_4)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: 拇指和食指指尖触碰动作执行失败")
+        return False
     time.sleep(1)
 
     # 5: 全部手指保持在零位
     joints = Joint.create_joint_positions(open_hand)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: 手指复位动作执行失败")
+        return False
     time.sleep(1)
+    
+    return True
 
 def fist_then_open(hand):
     # 1: 握拳动作 
     joints = Joint.create_joint_positions(fist)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: 握拳动作执行失败")
+        return False
     time.sleep(1)
 
     # 2: 张开手掌动作
     joints = Joint.create_joint_positions(open_hand)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: 张开手掌动作执行失败")
+        return False
     time.sleep(1)
-
+    
+    return True
 
 def seq_open_finger(hand):
-
     # 1: 握拳动作
     joints = Joint.create_joint_positions(fist)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: 握拳动作执行失败")
+        return False
     time.sleep(1)
 
     # 2: 张开食指动作
     joints = Joint.create_joint_positions(open_ff)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: 张开食指动作执行失败")
+        return False
     time.sleep(1)
 
     # 3: 张开中指动作
     joints = Joint.create_joint_positions(open_mf)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: 张开中指动作执行失败")
+        return False
     time.sleep(1)
 
     # 4: 张开无名指动作
     joints = Joint.create_joint_positions(open_rf)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: 张开无名指动作执行失败")
+        return False
     time.sleep(1)
 
     # 5: 张开小拇指动作
     joints = Joint.create_joint_positions(open_lf)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: 张开小拇指动作执行失败")
+        return False
     time.sleep(1)
 
-    # 5: 张开大拇指动作
+    # 6: 张开大拇指动作
     joints = Joint.create_joint_positions(open_hand)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: 张开大拇指动作执行失败")
+        return False
     time.sleep(1)
+    
+    return True
 
 def swing_ff(hand):
     joints = Joint.create_joint_positions(open_ff)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: 初始姿势动作执行失败")
+        return False
     time.sleep(1)
 
     for i in range(2):
         joints = Joint.create_joint_positions(ff_swing_neg)
-        hand.move_joints(joints)
+        if not hand.move_joints(joints):
+            print("警告: 食指负向摆动动作执行失败")
+            return False
         time.sleep(1)
 
         joints = Joint.create_joint_positions(ff_swing_pos)
-        hand.move_joints(joints)
+        if not hand.move_joints(joints):
+            print("警告: 食指正向摆动动作执行失败")
+            return False
         time.sleep(1)
 
     joints = Joint.create_joint_positions(open_ff)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: 复位姿势动作执行失败")
+        return False
     time.sleep(1)
+    
+    return True
 
 def flex_finger_movement(hand):
-
     joints = Joint.create_joint_positions(joint_positions_8)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: 手指弯曲动作1执行失败")
+        return False
     time.sleep(1)
 
     joints = Joint.create_joint_positions(joint_positions_9)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: 手指弯曲动作2执行失败")
+        return False
     time.sleep(1)
 
     joints = Joint.create_joint_positions(joint_positions_10)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: 手指弯曲动作3执行失败")
+        return False
     time.sleep(1)
 
     joints = Joint.create_joint_positions(joint_positions_11)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: 手指弯曲动作4执行失败")
+        return False
     time.sleep(1) 
 
     joints = Joint.create_joint_positions(joint_positions_5)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: 手指弯曲动作5执行失败")
+        return False
     time.sleep(1)
 
     joints = Joint.create_joint_positions(joint_positions_6)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: 手指弯曲动作6执行失败")
+        return False
     time.sleep(1)
 
     joints = Joint.create_joint_positions(joint_positions_7)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: 手指弯曲动作7执行失败")
+        return False
     time.sleep(1)
 
     joints = Joint.create_joint_positions(open_hand)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: 手指复位动作执行失败")
+        return False
     time.sleep(1)
+    
+    return True
 
 def make_ok(hand):
     joints = Joint.create_joint_positions(joint_positions_4)
-    hand.move_joints(joints)
+    if not hand.move_joints(joints):
+        print("警告: OK手势执行失败")
+        return False
     time.sleep(1)
-
-
+    return True
 
 def first_action(hand):
-    thumb_touch_tp(hand)
+    if not thumb_touch_tp(hand):
+        print("第一组动作执行失败")
+        return False
     
     for i in range(2):
-        fist_then_open(hand)
+        if not fist_then_open(hand):
+            print("握拳张开动作执行失败")
+            return False
+    return True
 
 def second_action(hand):
-    seq_open_finger(hand)
-    swing_ff(hand)
+    if not seq_open_finger(hand):
+        print("顺序张开手指动作执行失败")
+        return False
+        
+    if not swing_ff(hand):
+        print("食指摆动动作执行失败")
+        return False
 
     for i in range(4):
-        flex_finger_movement(hand)
+        if not flex_finger_movement(hand):
+            print("手指弯曲动作执行失败")
+            return False
 
-    make_ok(hand)
+    if not make_ok(hand):
+        print("OK手势执行失败")
+        return False
+    return True
 
 
 
@@ -500,10 +573,14 @@ def main():
                 
             print(f"\n--- 第 {gesture_cycle} 轮手势演示开始 ---")
             
-            first_action(hand)
+            if not first_action(hand):
+                print(f"第 {gesture_cycle} 轮演示中的第一组动作执行失败")
+                break
+                
+            if not second_action(hand):
+                print(f"第 {gesture_cycle} 轮演示中的第二组动作执行失败")
+                break
 
-            second_action(hand)
-            
             print(f"--- 第 {gesture_cycle} 轮手势演示结束 ---\n")
             
             # 提示信息

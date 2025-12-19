@@ -19,6 +19,8 @@ class EthercatClient(object):
         self._ch_thread_stop_event = threading.Event()
         self._connected = False
         self._slave = None
+        # 添加连接状态标志
+        self._connection_lost = False
         # 线程安全锁
         self._data_lock = threading.RLock()
         
@@ -74,6 +76,10 @@ class EthercatClient(object):
         """
         处理数据的线程函数，负责发送和接收过程数据
         """
+        # 添加计数器用于跟踪无效工作计数器的数量
+        invalid_wkc_count = 0
+        max_invalid_wkc_count = 30
+        
         while not self._pd_thread_stop_event.is_set():
             try:
                 with self._data_lock:
@@ -81,6 +87,20 @@ class EthercatClient(object):
                     self._actual_wkc = self._master.receive_processdata(15_000)
                 if self._actual_wkc < 1:
                     print(f"Warning: Invalid working counter (WKC): {self._actual_wkc}")
+                    invalid_wkc_count += 1
+                    # 当无效计数超过阈值时，触发断开连接
+                    if invalid_wkc_count >= max_invalid_wkc_count:
+                        print(f"Error: Too many invalid WKC counts ({invalid_wkc_count}), disconnecting...")
+                        # 设置连接丢失标志
+                        self._connection_lost = True
+                        # 在另一个线程中执行断开连接操作，避免死锁
+                        threading.Thread(target=self.disconnect).start()
+                        # 停止当前线程
+                        self._pd_thread_stop_event.set()
+                        break
+                else:
+                    # 重置计数器
+                    invalid_wkc_count = 0
             except Exception as e:
                 print(f"Error in process data thread: {e}")
             time.sleep(0.01)
@@ -116,6 +136,8 @@ class EthercatClient(object):
             bytes: 从设备输入数据，如果没有连接从设备则返回空字节
         """
         with self._data_lock:
+            if self._connection_lost:
+                raise RuntimeError("Connection lost due to too many invalid WKC counts")
             if self._slave is not None:
                 return self._slave.input
             else:
@@ -130,10 +152,14 @@ class EthercatClient(object):
             data (bytes): 要发送的数据
         """
         with self._data_lock:
+            if self._connection_lost:
+                raise RuntimeError("Connection lost due to too many invalid WKC counts")
             if self._slave is not None:
                 print(f"Sending {len(data)} bytes: {' '.join(f'{b:02x}' for b in data)}")
                 self._slave.output = data
                 print(f"【Joint】发送 PDO 数据成功")
+            else:
+                print("No slave connected")
 
     def search(self) -> list[str]:
         """

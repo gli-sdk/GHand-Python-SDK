@@ -219,27 +219,43 @@ def main():
             print(f"\n--- 第 {gesture_cycle} 轮手势演示开始 ---")
             
             print("演示1: [张开所有手指]")
-            open_hand(hand)
+            if not open_hand(hand):
+                print("打开手部失败，终止演示")
+                hand.close()
+                return
             time.sleep(3)
 
             print("演示2: [握拳]")
-            make_fist(hand)
+            if not make_fist(hand):
+                print("握拳动作失败，终止演示")
+                hand.close()
+                return
             time.sleep(3)
 
             print("演示3: [OK 手势]")
-            make_ok(hand)
+            if not make_ok(hand):
+                print("OK手势失败，终止演示")
+                hand.close()
+                return
             time.sleep(3)
 
             print("演示4: [竖大拇指]")
-            thumbs_up(hand)
+            if not thumbs_up(hand):
+                print("竖大拇指动作失败，终止演示")
+                hand.close()
+                return
             time.sleep(3)
 
             print("演示5: [六抓握]")
-            make_six_sign(hand)
+            if not make_six_sign(hand):
+                print("比666手势失败，终止演示")
+                hand.close()
+                return
             time.sleep(3)
 
             print("恢复: [张开所有手指]")
-            open_hand(hand)
+            if not open_hand(hand):
+                print("最后打开手部失败")
             time.sleep(5)
             
             print(f"--- 第 {gesture_cycle} 轮手势演示结束 ---\n")

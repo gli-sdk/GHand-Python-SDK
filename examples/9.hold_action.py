@@ -53,13 +53,13 @@ open_hand = {
 
 def hold(hand):
     joints = Joint.create_joint_positions(hold_tightly)
-    hand.move_joints(joints)
-    time.sleep(5)
+    result = hand.move_joints(joints)
+    return result
 
 def hand_zero(hand):
     joints = Joint.create_joint_positions(open_hand)
-    hand.move_joints(joints)
-    time.sleep(5)
+    result = hand.move_joints(joints)
+    return result
 
 def main():
     print("***** 枭尧灵巧手 SDK - 握功能演示 *****\n")
@@ -81,11 +81,17 @@ def main():
                 break
                 
             print(f"\n--- 第 {gesture_cycle} 轮功能演示开始 ---")
-            
-            hold(hand)
 
-            hand_zero(hand)
-            
+            if not hold(hand):
+                print(f"第 {gesture_cycle} 轮演示中的握紧动作执行失败")
+                break
+            time.sleep(5)
+
+            if not hand_zero(hand):
+                print(f"第 {gesture_cycle} 轮演示中的复位动作执行失败")
+                break
+            time.sleep(5)
+
             print(f"--- 第 {gesture_cycle} 轮功能演示结束 ---\n")
             
             # 提示信息
