@@ -83,6 +83,7 @@ def main():
                 print("按 Ctrl+C 停止演示并退出程序\n")          
                     
     except KeyboardInterrupt:
+        hand.close()
         print("\n\n程序被用户中断。")
     except Exception as e:
         print(f"\n[严重错误] {e}")

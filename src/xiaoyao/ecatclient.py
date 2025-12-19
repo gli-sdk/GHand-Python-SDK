@@ -291,6 +291,17 @@ class EthercatClient(object):
             if hasattr(self, 'check_thread') and self.check_thread.is_alive():
                 self.check_thread.join(timeout=thread_join_timeout)
             with self._data_lock:
+                # 先将从站切换为init状态，再关闭主站
+                try:
+                    if self._slave:
+                        # 将从站状态设置为INIT状态
+                        self._slave.state = pysoem.INIT_STATE
+                        self._slave.write_state()
+                        time.sleep(0.01)  # 等待状态切换完成
+                except Exception as e:
+                    # 如果切换失败，记录警告但继续关闭主站
+                    print(f"Warning: Failed to switch slave to INIT state: {e}")
+                
                 # 直接关闭主站
                 if self._master:
                     self._master.close()
