@@ -1,7 +1,6 @@
 import time
 import math
 from xiaoyao.dexhand import DexHand, CommType, Joint, JointId
-from do_gesture_dance import create_joint_positions
 
 grab_tightly = {
     JointId.THUMB_PIP: math.radians(50),
@@ -53,12 +52,12 @@ open_hand = {
 }
 
 def grab(hand):
-    joints = create_joint_positions(grab_tightly)
+    joints = Joint.create_joint_positions(grab_tightly)
     hand.move_joints(joints)
     time.sleep(5)
 
 def hand_zero(hand):
-    joints = create_joint_positions(open_hand)
+    joints = Joint.create_joint_positions(open_hand)
     hand.move_joints(joints)
     time.sleep(5)
 

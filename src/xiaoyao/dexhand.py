@@ -59,6 +59,29 @@ class Joint:
     speed: float = 0.0
     torque: float = 0.0
 
+    def create_joint_positions(joint_angles_dict):
+        """
+        根据关节角度字典创建关节列表
+        
+        Args:
+            joint_angles_dict: 字典,键为JointId,值为角度值(弧度)
+        
+        Returns:
+            list: Joint对象列表
+        """
+        joints = []
+        default_speed = 100
+        default_torque = 100
+        
+        for joint_id, angle in joint_angles_dict.items():
+            joints.append(Joint(
+                id=joint_id, 
+                angle=angle, 
+                speed=default_speed, 
+                torque=default_torque
+            ))
+        
+        return joints
 
 class GestureType(enum.Enum):
     HAND_OPEN = "hand_open"

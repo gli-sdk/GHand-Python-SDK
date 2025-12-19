@@ -1,7 +1,6 @@
 import time
 import math
 from xiaoyao.dexhand import DexHand, CommType, Joint, JointId
-from do_gesture_dance import create_joint_positions
 
 thumb_press = {
     JointId.THUMB_PIP: math.radians(0),
@@ -102,19 +101,19 @@ open_hand = {
 }
 
 def press(hand):
-    joints = create_joint_positions(ff_press)
+    joints = Joint.create_joint_positions(ff_press)
     hand.move_joints(joints)
     time.sleep(5)
 
 def hand_zero(hand):
-    joints = create_joint_positions(open_hand)
+    joints = Joint.create_joint_positions(open_hand)
     hand.move_joints(joints)
     time.sleep(5)
 
 def main():
     print("***** 枭尧灵巧手 SDK - 按功能演示 *****\n")
     hand = DexHand()
-    connected = hand.open(CommType.ETHERCAT, r"\Device\NPF_{22F450DC-244F-47FA-A538-CBD0142495BE}")
+    connected = hand.open(CommType.ETHERCAT, "auto")
     try:
         if not connected:
             print("\n[扫描结束] 未能连接到灵巧手。")

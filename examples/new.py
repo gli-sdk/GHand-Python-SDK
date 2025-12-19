@@ -31,13 +31,10 @@ def main():
     ver = hand.get_firmware_version()
     hand_name = hand.get_device_name()
     hand_hw_ver = hand.get_hardware_version()
-    mfr_mark = hand.get_manufacturer_mark()
-    prod_code = hand.get_product_code()
-    rev_num = hand.get_revision_number()
     serial_num = hand.get_serial_number()
     hand_type = hand.get_hand_type()
     print(f"hand name:{hand_name};H/W ver:{hand_hw_ver};ver: {ver};hand_type: {hand_type.value};")
-    print(f"Mfr Mark:{mfr_mark};Prod code:{prod_code};Rev num:{rev_num};Serial num:{int.from_bytes(serial_num, 'little')};")
+    print(f"Serial num:{int.from_bytes(serial_num, 'little')};")
 
     try:
         while True:
