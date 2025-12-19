@@ -34,8 +34,8 @@ def main():
             joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(0), speed=100, torque=100))   #角度范围为:-15~15(度)
             joints.append(Joint(id=JointId.MF_PIP, angle=math.radians(50), speed=100, torque=100))   #角度范围为:0~75(度)
             joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(50), speed=100, torque=100))   #角度范围为:0~70(度)
-            joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(78), speed=100, torque=100))   #角度范围为:0~75(度)
-            joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(78), speed=100, torque=100))   #角度范围为:0~70(度)
+            joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(50), speed=100, torque=100))   #角度范围为:0~75(度)
+            joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(50), speed=100, torque=100))   #角度范围为:0~70(度)
             joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(50), speed=100, torque=100))   #角度范围为:0~75(度)
             joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(50), speed=100, torque=100))   #角度范围为:0~70(度)
 
