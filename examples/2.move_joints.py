@@ -34,8 +34,8 @@ def main():
             joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(0), speed=100, torque=100))   #角度范围为:-15~15(度)
             joints.append(Joint(id=JointId.MF_PIP, angle=math.radians(50), speed=100, torque=100))   #角度范围为:0~75(度)
             joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(50), speed=100, torque=100))   #角度范围为:0~70(度)
-            joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(78), speed=100, torque=100))   #角度范围为:0~75(度)
-            joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(78), speed=100, torque=100))   #角度范围为:0~70(度)
+            joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(50), speed=100, torque=100))   #角度范围为:0~75(度)
+            joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(50), speed=100, torque=100))   #角度范围为:0~70(度)
             joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(50), speed=100, torque=100))   #角度范围为:0~75(度)
             joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(50), speed=100, torque=100))   #角度范围为:0~70(度)
 
@@ -49,6 +49,7 @@ def main():
                             print(f"当前关节状态 - 角度: {math.degrees(joint.angle):.2f} 度, 速度: {joint.speed}, 扭矩: {joint.torque}")
             else:
                 print("指令1发送失败")
+                break
             time.sleep(3)
 
             joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(0), speed=100, torque=100))   #角度范围为:0~75(度)
@@ -75,6 +76,7 @@ def main():
                             print(f"当前关节状态 - 角度: {math.degrees(joint.angle):.2f} 度, 速度: {joint.speed}, 扭矩: {joint.torque}")
             else:
                 print("指令2发送失败")
+                break
             time.sleep(3)
 
             print(f"--- 第 {gesture_cycle} 轮手指运动结束 ---\n")

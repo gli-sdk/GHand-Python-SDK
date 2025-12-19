@@ -363,55 +363,59 @@ class DexHand(object):
         Returns:
           bool: 连接成功返回True，否则返回False
         """
-        rpdo = Rpdo()
-        rpdo.mode = mode
-        rpdo.stop = stop
-        for joint in joints:
-            # 应用关节限制检查
-            if joint.id == JointId.THUMB_PIP:
-                self._check_joint_limit(joint, self._th_pip_limit)
-                self._joint_to_pdo(joint, rpdo.th_pip)
-            elif joint.id == JointId.THUMB_MCP:
-                self._check_joint_limit(joint, self._th_mcp_limit)
-                self._joint_to_pdo(joint, rpdo.th_mcp)
-            elif joint.id == JointId.THUMB_SWING:
-                self._check_joint_limit(joint, self._th_swing_limit)
-                self._joint_to_pdo(joint, rpdo.th_swing)
-            elif joint.id == JointId.THUMB_ROTATION:
-                self._check_joint_limit(joint, self._th_rot_limit)
-                self._joint_to_pdo(joint, rpdo.th_rot)
-            elif joint.id == JointId.FF_PIP:
-                self._check_joint_limit(joint, self._ff_pip_limit)
-                self._joint_to_pdo(joint, rpdo.ff_pip)
-            elif joint.id == JointId.FF_MCP:
-                self._check_joint_limit(joint, self._ff_mcp_limit)
-                self._joint_to_pdo(joint, rpdo.ff_mcp)
-            elif joint.id == JointId.FF_SWING:
-                self._check_joint_limit(joint, self._ff_swing_limit)
-                self._joint_to_pdo(joint, rpdo.ff_swing)
-            elif joint.id == JointId.MF_PIP:
-                self._check_joint_limit(joint, self._mf_pip_limit)
-                self._joint_to_pdo(joint, rpdo.mf_pip)
-            elif joint.id == JointId.MF_MCP:
-                self._check_joint_limit(joint, self._mf_mcp_limit)
-                self._joint_to_pdo(joint, rpdo.mf_mcp)
-            elif joint.id == JointId.RF_PIP:
-                self._check_joint_limit(joint, self._rf_pip_limit)
-                self._joint_to_pdo(joint, rpdo.rf_pip)
-            elif joint.id == JointId.RF_MCP:
-                self._check_joint_limit(joint, self._rf_mcp_limit)
-                self._joint_to_pdo(joint, rpdo.rf_mcp)
-            elif joint.id == JointId.LF_PIP:
-                self._check_joint_limit(joint, self._lf_pip_limit)
-                self._joint_to_pdo(joint, rpdo.lf_pip)
-            elif joint.id == JointId.LF_MCP:
-                self._check_joint_limit(joint, self._lf_mcp_limit)
-                self._joint_to_pdo(joint, rpdo.lf_mcp)
-            else:
-                print(f"【Joint】无效的关节ID: {joint.id}")
-                return False
-        self._client.send_data(rpdo.to_bytes())
-        return True
+        try:
+            rpdo = Rpdo()
+            rpdo.mode = mode
+            rpdo.stop = stop
+            for joint in joints:
+                # 应用关节限制检查
+                if joint.id == JointId.THUMB_PIP:
+                    self._check_joint_limit(joint, self._th_pip_limit)
+                    self._joint_to_pdo(joint, rpdo.th_pip)
+                elif joint.id == JointId.THUMB_MCP:
+                    self._check_joint_limit(joint, self._th_mcp_limit)
+                    self._joint_to_pdo(joint, rpdo.th_mcp)
+                elif joint.id == JointId.THUMB_SWING:
+                    self._check_joint_limit(joint, self._th_swing_limit)
+                    self._joint_to_pdo(joint, rpdo.th_swing)
+                elif joint.id == JointId.THUMB_ROTATION:
+                    self._check_joint_limit(joint, self._th_rot_limit)
+                    self._joint_to_pdo(joint, rpdo.th_rot)
+                elif joint.id == JointId.FF_PIP:
+                    self._check_joint_limit(joint, self._ff_pip_limit)
+                    self._joint_to_pdo(joint, rpdo.ff_pip)
+                elif joint.id == JointId.FF_MCP:
+                    self._check_joint_limit(joint, self._ff_mcp_limit)
+                    self._joint_to_pdo(joint, rpdo.ff_mcp)
+                elif joint.id == JointId.FF_SWING:
+                    self._check_joint_limit(joint, self._ff_swing_limit)
+                    self._joint_to_pdo(joint, rpdo.ff_swing)
+                elif joint.id == JointId.MF_PIP:
+                    self._check_joint_limit(joint, self._mf_pip_limit)
+                    self._joint_to_pdo(joint, rpdo.mf_pip)
+                elif joint.id == JointId.MF_MCP:
+                    self._check_joint_limit(joint, self._mf_mcp_limit)
+                    self._joint_to_pdo(joint, rpdo.mf_mcp)
+                elif joint.id == JointId.RF_PIP:
+                    self._check_joint_limit(joint, self._rf_pip_limit)
+                    self._joint_to_pdo(joint, rpdo.rf_pip)
+                elif joint.id == JointId.RF_MCP:
+                    self._check_joint_limit(joint, self._rf_mcp_limit)
+                    self._joint_to_pdo(joint, rpdo.rf_mcp)
+                elif joint.id == JointId.LF_PIP:
+                    self._check_joint_limit(joint, self._lf_pip_limit)
+                    self._joint_to_pdo(joint, rpdo.lf_pip)
+                elif joint.id == JointId.LF_MCP:
+                    self._check_joint_limit(joint, self._lf_mcp_limit)
+                    self._joint_to_pdo(joint, rpdo.lf_mcp)
+                else:
+                    print(f"【Joint】无效的关节ID: {joint.id}")
+                    return False
+            self._client.send_data(rpdo.to_bytes())
+            return True
+        except RuntimeError as e:
+            print(f"Failed to move joints: {e}")
+            return False
 
     def get_joints(self) -> list[Joint]:
         """
@@ -420,53 +424,57 @@ class DexHand(object):
         Returns:
         list[Joint]: 连接成功返回True,否则返回False
         """
-        data = self._client.recv_data()
-        print(f"Received data!!!!!: {' '.join(f'{b:02x}' for b in data)}")
-        print(f"Received data length: {len(data)} bytes")  # 调试信息：打印接收到的数据长度
-        
-        if len(data) < 208:
-            print(f"Data length insufficient. Expected at least 208 bytes, got {len(data)} bytes")  # 调试信息：数据长度不足时的提示
+        try:
+            data = self._client.recv_data()
+            print(f"Received data!!!!!: {' '.join(f'{b:02x}' for b in data)}")
+            print(f"Received data length: {len(data)} bytes")  # 调试信息：打印接收到的数据长度
+            
+            if len(data) < 208:
+                print(f"Data length insufficient. Expected at least 208 bytes, got {len(data)} bytes")  # 调试信息：数据长度不足时的提示
+                return []
+            
+            tpdo = Tpdo.from_bytes(data)
+            print(f"Parsed TPDO: {tpdo}")  # 调试信息：打印解析后的TPDO对象
+            
+            # 定义关节信息映射
+            joint_mappings = [
+                # thumb
+                (JointId.THUMB_DIP, tpdo.th_dip),
+                (JointId.THUMB_PIP, tpdo.th_pip),
+                (JointId.THUMB_MCP, tpdo.th_mcp),
+                (JointId.THUMB_SWING, tpdo.th_swing),
+                (JointId.THUMB_ROTATION, tpdo.th_rot),
+                # ff
+                (JointId.FF_DIP, tpdo.ff_dip),
+                (JointId.FF_PIP, tpdo.ff_pip),
+                (JointId.FF_MCP, tpdo.ff_mcp),
+                (JointId.FF_SWING, tpdo.ff_swing),
+                # mf
+                (JointId.MF_DIP, tpdo.mf_dip),
+                (JointId.MF_PIP, tpdo.mf_pip),
+                (JointId.MF_MCP, tpdo.mf_mcp),
+                # rf
+                (JointId.RF_DIP, tpdo.rf_dip),
+                (JointId.RF_PIP, tpdo.rf_pip),
+                (JointId.RF_MCP, tpdo.rf_mcp),
+                # lf
+                (JointId.LF_DIP, tpdo.lf_dip),
+                (JointId.LF_PIP, tpdo.lf_pip),
+                (JointId.LF_MCP, tpdo.lf_mcp),
+            ]
+            
+            joints = []
+            for joint_id, joint_tpdo in joint_mappings:
+                joints.append(Joint(
+                    id=joint_id,
+                    angle=joint_tpdo.angle,
+                    speed=joint_tpdo.speed,
+                    torque=joint_tpdo.torque
+                ))
+            
+            print(f"Returning {len(joints)} joints")  # 调试信息：打印返回的关节数量
+            return joints
+        except RuntimeError as e:
+            print(f"Failed to get joints: {e}")
             return []
-        
-        tpdo = Tpdo.from_bytes(data)
-        print(f"Parsed TPDO: {tpdo}")  # 调试信息：打印解析后的TPDO对象
-        
-        # 定义关节信息映射
-        joint_mappings = [
-            # thumb
-            (JointId.THUMB_DIP, tpdo.th_dip),
-            (JointId.THUMB_PIP, tpdo.th_pip),
-            (JointId.THUMB_MCP, tpdo.th_mcp),
-            (JointId.THUMB_SWING, tpdo.th_swing),
-            (JointId.THUMB_ROTATION, tpdo.th_rot),
-            # ff
-            (JointId.FF_DIP, tpdo.ff_dip),
-            (JointId.FF_PIP, tpdo.ff_pip),
-            (JointId.FF_MCP, tpdo.ff_mcp),
-            (JointId.FF_SWING, tpdo.ff_swing),
-            # mf
-            (JointId.MF_DIP, tpdo.mf_dip),
-            (JointId.MF_PIP, tpdo.mf_pip),
-            (JointId.MF_MCP, tpdo.mf_mcp),
-            # rf
-            (JointId.RF_DIP, tpdo.rf_dip),
-            (JointId.RF_PIP, tpdo.rf_pip),
-            (JointId.RF_MCP, tpdo.rf_mcp),
-            # lf
-            (JointId.LF_DIP, tpdo.lf_dip),
-            (JointId.LF_PIP, tpdo.lf_pip),
-            (JointId.LF_MCP, tpdo.lf_mcp),
-        ]
-        
-        joints = []
-        for joint_id, joint_tpdo in joint_mappings:
-            joints.append(Joint(
-                id=joint_id,
-                angle=joint_tpdo.angle,
-                speed=joint_tpdo.speed,
-                torque=joint_tpdo.torque
-            ))
-        
-        print(f"Returning {len(joints)} joints")  # 调试信息：打印返回的关节数量
-        return joints
 
