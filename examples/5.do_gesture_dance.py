@@ -2,31 +2,6 @@ import time
 import math
 from xiaoyao.dexhand import DexHand, CommType, Joint, JointId
 
-def create_joint_positions(joint_angles_dict):
-    """
-    根据关节角度字典创建关节列表
-    
-    Args:
-        joint_angles_dict: 字典,键为JointId,值为角度值(弧度)
-    
-    Returns:
-        list: Joint对象列表
-    """
-    joints = []
-    default_speed = 1000.0
-    default_torque = 90.0
-    
-    for joint_id, angle in joint_angles_dict.items():
-        joints.append(Joint(
-            id=joint_id, 
-            angle=angle, 
-            speed=default_speed, 
-            torque=default_torque
-        ))
-    
-    return joints
-
-
 joint_positions_1 = {
     JointId.THUMB_PIP: math.radians(20),
     JointId.THUMB_MCP: math.radians(55),
@@ -356,132 +331,132 @@ joint_positions_11 = {
     JointId.LF_PIP: math.radians(75),
     JointId.LF_MCP: math.radians(70),
 }
-       
+
 def thumb_touch_tp(hand):
     # 1: 拇指和小指指尖触碰，其他手指保持在零位
     
-    joints = create_joint_positions(joint_positions_1)
+    joints = Joint.create_joint_positions(joint_positions_1)
     hand.move_joints(joints)
     time.sleep(1)
 
     # 2: 拇指和无名指指尖触碰，其他手指保持在零位
-    joints = create_joint_positions(joint_positions_2)
+    joints = Joint.create_joint_positions(joint_positions_2)
     hand.move_joints(joints)
     time.sleep(1)
 
     # 3: 拇指和中指指尖触碰，其他手指保持在零位
-    joints = create_joint_positions(joint_positions_3)
+    joints = Joint.create_joint_positions(joint_positions_3)
     hand.move_joints(joints)
     time.sleep(1)
 
-    # 4: 拇指和食指指尖触碰，其他手指保持在零位   
-    joints = create_joint_positions(joint_positions_4)
+    # 4: 拇指和食指指尖触碰，其他手指保持在零位
+    joints = Joint.create_joint_positions(joint_positions_4)
     hand.move_joints(joints)
     time.sleep(1)
 
-    # 5: 全部手指保持在零位    
-    joints = create_joint_positions(open_hand)
+    # 5: 全部手指保持在零位
+    joints = Joint.create_joint_positions(open_hand)
     hand.move_joints(joints)
     time.sleep(1)
 
 def fist_then_open(hand):
     # 1: 握拳动作 
-    joints = create_joint_positions(fist)
+    joints = Joint.create_joint_positions(fist)
     hand.move_joints(joints)
     time.sleep(1)
 
     # 2: 张开手掌动作
-    joints = create_joint_positions(open_hand)
+    joints = Joint.create_joint_positions(open_hand)
     hand.move_joints(joints)
     time.sleep(1)
 
 
 def seq_open_finger(hand):
 
-    # 1: 握拳动作   
-    joints = create_joint_positions(fist)
+    # 1: 握拳动作
+    joints = Joint.create_joint_positions(fist)
     hand.move_joints(joints)
     time.sleep(1)
 
     # 2: 张开食指动作
-    joints = create_joint_positions(open_ff)
+    joints = Joint.create_joint_positions(open_ff)
     hand.move_joints(joints)
     time.sleep(1)
 
     # 3: 张开中指动作
-    joints = create_joint_positions(open_mf)
+    joints = Joint.create_joint_positions(open_mf)
     hand.move_joints(joints)
     time.sleep(1)
 
     # 4: 张开无名指动作
-    joints = create_joint_positions(open_rf)
+    joints = Joint.create_joint_positions(open_rf)
     hand.move_joints(joints)
     time.sleep(1)
 
     # 5: 张开小拇指动作
-    joints = create_joint_positions(open_lf)
+    joints = Joint.create_joint_positions(open_lf)
     hand.move_joints(joints)
     time.sleep(1)
 
     # 5: 张开大拇指动作
-    joints = create_joint_positions(open_hand)
+    joints = Joint.create_joint_positions(open_hand)
     hand.move_joints(joints)
     time.sleep(1)
 
 def swing_ff(hand):
-    joints = create_joint_positions(open_ff)
+    joints = Joint.create_joint_positions(open_ff)
     hand.move_joints(joints)
     time.sleep(1)
 
     for i in range(2):
-        joints = create_joint_positions(ff_swing_neg)
+        joints = Joint.create_joint_positions(ff_swing_neg)
         hand.move_joints(joints)
         time.sleep(1)
 
-        joints = create_joint_positions(ff_swing_pos)
+        joints = Joint.create_joint_positions(ff_swing_pos)
         hand.move_joints(joints)
         time.sleep(1)
 
-    joints = create_joint_positions(open_ff)
+    joints = Joint.create_joint_positions(open_ff)
     hand.move_joints(joints)
     time.sleep(1)
 
 def flex_finger_movement(hand):
 
-    joints = create_joint_positions(joint_positions_8)   
+    joints = Joint.create_joint_positions(joint_positions_8)
     hand.move_joints(joints)
     time.sleep(1)
 
-    joints = create_joint_positions(joint_positions_9)
+    joints = Joint.create_joint_positions(joint_positions_9)
     hand.move_joints(joints)
     time.sleep(1)
 
-    joints = create_joint_positions(joint_positions_10)
+    joints = Joint.create_joint_positions(joint_positions_10)
     hand.move_joints(joints)
     time.sleep(1)
 
-    joints = create_joint_positions(joint_positions_11)
+    joints = Joint.create_joint_positions(joint_positions_11)
     hand.move_joints(joints)
     time.sleep(1) 
 
-    joints = create_joint_positions(joint_positions_5)
+    joints = Joint.create_joint_positions(joint_positions_5)
     hand.move_joints(joints)
     time.sleep(1)
 
-    joints = create_joint_positions(joint_positions_6)
+    joints = Joint.create_joint_positions(joint_positions_6)
     hand.move_joints(joints)
     time.sleep(1)
 
-    joints = create_joint_positions(joint_positions_7)
+    joints = Joint.create_joint_positions(joint_positions_7)
     hand.move_joints(joints)
     time.sleep(1)
 
-    joints = create_joint_positions(open_hand)
+    joints = Joint.create_joint_positions(open_hand)
     hand.move_joints(joints)
     time.sleep(1)
 
 def make_ok(hand):
-    joints = create_joint_positions(joint_positions_4)
+    joints = Joint.create_joint_positions(joint_positions_4)
     hand.move_joints(joints)
     time.sleep(1)
 
@@ -507,7 +482,7 @@ def second_action(hand):
 def main():
     print("***** 枭尧灵巧手 SDK - 手势舞功能演示 *****\n")
     hand = DexHand()
-    connected = hand.open(CommType.ETHERCAT, r"\Device\NPF_{22F450DC-244F-47FA-A538-CBD0142495BE}")
+    connected = hand.open(CommType.ETHERCAT, "auto")
     try:
         if not connected:
             print("\n[扫描结束] 未能连接到灵巧手。")
