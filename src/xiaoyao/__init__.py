@@ -1,17 +1,16 @@
 import sys
-if sys.version_info < (3, 8):
+if sys.version_info < (3, 10):
     sys.exit("xiaoyao-sdk requires Python 3.8 or higher")
 import logging
 import time
 
-from .client import Client
 from .dexhand import DexHand
 from .subscription import SubscriptionManager
 from .version import __version__
 
 logger_name = "xiaoyao"
 logger = logging.getLogger(logger_name)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(logging.Formatter(

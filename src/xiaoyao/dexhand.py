@@ -1,10 +1,13 @@
 import enum
+import math
+import logging
 from typing import Optional
 from dataclasses import dataclass
 from .ecatclient import EthercatClient
 from .subscription import SubscriptionManager
 from .data import JointRpdo, Rpdo, Tpdo
 
+logger = logging.getLogger("xiaoyao")
 
 class HandType(enum.Enum):
     UNKNOWN = "unknown"
@@ -59,6 +62,29 @@ class Joint:
     speed: float = 0.0
     torque: float = 0.0
 
+    def create_joint_positions(joint_angles_dict):
+        """
+        根据关节角度字典创建关节列表
+        
+        Args:
+            joint_angles_dict: 字典,键为JointId,值为角度值(弧度)
+        
+        Returns:
+            list: Joint对象列表
+        """
+        joints = []
+        default_speed = 100
+        default_torque = 100
+        
+        for joint_id, angle in joint_angles_dict.items():
+            joints.append(Joint(
+                id=joint_id, 
+                angle=angle, 
+                speed=default_speed, 
+                torque=default_torque
+            ))
+        
+        return joints
 
 class GestureType(enum.Enum):
     HAND_OPEN = "hand_open"
@@ -66,35 +92,55 @@ class GestureType(enum.Enum):
 
 class DexHand(object):
     def __init__(self):
+        """
+        初始化灵巧手对象
+        """
         self._client = EthercatClient()
         self._hand_type = HandType.UNKNOWN
         self._firmware_version = ""
-        self._sub_manager = SubscriptionManager()
+        # 传递客户端实例给SubscriptionManager
+        self._sub_manager = SubscriptionManager(self._client)
         self._opened = False
         self._set_joint_limit()
 
     def __del__(self):
+        """
+        析构函数，关闭灵巧手设备连接
+        """
         self.close()
 
     def _set_joint_limit(self):
-        self._th_pip_limit = (0, 0)
-        self._th_mcp_limit = (0, 0)
-        self._th_swing_limit = (0, 0)
-        self._th_rot_limit = (0, 0)
-        self._ff_pip_limit = (0, 0)
-        self._ff_mcp_limit = (0, 0)
-        self._ff_swing_limit = (0, 0)
-        self._mf_pip_limit = (0, 0)
-        self._mf_mcp_limit = (0, 0)
-        self._rf_pip_limit = (0, 0)
-        self._rf_mcp_limit = (0, 0)
-        self._lf_pip_limit = (0, 0)
-        self._lf_mcp_limit = (0, 0)
+        """
+        设置关节限制参数
+        """
+        self._th_pip_limit = (0, math.radians(75))
+        self._th_mcp_limit = (0, math.radians(75))
+        self._th_swing_limit = (0, math.radians(90))
+        self._th_rot_limit = (0, math.radians(90))
+        self._ff_pip_limit = (0, math.radians(75))
+        self._ff_mcp_limit = (0, math.radians(70))
+        self._ff_swing_limit = (math.radians(-15), math.radians(15))
+        self._mf_pip_limit = (0, math.radians(75))
+        self._mf_mcp_limit = (0, math.radians(70))
+        self._rf_pip_limit = (0, math.radians(75))
+        self._rf_mcp_limit = (0, math.radians(70))
+        self._lf_pip_limit = (0, math.radians(75))
+        self._lf_mcp_limit = (0, math.radians(70))
 
     def _check_joint_limit(self, joint: Joint, limit):
-        if joint.angle < limit[0] or joint.angle > limit[1]:
-            return False
-        return True
+        """
+        检查关节角度是否超出限制范围，如果超出则设为边界值
+
+        Args:
+          joint (Joint): 关节对象
+          limit: 关节限制范围
+
+        """
+        if joint.angle < limit[0]:
+            joint.angle = limit[0]
+        elif joint.angle > limit[1]:
+            joint.angle = limit[1]
+            logger.warning(f"【Joint】关节ID: {joint.id} 角度超出限制范围，已设为最大值 {math.degrees(limit[1]):.2f} 度")
 
     def open(self, type: CommType = CommType.ETHERCAT, id: str = "auto"):
         """
@@ -112,15 +158,22 @@ class DexHand(object):
         if type == CommType.ETHERCAT:
             if id == "auto":
                 id_list = self._client.search()
+                logger.info("搜索到的ID:\n" + "\n".join([f"{id}" for id in id_list]))
                 for id in id_list:
-                    self._opened = self._client.connect(id)
-                    if self._opened:
-                        self._client.run()
-                        break
+                    connected = self._client.connect(id)
+                    if connected:
+                        run_success = self._client.run()
+                        if run_success:
+                            self._opened = True
+                            break
+                        else:
+                            # 如果run失败，断开连接并尝试下一个设备
+                            self._client.disconnect()
             else:
-                self._opened = self._client.connect(id)
-                if self._opened:
-                    self._client.run()
+                connected = self._client.connect(id)
+                if connected:
+                    run_success = self._client.run()
+                    self._opened = run_success
         elif type == CommType.CANFD:
             pass
         elif type == CommType.RS485:
@@ -132,43 +185,112 @@ class DexHand(object):
         关闭灵巧手设备连接
 
         Returns:
-            bool: 关闭成功返回True，失败返回False
+          bool: 关闭成功返回True，失败返回False
         """
         if self._opened:
             self._client.disconnect()
         return True
+    
+    def subscribe(self, callback):
+        """
+        订阅灵巧手数据更新
+        
+        Args:
+            callback: 回调函数，当有新数据时会被调用
+                     回调函数应接受一个参数：TPDO数据对象
+            
+        Returns:
+            int: 订阅ID，可用于取消订阅
+        """
+        def wrapper(data_bytes, *args, **kwargs):
+            # 将字节数据转换为TPDO对象
+            tpdo = Tpdo.from_bytes(data_bytes)
+            # 调用用户提供的回调函数
+            callback(tpdo)
+            
+        return self._sub_manager.subscribe(wrapper)
+
+    def unsubscribe(self, sub_id):
+        """
+        取消订阅
+        
+        Args:
+            sub_id (int): 订阅ID
+            
+        Returns:
+            bool: 取消成功返回True，否则返回False
+        """
+        return self._sub_manager.unsubscribe(sub_id)
+
+    def start_subscription(self):
+        """
+        手动启动订阅功能
+        """
+        self._sub_manager.start()
+
+    def stop_subscription(self):
+        """
+        停止订阅功能
+        """
+        self._sub_manager.stop()
 
     def get_firmware_version(self):
         """
         获取灵巧手固件版本号
 
         Returns:
-            str: 获取成功返回版本号（如："v1.0.0"），失败返回空字符串""
+            str: 返回版本号（如："v1.0.0"）
         """
         if self._firmware_version == "":
             self._firmware_version = self._client.sdo_read(
                 0x100A, 0x00).decode('utf-8')
         return self._firmware_version
-
-    def release_protection(self) -> bool:
+    
+    def get_device_name(self):
         """
-        解除保护
+        获取设备名
 
         Returns:
-            bool: 解除成功返回True，失败返回False
+            str: 获取成功返回设备ID，失败返回空字符串""
         """
         try:
-            self._client.sdo_write(0x2001, 0x00, b'\x01')
+            device_name = self._client.sdo_read(0x1008, 0x00).decode('utf-8')
         except Exception:
-            return False
-        return True
-
-    def reboot(self) -> bool:
+            return ""
+        return device_name
+    
+    def get_hardware_version(self):
         """
-        重启设备
+        获取硬件版本号
 
         Returns:
-            bool: 重启成功返回True，失败返回False
+            str: 获取成功返回版本号（如："v1.0.0"），失败返回空字符串""
+        """
+        try:
+            hardware_version = self._client.sdo_read(0x1009, 0x00).decode('utf-8')
+        except Exception:
+            return ""
+        return hardware_version
+
+    def get_serial_number(self):
+        """
+        获取产品序列号
+
+        Returns:
+            str: 获取成功返回产品序列号，失败返回空字符串""
+        """        
+        try:
+            serial_number = self._client.sdo_read(0x1018, 0x04)
+        except Exception:
+            return ""
+        return serial_number
+
+    def fault_clearance(self) -> bool:
+        """
+        故障清除
+
+        Returns:
+            bool: 清除成功返回True，失败返回False
         """
         try:
             self._client.sdo_write(0x2002, 0x01, b'\x01')
@@ -177,15 +299,14 @@ class DexHand(object):
         return True
 
     def joint_init(self) -> bool:
-        try:
-            self._client.sdo_write(0x2003, 0x00, b'\x01')
-        except Exception:
-            return False
-        return True
+        """
+        关节初始化
 
-    def tactile_self_test(self) -> bool:
+        Returns:
+            bool: 初始化成功返回True，失败返回False
+        """
         try:
-            self._client.sdo_write(0x2005, 0x00, b'\x01')
+            self._client.sdo_write(0x2003, 0x01, b'\x01')
         except Exception:
             return False
         return True
@@ -198,12 +319,18 @@ class DexHand(object):
             bool: 重置成功返回True，失败返回False
         """
         try:
-            self._client.sdo_write(0x2006, 0x00, b'\x01')
+            self._client.sdo_write(0x2004, 0x01, b'\x01')
         except Exception:
             return False
         return True
 
     def motor_self_test(self) -> bool:
+        """
+        电机自检
+
+        Returns:
+            bool: 自检成功返回True，失败返回False
+        """
         try:
             self._client.sdo_write(0x2007, 0x00, b'\x01')
         except Exception:
@@ -224,6 +351,15 @@ class DexHand(object):
         return True
 
     def do_preset_gesture(self, gesture: GestureType):
+        """
+        执行预设手势动作
+
+        Args:
+            gesture (GestureType): 手势类型
+
+        Returns:
+            bool: 执行成功返回True，失败返回False
+        """
         if gesture == GestureType.HAND_OPEN:
             try:
                 self._client.sdo_write(0x2021, 0x00, b'\x01')
@@ -241,7 +377,7 @@ class DexHand(object):
         if self._hand_type == HandType.UNKNOWN:
             try:
                 type = int.from_bytes(
-                    self._client.sdo_read(0x2011), byteorder='little')
+                    self._client.sdo_read(0x2001, 0x00), byteorder='little')
             except Exception:
                 return HandType.UNKNOWN
             if type == 0x01:
@@ -249,142 +385,150 @@ class DexHand(object):
             elif type == 0x02:
                 self._hand_type = HandType.RIGHT_HAND
         return self._hand_type
-
-    def sub_hand_data(self, callback=None, *args, **kw):
-        sub_id = self._sub_manager.subscribe(callback, *args, **kw)
-        return sub_id
-
-    def unsub_hand_data(self, sub_id):
-        return self._sub_manager.unsubscribe(sub_id)
-
     def _joint_to_pdo(self, joint: Joint, pdo: JointRpdo):
-        print(joint.angle)
+        """
+        将Joint对象转换为PDO对象
+        
+        Args:
+          joint (Joint): 关节对象
+          pdo (JointRpdo): PDO对象
+        """
         pdo.angle = joint.angle
         pdo.speed = joint.speed
         pdo.torque = joint.torque
 
-    def move_joints(self, joints: list[Joint]):
+    def move_joints(self, joints: list[Joint], mode: int = 0, stop: int = 0):
         """
         发送多个关节控制指令
 
         Args:
           joints (list[Joint]): 关节控制指令
+          mode (int, optional): 模式选择。0:位置模式;1:力矩模式。默认为0
+          stop (int, optional): 停止选择。0:运动;1:停止所有关节。默认为0
 
         Returns:
           bool: 连接成功返回True，否则返回False
         """
-        rpdo = Rpdo()
-        for joint in joints:
-            if joint.id == JointId.THUMB_PIP:
-                self._joint_to_pdo(joint, rpdo.th_pip)
-            elif joint.id == JointId.THUMB_MCP:
-                self._joint_to_pdo(joint, rpdo.th_mcp)
-            elif joint.id == JointId.THUMB_SWING:
-                self._joint_to_pdo(joint, rpdo.th_swing)
-            elif joint.id == JointId.THUMB_ROTATION:
-                self._joint_to_pdo(joint, rpdo.th_rot)
-            elif joint.id == JointId.FF_PIP:
-                self._joint_to_pdo(joint, rpdo.ff_pip)
-            elif joint.id == JointId.FF_MCP:
-                self._joint_to_pdo(joint, rpdo.ff_mcp)
-            elif joint.id == JointId.FF_SWING:
-                self._joint_to_pdo(joint, rpdo.ff_swing)
-            elif joint.id == JointId.MF_PIP:
-                self._joint_to_pdo(joint, rpdo.mf_pip)
-            elif joint.id == JointId.MF_MCP:
-                self._joint_to_pdo(joint, rpdo.mf_mcp)
-            elif joint.id == JointId.RF_PIP:
-                self._joint_to_pdo(joint, rpdo.rf_pip)
-            elif joint.id == JointId.RF_MCP:
-                self._joint_to_pdo(joint, rpdo.rf_mcp)
-            elif joint.id == JointId.LF_PIP:
-                self._joint_to_pdo(joint, rpdo.lf_pip)
-            elif joint.id == JointId.LF_MCP:
-                self._joint_to_pdo(joint, rpdo.lf_mcp)
-            else:
-                print(f"【Joint】无效的关节ID: {joint.id}")
-                return False
-        self._client.send_data(rpdo.to_bytes())
-        print(f"【Joint】发送 PDO 数据成功")
-        return True
+        try:
+            rpdo = Rpdo()
+            rpdo.mode = mode
+            rpdo.stop = stop
+            for joint in joints:
+                # 应用关节限制检查
+                if joint.id == JointId.THUMB_PIP:
+                    self._check_joint_limit(joint, self._th_pip_limit)
+                    self._joint_to_pdo(joint, rpdo.th_pip)
+                elif joint.id == JointId.THUMB_MCP:
+                    self._check_joint_limit(joint, self._th_mcp_limit)
+                    self._joint_to_pdo(joint, rpdo.th_mcp)
+                elif joint.id == JointId.THUMB_SWING:
+                    self._check_joint_limit(joint, self._th_swing_limit)
+                    self._joint_to_pdo(joint, rpdo.th_swing)
+                elif joint.id == JointId.THUMB_ROTATION:
+                    self._check_joint_limit(joint, self._th_rot_limit)
+                    self._joint_to_pdo(joint, rpdo.th_rot)
+                elif joint.id == JointId.FF_PIP:
+                    self._check_joint_limit(joint, self._ff_pip_limit)
+                    self._joint_to_pdo(joint, rpdo.ff_pip)
+                elif joint.id == JointId.FF_MCP:
+                    self._check_joint_limit(joint, self._ff_mcp_limit)
+                    self._joint_to_pdo(joint, rpdo.ff_mcp)
+                elif joint.id == JointId.FF_SWING:
+                    self._check_joint_limit(joint, self._ff_swing_limit)
+                    self._joint_to_pdo(joint, rpdo.ff_swing)
+                elif joint.id == JointId.MF_PIP:
+                    self._check_joint_limit(joint, self._mf_pip_limit)
+                    self._joint_to_pdo(joint, rpdo.mf_pip)
+                elif joint.id == JointId.MF_MCP:
+                    self._check_joint_limit(joint, self._mf_mcp_limit)
+                    self._joint_to_pdo(joint, rpdo.mf_mcp)
+                elif joint.id == JointId.RF_PIP:
+                    self._check_joint_limit(joint, self._rf_pip_limit)
+                    self._joint_to_pdo(joint, rpdo.rf_pip)
+                elif joint.id == JointId.RF_MCP:
+                    self._check_joint_limit(joint, self._rf_mcp_limit)
+                    self._joint_to_pdo(joint, rpdo.rf_mcp)
+                elif joint.id == JointId.LF_PIP:
+                    self._check_joint_limit(joint, self._lf_pip_limit)
+                    self._joint_to_pdo(joint, rpdo.lf_pip)
+                elif joint.id == JointId.LF_MCP:
+                    self._check_joint_limit(joint, self._lf_mcp_limit)
+                    self._joint_to_pdo(joint, rpdo.lf_mcp)
+                else:
+                    logger.warning(f"【Joint】无效的关节ID: {joint.id}")
+                    return False
+            self._client.send_data(rpdo.to_bytes())
+            return True
+        except RuntimeError as e:
+            logger.error(f"Failed to move joints: {e}")
+            return False
 
     def get_joints(self) -> list[Joint]:
         """
         获取所有关节状态及运动信息
 
         Returns:
-        list[Joint]: 连接成功返回True，否则返回False
+        list[Joint]: 连接成功返回True,否则返回False
         """
-        data = self._client.recv_data()
-        print(f"Received data length: {len(data)} bytes")  # 调试信息：打印接收到的数据长度
+        try:
+            data = self._client.recv_data()
+            logger.debug(f"Received data: \n{' '.join(f'{b:02x}' for b in data)}")
+            logger.debug(f"Received data length: {len(data)} bytes")  # 调试信息：打印接收到的数据长度
+
+            if len(data) != 208:
+                logger.warning(f"Data length insufficient. Expected 208 bytes, got {len(data)} bytes")  # 数据长度不足时的提示
+                return []
+            
+            tpdo = Tpdo.from_bytes(data)
+            logger.debug(f"Parsed TPDO:\n" + "\n".join([f"hand: {tpdo.hand}",
+                           f"th_dip: {tpdo.th_dip}", f"th_pip: {tpdo.th_pip}", f"th_mcp: {tpdo.th_mcp}",
+                           f"th_swing: {tpdo.th_swing}",f"th_rot: {tpdo.th_rot}",
+                           f"ff_dip: {tpdo.ff_dip}",f"ff_pip: {tpdo.ff_pip}",f"ff_mcp: {tpdo.ff_mcp}",f"ff_swing: {tpdo.ff_swing}",
+                           f"mf_dip: {tpdo.mf_dip}",f"mf_pip: {tpdo.mf_pip}",f"mf_mcp: {tpdo.mf_mcp}",
+                           f"rf_dip: {tpdo.rf_dip}",f"rf_pip: {tpdo.rf_pip}",f"rf_mcp: {tpdo.rf_mcp}",
+                           f"lf_dip: {tpdo.lf_dip}",f"lf_pip: {tpdo.lf_pip}",f"lf_mcp: {tpdo.lf_mcp}",
+                           f"tac_th: {tpdo.tac_th}",f"tac_ff: {tpdo.tac_ff}",f"tac_mf: {tpdo.tac_mf}",
+                           f"tac_rf: {tpdo.tac_rf}",f"tac_lf: {tpdo.tac_lf}",f"tac_palm: {tpdo.tac_palm}"]))
+            
+            # 定义关节信息映射
+            joint_mappings = [
+                # thumb
+                (JointId.THUMB_DIP, tpdo.th_dip),
+                (JointId.THUMB_PIP, tpdo.th_pip),
+                (JointId.THUMB_MCP, tpdo.th_mcp),
+                (JointId.THUMB_SWING, tpdo.th_swing),
+                (JointId.THUMB_ROTATION, tpdo.th_rot),
+                # ff
+                (JointId.FF_DIP, tpdo.ff_dip),
+                (JointId.FF_PIP, tpdo.ff_pip),
+                (JointId.FF_MCP, tpdo.ff_mcp),
+                (JointId.FF_SWING, tpdo.ff_swing),
+                # mf
+                (JointId.MF_DIP, tpdo.mf_dip),
+                (JointId.MF_PIP, tpdo.mf_pip),
+                (JointId.MF_MCP, tpdo.mf_mcp),
+                # rf
+                (JointId.RF_DIP, tpdo.rf_dip),
+                (JointId.RF_PIP, tpdo.rf_pip),
+                (JointId.RF_MCP, tpdo.rf_mcp),
+                # lf
+                (JointId.LF_DIP, tpdo.lf_dip),
+                (JointId.LF_PIP, tpdo.lf_pip),
+                (JointId.LF_MCP, tpdo.lf_mcp),
+            ]
+            
+            joints = []
+            for joint_id, joint_tpdo in joint_mappings:
+                joints.append(Joint(
+                    id=joint_id,
+                    angle=joint_tpdo.angle,
+                    speed=joint_tpdo.speed,
+                    torque=joint_tpdo.torque
+                ))
+
+            return joints
         
-        if len(data) < 235:
-            print(f"Data length insufficient. Expected at least 235 bytes, got {len(data)} bytes")  # 调试信息：数据长度不足时的提示
+        except RuntimeError as e:
+            logger.error(f"Failed to get joints: {e}")
             return []
-        
-        tpdo = Tpdo.from_bytes(data)
-        print(f"Parsed TPDO: {tpdo}")  # 调试信息：打印解析后的TPDO对象
-        
-        joints = []
-        for i in range(18):
-            joint = Joint(id=i, angle=i)
-            joints.append(joint)
-        
-        print(f"Returning {len(joints)} joints")  # 调试信息：打印返回的关节数量
-        return joints
 
-    def set_light(self, color: tuple = (0, 0, 0), effect: str = 'on', T: int = 1000) -> bool:
-        """
-        设置灯光效果
-
-        Args:
-            color (tuple): 灯颜色(R, G, B)，R:[0~255], G:[0~255], [0~255],
-            effect (str): 灯效，"on":开启灯光, "off":关闭灯光, "flash":灯光闪烁, "breath":呼吸灯
-            T (int): 灯效周期，呼吸的时间范围为[500,2000], 闪烁的时间范围为[100,1000]
-
-        Returns:
-            bool: 成功返回True，失败返回False
-        """
-        if min(color) < 0 or max(color) > 255:
-            return False
-        if effect == 'breath':
-            if T > 2000 or T < 500:
-                return False
-        elif effect == 'flash':
-            if T > 1000 or T < 100:
-                return False
-        # TODO
-        return True
-    # def move_joints(self, th_pip: Optional[Joint] = None, th_mcp: Optional[Joint] = None, th_swing: Optional[Joint] = None, th_rot: Optional[Joint] = None, ff_pip: Optional[Joint] = None, ff_mcp: Optional[Joint] = None, ff_swing: Optional[Joint] = None, mf_pip: Optional[Joint] = None, mf_mcp: Optional[Joint] = None, rf_pip: Optional[Joint] = None, rf_mcp: Optional[Joint] = None, lf_pip: Optional[Joint] = None, lf_mcp: Optional[Joint] = None, ctrl_mode=CtrlMode.POSITION):
-    #     if not self._client._connected:
-    #         return False
-    #     rpdo = Rpdo(mode=ctrl_mode.value)
-    #     # Check joint limit
-    #     if th_pip is not None:
-    #         self._joint_to_pdo(th_pip, rpdo.th_pip)
-    #     if th_mcp is not None:
-    #         self._joint_to_pdo(th_mcp, rpdo.th_mcp)
-    #     if th_swing is not None:
-    #         self._joint_to_pdo(th_swing, rpdo.th_swing)
-    #     if th_rot is not None:
-    #         self._joint_to_pdo(th_rot, rpdo.th_rot)
-    #     if ff_pip is not None:
-    #         self._joint_to_pdo(ff_pip, rpdo.ff_pip)
-    #     if ff_mcp is not None:
-    #         self._joint_to_pdo(ff_mcp, rpdo.ff_mcp)
-    #     if ff_swing is not None:
-    #         self._joint_to_pdo(ff_swing, rpdo.ff_swing)
-    #     if mf_pip is not None:
-    #         self._joint_to_pdo(mf_pip, rpdo.mf_pip)
-    #     if mf_mcp is not None:
-    #         self._joint_to_pdo(mf_mcp, rpdo.mf_mcp)
-    #     if rf_pip is not None:
-    #         self._joint_to_pdo(rf_pip, rpdo.rf_pip)
-    #     if rf_mcp is not None:
-    #         self._joint_to_pdo(rf_mcp, rpdo.rf_mcp)
-    #     if lf_pip is not None:
-    #         self._joint_to_pdo(lf_pip, rpdo.lf_pip)
-    #     if lf_mcp is not None:
-    #         self._joint_to_pdo(lf_mcp, rpdo.lf_mcp)
-    #     self._client._slave.output = rpdo.to_bytes()
-    #     return True

@@ -10,7 +10,7 @@
 ------------------------
 .. code-block:: bash
 
-   pip install xiaoyao
+   python setup.py install
 
 第二步：连接设备
 ------------------------
@@ -27,10 +27,12 @@
    
    # 连接灵巧手设备
    hand.open(CommType.ETHERCAT, "your device id")
+   # 或自动连接您当前的灵巧手设备
+   hand.open(CommType.ETHERCAT,  "auto")
    
    # 获取手部类型（左手/右手）并打印
    hand_type = hand.get_hand_type()
-   print(hand.get_operation_status())
+   print(hand_type.value)
 
 
 使用示例程序
