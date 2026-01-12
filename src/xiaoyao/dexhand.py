@@ -46,6 +46,54 @@ class JointId(enum.IntEnum):
     LF_PIP = 16
     LF_MCP = 17
 
+<<<<<<< HEAD
+=======
+# 触觉传感器枚举
+class TactileSensorId(enum.Enum):
+    THUMB = 'thumb'
+    FOREFINGER = 'forefinger'
+    MIDDLE_FINGER = 'middle_finger'
+    RING_FINGER = 'ring_finger'
+    LITTLE_FINGER = 'little_finger'
+
+@dataclass
+class TactileInfo:
+    """触觉传感器信息数据类"""
+    status: object = None  # TactileSensorStatus
+    resultant_force: list[int] = None  # xyz合力数据
+    distributed_force: list[int] = None  # 分布力数据
+
+    def __post_init__(self):
+        """初始化后设置默认值"""
+        if self.resultant_force is None:
+            self.resultant_force = [0, 0, 0]
+        if self.distributed_force is None:
+            self.distributed_force = []
+
+    def get_force_x(self) -> float:
+        """获取X轴合力"""
+        return self.resultant_force[0] if len(self.resultant_force) > 0 else 0
+
+    def get_force_y(self) -> float:
+        """获取Y轴合力"""
+        return self.resultant_force[1] if len(self.resultant_force) > 1 else 0
+
+    def get_force_z(self) -> float:
+        """获取Z轴合力"""
+        return self.resultant_force[2] if len(self.resultant_force) > 2 else 0
+
+    def get_distributed_force(self) -> list[int]:
+        """获取分布力数据"""
+        return self.distributed_force
+
+    def get_distributed_force_at(self, index: int) -> int:
+        """获取指定索引处的分布力值"""
+        if 0 <= index < len(self.distributed_force):
+            return self.distributed_force[index]
+        else:
+            return 0  # 返回默认值，避免索引错误
+
+>>>>>>> origin/wang_develop
 @dataclass
 class Joint:
     id: int = JointId.THUMB_DIP
@@ -257,18 +305,81 @@ class DexHand(object):
             return False
         return True
 
-    def tactile_reset(self) -> bool:
+    def tactile_restart(self) -> bool:
         """
-        重置（清零）触觉传感器数据
+        重启触觉传感器数据
 
         Returns:
             bool: 重置成功返回True，失败返回False
         """
         try:
-            self._client.sdo_write(0x2004, 0x01, b'\x01')
+            self._client.sdo_write(0x2004, 0x01, b'\x03')
+            # 读取结果区（子索引3）
+            result_data = self._client.sdo_read(0x2004, 0x03)
+            # 检查结果区数据，如果为0则成功，为1则失败
+            if result_data == b'\x00':
+                return True
+            else:
+                return False
         except Exception:
             return False
-        return True
+    
+    def tactile_open(self) -> bool:
+        """
+        打开触觉传感器
+
+        Returns:
+            bool: 打开成功返回True，失败返回False
+        """
+        try:
+            self._client.sdo_write(0x2004, 0x01, b'\x01')
+            # 读取结果区（子索引3）
+            result_data = self._client.sdo_read(0x2004, 0x03)
+            # 检查结果区数据，如果为0则成功，为1则失败
+            if result_data == b'\x00':
+                return True
+            else:
+                return False
+        except Exception:
+            return False
+    
+    def tactile_close(self) -> bool:
+        """
+        关闭触觉传感器
+
+        Returns:
+            bool: 关闭成功返回True，失败返回False
+        """
+        try:
+            self._client.sdo_write(0x2004, 0x01, b'\x02')
+            # 读取结果区（子索引3）
+            result_data = self._client.sdo_read(0x2004, 0x03)
+            # 检查结果区数据，如果为0则成功，为1则失败
+            if result_data == b'\x00':
+                return True
+            else:
+                return False
+        except Exception:
+            return False
+
+    def tactile_zero(self) -> bool:
+        """
+        调零触觉传感器
+
+        Returns:
+            bool: 调零成功返回True，失败返回False
+        """
+        try:
+            self._client.sdo_write(0x2004, 0x01, b'\x04')
+            # 读取结果区（子索引3）
+            result_data = self._client.sdo_read(0x2004, 0x03)
+            # 检查结果区数据，如果为0则成功，为1则失败
+            if result_data == b'\x00':
+                return True
+            else:
+                return False
+        except Exception:
+            return False
 
     def stop(self) -> bool:
         """
@@ -408,8 +519,8 @@ class DexHand(object):
             logger.debug(f"Received data: \n{' '.join(f'{b:02x}' for b in data)}")
             logger.debug(f"Received data length: {len(data)} bytes")  # 调试信息：打印接收到的数据长度
 
-            if len(data) != 208:
-                logger.warning(f"Data length insufficient. Expected 208 bytes, got {len(data)} bytes")  # 数据长度不足时的提示
+            if len(data) != 708:
+                logger.warning(f"Data length insufficient. Expected 708 bytes, got {len(data)} bytes")  # 数据长度不足时的提示
                 return []
             
             tpdo = Tpdo.from_bytes(data)
@@ -420,8 +531,8 @@ class DexHand(object):
                            f"mf_dip: {tpdo.mf_dip}",f"mf_pip: {tpdo.mf_pip}",f"mf_mcp: {tpdo.mf_mcp}",
                            f"rf_dip: {tpdo.rf_dip}",f"rf_pip: {tpdo.rf_pip}",f"rf_mcp: {tpdo.rf_mcp}",
                            f"lf_dip: {tpdo.lf_dip}",f"lf_pip: {tpdo.lf_pip}",f"lf_mcp: {tpdo.lf_mcp}",
-                           f"tac_th: {tpdo.tac_th}",f"tac_ff: {tpdo.tac_ff}",f"tac_mf: {tpdo.tac_mf}",
-                           f"tac_rf: {tpdo.tac_rf}",f"tac_lf: {tpdo.tac_lf}",f"tac_palm: {tpdo.tac_palm}"]))
+                           f"tactile_status: {tpdo.tactile_status}",f"tac_th: {tpdo.thumb_tactile}",f"tac_ff: {tpdo.ff_tactile}",f"tac_mf: {tpdo.mf_tactile}",
+                           f"tac_rf: {tpdo.rf_tactile}",f"tac_lf: {tpdo.lf_tactile}"]))
             
             # 定义关节信息映射
             joint_mappings = [
@@ -465,3 +576,62 @@ class DexHand(object):
             logger.error(f"Failed to get joints: {e}")
             return []
 
+    def get_tactile_data(self):
+        """
+        获取触觉传感器数据
+
+        Returns:
+            dict: 包含各手指触觉传感器数据的字典，键为TactileSensorId枚举，值为TactileInfo对象
+        """
+        try:
+            data = self._client.recv_data()
+            logger.debug(f"Received data: \n{' '.join(f'{b:02x}' for b in data)}")
+            logger.debug(f"Received data length: {len(data)} bytes")
+
+            if len(data) != 708:
+                logger.warning(f"Data length insufficient. Expected 708 bytes, got {len(data)} bytes")
+                return {}
+            
+            tpdo = Tpdo.from_bytes(data)
+            logger.debug(f"Parsed TPDO tactile data:\n" + "\n".join([
+                           f"tactile_status: {tpdo.tactile_status}",
+                           f"thumb_tactile: {tpdo.thumb_tactile}",
+                           f"ff_tactile: {tpdo.ff_tactile}",
+                           f"mf_tactile: {tpdo.mf_tactile}",
+                           f"rf_tactile: {tpdo.rf_tactile}",
+                           f"lf_tactile: {tpdo.lf_tactile}"]))
+            
+            # 返回一个结构化的字典，使用枚举作为键
+            tactile_data = {
+                TactileSensorId.THUMB: TactileInfo(
+                    status=tpdo.tactile_status,
+                    resultant_force=tpdo.thumb_tactile.resultant_force,
+                    distributed_force=tpdo.thumb_tactile.sample_force
+                ),
+                TactileSensorId.FOREFINGER: TactileInfo(
+                    status=tpdo.tactile_status,
+                    resultant_force=tpdo.ff_tactile.resultant_force,
+                    distributed_force=tpdo.ff_tactile.sample_force
+                ),
+                TactileSensorId.MIDDLE_FINGER: TactileInfo(
+                    status=tpdo.tactile_status,
+                    resultant_force=tpdo.mf_tactile.resultant_force,
+                    distributed_force=tpdo.mf_tactile.sample_force
+                ),
+                TactileSensorId.RING_FINGER: TactileInfo(
+                    status=tpdo.tactile_status,
+                    resultant_force=tpdo.rf_tactile.resultant_force,
+                    distributed_force=tpdo.rf_tactile.sample_force
+                ),
+                TactileSensorId.LITTLE_FINGER: TactileInfo(
+                    status=tpdo.tactile_status,
+                    resultant_force=tpdo.lf_tactile.resultant_force,
+                    distributed_force=tpdo.lf_tactile.sample_force
+                )
+            }
+
+            return tactile_data
+        
+        except RuntimeError as e:
+            logger.error(f"Failed to get tactile data: {e}")
+            return []

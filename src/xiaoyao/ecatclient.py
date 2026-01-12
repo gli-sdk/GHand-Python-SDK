@@ -212,7 +212,7 @@ class EthercatClient(object):
             logger.error("Not connected or no slave configured")
             return False
         
-        expected_input_size = 208
+        expected_input_size = 708
         expected_output_size = 80
         
         # 进入初始状态

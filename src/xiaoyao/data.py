@@ -35,10 +35,10 @@ class JointTpdo:
 
 
 @dataclass
-class TactileTpdo:
-    state: int
-    error: int
-    tactile: list[int]  # 存储8个uint8值
+class TactileSensorStatus:
+    """触觉传感器状态类"""
+    state: int = 0  # uint8 状态码
+    error: int = 0  # uint8 错误码
 
     @classmethod
     def from_bytes(cls, data: bytes):
@@ -53,11 +53,76 @@ class TactileTpdo:
         将触觉数据进行缩放处理，获取真实值
         缩放方式:接收到的数据除以10
 
-        Returns:
-            list[float]: 缩放后的触觉数据列表,每个元素为float类型
-        """
-        return [t / 10.0 for t in self.tactile]
+@dataclass
+class ThumbTactileData:
+    """大拇指触觉数据类"""
+    resultant_force: list[int] = field(default_factory=lambda: [0, 0, 0])  # 合力数据 xyz (int16, int16, uint16)
+    sample_force: list[int] = field(default_factory=lambda: [0] * 156)     # 分布力数据 52组xyz
 
+    @classmethod
+    def from_bytes(cls, data: bytes):
+        expected_size = 162  # 6字节合力数据 + 156字节分布力数据
+        if not data or len(data) < expected_size:
+            return cls()
+        
+        # 解析合力数据 (虽然为int16, int16, uint16，但只取低字节为有效值)
+        rf_x_low = struct.unpack_from('<b', data, 0)[0]  # 取低字节作为int8
+        rf_y_low = struct.unpack_from('<b', data, 2)[0]  # 取低字节作为int8
+        rf_z_low = struct.unpack_from('<B', data, 4)[0]  # 取低字节作为uint8
+        resultant_force = [rf_x_low, rf_y_low, rf_z_low]
+        
+        # 解析分布力数据 (52组xyz，其中xy为int8，z为uint8) - 共156字节
+        sample_force = []
+        for i in range(52):
+            offset = 6 + i * 3  # 6字节合力数据偏移
+            x, y, z = struct.unpack_from('<bbB', data, offset)
+            sample_force.extend([x, y, z])
+            
+        return cls(resultant_force=resultant_force, sample_force=sample_force)
+
+@dataclass
+class FingerTactileData:
+    """其余四指触觉数据类"""
+    resultant_force: list[int] = field(default_factory=lambda: [0, 0, 0])  # 合力数据 xyz (int16, int16, uint16)
+    sample_force: list[int] = field(default_factory=lambda: [0] * 93)      # 分布力数据 31组xyz
+
+    @classmethod
+    def from_bytes(cls, data: bytes):
+        expected_size = 99  # 6字节合力数据 + 93字节分布力数据
+        if not data or len(data) < expected_size:
+            return cls()
+        
+        # 解析合力数据 (虽然为int16, int16, uint16，但只取低字节为有效值)
+        rf_x_low = struct.unpack_from('<b', data, 0)[0]  # 取低字节作为int8
+        rf_y_low = struct.unpack_from('<b', data, 2)[0]  # 取低字节作为int8
+        rf_z_low = struct.unpack_from('<B', data, 4)[0]  # 取低字节作为uint8
+        resultant_force = [rf_x_low, rf_y_low, rf_z_low]
+        
+        # 解析分布力数据 (31组xyz，其中xy为int8，z为uint8) - 共93字节
+        sample_force = []
+        for i in range(31):
+            offset = 6 + i * 3  # 6字节合力数据偏移
+            x, y, z = struct.unpack_from('<bbB', data, offset)
+            sample_force.extend([x, y, z])
+            
+        return cls(resultant_force=resultant_force, sample_force=sample_force)
+
+
+
+def _convert_tactile_to_N(tactile_data):
+    """将触觉数据从0.1N单位转换为N单位"""
+    if isinstance(tactile_data, ThumbTactileData):
+        return ThumbTactileData(
+            resultant_force=[round(f * 0.1, 1) for f in tactile_data.resultant_force],
+            sample_force=[round(f * 0.1, 1) for f in tactile_data.sample_force]
+        )
+    elif isinstance(tactile_data, FingerTactileData):
+        return FingerTactileData(
+            resultant_force=[round(f * 0.1, 1) for f in tactile_data.resultant_force],
+            sample_force=[round(f * 0.1, 1) for f in tactile_data.sample_force]
+        )
+    else:
+        return tactile_data
 
 @dataclass
 class Tpdo:
@@ -86,12 +151,12 @@ class Tpdo:
     lf_pip: JointTpdo
     lf_mcp: JointTpdo
     # tactile
-    tac_th: TactileTpdo
-    tac_ff: TactileTpdo
-    tac_mf: TactileTpdo
-    tac_rf: TactileTpdo
-    tac_lf: TactileTpdo
-    tac_palm: TactileTpdo
+    tactile_status: TactileSensorStatus     # 触觉传感器状态
+    thumb_tactile: ThumbTactileData         # 大拇指触觉数据
+    ff_tactile: FingerTactileData           # 食指触觉数据
+    mf_tactile: FingerTactileData           # 中指触觉数据
+    rf_tactile: FingerTactileData           # 无名指触觉数据
+    lf_tactile: FingerTactileData           # 小指触觉数据
 
     @classmethod
     def from_bytes(cls, data: bytes):
@@ -123,12 +188,12 @@ class Tpdo:
                 JointTpdo(0, 0, 0.0, 0, 0),
                 JointTpdo(0, 0, 0.0, 0, 0),
                 # tactile
-                TactileTpdo(0, 0, [0] * 8),
-                TactileTpdo(0, 0, [0] * 8),
-                TactileTpdo(0, 0, [0] * 8),
-                TactileTpdo(0, 0, [0] * 8),
-                TactileTpdo(0, 0, [0] * 8),
-                TactileTpdo(0, 0, [0] * 8)
+                TactileSensorStatus(),
+                ThumbTactileData(),
+                FingerTactileData(),
+                FingerTactileData(),
+                FingerTactileData(),
+                FingerTactileData()
             )
         
         # hand (4 bytes)
@@ -156,15 +221,29 @@ class Tpdo:
         lf_dip = JointTpdo.from_bytes(data[124:132]) # bytes 124-131
         lf_pip = JointTpdo.from_bytes(data[132:140]) # bytes 132-139
         lf_mcp = JointTpdo.from_bytes(data[140:148]) # bytes 140-147
-        # tactile (6 sensors × 10 bytes = 60 bytes)
-        tac_th = TactileTpdo.from_bytes(data[148:158]).scaled_data() # bytes 148-157
-        tac_ff = TactileTpdo.from_bytes(data[158:168]).scaled_data() # bytes 158-167
-        tac_mf = TactileTpdo.from_bytes(data[168:178]).scaled_data() # bytes 168-177
-        tac_rf = TactileTpdo.from_bytes(data[178:188]).scaled_data() # bytes 178-187
-        tac_lf = TactileTpdo.from_bytes(data[188:198]).scaled_data() # bytes 188-197
-        tac_palm = TactileTpdo.from_bytes(data[198:208]).scaled_data()  # bytes 198-207
+        # tactile 31 + 157 + 94*4 = 564 bytes
+        tactile_status = TactileSensorStatus.from_bytes(data[148:150])      # bytes 148-149
+        
+        # 解析触觉数据并转换为N单位
+        thumb_tactile_raw = ThumbTactileData.from_bytes(data[150:312])          # bytes 150-311
+        ff_tactile_raw = FingerTactileData.from_bytes(data[312:411])            # bytes 312-410
+        mf_tactile_raw = FingerTactileData.from_bytes(data[411:510])            # bytes 411-509
+        rf_tactile_raw = FingerTactileData.from_bytes(data[510:609])            # bytes 510-608
+        lf_tactile_raw = FingerTactileData.from_bytes(data[609:708])            # bytes 609-707 (总共560字节触觉数据)
+        
+        # 使用辅助函数转换触觉数据为N单位
+        thumb_tactile = _convert_tactile_to_N(thumb_tactile_raw)
+        ff_tactile = _convert_tactile_to_N(ff_tactile_raw)
+        mf_tactile = _convert_tactile_to_N(mf_tactile_raw)
+        rf_tactile = _convert_tactile_to_N(rf_tactile_raw)
+        lf_tactile = _convert_tactile_to_N(lf_tactile_raw)
 
-        return cls(hand, th_dip, th_pip, th_mcp, th_swing, th_rot, ff_dip, ff_pip, ff_mcp, ff_swing, mf_dip, mf_pip, mf_mcp, rf_dip, rf_pip, rf_mcp, lf_dip, lf_pip, lf_mcp, tac_th, tac_ff, tac_mf, tac_rf, tac_lf, tac_palm)
+        return cls(hand, th_dip, th_pip, th_mcp, th_swing, th_rot,
+                   ff_dip, ff_pip, ff_mcp, ff_swing,
+                   mf_dip, mf_pip, mf_mcp,
+                   rf_dip, rf_pip, rf_mcp,
+                   lf_dip, lf_pip, lf_mcp,
+                   tactile_status, thumb_tactile, ff_tactile, mf_tactile, rf_tactile, lf_tactile)
 
 
 @dataclass

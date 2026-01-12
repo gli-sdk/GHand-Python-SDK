@@ -10,7 +10,7 @@ from .version import __version__
 
 logger_name = "xiaoyao"
 logger = logging.getLogger(logger_name)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(logging.Formatter(
