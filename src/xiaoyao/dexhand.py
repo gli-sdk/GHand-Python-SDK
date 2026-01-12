@@ -148,9 +148,9 @@ class DexHand(object):
         设置关节限制参数
         """
         self._th_pip_limit = (0, math.radians(75))
-        self._th_mcp_limit = (0, math.radians(75))
+        self._th_mcp_limit = (0, math.radians(55))
         self._th_swing_limit = (0, math.radians(90))
-        self._th_rot_limit = (0, math.radians(90))
+        self._th_rot_limit = (math.radians(-30), math.radians(60))
         self._ff_pip_limit = (0, math.radians(75))
         self._ff_mcp_limit = (0, math.radians(70))
         self._ff_swing_limit = (math.radians(-15), math.radians(15))
@@ -174,14 +174,14 @@ class DexHand(object):
             joint.angle = limit[0]
         elif joint.angle > limit[1]:
             joint.angle = limit[1]
-            logger.warning(f"【Joint】关节ID: {joint.id} 角度超出限制范围，已设为最大值 {math.degrees(limit[1]):.2f} 度")
+            logger.warning(f"【Joint】关节ID: {JointId(joint.id).name} 角度超出限制范围，已设为最大值 {math.degrees(limit[1]):.2f} 度")
 
     def open(self, type: CommType = CommType.ETHERCAT, id: str = "auto"):
         """
         打开灵巧手设备连接
 
         Args:
-          type (CommType): 通信类型，默认为ETHERCAT
+          type (CommType): 通信类型，默认为ETHERCATpython examples/3.do_preset_gestrue.py
           id (str): 设备ID，当设置为"auto"时自动搜索设备，默认为"auto"
 
         Returns:

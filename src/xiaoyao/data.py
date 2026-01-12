@@ -42,18 +42,13 @@ class TactileSensorStatus:
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        expected_size = struct.calcsize('<BB8B')  # B(1字节) + B(1字节) + 8B(8字节)
+        expected_size = 2  # 2字节：1字节state + 1字节error
         if len(data) < expected_size:
-            return cls(0, 0, [0] * 8)
-        state, error, *tactile = struct.unpack_from('<BB8B', data, 0)
-        return cls(state, error, tactile)
-    
-    def scaled_data(self) -> list[float]:
-        """
-        将触觉数据进行缩放处理，获取真实值
-        缩放方式:接收到的数据除以10
-        """
-        return [x / 10 for x in self.tactile] if self.tactile else []
+            return cls()
+        
+        # 解析状态和错误码 (uint8, uint8)
+        state, error = struct.unpack_from('<BB', data, 0)
+        return cls(state=state, error=error)
 
 @dataclass
 class ThumbTactileData:
@@ -64,7 +59,7 @@ class ThumbTactileData:
     @classmethod
     def from_bytes(cls, data: bytes):
         expected_size = 162  # 6字节合力数据 + 156字节分布力数据
-        if not data or len(data) < expected_size:
+        if len(data) < expected_size:
             return cls()
         
         # 解析合力数据 (虽然为int16, int16, uint16，但只取低字节为有效值)
@@ -91,7 +86,7 @@ class FingerTactileData:
     @classmethod
     def from_bytes(cls, data: bytes):
         expected_size = 99  # 6字节合力数据 + 93字节分布力数据
-        if not data or len(data) < expected_size:
+        if len(data) < expected_size:
             return cls()
         
         # 解析合力数据 (虽然为int16, int16, uint16，但只取低字节为有效值)
