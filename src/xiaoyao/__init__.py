@@ -5,7 +5,6 @@ import logging
 import time
 
 from .dexhand import DexHand
-from .subscription import SubscriptionManager
 from .version import __version__
 
 logger_name = "xiaoyao"

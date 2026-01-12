@@ -52,6 +52,8 @@ class TactileSensorStatus:
         """
         将触觉数据进行缩放处理，获取真实值
         缩放方式:接收到的数据除以10
+        """
+        return [x / 10 for x in self.tactile] if self.tactile else []
 
 @dataclass
 class ThumbTactileData:

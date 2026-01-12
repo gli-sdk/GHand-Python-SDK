@@ -46,8 +46,6 @@ class JointId(enum.IntEnum):
     LF_PIP = 16
     LF_MCP = 17
 
-<<<<<<< HEAD
-=======
 # 触觉传感器枚举
 class TactileSensorId(enum.Enum):
     THUMB = 'thumb'
@@ -93,7 +91,6 @@ class TactileInfo:
         else:
             return 0  # 返回默认值，避免索引错误
 
->>>>>>> origin/wang_develop
 @dataclass
 class Joint:
     id: int = JointId.THUMB_DIP
