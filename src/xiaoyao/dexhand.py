@@ -4,7 +4,6 @@ import logging
 from typing import Optional
 from dataclasses import dataclass
 from .ecatclient import EthercatClient
-from .subscription import SubscriptionManager
 from .data import JointRpdo, Rpdo, Tpdo
 
 logger = logging.getLogger("xiaoyao")
@@ -46,14 +45,6 @@ class JointId(enum.IntEnum):
     LF_DIP = 15
     LF_PIP = 16
     LF_MCP = 17
-
-
-class LightEffect(enum.Enum):
-    ON = 'on'
-    OFF = "off"
-    BREATH = "breath"
-    FLASH = "flash"
-
 
 @dataclass
 class Joint:
@@ -98,8 +89,6 @@ class DexHand(object):
         self._client = EthercatClient()
         self._hand_type = HandType.UNKNOWN
         self._firmware_version = ""
-        # 传递客户端实例给SubscriptionManager
-        self._sub_manager = SubscriptionManager(self._client)
         self._opened = False
         self._set_joint_limit()
 
@@ -191,49 +180,6 @@ class DexHand(object):
             self._client.disconnect()
         return True
     
-    def subscribe(self, callback):
-        """
-        订阅灵巧手数据更新
-        
-        Args:
-            callback: 回调函数，当有新数据时会被调用
-                     回调函数应接受一个参数：TPDO数据对象
-            
-        Returns:
-            int: 订阅ID，可用于取消订阅
-        """
-        def wrapper(data_bytes, *args, **kwargs):
-            # 将字节数据转换为TPDO对象
-            tpdo = Tpdo.from_bytes(data_bytes)
-            # 调用用户提供的回调函数
-            callback(tpdo)
-            
-        return self._sub_manager.subscribe(wrapper)
-
-    def unsubscribe(self, sub_id):
-        """
-        取消订阅
-        
-        Args:
-            sub_id (int): 订阅ID
-            
-        Returns:
-            bool: 取消成功返回True，否则返回False
-        """
-        return self._sub_manager.unsubscribe(sub_id)
-
-    def start_subscription(self):
-        """
-        手动启动订阅功能
-        """
-        self._sub_manager.start()
-
-    def stop_subscription(self):
-        """
-        停止订阅功能
-        """
-        self._sub_manager.stop()
-
     def get_firmware_version(self):
         """
         获取灵巧手固件版本号
@@ -320,19 +266,6 @@ class DexHand(object):
         """
         try:
             self._client.sdo_write(0x2004, 0x01, b'\x01')
-        except Exception:
-            return False
-        return True
-
-    def motor_self_test(self) -> bool:
-        """
-        电机自检
-
-        Returns:
-            bool: 自检成功返回True，失败返回False
-        """
-        try:
-            self._client.sdo_write(0x2007, 0x00, b'\x01')
         except Exception:
             return False
         return True

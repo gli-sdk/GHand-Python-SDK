@@ -11,7 +11,7 @@ class HandTpdo:
     @classmethod
     def from_bytes(cls, data: bytes):
         expected_size = struct.calcsize('<BBH')
-        if not data or len(data) < expected_size:
+        if len(data) < expected_size:
             return cls(0, 0, 0)
         state, error, temp = struct.unpack_from('<BBH', data, 0)
         return cls(state, error, temp)
@@ -28,7 +28,7 @@ class JointTpdo:
     @classmethod
     def from_bytes(cls, data: bytes):
         expected_size = struct.calcsize('<BBfBB')
-        if not data or len(data) < expected_size:
+        if len(data) < expected_size:
             return cls(0, 0, 0.0, 0, 0)
         state, error, angle, speed, torque = struct.unpack_from('<BBfBB', data, 0)
         return cls(state, error, angle, speed, torque)
@@ -43,7 +43,7 @@ class TactileTpdo:
     @classmethod
     def from_bytes(cls, data: bytes):
         expected_size = struct.calcsize('<BB8B')  # B(1字节) + B(1字节) + 8B(8字节)
-        if not data or len(data) < expected_size:
+        if len(data) < expected_size:
             return cls(0, 0, [0] * 8)
         state, error, *tactile = struct.unpack_from('<BB8B', data, 0)
         return cls(state, error, tactile)
@@ -95,7 +95,7 @@ class Tpdo:
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        if not data:
+        if len(data) < 208:
             # 返回所有字段的默认实例
             return cls(
                 HandTpdo(0, 0, 0),
