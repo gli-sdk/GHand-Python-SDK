@@ -3,3 +3,6 @@ test
 build
 dist
 *.egg-info
+.idea/
+docs/build/
+nul

@@ -172,6 +172,7 @@ class DexHand(object):
         """
         if joint.angle < limit[0]:
             joint.angle = limit[0]
+            logger.warning(f"【Joint】关节ID: {JointId(joint.id).name} 角度超出限制范围，已设为最小值 {math.degrees(limit[0]):.2f} 度")
         elif joint.angle > limit[1]:
             joint.angle = limit[1]
             logger.warning(f"【Joint】关节ID: {JointId(joint.id).name} 角度超出限制范围，已设为最大值 {math.degrees(limit[1]):.2f} 度")
