@@ -157,7 +157,7 @@ class Tpdo:
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        if len(data) < 208:
+        if len(data) < 708:
             # 返回所有字段的默认实例
             return cls(
                 HandTpdo(0, 0, 0),

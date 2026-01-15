@@ -182,7 +182,7 @@ class DexHand(object):
         打开灵巧手设备连接
 
         Args:
-          type (CommType): 通信类型，默认为ETHERCATpython examples/3.do_preset_gestrue.py
+          type (CommType): 通信类型，默认为ETHERCAT
           id (str): 设备ID，当设置为"auto"时自动搜索设备，默认为"auto"
 
         Returns:
@@ -379,36 +379,6 @@ class DexHand(object):
         except Exception:
             return False
 
-    def stop(self) -> bool:
-        """
-        急停-立即停止所有关节运动
-
-        Returns:
-            bool: 成功返回True，失败返回False
-        """
-        try:
-            self._client.sdo_write(0x2007, 0x00, b'\x00')
-        except Exception:
-            return False
-        return True
-
-    def do_preset_gesture(self, gesture: GestureType):
-        """
-        执行预设手势动作
-
-        Args:
-            gesture (GestureType): 手势类型
-
-        Returns:
-            bool: 执行成功返回True，失败返回False
-        """
-        if gesture == GestureType.HAND_OPEN:
-            try:
-                self._client.sdo_write(0x2021, 0x00, b'\x01')
-            except Exception:
-                return False
-        return True
-
     def get_hand_type(self) -> HandType:
         """
         获取手的类型
@@ -445,7 +415,7 @@ class DexHand(object):
 
         Args:
           joints (list[Joint]): 关节控制指令
-          mode (int, optional): 模式选择。0:位置模式;1:力矩模式。默认为0
+          mode (int, optional): 模式选择。0:位置模式;1:力矩模式;2:速度模式。默认为0
           stop (int, optional): 停止选择。0:运动;1:停止所有关节。默认为0
 
         Returns:
