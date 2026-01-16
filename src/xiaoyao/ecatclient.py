@@ -170,9 +170,13 @@ class EthercatClient(object):
         Returns:
             list[str]: 返回网络接口设备ID列表
         """
+        import platform
         ids = netifaces.interfaces()
-        for i, v in enumerate(ids):
-            ids[i] = "\\Device\\NPF_" + v
+        # Linux 上直接使用接口名，Windows 需要 NPF_ 前缀
+        if platform.system() == 'Windows':
+            for i, v in enumerate(ids):
+                ids[i] = "\\Device\\NPF_" + v
+        # Linux/macOS: 直接使用接口名，如 eth0, ens33 等
         return ids
     def connect(self, id):
         """
