@@ -1,5 +1,6 @@
 from enum import IntEnum
 
+
 class ErrorCode(IntEnum):
     SUCCESS = 0
     # Motor

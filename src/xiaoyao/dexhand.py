@@ -1,12 +1,12 @@
 import enum
 import math
 import logging
-from typing import Optional
 from dataclasses import dataclass
 from .ecatclient import EthercatClient
 from .data import JointRpdo, Rpdo, Tpdo
 
 logger = logging.getLogger("xiaoyao")
+
 
 class HandType(enum.Enum):
     UNKNOWN = "unknown"
@@ -53,6 +53,7 @@ class TactileSensorId(enum.Enum):
     MIDDLE_FINGER = 'middle_finger'
     RING_FINGER = 'ring_finger'
     LITTLE_FINGER = 'little_finger'
+
 
 @dataclass
 class TactileInfo:
@@ -101,26 +102,27 @@ class Joint:
     def create_joint_positions(joint_angles_dict):
         """
         根据关节角度字典创建关节列表
-        
+
         Args:
             joint_angles_dict: 字典,键为JointId,值为角度值(弧度)
-        
+
         Returns:
             list: Joint对象列表
         """
         joints = []
         default_speed = 100
         default_torque = 100
-        
+
         for joint_id, angle in joint_angles_dict.items():
             joints.append(Joint(
-                id=joint_id, 
-                angle=angle, 
-                speed=default_speed, 
+                id=joint_id,
+                angle=angle,
+                speed=default_speed,
                 torque=default_torque
             ))
-        
+
         return joints
+
 
 class GestureType(enum.Enum):
     HAND_OPEN = "hand_open"
@@ -172,10 +174,39 @@ class DexHand(object):
         """
         if joint.angle < limit[0]:
             joint.angle = limit[0]
-            logger.warning(f"【Joint】关节ID: {JointId(joint.id).name} 角度超出限制范围，已设为最小值 {math.degrees(limit[0]):.2f} 度")
+            logger.warning(
+                f"【Joint】关节ID: {JointId(joint.id).name} "
+                f"角度超出限制范围，已设为最小值 {math.degrees(limit[0]):.2f} 度"
+            )
         elif joint.angle > limit[1]:
             joint.angle = limit[1]
-            logger.warning(f"【Joint】关节ID: {JointId(joint.id).name} 角度超出限制范围，已设为最大值 {math.degrees(limit[1]):.2f} 度")
+            logger.warning(
+                f"【Joint】关节ID: {JointId(joint.id).name} "
+                f"角度超出限制范围，已设为最大值 {math.degrees(limit[1]):.2f} 度"
+            )
+
+    def get_connectable_devices(self) -> list[str]:
+        """
+        获取可连接的设备列表
+
+        Returns:
+            list[str]: 返回可连接设备的网络接口ID列表
+        """
+        connected_interfaces = []
+        id_list = self._client.search()
+
+        for iface_id in id_list:
+            connected = self._client.connect(iface_id)
+            if connected:
+                connected_interfaces.append(iface_id)
+                self._client.disconnect()
+
+        if connected_interfaces:
+            logger.info("可连接的设备:\n" + "\n".join([f"{id}" for id in connected_interfaces]))
+        else:
+            logger.warning("未找到可连接的设备")
+
+        return connected_interfaces
 
     def open(self, type: CommType = CommType.ETHERCAT, id: str = "auto"):
         """
@@ -225,7 +256,7 @@ class DexHand(object):
         if self._opened:
             self._client.disconnect()
         return True
-    
+
     def get_firmware_version(self):
         """
         获取灵巧手固件版本号
@@ -237,7 +268,7 @@ class DexHand(object):
             self._firmware_version = self._client.sdo_read(
                 0x100A, 0x00).decode('utf-8')
         return self._firmware_version
-    
+
     def get_device_name(self):
         """
         获取设备名
@@ -250,7 +281,7 @@ class DexHand(object):
         except Exception:
             return ""
         return device_name
-    
+
     def get_hardware_version(self):
         """
         获取硬件版本号
@@ -270,7 +301,7 @@ class DexHand(object):
 
         Returns:
             str: 获取成功返回产品序列号，失败返回空字符串""
-        """        
+        """
         try:
             serial_number = self._client.sdo_read(0x1018, 0x04)
         except Exception:
@@ -321,7 +352,7 @@ class DexHand(object):
                 return False
         except Exception:
             return False
-    
+
     def tactile_open(self) -> bool:
         """
         打开触觉传感器
@@ -340,7 +371,7 @@ class DexHand(object):
                 return False
         except Exception:
             return False
-    
+
     def tactile_close(self) -> bool:
         """
         关闭触觉传感器
@@ -492,16 +523,28 @@ class DexHand(object):
                 return []
             
             tpdo = Tpdo.from_bytes(data)
-            logger.debug(f"Parsed TPDO:\n" + "\n".join([f"hand: {tpdo.hand}",
-                           f"th_dip: {tpdo.th_dip}", f"th_pip: {tpdo.th_pip}", f"th_mcp: {tpdo.th_mcp}",
-                           f"th_swing: {tpdo.th_swing}",f"th_rot: {tpdo.th_rot}",
-                           f"ff_dip: {tpdo.ff_dip}",f"ff_pip: {tpdo.ff_pip}",f"ff_mcp: {tpdo.ff_mcp}",f"ff_swing: {tpdo.ff_swing}",
-                           f"mf_dip: {tpdo.mf_dip}",f"mf_pip: {tpdo.mf_pip}",f"mf_mcp: {tpdo.mf_mcp}",
-                           f"rf_dip: {tpdo.rf_dip}",f"rf_pip: {tpdo.rf_pip}",f"rf_mcp: {tpdo.rf_mcp}",
-                           f"lf_dip: {tpdo.lf_dip}",f"lf_pip: {tpdo.lf_pip}",f"lf_mcp: {tpdo.lf_mcp}",
-                           f"tactile_status: {tpdo.tactile_status}",f"tac_th: {tpdo.thumb_tactile}",f"tac_ff: {tpdo.ff_tactile}",f"tac_mf: {tpdo.mf_tactile}",
-                           f"tac_rf: {tpdo.rf_tactile}",f"tac_lf: {tpdo.lf_tactile}"]))
-            
+            logger.debug(
+                "Parsed TPDO:\n" + "\n".join(
+                    [f"hand: {tpdo.hand}",
+                     f"th_dip: {tpdo.th_dip}", f"th_pip: {tpdo.th_pip}",
+                     f"th_mcp: {tpdo.th_mcp}",
+                     f"th_swing: {tpdo.th_swing}", f"th_rot: {tpdo.th_rot}",
+                     f"ff_dip: {tpdo.ff_dip}", f"ff_pip: {tpdo.ff_pip}",
+                     f"ff_mcp: {tpdo.ff_mcp}", f"ff_swing: {tpdo.ff_swing}",
+                     f"mf_dip: {tpdo.mf_dip}", f"mf_pip: {tpdo.mf_pip}",
+                     f"mf_mcp: {tpdo.mf_mcp}",
+                     f"rf_dip: {tpdo.rf_dip}", f"rf_pip: {tpdo.rf_pip}",
+                     f"rf_mcp: {tpdo.rf_mcp}",
+                     f"lf_dip: {tpdo.lf_dip}", f"lf_pip: {tpdo.lf_pip}",
+                     f"lf_mcp: {tpdo.lf_mcp}",
+                     f"tactile_status: {tpdo.tactile_status}",
+                     f"tac_th: {tpdo.thumb_tactile}",
+                     f"tac_ff: {tpdo.ff_tactile}",
+                     f"tac_mf: {tpdo.mf_tactile}",
+                     f"tac_rf: {tpdo.rf_tactile}", f"tac_lf: {tpdo.lf_tactile}"]
+                )
+            )
+
             # 定义关节信息映射
             joint_mappings = [
                 # thumb
@@ -539,7 +582,7 @@ class DexHand(object):
                 ))
 
             return joints
-        
+
         except RuntimeError as e:
             logger.error(f"Failed to get joints: {e}")
             return []
@@ -559,16 +602,19 @@ class DexHand(object):
             if len(data) != 708:
                 logger.warning(f"Data length insufficient. Expected 708 bytes, got {len(data)} bytes")
                 return {}
-            
+
             tpdo = Tpdo.from_bytes(data)
-            logger.debug(f"Parsed TPDO tactile data:\n" + "\n".join([
-                           f"tactile_status: {tpdo.tactile_status}",
-                           f"thumb_tactile: {tpdo.thumb_tactile}",
-                           f"ff_tactile: {tpdo.ff_tactile}",
-                           f"mf_tactile: {tpdo.mf_tactile}",
-                           f"rf_tactile: {tpdo.rf_tactile}",
-                           f"lf_tactile: {tpdo.lf_tactile}"]))
-            
+            logger.debug(
+                "Parsed TPDO tactile data:\n" + "\n".join(
+                    [f"tactile_status: {tpdo.tactile_status}",
+                     f"thumb_tactile: {tpdo.thumb_tactile}",
+                     f"ff_tactile: {tpdo.ff_tactile}",
+                     f"mf_tactile: {tpdo.mf_tactile}",
+                     f"rf_tactile: {tpdo.rf_tactile}",
+                     f"lf_tactile: {tpdo.lf_tactile}"]
+                )
+            )
+
             # 返回一个结构化的字典，使用枚举作为键
             tactile_data = {
                 TactileSensorId.THUMB: TactileInfo(
@@ -599,7 +645,7 @@ class DexHand(object):
             }
 
             return tactile_data
-        
+
         except RuntimeError as e:
             logger.error(f"Failed to get tactile data: {e}")
             return []

@@ -2,10 +2,6 @@ import sys
 if sys.version_info < (3, 10):
     sys.exit("xiaoyao-sdk requires Python 3.8 or higher")
 import logging
-import time
-
-from .dexhand import DexHand
-from .version import __version__
 
 logger_name = "xiaoyao"
 logger = logging.getLogger(logger_name)

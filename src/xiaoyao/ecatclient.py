@@ -6,12 +6,14 @@ import netifaces
 
 logger = logging.getLogger("xiaoyao")
 
-class EthercatClient(object):
-    _instance_lock = threading.Lock()
 
+class EthercatClient(object):
     def __init__(self):
         """
         初始化EtherCAT客户端对象
+
+        注意：已移除单例模式，每个 DexHand 实例都有自己独立的 EthercatClient
+        这样可以支持多个网络接口同时连接不同的设备
         """
         self._master = pysoem.Master()
         self._master.in_op = False
@@ -25,24 +27,6 @@ class EthercatClient(object):
         self._connection_lost = False
         # 线程安全锁
         self._data_lock = threading.RLock()
-        
-    def __new__(cls, *args, **kwargs):
-        """
-        创建单例实例
-
-        Args:
-            cls: 类对象
-            *args: 可变位置参数
-            **kwargs: 可变关键字参数
-
-        Returns:
-            EthercatClient: 返回EthercatClient类的单例实例
-        """
-        if not hasattr(cls, '_instance'):
-            with cls._instance_lock:
-                if not hasattr(cls, '_instance'):
-                    cls._instance = super().__new__(cls)
-        return cls._instance
 
     @staticmethod
     def _check_slave(slave):
@@ -81,7 +65,7 @@ class EthercatClient(object):
         # 添加计数器用于跟踪无效工作计数器的数量
         invalid_wkc_count = 0
         max_invalid_wkc_count = 30
-        
+
         while not self._pd_thread_stop_event.is_set():
             try:
                 with self._data_lock:
@@ -159,7 +143,7 @@ class EthercatClient(object):
             if self._slave is not None:
                 logger.debug(f"Sending {len(data)} bytes: \n{' '.join(f'{b:02x}' for b in data)}")
                 self._slave.output = data
-                logger.debug(f"发送 PDO 数据成功")
+                logger.debug("发送 PDO 数据成功")
             else:
                 logger.warning("No slave connected")
 
@@ -174,10 +158,11 @@ class EthercatClient(object):
         ids = netifaces.interfaces()
         # Linux 上直接使用接口名，Windows 需要 NPF_ 前缀
         if platform.system() == 'Windows':
-            for i, v in enumerate(ids):
-                ids[i] = "\\Device\\NPF_" + v
+            for i in range(len(ids)):
+                ids[i] = "\\Device\\NPF_" + ids[i]
         # Linux/macOS: 直接使用接口名，如 eth0, ens33 等
         return ids
+
     def connect(self, id):
         """
         连接指定ID的设备
@@ -204,7 +189,7 @@ class EthercatClient(object):
         except Exception as e:
             logger.error(f"Error connecting to device {id}: {e}")
             return False
-              
+
     def run(self):
         """
         启动EtherCAT主站并进入操作状态
@@ -215,14 +200,14 @@ class EthercatClient(object):
         if not self._connected or self._slave is None:
             logger.error("Not connected or no slave configured")
             return False
-        
+
         expected_input_size = 708
         expected_output_size = 80
-        
+
         # 进入初始状态
         if self._master.state != pysoem.INIT_STATE:
             self._master.state = pysoem.INIT_STATE
-        
+
         # 配置映射并等待完成
         try:
             # 确保从站在INIT状态才能进行映射
@@ -248,10 +233,18 @@ class EthercatClient(object):
                 self._master.config_map()
                 logger.debug(f"master state: {self._master.state}")
                 
-                if len(slave.input) != expected_input_size or len(slave.output) != expected_output_size:
+                if len(slave.input) != expected_input_size or len(
+                    slave.output
+                ) != expected_output_size:
                     logger.error("Expected size error!")
-                    logger.error(f"Expected input size: {expected_input_size}, actual input size: {len(slave.input)}")
-                    logger.error(f"Expected output size: {expected_output_size}, actual output size: {len(slave.output)}")
+                    logger.error(
+                        f"Expected input size: {expected_input_size}, "
+                        f"actual input size: {len(slave.input)}"
+                    )
+                    logger.error(
+                        f"Expected output size: {expected_output_size}, "
+                        f"actual output size: {len(slave.output)}"
+                    )
             else:
                 logger.warning("No slaves found")
                 self._master.close()
@@ -260,15 +253,19 @@ class EthercatClient(object):
             logger.error(f"Failed to configure PDO mapping: {e}")
             self._master.close()
             return False
-        
-        
-        if self._master.state_check(pysoem.SAFEOP_STATE, timeout=500_000) != pysoem.SAFEOP_STATE:
+
+        if self._master.state_check(
+            pysoem.SAFEOP_STATE, timeout=500_000
+        ) != pysoem.SAFEOP_STATE:
             logger.error("Failed to enter SAFEOP state")
             for i, slave in enumerate(self._master.slaves):
                 logger.error(f'Slave {i}: {slave.name}')
                 logger.error(f'  Current state: {slave.state}')
                 logger.error(f'  Expected state: {pysoem.SAFEOP_STATE}')
-                logger.error(f'  AL status code: {hex(slave.al_status)} ({pysoem.al_status_code_to_string(slave.al_status)})')
+                logger.error(
+                    f'  AL status code: {hex(slave.al_status)} '
+                    f'({pysoem.al_status_code_to_string(slave.al_status)})'
+                )
                 logger.error(f'  Input size: {len(slave.input)} bytes')
                 logger.error(f'  Output size: {len(slave.output)} bytes')
             self._master.close()
@@ -277,7 +274,7 @@ class EthercatClient(object):
         # 设置OP状态
         self._master.state = pysoem.OP_STATE
         self._master.write_state()
-        
+
         # 启动处理线程
         self.check_thread = threading.Thread(target=self._check_thread)
         self.check_thread.daemon = True
@@ -285,7 +282,7 @@ class EthercatClient(object):
         self.proc_thread = threading.Thread(target=self._processdata_thread)
         self.proc_thread.daemon = True
         self.proc_thread.start()
-        
+
         # 等待进入OP状态，增加超时时间
         self._master.read_state()  # 刷新状态
         if self._master.state_check(pysoem.OP_STATE, timeout=500_000) != pysoem.OP_STATE:
@@ -301,9 +298,9 @@ class EthercatClient(object):
                 self.check_thread.join(timeout=thread_join_timeout)
             self._master.close()
             return False
-                
+
         self._master.in_op = True
-        
+
         return True
 
     def disconnect(self):
@@ -340,14 +337,15 @@ class EthercatClient(object):
                     logger.info("Master closed")
                 self._slave = None
                 self._connected = False
+
     def sdo_read(self, index, subindex=0):
         """
         读取SDO对象字典中的值
-        
+
         Args:
             index: 对象字典索引
             subindex: 子索引，默认为0
-        
+
         Returns:
             读取到的数据
         """
@@ -359,7 +357,7 @@ class EthercatClient(object):
     def sdo_write(self, index, subindex, value):
         """
         写入SDO对象字典中的值
-        
+
         Args:
             index: 对象字典索引
             subindex: 子索引
@@ -372,4 +370,3 @@ class EthercatClient(object):
             if self._slave is None:
                 raise RuntimeError("No slave connected")
             return self._slave.sdo_write(index, subindex, value)
-        
