@@ -5,6 +5,7 @@ from typing import Optional
 from dataclasses import dataclass
 from .ecatclient import EthercatClient
 from .data import JointRpdo, Rpdo, Tpdo
+from .error import State, ErrorCode
 
 logger = logging.getLogger("xiaoyao")
 
@@ -97,7 +98,18 @@ class Joint:
     angle: float = 0.0
     speed: float = 0.0
     torque: float = 0.0
+    state: State = State.STOPPED  # 关节状态
+    error: ErrorCode = ErrorCode.NO_ERROR  # 错误码
 
+
+@dataclass
+class HandInfo:
+    """手部状态信息"""
+    state: State = State.STOPPED  # 手部状态
+    error: ErrorCode = ErrorCode.NO_ERROR  # 错误码
+    temp: int = 0  # 温度
+
+    @staticmethod
     def create_joint_positions(joint_angles_dict):
         """
         根据关节角度字典创建关节列表
@@ -121,9 +133,6 @@ class Joint:
             ))
         
         return joints
-
-class GestureType(enum.Enum):
-    HAND_OPEN = "hand_open"
 
 
 class DexHand(object):
@@ -397,6 +406,7 @@ class DexHand(object):
             elif type == 0x02:
                 self._hand_type = HandType.RIGHT_HAND
         return self._hand_type
+
     def _joint_to_pdo(self, joint: Joint, pdo: JointRpdo):
         """
         将Joint对象转换为PDO对象
@@ -531,18 +541,62 @@ class DexHand(object):
             
             joints = []
             for joint_id, joint_tpdo in joint_mappings:
-                joints.append(Joint(
-                    id=joint_id,
-                    angle=joint_tpdo.angle,
-                    speed=joint_tpdo.speed,
-                    torque=joint_tpdo.torque
-                ))
+                # 检查状态并记录异常（state == 2 或 3 为错误状态，或 error != 0）
+                if joint_tpdo.error != 0 or joint_tpdo.state in [2, 3]:
+                    logger.warning(
+                        f"关节错误 - ID: {JointId(joint_id).name}, State: {joint_tpdo.state}, Error: {joint_tpdo.error}"
+                    )
+
+                joints.append(
+                    Joint(
+                        id=joint_id,
+                        angle=joint_tpdo.angle,
+                        speed=joint_tpdo.speed,
+                        torque=joint_tpdo.torque,
+                        state=joint_tpdo.state,
+                        error=joint_tpdo.error,
+                    )
+                )
 
             return joints
         
         except RuntimeError as e:
             logger.error(f"Failed to get joints: {e}")
             return []
+
+    def get_hand_info(self) -> HandInfo:
+        """
+        获取手部状态信息
+
+        Returns:
+            HandInfo: 手部状态信息对象，包含 state（状态）、error（错误码）、temp（温度）
+        """
+        try:
+            data = self._client.recv_data()
+            logger.debug(f"Received data: \n{' '.join(f'{b:02x}' for b in data)}")
+            logger.debug(f"Received data length: {len(data)} bytes")
+
+            if len(data) != 708:
+                logger.warning(f"Data length insufficient. Expected 708 bytes, got {len(data)} bytes")
+                return HandInfo()
+
+            tpdo = Tpdo.from_bytes(data)
+
+            # 检查手部状态并记录异常
+            if tpdo.hand.error != 0 or tpdo.hand.state in [2, 3]:
+                logger.warning(
+                    f"手部错误 - State: {tpdo.hand.state}, Error: {tpdo.hand.error}, Temp: {tpdo.hand.temp}"
+                )
+
+            return HandInfo(
+                state=tpdo.hand.state,
+                error=tpdo.hand.error,
+                temp=tpdo.hand.temp
+            )
+
+        except RuntimeError as e:
+            logger.error(f"Failed to get hand info: {e}")
+            return HandInfo()
 
     def get_tactile_data(self):
         """

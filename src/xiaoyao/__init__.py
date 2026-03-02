@@ -4,7 +4,7 @@ if sys.version_info < (3, 10):
 import logging
 import time
 
-from .dexhand import DexHand
+from .dexhand import DexHand, Joint, HandInfo
 from .version import __version__
 
 logger_name = "xiaoyao"

@@ -1,7 +1,15 @@
 from enum import IntEnum
 
+
+class State(IntEnum):
+    STOPPED = 0  # 停止
+    RUNNING = 1  # 运行中
+    ABNORMAL_RUNNING = 2  # 异常运行
+    PROTECTIVE_STOP = 3  # 保护性停止
+
+
 class ErrorCode(IntEnum):
-    SUCCESS = 0
+    NO_ERROR = 0  # 无错误
     # Motor
     HIGH_CURRENT = 1
     ENCODER_ERROR = 2
