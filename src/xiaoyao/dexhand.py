@@ -255,6 +255,7 @@ class DexHand(object):
         """
         if self._opened:
             self._client.disconnect()
+            self._opened = False
         return True
 
     def get_firmware_version(self):
@@ -333,25 +334,6 @@ class DexHand(object):
         except Exception:
             return False
         return True
-
-    def tactile_restart(self) -> bool:
-        """
-        重启触觉传感器数据
-
-        Returns:
-            bool: 重置成功返回True，失败返回False
-        """
-        try:
-            self._client.sdo_write(0x2004, 0x01, b'\x03')
-            # 读取结果区（子索引3）
-            result_data = self._client.sdo_read(0x2004, 0x03)
-            # 检查结果区数据，如果为0则成功，为1则失败
-            if result_data == b'\x00':
-                return True
-            else:
-                return False
-        except Exception:
-            return False
 
     def tactile_open(self) -> bool:
         """

@@ -319,6 +319,11 @@ class EthercatClient(object):
                 self.proc_thread.join(timeout=thread_join_timeout)
             if hasattr(self, 'check_thread') and self.check_thread.is_alive():
                 self.check_thread.join(timeout=thread_join_timeout)
+
+            # 重置线程停止事件，为下次连接做准备
+            self._pd_thread_stop_event.clear()
+            self._ch_thread_stop_event.clear()
+
             with self._data_lock:
                 # 先将从站切换为init状态，再关闭主站
                 try:
@@ -337,6 +342,12 @@ class EthercatClient(object):
                     logger.info("Master closed")
                 self._slave = None
                 self._connected = False
+
+                # 重置所有状态标志，为下次连接做准备
+                self._actual_wkc = 0
+                self._connection_lost = False
+                self._master.in_op = False
+                self._master.do_check_state = False
 
     def sdo_read(self, index, subindex=0):
         """

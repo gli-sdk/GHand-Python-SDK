@@ -19,5 +19,8 @@ def main():
     logger.info(f"Serial num:{int.from_bytes(serial_num, 'little')};")
     logger.info(f"hand temperature:{hand_temperature};")
 
+    # 关闭连接
+    hand.close()
+
 if __name__ == "__main__":
     main()
