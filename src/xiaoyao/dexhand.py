@@ -4,6 +4,7 @@ import logging
 from typing import Optional
 from dataclasses import dataclass
 from .ecatclient import EthercatClient
+from .subscription import SubscriptionManager
 from .data import JointRpdo, Rpdo, Tpdo
 from .error import State, ErrorCode
 
@@ -144,6 +145,8 @@ class DexHand(object):
         self._client = EthercatClient()
         self._hand_type = HandType.UNKNOWN
         self._firmware_version = ""
+        # 传递客户端实例给SubscriptionManager
+        self._sub_manager = SubscriptionManager(self._client)
         self._opened = False
         self._set_joint_limit()
 
@@ -233,6 +236,7 @@ class DexHand(object):
         Returns:
           bool: 关闭成功返回True，失败返回False
         """
+        self._sub_manager.stop()
         if self._opened:
             self._client.disconnect()
             logger.info("Disconnected from device")
@@ -270,18 +274,6 @@ class DexHand(object):
             bool: 取消成功返回True，否则返回False
         """
         return self._sub_manager.unsubscribe(sub_id)
-
-    def start_subscription(self):
-        """
-        手动启动订阅功能
-        """
-        self._sub_manager.start()
-
-    def stop_subscription(self):
-        """
-        停止订阅功能
-        """
-        self._sub_manager.stop()
 
     def get_firmware_version(self):
         """
@@ -342,7 +334,6 @@ class DexHand(object):
             bool: 清除成功返回True，失败返回False
         """
         try:
-            logger.debug("Clearing fault via SDO (0x2002)")
             self._client.sdo_write(0x2002, 0x01, b'\x01')
             logger.info("Fault cleared successfully")
         except Exception as e:
@@ -358,7 +349,6 @@ class DexHand(object):
             bool: 初始化成功返回True，失败返回False
         """
         try:
-            logger.debug("Initializing joints via SDO (0x2003)")
             self._client.sdo_write(0x2003, 0x01, b'\x01')
             logger.info("Joint initialization completed successfully")
         except Exception as e:
