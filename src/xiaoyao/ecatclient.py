@@ -10,12 +10,14 @@ import platform
 
 logger = logging.getLogger("xiaoyao.ecatclient")
 
-class EthercatClient(object):
-    _instance_lock = threading.Lock()
 
+class EthercatClient(object):
     def __init__(self):
         """
         初始化EtherCAT客户端对象
+
+        注意：已移除单例模式，每个 DexHand 实例都有自己独立的 EthercatClient
+        这样可以支持多个网络接口同时连接不同的设备
         """
         self._master = pysoem.Master()
         self._master.in_op = False
@@ -274,11 +276,16 @@ class EthercatClient(object):
             list[str]: 返回网络接口设备ID列表
         """
         logger.info("Searching for network interfaces...")
+        import platform
         ids = netifaces.interfaces()
-        for i, v in enumerate(ids):
-            ids[i] = "\\Device\\NPF_" + v
+        # Linux 上直接使用接口名，Windows 需要 NPF_ 前缀
+        if platform.system() == 'Windows':
+            for i in range(len(ids)):
+                ids[i] = "\\Device\\NPF_" + ids[i]
+        # Linux/macOS: 直接使用接口名，如 eth0, ens33 等
         logger.info(f"Found {len(ids)} network interface(s)")
         return ids
+
     def connect(self, id):
         """
         连接指定ID的设备
@@ -356,11 +363,20 @@ class EthercatClient(object):
                     return False
 
                 self._master.config_map()
-
-                if len(slave.input) != expected_input_size or len(slave.output) != expected_output_size:
-                    logger.debug("PDO size mismatch")
-                    logger.debug(f"Expected input size: {expected_input_size}, actual input size: {len(slave.input)}")
-                    logger.debug(f"Expected output size: {expected_output_size}, actual output size: {len(slave.output)}")
+                logger.debug(f"master state: {self._master.state}")
+                
+                if len(slave.input) != expected_input_size or len(
+                    slave.output
+                ) != expected_output_size:
+                    logger.error("Expected size error!")
+                    logger.error(
+                        f"Expected input size: {expected_input_size}, "
+                        f"actual input size: {len(slave.input)}"
+                    )
+                    logger.error(
+                        f"Expected output size: {expected_output_size}, "
+                        f"actual output size: {len(slave.output)}"
+                    )
             else:
                 logger.warning("No slaves found")
                 self._master.close()
@@ -371,14 +387,18 @@ class EthercatClient(object):
             return False
 
         if self._master.state_check(pysoem.SAFEOP_STATE, timeout=500_000) != pysoem.SAFEOP_STATE:
+
             logger.error("Failed to enter SAFEOP state")
             for i, slave in enumerate(self._master.slaves):
-                logger.debug(f'Slave {i}: {slave.name}')
-                logger.debug(f'  Current state: {slave.state}')
-                logger.debug(f'  Expected state: {pysoem.SAFEOP_STATE}')
-                logger.debug(f'  AL status code: {hex(slave.al_status)} ({pysoem.al_status_code_to_string(slave.al_status)})')
-                logger.debug(f'  Input size: {len(slave.input)} bytes')
-                logger.debug(f'  Output size: {len(slave.output)} bytes')
+                logger.error(f'Slave {i}: {slave.name}')
+                logger.error(f'  Current state: {slave.state}')
+                logger.error(f'  Expected state: {pysoem.SAFEOP_STATE}')
+                logger.error(
+                    f'  AL status code: {hex(slave.al_status)} '
+                    f'({pysoem.al_status_code_to_string(slave.al_status)})'
+                )
+                logger.error(f'  Input size: {len(slave.input)} bytes')
+                logger.error(f'  Output size: {len(slave.output)} bytes')
             self._master.close()
             return False
 
@@ -430,6 +450,11 @@ class EthercatClient(object):
                 self.proc_thread.join(timeout=thread_join_timeout)
             if hasattr(self, 'check_thread') and self.check_thread.is_alive():
                 self.check_thread.join(timeout=thread_join_timeout)
+
+            # 重置线程停止事件，为下次连接做准备
+            self._pd_thread_stop_event.clear()
+            self._ch_thread_stop_event.clear()
+
             with self._data_lock:
                 # 先将从站切换为init状态，再关闭主站
                 try:
@@ -449,16 +474,23 @@ class EthercatClient(object):
                 self._slave = None
                 self._connected = False
 
-        # 释放设备独占锁
-        self._release_lock()
+                # 释放设备独占锁
+                self._release_lock()
+
+                # 重置所有状态标志，为下次连接做准备
+                self._actual_wkc = 0
+                self._connection_lost = False
+                self._master.in_op = False
+                self._master.do_check_state = False
+
     def sdo_read(self, index, subindex=0):
         """
         读取SDO对象字典中的值
-        
+
         Args:
             index: 对象字典索引
             subindex: 子索引，默认为0
-        
+
         Returns:
             读取到的数据
         """
@@ -470,7 +502,7 @@ class EthercatClient(object):
     def sdo_write(self, index, subindex, value):
         """
         写入SDO对象字典中的值
-        
+
         Args:
             index: 对象字典索引
             subindex: 子索引

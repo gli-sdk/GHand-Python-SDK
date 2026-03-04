@@ -1,7 +1,6 @@
 import enum
 import math
 import logging
-from typing import Optional
 from dataclasses import dataclass
 from .ecatclient import EthercatClient
 from .subscription import SubscriptionManager
@@ -56,6 +55,7 @@ class TactileSensorId(enum.Enum):
     MIDDLE_FINGER = 'middle_finger'
     RING_FINGER = 'ring_finger'
     LITTLE_FINGER = 'little_finger'
+
 
 @dataclass
 class TactileInfo:
@@ -115,25 +115,25 @@ class Joint:
     def create_joint_positions(joint_angles_dict):
         """
         根据关节角度字典创建关节列表
-        
+
         Args:
             joint_angles_dict: 字典,键为JointId,值为角度值(弧度)
-        
+
         Returns:
             list: Joint对象列表
         """
         joints = []
         default_speed = 100
         default_torque = 100
-        
+
         for joint_id, angle in joint_angles_dict.items():
             joints.append(Joint(
-                id=joint_id, 
-                angle=angle, 
-                speed=default_speed, 
+                id=joint_id,
+                angle=angle,
+                speed=default_speed,
                 torque=default_torque
             ))
-        
+
         return joints
 
 
@@ -189,6 +189,29 @@ class DexHand(object):
         elif joint.angle > limit[1]:
             joint.angle = limit[1]
             logger.warning(f"[Joint] ID: {JointId(joint.id).name} angle above limit, clamped to max value {math.degrees(limit[1]):.2f} degrees")
+
+    def get_connectable_devices(self) -> list[str]:
+        """
+        获取可连接的设备列表
+
+        Returns:
+            list[str]: 返回可连接设备的网络接口ID列表
+        """
+        connected_interfaces = []
+        id_list = self._client.search()
+
+        for iface_id in id_list:
+            connected = self._client.connect(iface_id)
+            if connected:
+                connected_interfaces.append(iface_id)
+                self._client.disconnect()
+
+        if connected_interfaces:
+            logger.info("可连接的设备:\n" + "\n".join([f"{id}" for id in connected_interfaces]))
+        else:
+            logger.warning("未找到可连接的设备")
+
+        return connected_interfaces
 
     def open(self, type: CommType = CommType.ETHERCAT, id: str = "auto"):
         """
@@ -287,6 +310,7 @@ class DexHand(object):
                 0x100A, 0x00).decode('utf-8')
         return self._firmware_version
 
+
     def get_device_name(self):
         """
         获取设备名
@@ -319,7 +343,7 @@ class DexHand(object):
 
         Returns:
             str: 获取成功返回产品序列号，失败返回空字符串""
-        """        
+        """
         try:
             serial_number = self._client.sdo_read(0x1018, 0x04)
         except Exception:
@@ -355,25 +379,6 @@ class DexHand(object):
             logger.error(f"Failed to initialize joints: {e}")
             return False
         return True
-
-    def tactile_restart(self) -> bool:
-        """
-        重启触觉传感器数据
-
-        Returns:
-            bool: 重置成功返回True，失败返回False
-        """
-        try:
-            self._client.sdo_write(0x2004, 0x01, b'\x03')
-            # 读取结果区（子索引3）
-            result_data = self._client.sdo_read(0x2004, 0x03)
-            # 检查结果区数据，如果为0则成功，为1则失败
-            if result_data == b'\x00':
-                return True
-            else:
-                return False
-        except Exception:
-            return False
 
     def tactile_open(self) -> bool:
         """
@@ -530,6 +535,29 @@ class DexHand(object):
             logger.error(f"Failed to move joints: {e}")
             return False
 
+
+    def get_temperature(self) -> int:
+        """
+        获取灵巧手温度
+
+        Returns:
+            int: 获取成功返回温度值（单位：0.1°C），失败返回0
+                  例如：返回 250 表示 25.0°C
+        """
+        try:
+            data = self._client.recv_data()
+            if len(data) != 708:
+                logger.warning(
+                    f"Data length insufficient. Expected 708 bytes, "
+                    f"got {len(data)} bytes"
+                )
+                return 0
+
+            tpdo = Tpdo.from_bytes(data)
+            return tpdo.hand.temp
+        except Exception as e:
+            logger.error(f"Failed to get temperature: {e}")
+            return 0
     def get_joints(self) -> list[Joint]:
         """
         获取所有关节状态及运动信息
@@ -703,6 +731,7 @@ class DexHand(object):
             }
 
             return tactile_data
+
 
         except RuntimeError as e:
             logger.error(f"Failed to get tactile data: {e}")
