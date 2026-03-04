@@ -1,6 +1,6 @@
 import sys
 if sys.version_info < (3, 10):
-    sys.exit("xiaoyao-sdk requires Python 3.8 or higher")
+    sys.exit("xiaoyao-sdk requires Python 3.10 or higher")
 
 from .dexhand import DexHand, Joint, HandInfo, CommType, JointId
 from .version import __version__
