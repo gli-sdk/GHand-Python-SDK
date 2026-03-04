@@ -1,8 +1,11 @@
 import time
 import logging
 from xiaoyao.dexhand import DexHand
+from xiaoyao import configure_logging
 
-logger = logging.getLogger("xiaoyao")
+# Configure SDK logging (shows connection status, warnings, errors)
+configure_logging(level=logging.INFO)
+
 
 def data_callback(tpdo):
     """
@@ -11,10 +14,10 @@ def data_callback(tpdo):
     Args:
         tpdo: 解析后的TPDO数据对象
     """
-    logger.info("Received TPDO data:")
-    logger.info(f"  Hand state: {tpdo.hand}")
-    logger.info(f"  Thumb DIP angle: {tpdo.th_dip.angle}")
-    logger.info(f"  FF MCP angle: {tpdo.ff_mcp.angle}")
+    print("Received TPDO data:")
+    print(f"  Hand state: {tpdo.hand}")
+    print(f"  Thumb DIP angle: {tpdo.th_dip.angle}")
+    print(f"  FF MCP angle: {tpdo.ff_mcp.angle}")
     # 可以在这里处理接收到的数据
 
 def main():
@@ -23,12 +26,12 @@ def main():
     
     # 打开连接
     if not hand.open():
-        logger.error("Failed to open hand connection")
+        print("Failed to open hand connection")
         return
     
     # 订阅数据更新
     sub_id = hand.subscribe(data_callback)
-    logger.info(f"Subscribed with ID: {sub_id}")
+    print(f"Subscribed with ID: {sub_id}")
     
     try:
         # 让订阅运行一段时间

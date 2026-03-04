@@ -7,7 +7,7 @@ from .ecatclient import EthercatClient
 from .data import JointRpdo, Rpdo, Tpdo
 from .error import State, ErrorCode
 
-logger = logging.getLogger("xiaoyao")
+logger = logging.getLogger("xiaoyao.dexhand")
 
 class HandType(enum.Enum):
     UNKNOWN = "unknown"
@@ -25,6 +25,7 @@ class CommType(enum.Enum):
 class CtrlMode(enum.Enum):
     POSITION = 0
     TORQUE = 1
+    SPEED = 2
 
 
 class JointId(enum.IntEnum):
@@ -58,7 +59,7 @@ class TactileSensorId(enum.Enum):
 @dataclass
 class TactileInfo:
     """触觉传感器信息数据类"""
-    status: object = None  # TactileSensorStatus
+    status: bool = False  # 传感器连接状态
     resultant_force: list[int] = None  # xyz合力数据
     distributed_force: list[int] = None  # 分布力数据
 
@@ -92,6 +93,14 @@ class TactileInfo:
         else:
             return 0  # 返回默认值，避免索引错误
 
+
+@dataclass
+class HandInfo:
+    """手部状态信息"""
+    state: State = State.STOPPED  # 手部状态
+    error: ErrorCode = ErrorCode.NORMAL  # 错误码
+    temp: int = 0  # 温度
+
 @dataclass
 class Joint:
     id: int = JointId.THUMB_DIP
@@ -99,15 +108,7 @@ class Joint:
     speed: float = 0.0
     torque: float = 0.0
     state: State = State.STOPPED  # 关节状态
-    error: ErrorCode = ErrorCode.NO_ERROR  # 错误码
-
-
-@dataclass
-class HandInfo:
-    """手部状态信息"""
-    state: State = State.STOPPED  # 手部状态
-    error: ErrorCode = ErrorCode.NO_ERROR  # 错误码
-    temp: int = 0  # 温度
+    error: ErrorCode = ErrorCode.NORMAL  # 错误码
 
     @staticmethod
     def create_joint_positions(joint_angles_dict):
@@ -156,19 +157,19 @@ class DexHand(object):
         """
         设置关节限制参数
         """
-        self._th_pip_limit = (0, math.radians(75))
-        self._th_mcp_limit = (0, math.radians(55))
+        self._th_pip_limit = (0, math.radians(66))
+        self._th_mcp_limit = (0, math.radians(50))
         self._th_swing_limit = (0, math.radians(90))
         self._th_rot_limit = (math.radians(-30), math.radians(60))
-        self._ff_pip_limit = (0, math.radians(75))
-        self._ff_mcp_limit = (0, math.radians(70))
-        self._ff_swing_limit = (math.radians(-15), math.radians(15))
-        self._mf_pip_limit = (0, math.radians(75))
-        self._mf_mcp_limit = (0, math.radians(70))
-        self._rf_pip_limit = (0, math.radians(75))
-        self._rf_mcp_limit = (0, math.radians(70))
-        self._lf_pip_limit = (0, math.radians(75))
-        self._lf_mcp_limit = (0, math.radians(70))
+        self._ff_pip_limit = (0, math.radians(80))
+        self._ff_mcp_limit = (0, math.radians(90))
+        self._ff_swing_limit = (math.radians(-10), math.radians(10))
+        self._mf_pip_limit = (0, math.radians(90))
+        self._mf_mcp_limit = (0, math.radians(90))
+        self._rf_pip_limit = (0, math.radians(90))
+        self._rf_mcp_limit = (0, math.radians(90))
+        self._lf_pip_limit = (0, math.radians(74))
+        self._lf_mcp_limit = (0, math.radians(90))
 
     def _check_joint_limit(self, joint: Joint, limit):
         """
@@ -181,10 +182,10 @@ class DexHand(object):
         """
         if joint.angle < limit[0]:
             joint.angle = limit[0]
-            logger.warning(f"【Joint】关节ID: {JointId(joint.id).name} 角度超出限制范围，已设为最小值 {math.degrees(limit[0]):.2f} 度")
+            logger.warning(f"[Joint] ID: {JointId(joint.id).name} angle below limit, clamped to min value {math.degrees(limit[0]):.2f} degrees")
         elif joint.angle > limit[1]:
             joint.angle = limit[1]
-            logger.warning(f"【Joint】关节ID: {JointId(joint.id).name} 角度超出限制范围，已设为最大值 {math.degrees(limit[1]):.2f} 度")
+            logger.warning(f"[Joint] ID: {JointId(joint.id).name} angle above limit, clamped to max value {math.degrees(limit[1]):.2f} degrees")
 
     def open(self, type: CommType = CommType.ETHERCAT, id: str = "auto"):
         """
@@ -202,13 +203,14 @@ class DexHand(object):
         if type == CommType.ETHERCAT:
             if id == "auto":
                 id_list = self._client.search()
-                logger.info("搜索到的ID:\n" + "\n".join([f"{id}" for id in id_list]))
+                logger.info("Found IDs:\n" + "\n".join([f"\t{id}" for id in id_list]))
                 for id in id_list:
                     connected = self._client.connect(id)
                     if connected:
                         run_success = self._client.run()
                         if run_success:
                             self._opened = True
+                            logger.info(f"Device opened successfully (ID: {id})")
                             break
                         else:
                             # 如果run失败，断开连接并尝试下一个设备
@@ -233,8 +235,54 @@ class DexHand(object):
         """
         if self._opened:
             self._client.disconnect()
+            logger.info("Disconnected from device")
+            self._opened = False
         return True
-    
+
+    def subscribe(self, callback):
+        """
+        订阅灵巧手数据更新
+
+        Args:
+            callback: 回调函数，当有新数据时会被调用
+                     回调函数应接受一个参数：TPDO数据对象
+
+        Returns:
+            int: 订阅ID，可用于取消订阅
+        """
+
+        def wrapper(data_bytes, *args, **kwargs):
+            # 将字节数据转换为TPDO对象
+            tpdo = Tpdo.from_bytes(data_bytes)
+            # 调用用户提供的回调函数
+            callback(tpdo)
+
+        return self._sub_manager.subscribe(wrapper)
+
+    def unsubscribe(self, sub_id):
+        """
+        取消订阅
+
+        Args:
+            sub_id (int): 订阅ID
+
+        Returns:
+            bool: 取消成功返回True，否则返回False
+        """
+        return self._sub_manager.unsubscribe(sub_id)
+
+    def start_subscription(self):
+        """
+        手动启动订阅功能
+        """
+        self._sub_manager.start()
+
+    def stop_subscription(self):
+        """
+        停止订阅功能
+        """
+        self._sub_manager.stop()
+
     def get_firmware_version(self):
         """
         获取灵巧手固件版本号
@@ -246,7 +294,7 @@ class DexHand(object):
             self._firmware_version = self._client.sdo_read(
                 0x100A, 0x00).decode('utf-8')
         return self._firmware_version
-    
+
     def get_device_name(self):
         """
         获取设备名
@@ -259,7 +307,7 @@ class DexHand(object):
         except Exception:
             return ""
         return device_name
-    
+
     def get_hardware_version(self):
         """
         获取硬件版本号
@@ -294,8 +342,11 @@ class DexHand(object):
             bool: 清除成功返回True，失败返回False
         """
         try:
+            logger.debug("Clearing fault via SDO (0x2002)")
             self._client.sdo_write(0x2002, 0x01, b'\x01')
-        except Exception:
+            logger.info("Fault cleared successfully")
+        except Exception as e:
+            logger.error(f"Failed to clear fault: {e}")
             return False
         return True
 
@@ -307,8 +358,11 @@ class DexHand(object):
             bool: 初始化成功返回True，失败返回False
         """
         try:
+            logger.debug("Initializing joints via SDO (0x2003)")
             self._client.sdo_write(0x2003, 0x01, b'\x01')
-        except Exception:
+            logger.info("Joint initialization completed successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize joints: {e}")
             return False
         return True
 
@@ -330,7 +384,7 @@ class DexHand(object):
                 return False
         except Exception:
             return False
-    
+
     def tactile_open(self) -> bool:
         """
         打开触觉传感器
@@ -349,7 +403,7 @@ class DexHand(object):
                 return False
         except Exception:
             return False
-    
+
     def tactile_close(self) -> bool:
         """
         关闭触觉传感器
@@ -477,9 +531,10 @@ class DexHand(object):
                     self._check_joint_limit(joint, self._lf_mcp_limit)
                     self._joint_to_pdo(joint, rpdo.lf_mcp)
                 else:
-                    logger.warning(f"【Joint】无效的关节ID: {joint.id}")
+                    logger.warning(f"[Joint] Invalid joint ID: {joint.id}")
                     return False
             self._client.send_data(rpdo.to_bytes())
+            logger.info("Command sent successfully")
             return True
         except RuntimeError as e:
             logger.error(f"Failed to move joints: {e}")
@@ -494,24 +549,24 @@ class DexHand(object):
         """
         try:
             data = self._client.recv_data()
-            logger.debug(f"Received data: \n{' '.join(f'{b:02x}' for b in data)}")
-            logger.debug(f"Received data length: {len(data)} bytes")  # 调试信息：打印接收到的数据长度
-
             if len(data) != 708:
-                logger.warning(f"Data length insufficient. Expected 708 bytes, got {len(data)} bytes")  # 数据长度不足时的提示
+                logger.warning(f"Data length insufficient. Expected 708 bytes, got {len(data)} bytes")
                 return []
-            
+            logger.info("Joint data received successfully")
+            # Display first 4 bytes of joint data
+            joint_data = data[4:148]
+            logger.debug(f"Joint data (144 bytes): {' '.join(f'{b:02x}' for b in joint_data)}")
+
             tpdo = Tpdo.from_bytes(data)
-            logger.debug(f"Parsed TPDO:\n" + "\n".join([f"hand: {tpdo.hand}",
-                           f"th_dip: {tpdo.th_dip}", f"th_pip: {tpdo.th_pip}", f"th_mcp: {tpdo.th_mcp}",
-                           f"th_swing: {tpdo.th_swing}",f"th_rot: {tpdo.th_rot}",
-                           f"ff_dip: {tpdo.ff_dip}",f"ff_pip: {tpdo.ff_pip}",f"ff_mcp: {tpdo.ff_mcp}",f"ff_swing: {tpdo.ff_swing}",
-                           f"mf_dip: {tpdo.mf_dip}",f"mf_pip: {tpdo.mf_pip}",f"mf_mcp: {tpdo.mf_mcp}",
-                           f"rf_dip: {tpdo.rf_dip}",f"rf_pip: {tpdo.rf_pip}",f"rf_mcp: {tpdo.rf_mcp}",
-                           f"lf_dip: {tpdo.lf_dip}",f"lf_pip: {tpdo.lf_pip}",f"lf_mcp: {tpdo.lf_mcp}",
-                           f"tactile_status: {tpdo.tactile_status}",f"tac_th: {tpdo.thumb_tactile}",f"tac_ff: {tpdo.ff_tactile}",f"tac_mf: {tpdo.mf_tactile}",
-                           f"tac_rf: {tpdo.rf_tactile}",f"tac_lf: {tpdo.lf_tactile}"]))
-            
+            # logger.debug(f"Parsed TPDO:\n" + "\n".join([
+            #                f"th_dip: {tpdo.th_dip}", f"th_pip: {tpdo.th_pip}", f"th_mcp: {tpdo.th_mcp}",
+            #                f"th_swing: {tpdo.th_swing}",f"th_rot: {tpdo.th_rot}",
+            #                f"ff_dip: {tpdo.ff_dip}",f"ff_pip: {tpdo.ff_pip}",f"ff_mcp: {tpdo.ff_mcp}",f"ff_swing: {tpdo.ff_swing}",
+            #                f"mf_dip: {tpdo.mf_dip}",f"mf_pip: {tpdo.mf_pip}",f"mf_mcp: {tpdo.mf_mcp}",
+            #                f"rf_dip: {tpdo.rf_dip}",f"rf_pip: {tpdo.rf_pip}",f"rf_mcp: {tpdo.rf_mcp}",
+            #                f"lf_dip: {tpdo.lf_dip}",f"lf_pip: {tpdo.lf_pip}",f"lf_mcp: {tpdo.lf_mcp}"
+            #             ]))
+
             # 定义关节信息映射
             joint_mappings = [
                 # thumb
@@ -538,13 +593,13 @@ class DexHand(object):
                 (JointId.LF_PIP, tpdo.lf_pip),
                 (JointId.LF_MCP, tpdo.lf_mcp),
             ]
-            
+
             joints = []
             for joint_id, joint_tpdo in joint_mappings:
                 # 检查状态并记录异常（state == 2 或 3 为错误状态，或 error != 0）
                 if joint_tpdo.error != 0 or joint_tpdo.state in [2, 3]:
                     logger.warning(
-                        f"关节错误 - ID: {JointId(joint_id).name}, State: {joint_tpdo.state}, Error: {joint_tpdo.error}"
+                        f"Joint error - ID: {JointId(joint_id).name}, State: {joint_tpdo.state}, Error: {joint_tpdo.error}"
                     )
 
                 joints.append(
@@ -559,7 +614,7 @@ class DexHand(object):
                 )
 
             return joints
-        
+
         except RuntimeError as e:
             logger.error(f"Failed to get joints: {e}")
             return []
@@ -573,19 +628,22 @@ class DexHand(object):
         """
         try:
             data = self._client.recv_data()
-            logger.debug(f"Received data: \n{' '.join(f'{b:02x}' for b in data)}")
-            logger.debug(f"Received data length: {len(data)} bytes")
 
             if len(data) != 708:
                 logger.warning(f"Data length insufficient. Expected 708 bytes, got {len(data)} bytes")
                 return HandInfo()
 
+            # logger.info("Hand data received successfully")
+            # hand_data = data[0:4]
+            # logger.debug(
+            #     f"Hand data (4 bytes): {' '.join(f'{b:02x}' for b in hand_data)}"
+            # )
             tpdo = Tpdo.from_bytes(data)
 
             # 检查手部状态并记录异常
             if tpdo.hand.error != 0 or tpdo.hand.state in [2, 3]:
                 logger.warning(
-                    f"手部错误 - State: {tpdo.hand.state}, Error: {tpdo.hand.error}, Temp: {tpdo.hand.temp}"
+                    f"Hand error - State: {tpdo.hand.state}, Error: {tpdo.hand.error}, Temp: {tpdo.hand.temp}"
                 )
 
             return HandInfo(
@@ -607,13 +665,15 @@ class DexHand(object):
         """
         try:
             data = self._client.recv_data()
-            logger.debug(f"Received data: \n{' '.join(f'{b:02x}' for b in data)}")
-            logger.debug(f"Received data length: {len(data)} bytes")
 
             if len(data) != 708:
                 logger.warning(f"Data length insufficient. Expected 708 bytes, got {len(data)} bytes")
                 return {}
-            
+
+            logger.info("Tactile data received successfully")
+            tactile_data = data[148:708]
+            logger.debug(f"Tactile data (560 bytes):\n{' '.join(f'{b:02x}' for b in tactile_data)}")
+
             tpdo = Tpdo.from_bytes(data)
             logger.debug(f"Parsed TPDO tactile data:\n" + "\n".join([
                            f"tactile_status: {tpdo.tactile_status}",
@@ -622,38 +682,38 @@ class DexHand(object):
                            f"mf_tactile: {tpdo.mf_tactile}",
                            f"rf_tactile: {tpdo.rf_tactile}",
                            f"lf_tactile: {tpdo.lf_tactile}"]))
-            
+
             # 返回一个结构化的字典，使用枚举作为键
             tactile_data = {
                 TactileSensorId.THUMB: TactileInfo(
-                    status=tpdo.tactile_status,
+                    status=bool(tpdo.tactile_status.state & (1 << 0)),
                     resultant_force=tpdo.thumb_tactile.resultant_force,
                     distributed_force=tpdo.thumb_tactile.sample_force
                 ),
                 TactileSensorId.FOREFINGER: TactileInfo(
-                    status=tpdo.tactile_status,
+                    status=bool(tpdo.tactile_status.state & (1 << 1)),
                     resultant_force=tpdo.ff_tactile.resultant_force,
                     distributed_force=tpdo.ff_tactile.sample_force
                 ),
                 TactileSensorId.MIDDLE_FINGER: TactileInfo(
-                    status=tpdo.tactile_status,
+                    status=bool(tpdo.tactile_status.state & (1 << 2)),
                     resultant_force=tpdo.mf_tactile.resultant_force,
                     distributed_force=tpdo.mf_tactile.sample_force
                 ),
                 TactileSensorId.RING_FINGER: TactileInfo(
-                    status=tpdo.tactile_status,
+                    status=bool(tpdo.tactile_status.state & (1 << 3)),
                     resultant_force=tpdo.rf_tactile.resultant_force,
                     distributed_force=tpdo.rf_tactile.sample_force
                 ),
                 TactileSensorId.LITTLE_FINGER: TactileInfo(
-                    status=tpdo.tactile_status,
+                    status=bool(tpdo.tactile_status.state & (1 << 4)),
                     resultant_force=tpdo.lf_tactile.resultant_force,
                     distributed_force=tpdo.lf_tactile.sample_force
                 )
             }
 
             return tactile_data
-        
+
         except RuntimeError as e:
             logger.error(f"Failed to get tactile data: {e}")
             return []

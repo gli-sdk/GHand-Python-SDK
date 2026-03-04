@@ -9,7 +9,7 @@ class State(IntEnum):
 
 
 class ErrorCode(IntEnum):
-    NO_ERROR = 0  # 无错误
+    NORMAL = 0  # 正常
     # Motor
     HIGH_CURRENT = 1
     ENCODER_ERROR = 2

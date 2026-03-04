@@ -1,21 +1,30 @@
 import logging
 from xiaoyao.dexhand import DexHand, CommType
+from xiaoyao import configure_logging
 
-logger = logging.getLogger("xiaoyao")
+# Configure SDK logging (shows connection status, errors, etc.)
+configure_logging(level=logging.INFO)
 
 def main():
     hand = DexHand()
-    connected = hand.open(CommType.ETHERCAT,  "auto") 
+    connected = hand.open(CommType.ETHERCAT, "auto")
     if not connected:
-        logger.error("connect failed")
+        print("Connection failed")
         return
+
+    # Get device information
     ver = hand.get_firmware_version()
     hand_name = hand.get_device_name()
     hand_hw_ver = hand.get_hardware_version()
     serial_num = hand.get_serial_number()
     hand_type = hand.get_hand_type()
-    logger.info(f"hand name:{hand_name};H/W ver:{hand_hw_ver};ver: {ver};hand_type: {hand_type.value};")
-    logger.info(f"Serial num:{int.from_bytes(serial_num, 'little')};")
+
+    # Output device information
+    print(f"\tDevice Name: {hand_name}")
+    print(f"\tFirmware: {ver}, Hardware: {hand_hw_ver}")
+    print(f"\tHand Type: {hand_type.value}")
+    print(f"\tSerial Number: {int.from_bytes(serial_num, 'little')}")
+    hand.close()
 
 if __name__ == "__main__":
     main()

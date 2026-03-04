@@ -71,5 +71,107 @@ sphinx-build -b html source build/html
 ```
 生成完成后，打开 .docs/build/html/index.html 文件即可查看完整的 API 文档和使用说明。
 
+## 日志配置
+
+### 基本使用
+
+SDK 默认是静默的，不会自动输出日志。如需查看日志，请显式启用：
+
+```python
+from xiaoyao import configure_logging, DexHand
+import logging
+
+# 启用控制台日志（INFO 级别）
+configure_logging(level=logging.INFO)
+
+# 使用 SDK
+hand = DexHand()
+```
+
+### 高级配置
+
+#### 输出到文件
+
+```python
+from xiaoyao import configure_logging_file
+
+# 将日志写入文件
+configure_logging_file("xiaoyao.log", level=logging.DEBUG)
+```
+
+#### 同时输出到控制台和文件
+
+```python
+from xiaoyao import configure_logging_both
+
+# 控制台 INFO，文件 DEBUG
+configure_logging_both(
+    level_console=logging.INFO,
+    level_file=logging.DEBUG,
+    filename="debug.log"
+)
+```
+
+#### 彩色日志输出（可选）
+
+```python
+from xiaoyao import configure_logging
+
+# 启用彩色输出（需要安装 colorlog）
+configure_logging(level=logging.INFO, use_color=True)
+```
+
+#### 模块级别控制
+
+```python
+import logging
+from xiaoyao import get_logger
+
+# 只显示特定模块的日志
+dexhand_logger = get_logger("dexhand")
+dexhand_logger.setLevel(logging.DEBUG)
+```
+
+#### 完全禁用日志
+
+```python
+from xiaoyao import disable_logging
+
+disable_logging()
+```
+
+### 日志级别
+
+支持的日志级别（从低到高）：
+- `DEBUG` - 详细调试信息
+- `INFO` - 一般信息（默认）
+- `WARNING` - 警告信息
+- `ERROR` - 错误信息
+- `CRITICAL` - 严重错误
+
+### 示例
+
+查看 `examples/logging_basics.py` 和 `examples/logging_advanced.py` 了解更多用法。
+
+### 迁移指南（Breaking Change）
+
+**重要变更**：从 v1.x 升级到 v2.0.0，SDK 默认不再自动输出日志。
+
+如果您之前依赖 SDK 的自动日志输出，请在代码中添加一行：
+
+```python
+from xiaoyao import configure_logging
+configure_logging()  # 恢复之前的日志行为
+```
+
+或者继续使用标准的 Python logging 配置：
+
+```python
+import logging
+logging.basicConfig(level=logging.INFO)
+```
+
+详见 [日志最佳实践](https://docs.python.org/3/howto/logging.html#configuring-logging-for-a-library)。
+
 ## 贡献
 我们欢迎社区的贡献！如果您有任何问题、建议或发现了 Bug，请通过 Issue Tracker 提交。

@@ -1,279 +1,77 @@
 import time
-import math
 import logging
-from xiaoyao.dexhand import DexHand, CommType, Joint, JointId
+from xiaoyao import (
+    DexHand,
+    CommType,
+    GestureType,
+    execute_gesture,
+    get_gesture_name,
+    configure_logging
+)
 
-logger = logging.getLogger("xiaoyao")
+# Configure SDK logging (shows connection status, warnings, errors)
+configure_logging(level=logging.INFO)
 
-# 创建所有关节列表，角度应设为预设值
-joints = []
-
-def open_hand(hand, speed = 100, torque = 100):
-     
-    # 拇指关节
-    joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(0), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(0), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.THUMB_SWING,angle=math.radians(0), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(0), speed=speed, torque=torque))
-    
-    # 食指关节
-    joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(0), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(0), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(0), speed=speed, torque=torque))
-    
-    # 中指关节
-    joints.append(Joint(id=JointId.MF_PIP, angle=math.radians(0), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(0), speed=speed, torque=torque))
-    
-    # 无名指关节
-    joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(0), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(0), speed=speed, torque=torque))
-    
-    # 小指关节
-    joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(0), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(0), speed=speed, torque=torque))
-    
-    # 发送关节控制指令
-    result = hand.move_joints(joints)
-    
-    if result:
-        logger.info("手部张开指令发送成功")
-    else:
-        logger.error("手部张开指令发送失败")
-
-    # 等待一段时间确保动作完成
-    time.sleep(2)
-    
-    return result
-
-def make_fist(hand, speed = 100, torque = 100):
-    
-    # 拇指关节
-    joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(70), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(50), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.THUMB_SWING,angle=math.radians(85), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(55), speed=speed, torque=torque))
-    
-    # 食指关节
-    joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(75), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(70), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(0), speed=speed, torque=torque))
-    
-    # 中指关节
-    joints.append(Joint(id=JointId.MF_PIP, angle=math.radians(75), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(70), speed=speed, torque=torque))
-    
-    # 无名指关节
-    joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(75), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(70), speed=speed, torque=torque))
-    
-    # 小指关节
-    joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(75), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(70), speed=speed, torque=torque))
-    
-    # 发送关节控制指令
-    result = hand.move_joints(joints)
-    
-    if result:
-        logger.info("握拳指令发送成功")
-    else:
-        logger.error("握拳指令发送失败")
-
-    # 等待一段时间确保动作完成
-    time.sleep(2)
-    
-    return result
-
-def make_ok(hand, speed = 100, torque = 100):
-    
-    # 拇指关节
-    joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(40), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(30), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.THUMB_SWING,angle=math.radians(30), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(4), speed=speed, torque=torque))
-    
-    # 食指关节
-    joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(30), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(50), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(0), speed=speed, torque=torque))
-    
-    # 中指关节
-    joints.append(Joint(id=JointId.MF_PIP, angle=math.radians(0), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(0), speed=speed, torque=torque))
-    
-    # 无名指关节
-    joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(0), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(0), speed=speed, torque=torque))
-    
-    # 小指关节
-    joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(0), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(0), speed=speed, torque=torque))
-    
-    # 发送关节控制指令
-    result = hand.move_joints(joints)
-    
-    if result:
-        logger.info("OK手势指令发送成功")
-    else:
-        logger.error("OK手势指令发送失败")
-
-    # 等待一段时间确保动作完成
-    time.sleep(2)
-        
-    return result
-
-def thumbs_up(hand, speed = 100, torque = 100):
-    
-    # 拇指关节
-    joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(0), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(0), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.THUMB_SWING,angle=math.radians(0), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(0), speed=speed, torque=torque))
-    
-    # 食指关节
-    joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(75), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(70), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(0), speed=speed, torque=torque))
-    
-    # 中指关节
-    joints.append(Joint(id=JointId.MF_PIP, angle=math.radians(75), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(70), speed=speed, torque=torque))
-    
-    # 无名指关节
-    joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(75), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(70), speed=speed, torque=torque))
-    
-    # 小指关节
-    joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(75), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(70), speed=speed, torque=torque))
-    
-    # 发送关节控制指令
-    result = hand.move_joints(joints)
-    
-    if result:
-        logger.info("竖大拇指指令发送成功")
-    else:
-        logger.error("竖大拇指指令发送失败")
-
-    # 等待一段时间确保动作完成
-    time.sleep(2)
-    
-    return result
-
-def make_six_sign(hand, speed = 100, torque = 100):
-    
-    # 拇指关节
-    joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(0), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(0), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.THUMB_SWING,angle=math.radians(0), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(0), speed=speed, torque=torque))
-    
-    # 食指关节
-    joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(75), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(70), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(0), speed=speed, torque=torque))
-    
-    # 中指关节
-    joints.append(Joint(id=JointId.MF_PIP, angle=math.radians(75), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(70), speed=speed, torque=torque))
-    
-    # 无名指关节
-    joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(75), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(70), speed=speed, torque=torque))
-    
-    # 小指关节
-    joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(0), speed=speed, torque=torque))
-    joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(0), speed=speed, torque=torque))
-    
-    # 发送关节控制指令
-    result = hand.move_joints(joints)
-    
-    if result:
-        logger.info("比666指令发送成功")
-    else:
-        logger.error("比666指令发送失败")
-
-    # 等待一段时间确保动作完成
-    time.sleep(2)
-        
-    return result
 
 def main():
     """主执行函数，演示如何执行预设手势。"""
-    logger.info("***** 枭尧灵巧手 SDK - 预设手势功能演示 *****\n")
+    print("***** 枭尧灵巧手 SDK - 预设手势功能演示 *****\n")
     hand = DexHand()
-    connected = hand.open(CommType.ETHERCAT,  "auto")
+    connected = hand.open(CommType.ETHERCAT, "auto")
+
     try:
         if not connected:
-            logger.error("[扫描结束] 未能连接到灵巧手。")
+            print("[扫描结束] 未能连接到灵巧手。")
             return
-        
-        logger.info("\n--- 设备已就绪，将开始依次演示预设手势 ---\n")
+
+        print("\n--- 设备已就绪，将开始依次演示预设手势 ---\n")
+
+        # 定义要演示的手势列表
+        gesture_demo = [
+            GestureType.OPEN_HAND,
+            GestureType.FIST,
+            GestureType.OK,
+            GestureType.THUMBS_UP,
+            GestureType.SIX_SIGN,
+        ]
 
         # 循环执行手势动作
         gesture_cycle = 0
         max_cycles = 0  # 设置循环次数，可以根据需要调整，0表示无限循环
-        
+
         while True:
             gesture_cycle += 1
             if max_cycles > 0 and gesture_cycle > max_cycles:
                 break
-                
-            logger.info(f"\n--- 第 {gesture_cycle} 轮手势演示开始 ---")
 
-            logger.info("演示1: [张开所有手指]")
-            if not open_hand(hand):
-                logger.error("打开手部失败，终止演示")
-                hand.close()
-                return
-            time.sleep(3)
+            print(f"\n--- 第 {gesture_cycle} 轮手势演示开始 ---")
 
-            logger.info("演示2: [握拳]")
-            if not make_fist(hand):
-                logger.error("握拳动作失败，终止演示")
-                hand.close()
-                return
-            time.sleep(3)
+            # 按顺序演示所有手势
+            for i, gesture in enumerate(gesture_demo, 1):
+                gesture_name = get_gesture_name(gesture)
+                print(f"演示{i}: [{gesture_name}]")
 
-            logger.info("演示3: [OK 手势]")
-            if not make_ok(hand):
-                logger.error("OK手势失败，终止演示")
-                hand.close()
-                return
-            time.sleep(3)
+                if not execute_gesture(hand, gesture, speed=100, torque=100):
+                    print(f"{gesture_name}动作失败，终止演示")
+                    hand.close()
+                    return
+                # time.sleep(1)
 
-            logger.info("演示4: [竖大拇指]")
-            if not thumbs_up(hand):
-                logger.error("竖大拇指动作失败，终止演示")
-                hand.close()
-                return
-            time.sleep(3)
-
-            logger.info("演示5: [六抓握]")
-            if not make_six_sign(hand):
-                logger.error("比666手势失败，终止演示")
-                hand.close()
-                return
-            time.sleep(3)
-
-            logger.info("恢复: [张开所有手指]")
-            if not open_hand(hand):
-                logger.error("最后打开手部失败")
-            time.sleep(5)
-
-            logger.info(f"\n--- 第 {gesture_cycle} 轮手势演示结束 ---\n")
+            print(f"\n--- 第 {gesture_cycle} 轮手势演示结束 ---\n")
 
             # 提示信息
             if max_cycles == 0:
-                logger.info("按 Ctrl+C 停止演示并退出程序\n")
+                print("按 Ctrl+C 停止演示并退出程序\n")
+
     except KeyboardInterrupt:
-        logger.info("程序被用户中断。")
+        print("程序被用户中断。")
     except Exception as e:
-        logger.error(f"[严重错误] {e}")
+        print(f"[严重错误] {e}")
     finally:
         hand.close()
         time.sleep(0.5)
-        logger.info("演示结束，断开连接")
+        print("演示结束，断开连接")
+
 
 if __name__ == "__main__":
     main()
