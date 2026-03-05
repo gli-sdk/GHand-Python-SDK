@@ -11,8 +11,13 @@ class State(IntEnum):
 class ErrorCode(IntEnum):
     NORMAL = 0  # 正常
     # Motor
-    HIGH_CURRENT = 1
-    ENCODER_ERROR = 2
+    MOTOR_HARDWARE_OVERCURRENT = 1  # 电机硬件过流
+    MOTOR_SOFTWARE_OVERCURRENT = 2  # 电机软件过流
+    MOTOR_BUS_OVERCURRENT = 3  # 电机母线过流
+    MOTOR_PHASE_LOST = 4  # 电机缺相
+    MOTOR_STALLED = 5  # 电机堵转
+    MOTOR_DRIVER_OVERTEMP = 6  # 电机驱动芯片过温
+    MOTOR_COMM_ERROR = 7  # 电机通信错误
     # Finger
     JOINT_CONFLICT = 11
     TIP_CONFLICT = 12

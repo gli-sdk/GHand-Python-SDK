@@ -1,6 +1,8 @@
 import enum
 import math
 import logging
+import atexit
+import signal
 from dataclasses import dataclass
 from .ecatclient import EthercatClient
 from .subscription import SubscriptionManager
@@ -60,9 +62,9 @@ class TactileSensorId(enum.Enum):
 @dataclass
 class TactileInfo:
     """触觉传感器信息数据类"""
-    status: bool = False  # 传感器连接状态
-    resultant_force: list[int] = None  # xyz合力数据
-    distributed_force: list[int] = None  # 分布力数据
+    _status: bool = False  # 传感器连接状态
+    _resultant_force: list[int] = None  # xyz合力数据
+    _distributed_force: list[int] = None  # 分布力数据
 
     def __post_init__(self):
         """初始化后设置默认值"""
@@ -94,6 +96,10 @@ class TactileInfo:
         else:
             return 0  # 返回默认值，避免索引错误
 
+    def get_status(self) -> bool:
+        """获取传感器连接状态"""
+        return self.status
+
 
 @dataclass
 class HandInfo:
@@ -106,12 +112,11 @@ class HandInfo:
 class Joint:
     id: int = JointId.THUMB_DIP
     angle: float = 0.0
-    speed: float = 0.0
-    torque: float = 0.0
+    speed: int = 0.0
+    torque: int = 0.0
     state: State = State.STOPPED  # 关节状态
     error: ErrorCode = ErrorCode.NORMAL  # 错误码
 
-    @staticmethod
     def create_joint_positions(joint_angles_dict):
         """
         根据关节角度字典创建关节列表
@@ -267,6 +272,15 @@ class DexHand(object):
             self._opened = False
         return True
 
+    def is_connected(self) -> bool:
+        """
+        检查设备是否已连接
+
+        Returns:
+            bool: 已连接返回True，否则返回False
+        """
+        return self._opened
+
     def subscribe(self, callback):
         """
         订阅灵巧手数据更新
@@ -310,7 +324,6 @@ class DexHand(object):
             self._firmware_version = self._client.sdo_read(
                 0x100A, 0x00).decode('utf-8')
         return self._firmware_version
-
 
     def get_device_name(self):
         """
@@ -469,14 +482,13 @@ class DexHand(object):
         pdo.speed = joint.speed
         pdo.torque = joint.torque
 
-    def move_joints(self, joints: list[Joint], mode: int = 0, stop: int = 0):
+    def move_joints(self, joints: list[Joint], mode: int = 0):
         """
         发送多个关节控制指令
 
         Args:
           joints (list[Joint]): 关节控制指令
           mode (int, optional): 模式选择。0:位置模式;1:力矩模式;2:速度模式。默认为0
-          stop (int, optional): 停止选择。0:运动;1:停止所有关节。默认为0
 
         Returns:
           bool: 连接成功返回True，否则返回False
@@ -484,7 +496,7 @@ class DexHand(object):
         try:
             rpdo = Rpdo()
             rpdo.mode = mode
-            rpdo.stop = stop
+            rpdo.stop = 0
             for joint in joints:
                 # 应用关节限制检查
                 if joint.id == JointId.THUMB_PIP:
@@ -535,7 +547,25 @@ class DexHand(object):
         except RuntimeError as e:
             logger.error(f"Failed to move joints: {e}")
             return False
-        
+
+    def stop(self) -> bool:
+        """
+        停止所有关节运动
+
+        Returns:
+            bool: 指令是否发送成功
+        """
+        try:
+            rpdo = Rpdo()
+            rpdo.mode = 0
+            rpdo.stop = 1
+            self._client.send_data(rpdo.to_bytes())
+            logger.info("Stop command sent successfully")
+            return True
+        except RuntimeError as e:
+            logger.error(f"Failed to stop joints: {e}")
+            return False
+
     def get_joints(self) -> list[Joint]:
         """
         获取所有关节状态及运动信息
@@ -709,7 +739,6 @@ class DexHand(object):
             }
 
             return tactile_data
-
 
         except RuntimeError as e:
             logger.error(f"Failed to get tactile data: {e}")

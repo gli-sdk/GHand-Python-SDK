@@ -35,6 +35,15 @@ class EthercatClient(object):
         self._lock_file = None
         self._lock_file_path = None
 
+    def __del__(self):
+        """
+        析构函数，确保对象销毁时释放锁
+        """
+        try:
+            self._release_lock()
+        except Exception:
+            pass  # 忽略析构时的任何异常
+
     def _get_lock_file_path(self, device_id: str) -> str:
         """
         生成设备锁文件路径
@@ -455,14 +464,14 @@ class EthercatClient(object):
                 self._slave = None
                 self._connected = False
 
-                # 释放设备独占锁
-                self._release_lock()
+            # 释放设备独占锁
+            self._release_lock()
 
-                # 重置所有状态标志，为下次连接做准备
-                self._actual_wkc = 0
-                self._connection_lost = False
-                self._master.in_op = False
-                self._master.do_check_state = False
+            # 重置所有状态标志，为下次连接做准备
+            self._actual_wkc = 0
+            self._connection_lost = False
+            self._master.in_op = False
+            self._master.do_check_state = False
 
     def sdo_read(self, index, subindex=0):
         """
