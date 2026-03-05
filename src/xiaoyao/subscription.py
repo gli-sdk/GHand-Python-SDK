@@ -11,11 +11,11 @@ class SubscriptionManager:
         self._lock = threading.Lock()
         self._running = False
         self._thread = None
+        self._dispatcher_thread = None
         # 如果提供了客户端实例，则使用它，否则创建新的实例
         self._client = client if client else EthercatClient()
         self._data = None
         self._sub_id_counter = 0
-        self._lock = threading.Lock()
         self._subscribers = {}
         self._is_client_owner = client is None  # 标记是否拥有客户端实例
 

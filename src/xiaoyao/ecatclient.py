@@ -132,24 +132,6 @@ class EthercatClient(object):
                 self._lock_file = None
                 self._lock_file_path = None
 
-    def __new__(cls, *args, **kwargs):
-        """
-        创建单例实例
-
-        Args:
-            cls: 类对象
-            *args: 可变位置参数
-            **kwargs: 可变关键字参数
-
-        Returns:
-            EthercatClient: 返回EthercatClient类的单例实例
-        """
-        if not hasattr(cls, '_instance'):
-            with cls._instance_lock:
-                if not hasattr(cls, '_instance'):
-                    cls._instance = super().__new__(cls)
-        return cls._instance
-
     @staticmethod
     def _check_slave(slave):
         """
@@ -318,7 +300,7 @@ class EthercatClient(object):
             self._master.read_state()  # 刷新状态
             return True
         except Exception as e:
-            logger.error(f"Error connecting to device {id}: {e}")
+            logger.error(f"Error connecting to device {id}")
             self._release_lock()  # 异常时释放锁
             return False
 
@@ -363,7 +345,6 @@ class EthercatClient(object):
                     return False
 
                 self._master.config_map()
-                logger.debug(f"master state: {self._master.state}")
                 
                 if len(slave.input) != expected_input_size or len(
                     slave.output

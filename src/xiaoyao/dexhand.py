@@ -240,6 +240,7 @@ class DexHand(object):
                             break
                         else:
                             # 如果run失败，断开连接并尝试下一个设备
+                            logger.error(f"Failed to open device (ID: {id})")
                             self._client.disconnect()
             else:
                 connected = self._client.connect(id)
@@ -534,30 +535,7 @@ class DexHand(object):
         except RuntimeError as e:
             logger.error(f"Failed to move joints: {e}")
             return False
-
-
-    def get_temperature(self) -> int:
-        """
-        获取灵巧手温度
-
-        Returns:
-            int: 获取成功返回温度值（单位：0.1°C），失败返回0
-                  例如：返回 250 表示 25.0°C
-        """
-        try:
-            data = self._client.recv_data()
-            if len(data) != 708:
-                logger.warning(
-                    f"Data length insufficient. Expected 708 bytes, "
-                    f"got {len(data)} bytes"
-                )
-                return 0
-
-            tpdo = Tpdo.from_bytes(data)
-            return tpdo.hand.temp
-        except Exception as e:
-            logger.error(f"Failed to get temperature: {e}")
-            return 0
+        
     def get_joints(self) -> list[Joint]:
         """
         获取所有关节状态及运动信息

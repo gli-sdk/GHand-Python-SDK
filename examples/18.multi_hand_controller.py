@@ -9,8 +9,10 @@ import math
 import logging
 from typing import List, Dict, Optional
 from xiaoyao.dexhand import DexHand, CommType, Joint, JointId
+from xiaoyao import configure_logging
 
-logger = logging.getLogger("xiaoyao")
+# Configure SDK logging
+configure_logging(level=logging.INFO)
 
 
 class MultiDexHandController:
@@ -68,7 +70,7 @@ class MultiDexHandController:
             temp_hand = DexHand()
             self.interfaces = temp_hand.get_connectable_devices()
             del temp_hand
-            logger.info(f"自动搜索到 {len(self.interfaces)} 个可连接设备")
+            print(f"自动搜索到 {len(self.interfaces)} 个可连接设备")
 
     def _detect_connected_interfaces(self, available_interfaces: List[str]) -> List[str]:
         """
@@ -82,9 +84,9 @@ class MultiDexHandController:
         """
         connected_interfaces = []
 
-        logger.info("\n检测哪些接口连接了设备...")
+        print("\n检测哪些接口连接了设备...")
         for i, iface in enumerate(available_interfaces):
-            logger.info(f"  测试接口 {i}: {iface}")
+            print(f"  测试接口 {i}: {iface}")
 
             # 尝试连接
             test_hand = DexHand()
@@ -92,16 +94,16 @@ class MultiDexHandController:
                 if test_hand.open(CommType.ETHERCAT, iface):
                     # 成功检测到设备
                     connected_interfaces.append(iface)
-                    logger.info(f"    ✓ 检测到设备")
+                    print(f"    ✓ 检测到设备")
                     test_hand.close()
                 else:
-                    logger.info(f"    ✗ 连接失败")
+                    print(f"    ✗ 连接失败")
             except Exception as e:
-                logger.info(f"    ✗ 错误: {e}")
+                print(f"    ✗ 错误: {e}")
             finally:
                 del test_hand
 
-        logger.info(f"\n共检测到 {len(connected_interfaces)} 个设备")
+        print(f"\n共检测到 {len(connected_interfaces)} 个设备")
         return connected_interfaces
 
     def initialize(self) -> bool:
@@ -111,19 +113,19 @@ class MultiDexHandController:
         Returns:
             bool: 至少成功连接一个设备返回 True，否则返回 False
         """
-        logger.info("\n=== 初始化多灵巧手控制器 ===")
+        print("\n=== 初始化多灵巧手控制器 ===")
 
         if not self.interfaces:
-            logger.error("没有可用的网络接口")
+            print("没有可用的网络接口")
             return False
 
         # 第一步：连接所有设备
-        logger.info(f"\n第一步：连接 {len(self.interfaces)} 个设备...")
+        print(f"\n第一步：连接 {len(self.interfaces)} 个设备...")
         connected_hands = []
         connected_interfaces = []
 
         for i, interface in enumerate(self.interfaces):
-            logger.info(f"  连接设备 {i}: {interface}")
+            print(f"  连接设备 {i}: {interface}")
 
             hand = DexHand()
             try:
@@ -133,22 +135,22 @@ class MultiDexHandController:
                     self.interface_to_hand[interface] = hand_name
                     connected_hands.append((hand_name, hand))
                     connected_interfaces.append(interface)
-                    logger.info(f"    ✓ 连接成功")
+                    print(f"    ✓ 连接成功")
                 else:
-                    logger.warning(f"    ✗ 连接失败")
+                    print(f"    ✗ 连接失败")
                     del hand
             except Exception as e:
-                logger.error(f"    ✗ 错误: {e}")
+                print(f"    ✗ 错误: {e}")
                 del hand
 
         if not connected_hands:
-            logger.error("没有成功连接任何设备")
+            print("没有成功连接任何设备")
             return False
 
-        logger.info(f"\n✓ 成功连接 {len(connected_hands)} 个设备")
+        print(f"\n✓ 成功连接 {len(connected_hands)} 个设备")
 
         # 第二步：获取所有设备信息
-        logger.info(f"\n第二步：获取所有设备信息...")
+        print(f"\n第二步：获取所有设备信息...")
         for hand_name, hand in connected_hands:
             try:
                 hand_info = {
@@ -161,7 +163,7 @@ class MultiDexHandController:
                 }
                 self.hand_info[hand_name] = hand_info
 
-                logger.info(
+                print(
                     f"  {hand_name}: {hand_info['name']} "
                     f"({hand_info['hand_type']}, "
                     f"SN: {hand_info['serial_number']}, "
@@ -169,10 +171,10 @@ class MultiDexHandController:
                     f"HW: {hand_info['hardware_version']})"
                 )
             except Exception as e:
-                logger.error(f"  获取 {hand_name} 信息失败: {e}")
+                print(f"  获取 {hand_name} 信息失败: {e}")
 
         self._initialized = True
-        logger.info(f"\n✓ 初始化完成")
+        print(f"\n✓ 初始化完成")
         return True
 
     def get_hand_names(self) -> List[str]:
@@ -226,11 +228,11 @@ class MultiDexHandController:
             bool: 成功返回 True
         """
         if not self._initialized:
-            logger.error("控制器未初始化")
+            print("控制器未初始化")
             return False
 
         if hand_name not in self.hands:
-            logger.error(f"手 '{hand_name}' 不存在")
+            print(f"手 '{hand_name}' 不存在")
             return False
 
         hand = self.hands[hand_name]
@@ -247,13 +249,13 @@ class MultiDexHandController:
             bool: 全部成功返回 True
         """
         if not self._initialized:
-            logger.error("控制器未初始化")
+            print("控制器未初始化")
             return False
 
         hand_names = self.get_hand_names()
 
         if len(joints_list) != len(hand_names):
-            logger.error(
+            print(
                 f"关节数量不匹配: 有 {len(hand_names)} 只手, "
                 f"但提供了 {len(joints_list)} 组关节命令"
             )
@@ -277,11 +279,11 @@ class MultiDexHandController:
             list: 关节状态列表
         """
         if not self._initialized:
-            logger.error("控制器未初始化")
+            print("控制器未初始化")
             return []
 
         if hand_name not in self.hands:
-            logger.error(f"手 '{hand_name}' 不存在")
+            print(f"手 '{hand_name}' 不存在")
             return []
 
         hand = self.hands[hand_name]
@@ -295,7 +297,7 @@ class MultiDexHandController:
             dict: 键为手名称，值为关节状态列表
         """
         if not self._initialized:
-            logger.error("控制器未初始化")
+            print("控制器未初始化")
             return {}
 
         result = {}
@@ -310,14 +312,14 @@ class MultiDexHandController:
             for hand_name, hand in self.hands.items():
                 try:
                     hand.close()
-                    logger.info(f"已关闭 {hand_name}")
+                    print(f"已关闭 {hand_name}")
                 except Exception as e:
-                    logger.error(f"关闭 {hand_name} 失败: {e}")
+                    print(f"关闭 {hand_name} 失败: {e}")
 
             self.hands.clear()
             self.hand_info.clear()
             self._initialized = False
-            logger.info("所有连接已关闭")
+            print("所有连接已关闭")
 
     def __enter__(self):
         """支持上下文管理器"""
@@ -332,7 +334,7 @@ def main():
     """示例：使用多灵巧手控制器"""
 
     # 方式1：自动搜索并连接所有可用设备（推荐）
-    logger.info("=== 方式1：自动搜索模式 ===")
+    print("=== 方式1：自动搜索模式 ===")
     controller = MultiDexHandController(auto_search=True)
 
     # 方式2：手动指定网络接口
@@ -345,20 +347,20 @@ def main():
 
     # 自动连接所有设备
     if not controller.initialize():
-        logger.error("初始化失败")
+        print("初始化失败")
         return
 
     # 显示设备信息
-    logger.info(f"\n=== 成功连接 {controller.get_hand_count()} 只灵巧手 ===")
+    print(f"\n=== 成功连接 {controller.get_hand_count()} 只灵巧手 ===")
     all_info = controller.get_all_hands_info()
     for hand_name, info in all_info.items():
-        logger.info(
+        print(
             f"{hand_name}: {info['name']} "
             f"({info['hand_type']}, SN: {info['serial_number']})"
         )
 
     # 示例：分别控制每只手
-    logger.info("\n=== 示例：分别控制 ===")
+    print("\n=== 示例：分别控制 ===")
 
     # 准备关节命令
     test_joints = [
@@ -369,17 +371,17 @@ def main():
 
     # 控制所有手
     for hand_name in controller.get_hand_names():
-        logger.info(f"控制 {hand_name}...")
+        print(f"控制 {hand_name}...")
         if controller.move_hand(hand_name, test_joints):
-            logger.info(f"  ✓ 指令发送成功")
+            print(f"  ✓ 指令发送成功")
             time.sleep(1)
 
             # 读取关节状态
             joints = controller.get_hand_joints(hand_name)
-            logger.info(f"  当前关节数: {len(joints)}")
+            print(f"  当前关节数: {len(joints)}")
 
     # 示例：同时控制所有手
-    logger.info("\n=== 示例：同时控制 ===")
+    print("\n=== 示例：同时控制 ===")
 
     # 准备复位命令
     reset_joints = [
@@ -391,18 +393,18 @@ def main():
     # 为每只手准备命令
     all_joints = [reset_joints] * controller.get_hand_count()
 
-    logger.info("同时控制所有手...")
+    print("同时控制所有手...")
     if controller.move_all_hands(all_joints):
-        logger.info("  ✓ 所有手指令发送成功")
+        print("  ✓ 所有手指令发送成功")
         time.sleep(1)
 
     # 获取所有手的关节状态
-    logger.info("\n=== 关节状态 ===")
+    print("\n=== 关节状态 ===")
     all_joints_state = controller.get_all_joints()
     for hand_name, joints in all_joints_state.items():
-        logger.info(f"{hand_name}: {len(joints)} 个关节")
+        print(f"{hand_name}: {len(joints)} 个关节")
 
-    logger.info("\n=== 完成 ===")
+    print("\n=== 完成 ===")
 
     # 关闭所有连接
     controller.close_all()
