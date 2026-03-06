@@ -473,12 +473,17 @@ class DexHand(object):
     def _joint_to_pdo(self, joint: Joint, pdo: JointRpdo):
         """
         将Joint对象转换为PDO对象
-        
+
         Args:
           joint (Joint): 关节对象
           pdo (JointRpdo): PDO对象
         """
-        pdo.angle = joint.angle
+        # THUMB_ROTATION 在固件层面有 30 度偏移，发送时需要补偿
+        # 固件期望 0-90 度，SDK 逻辑范围是 -30 到 60 度
+        if joint.id == JointId.THUMB_ROTATION:
+            pdo.angle = joint.angle + math.radians(30)
+        else:
+            pdo.angle = joint.angle
         pdo.speed = joint.speed
         pdo.torque = joint.torque
 
@@ -628,10 +633,16 @@ class DexHand(object):
                         f"Joint error - ID: {JointId(joint_id).name}, State: {joint_tpdo.state}, Error: {joint_tpdo.error}"
                     )
 
+                # THUMB_ROTATION 在固件层面有 30 度偏移，读取时需要补偿
+                # 固件返回 0-90 度，SDK 逻辑范围是 -30 到 60 度
+                angle = joint_tpdo.angle
+                if joint_id == JointId.THUMB_ROTATION:
+                    angle = angle - math.radians(30)
+
                 joints.append(
                     Joint(
                         id=joint_id,
-                        angle=joint_tpdo.angle,
+                        angle=angle,
                         speed=joint_tpdo.speed,
                         torque=joint_tpdo.torque,
                         state=joint_tpdo.state,

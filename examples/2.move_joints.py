@@ -30,6 +30,7 @@ def main():
             print(f"\n--- Cycle {gesture_cycle}: Finger movement started ---")
 
             # Configure joint angles for gesture 1
+            joints = []
             joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(30), speed=100, torque=100))
             joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(30), speed=100, torque=100))
             joints.append(Joint(id=JointId.THUMB_SWING, angle=math.radians(30), speed=100, torque=100))
@@ -64,6 +65,7 @@ def main():
                 break
 
             # Configure joint angles for gesture 2 (reset position)
+            joints = []
             joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(0), speed=100, torque=100))
             joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(0), speed=100, torque=100))
             joints.append(Joint(id=JointId.THUMB_SWING, angle=math.radians(0), speed=100, torque=100))
