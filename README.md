@@ -15,6 +15,11 @@
   - [SDK 安装步骤](#3-sdk-安装步骤)
   - [权限配置（可选）](#4-权限配置可选)
   - [运行示例程序](#5-运行示例程序)
+- [日志配置](#日志配置)
+- [异常处理](#异常处理)
+  - [异常类型](#异常类型)
+  - [基本用法](#基本用法)
+  - [迁移指南](#迁移指南)
 - [生成说明文档](#生成说明文档)
 - [贡献](#贡献)
 
@@ -314,7 +319,7 @@ disable_logging()
 
 ### 迁移指南（Breaking Change）
 
-**重要变更**：从 v1.x 升级到 v2.0.0，SDK 默认不再自动输出日志。
+**重要变更**：从 v1.1.0 升级到 v1.1.1，SDK 默认不再自动输出日志。
 
 如果您之前依赖 SDK 的自动日志输出，请在代码中添加一行：
 
@@ -332,6 +337,101 @@ logging.basicConfig(level=logging.INFO)
 
 详见 [日志最佳实践](https://docs.python.org/3/howto/logging.html#configuring-logging-for-a-library)。
 
-## 贡献
+---
+
+## 异常处理
+
+从 v1.1.1 开始，SDK 引入了自定义异常系统，提供结构化的错误信息和强制错误处理，增强硬件安全性。
+
+### 异常类型
+
+SDK 提供以下异常类（继承自基类 `XiaoyaoError`）：
+
+| 异常类 | 使用场景 | 包含信息 |
+|--------|----------|----------|
+| `DeviceDisconnectedError` | 设备断连或通信失败 | -|
+| `DeviceFaultError` | 设备故障 (state=2/3 或 error≠0) | FaultInfo (错误码、状态、描述) |
+| `JointFaultError` | 关节故障 | List[JointFaultInfo] (所有故障关节) |
+| `DataReceiveError` | 数据接收错误 (长度不符) | 期望长度、实际长度 |
+
+### 基本用法
+
+```python
+from xiaoyao import DexHand, DeviceFaultError, JointFaultError, DeviceDisconnectedError
+
+hand = DexHand()
+
+try:
+    hand.open()
+    info = hand.get_hand_info()  # 可能抛出 DeviceFaultError
+    joints = hand.get_joints()   # 可能抛出 JointFaultError
+
+except DeviceFaultError as e:
+    print(f"设备故障: {e.fault_info.error_code.name}")
+    print(f"状态: {e.fault_info.state.name}")
+
+except JointFaultError as e:
+    print(f"检测到 {len(e.faulty_joints)} 个故障关节:")
+    for joint in e.faulty_joints:
+        print(f"  {joint.joint_id}: {joint.error_code.name}")
+
+except DeviceDisconnectedError as e:
+    print(f"设备断连: {e.reason}")
+
+finally:
+    hand.close()
+```
+
+**访问结构化错误信息：**
+
+```python
+except DeviceFaultError as e:
+    if e.fault_info:
+        # FaultInfo 是一个 dataclass，提供类型安全访问
+        error_code = e.fault_info.error_code  # ErrorCode 枚举
+        state = e.fault_info.state             # State 枚举
+        message = e.fault_info.message         # str
+
+        # 根据具体错误码处理
+        if error_code == ErrorCode.MOTOR_STALLED:
+            print("电机堵转！")
+        elif state == State.PROTECTIVE_STOP:
+            print("保护性停止！")
+```
+
+### 迁移指南
+
+**Breaking Change**: v1.1.0 引入破坏性变更 - `get_hand_info()` 和 `get_joints()` 现在会抛出异常。
+
+#### 旧代码 (v1.0.x)
+
+```python
+# 旧方式 - 手动检查返回值
+info = hand.get_hand_info()
+if info.error != 0:
+    print(f"错误: {info.error}")
+    return
+
+joints = hand.get_joints()
+if not joints:
+    print("获取失败")
+    return
+```
+
+#### 新代码 (v1.1.1+)
+
+```python
+# 新方式 - 使用异常处理
+try:
+    info = hand.get_hand_info()
+    joints = hand.get_joints()
+    # 正常处理数据
+except DeviceFaultError as e:
+    print(f"设备故障: {e.fault_info.error_code.name}")
+    return
+except JointFaultError as e:
+    print(f"关节故障: {len(e.faulty_joints)} 个")
+    return
+```
 
 我们欢迎社区的贡献！如果您有任何问题、建议或发现了 Bug，请通过 Issue Tracker 提交。
