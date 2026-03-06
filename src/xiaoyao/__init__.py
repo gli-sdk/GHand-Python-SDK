@@ -2,7 +2,20 @@ import sys
 if sys.version_info < (3, 10):
     sys.exit("xiaoyao-sdk requires Python 3.10 or higher")
 
-from .dexhand import DexHand, Joint, HandInfo, CommType, JointId
+from .dexhand import (
+    DexHand, Joint, HandInfo, CommType, JointId,
+    HandType, CtrlMode, TactileSensorId, TactileInfo
+)
+from .error import State, ErrorCode
+from .exceptions import (
+    XiaoyaoError,
+    DeviceDisconnectedError,
+    DeviceFaultError,
+    JointFaultError,
+    DataReceiveError,
+    FaultInfo,
+    JointFaultInfo
+)
 from .version import __version__
 from .gestures import GestureType, execute_gesture, get_all_gestures, get_gesture_name
 
@@ -15,11 +28,28 @@ from . import logging_config
 
 # 导出便捷函数
 __all__ = [
+    # 核心类
     "DexHand",
     "Joint",
     "JointId",
     "HandInfo",
+    "HandType",
+    "TactileSensorId",
+    "TactileInfo",
     "CommType",
+    "CtrlMode",
+    # 枚举
+    "State",
+    "ErrorCode",
+    # 异常类
+    "XiaoyaoError",
+    "DeviceDisconnectedError",
+    "DeviceFaultError",
+    "JointFaultError",
+    "DataReceiveError",
+    "FaultInfo",
+    "JointFaultInfo",
+    # 版本
     "__version__",
     # 手势相关
     "GestureType",

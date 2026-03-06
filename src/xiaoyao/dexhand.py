@@ -8,6 +8,15 @@ from .ecatclient import EthercatClient
 from .subscription import SubscriptionManager
 from .data import JointRpdo, Rpdo, Tpdo
 from .error import State, ErrorCode
+from .exceptions import (
+    DeviceDisconnectedError,
+    DeviceFaultError,
+    JointFaultError,
+    DataReceiveError,
+    FaultInfo,
+    JointFaultInfo,
+    get_fault_message
+)
 
 logger = logging.getLogger("xiaoyao.dexhand")
 
@@ -576,27 +585,28 @@ class DexHand(object):
         获取所有关节状态及运动信息
 
         Returns:
-        list[Joint]: 连接成功返回True,否则返回False
+            list[Joint]: 关节列表
+
+        Raises:
+            DataReceiveError: 数据长度不正确（期望708字节）
+            DeviceDisconnectedError: 设备断连或通信失败
+            JointFaultError: 任何关节故障（error != 0 或 state in [2, 3]）
         """
         try:
             data = self._client.recv_data()
-            if len(data) != 708:
-                logger.warning(f"Data length insufficient. Expected 708 bytes, got {len(data)} bytes")
-                return []
-            logger.info("Joint data received successfully")
-            # Display first 4 bytes of joint data
-            joint_data = data[4:148]
-            logger.debug(f"Joint data (144 bytes): {' '.join(f'{b:02x}' for b in joint_data)}")
 
+            # 数据长度验证
+            if len(data) != 708:
+                error_msg = f"Data length insufficient. Expected 708 bytes, got {len(data)} bytes"
+                logger.warning(error_msg)
+                raise DataReceiveError(
+                    error_msg,
+                    expected_length=708,
+                    actual_length=len(data)
+                )
+
+            logger.info("Joint data received successfully")
             tpdo = Tpdo.from_bytes(data)
-            # logger.debug(f"Parsed TPDO:\n" + "\n".join([
-            #                f"th_dip: {tpdo.th_dip}", f"th_pip: {tpdo.th_pip}", f"th_mcp: {tpdo.th_mcp}",
-            #                f"th_swing: {tpdo.th_swing}",f"th_rot: {tpdo.th_rot}",
-            #                f"ff_dip: {tpdo.ff_dip}",f"ff_pip: {tpdo.ff_pip}",f"ff_mcp: {tpdo.ff_mcp}",f"ff_swing: {tpdo.ff_swing}",
-            #                f"mf_dip: {tpdo.mf_dip}",f"mf_pip: {tpdo.mf_pip}",f"mf_mcp: {tpdo.mf_mcp}",
-            #                f"rf_dip: {tpdo.rf_dip}",f"rf_pip: {tpdo.rf_pip}",f"rf_mcp: {tpdo.rf_mcp}",
-            #                f"lf_dip: {tpdo.lf_dip}",f"lf_pip: {tpdo.lf_pip}",f"lf_mcp: {tpdo.lf_mcp}"
-            #             ]))
 
             # 定义关节信息映射
             joint_mappings = [
@@ -626,15 +636,18 @@ class DexHand(object):
             ]
 
             joints = []
-            for joint_id, joint_tpdo in joint_mappings:
-                # 检查状态并记录异常（state == 2 或 3 为错误状态，或 error != 0）
-                if joint_tpdo.error != 0 or joint_tpdo.state in [2, 3]:
-                    logger.warning(
-                        f"Joint error - ID: {JointId(joint_id).name}, State: {joint_tpdo.state}, Error: {joint_tpdo.error}"
-                    )
+            faulty_joints = []  # 收集所有故障关节
 
-                # THUMB_ROTATION 在固件层面有 30 度偏移，读取时需要补偿
-                # 固件返回 0-90 度，SDK 逻辑范围是 -30 到 60 度
+            for joint_id, joint_tpdo in joint_mappings:
+                # 检查关节故障
+                if joint_tpdo.error != 0 or joint_tpdo.state in [State.ABNORMAL_RUNNING, State.PROTECTIVE_STOP]:
+                    faulty_joints.append(JointFaultInfo(
+                        joint_id=JointId(joint_id).name,
+                        state=State(joint_tpdo.state),
+                        error_code=ErrorCode(joint_tpdo.error)
+                    ))
+
+                # THUMB_ROTATION 角度补偿
                 angle = joint_tpdo.angle
                 if joint_id == JointId.THUMB_ROTATION:
                     angle = angle - math.radians(30)
@@ -645,16 +658,31 @@ class DexHand(object):
                         angle=angle,
                         speed=joint_tpdo.speed,
                         torque=joint_tpdo.torque,
-                        state=joint_tpdo.state,
-                        error=joint_tpdo.error,
+                        state=State(joint_tpdo.state),
+                        error=ErrorCode(joint_tpdo.error),
                     )
                 )
 
+            # 如果有故障关节，抛出异常
+            if faulty_joints:
+                error_msg = f"Detected {len(faulty_joints)} faulty joint(s)"
+                logger.error(error_msg)
+                raise JointFaultError(error_msg, faulty_joints=faulty_joints)
+
             return joints
 
+        except DataReceiveError:
+            # 重新抛出数据接收错误
+            raise
+        except JointFaultError:
+            # 重新抛出关节故障错误
+            raise
         except RuntimeError as e:
-            logger.error(f"Failed to get joints: {e}")
-            return []
+            # 通信错误，转换为设备断连异常
+            # logger.error(f"Communication failed: {e}")
+            raise DeviceDisconnectedError(
+                f"Failed to communicate with device: {e}"
+            ) from e
 
     def get_hand_info(self) -> HandInfo:
         """
@@ -662,36 +690,70 @@ class DexHand(object):
 
         Returns:
             HandInfo: 手部状态信息对象，包含 state（状态）、error（错误码）、temp（温度）
+
+        Raises:
+            DataReceiveError: 数据长度不正确（期望708字节）
+            DeviceDisconnectedError: 设备断连或通信失败
+            DeviceFaultError: 设备故障（state=2/3 或 error!=0）
         """
         try:
             data = self._client.recv_data()
 
+            # 数据长度验证
             if len(data) != 708:
-                logger.warning(f"Data length insufficient. Expected 708 bytes, got {len(data)} bytes")
-                return HandInfo()
-
-            # logger.info("Hand data received successfully")
-            # hand_data = data[0:4]
-            # logger.debug(
-            #     f"Hand data (4 bytes): {' '.join(f'{b:02x}' for b in hand_data)}"
-            # )
-            tpdo = Tpdo.from_bytes(data)
-
-            # 检查手部状态并记录异常
-            if tpdo.hand.error != 0 or tpdo.hand.state in [2, 3]:
-                logger.warning(
-                    f"Hand error - State: {tpdo.hand.state}, Error: {tpdo.hand.error}, Temp: {tpdo.hand.temp}"
+                error_msg = f"Data length insufficient. Expected 708 bytes, got {len(data)} bytes"
+                logger.warning(error_msg)
+                raise DataReceiveError(
+                    error_msg,
+                    expected_length=708,
+                    actual_length=len(data)
                 )
 
+            tpdo = Tpdo.from_bytes(data)
+
+            # 检查设备故障状态
+            if tpdo.hand.error != 0:
+                fault_info = FaultInfo(
+                    error_code=ErrorCode(tpdo.hand.error),
+                    state=State(tpdo.hand.state),
+                    message=get_fault_message(ErrorCode(tpdo.hand.error), State(tpdo.hand.state), temp=tpdo.hand.temp)
+                )
+                error_msg = f"Device fault detected - {fault_info}"
+                logger.error(error_msg)
+                raise DeviceFaultError(error_msg, fault_info=fault_info)
+
+            # 检查异常运行状态（虽然你说 state=2/3 时一定 error!=0，但为了保险再检查一次）
+            if tpdo.hand.state in [State.ABNORMAL_RUNNING, State.PROTECTIVE_STOP]:
+                # 如果 error == 0 但状态异常，也抛出异常
+                if tpdo.hand.error == 0:
+                    fault_info = FaultInfo(
+                        error_code=ErrorCode.NORMAL,
+                        state=State(tpdo.hand.state),
+                        message=get_fault_message(ErrorCode.NORMAL, State(tpdo.hand.state))
+                    )
+                    error_msg = f"Abnormal device state - {fault_info}"
+                    logger.error(error_msg)
+                    raise DeviceFaultError(error_msg, fault_info=fault_info)
+
             return HandInfo(
-                state=tpdo.hand.state,
-                error=tpdo.hand.error,
+                state=State(tpdo.hand.state),
+                error=ErrorCode(tpdo.hand.error),
                 temp=tpdo.hand.temp
             )
 
+        except DataReceiveError:
+            # 重新抛出数据接收错误
+            raise
+        except DeviceFaultError:
+            # 重新抛出设备故障错误
+            raise
         except RuntimeError as e:
-            logger.error(f"Failed to get hand info: {e}")
-            return HandInfo()
+            # 通信错误，转换为设备断连异常
+            logger.error(f"Communication failed: {e}")
+            raise DeviceDisconnectedError(
+                f"Failed to communicate with device: {e}",
+                reason=str(e)
+            ) from e
 
     def get_tactile_data(self):
         """
@@ -699,13 +761,23 @@ class DexHand(object):
 
         Returns:
             dict: 包含各手指触觉传感器数据的字典，键为TactileSensorId枚举，值为TactileInfo对象
+
+        Raises:
+            DeviceDisconnectedError: 设备断开或通信失败
+            DataReceiveError: 数据接收异常（长度不匹配）
         """
         try:
             data = self._client.recv_data()
 
+            # 数据长度验证
             if len(data) != 708:
-                logger.warning(f"Data length insufficient. Expected 708 bytes, got {len(data)} bytes")
-                return {}
+                error_msg = f"Data length insufficient. Expected 708 bytes, got {len(data)} bytes"
+                logger.warning(error_msg)
+                raise DataReceiveError(
+                    error_msg,
+                    expected_length=708,
+                    actual_length=len(data)
+                )
 
             logger.info("Tactile data received successfully")
             tactile_data = data[148:708]
@@ -751,6 +823,12 @@ class DexHand(object):
 
             return tactile_data
 
+        except DataReceiveError:
+            # 重新抛出数据接收错误
+            raise
         except RuntimeError as e:
-            logger.error(f"Failed to get tactile data: {e}")
-            return []
+            # 通信错误，转换为设备断连异常
+            raise DeviceDisconnectedError(
+                f"Failed to communicate with device: {e}",
+                reason=str(e)
+            ) from e

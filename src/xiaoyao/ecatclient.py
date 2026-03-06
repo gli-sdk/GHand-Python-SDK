@@ -232,16 +232,18 @@ class EthercatClient(object):
         接收数据
 
         Returns:
-            bytes: 从设备输入数据，如果没有连接从设备则返回空字节
+            bytes: 从设备输入数据
+
+        Raises:
+            RuntimeError: 如果没有连接从设备或连接丢失
         """
         with self._data_lock:
             if self._connection_lost:
-                raise RuntimeError("Connection lost due to too many invalid WKC counts")
+                raise RuntimeError("Device disconnected")
             if self._slave is not None:
                 return self._slave.input
             else:
-                logger.warning("No slave connected")
-                return bytes()
+                raise RuntimeError("Device disconnected")
 
     def send_data(self, data: bytes):
         """
@@ -249,15 +251,18 @@ class EthercatClient(object):
 
         Args:
             data (bytes): 要发送的数据
+
+        Raises:
+            RuntimeError: 如果没有连接从设备或连接丢失
         """
         with self._data_lock:
             if self._connection_lost:
-                raise RuntimeError("Connection lost due to too many invalid WKC counts")
+                raise RuntimeError("Device disconnected")
             if self._slave is not None:
                 logger.debug(f"Sending {len(data)} bytes: \n{' '.join(f'{b:02x}' for b in data)}")
                 self._slave.output = data
             else:
-                logger.warning("No slave connected")
+                raise RuntimeError("Device disconnected")
 
     def search(self) -> list[str]:
         """
@@ -354,7 +359,7 @@ class EthercatClient(object):
                     return False
 
                 self._master.config_map()
-                
+
                 if len(slave.input) != expected_input_size or len(
                     slave.output
                 ) != expected_output_size:
@@ -460,7 +465,7 @@ class EthercatClient(object):
                 # 直接关闭主站
                 if self._master:
                     self._master.close()
-                    logger.info("Master closed")
+                    logger.error("Master closed")
                 self._slave = None
                 self._connected = False
 
@@ -486,7 +491,7 @@ class EthercatClient(object):
         """
         with self._data_lock:
             if self._slave is None:
-                raise RuntimeError("No slave connected")
+                raise RuntimeError("Device disconnected")
             return self._slave.sdo_read(index, subindex)
 
     def sdo_write(self, index, subindex, value):
@@ -503,5 +508,5 @@ class EthercatClient(object):
         """
         with self._data_lock:
             if self._slave is None:
-                raise RuntimeError("No slave connected")
+                raise RuntimeError("Device disconnected")
             return self._slave.sdo_write(index, subindex, value)

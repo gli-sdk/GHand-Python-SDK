@@ -47,20 +47,13 @@ def main():
 
             result = hand.move_joints(joints)
             if result:
-                time.sleep(1)
-                while(True):
-                    hand_info = hand.get_hand_info()
-                    if hand_info.state != State.RUNNING:
-                        break
+                time.sleep(2)  # Wait for movement to complete
+                # Display current joint states
                 current_joints = hand.get_joints()
-                if current_joints:
-                    for joint in current_joints:
-                        print(
-                            f"  {JointId(joint.id).name:<15}- state:{State(joint.state).name},\terror:{ErrorCode(joint.error).name},\tangle: {math.degrees(joint.angle):.2f}°,\tspeed: {joint.speed},\ttorque: {joint.torque}"
-                        )
-                if hand_info.state in [State.ABNORMAL_RUNNING, State.PROTECTIVE_STOP] or hand_info.error != ErrorCode.NORMAL:
-                    print("Please clear the fault and retry")
-                    break
+                for joint in current_joints:
+                    print(
+                        f"  {JointId(joint.id).name:<15}- state:{State(joint.state).name},\terror:{ErrorCode(joint.error).name},\tangle: {math.degrees(joint.angle):.2f}°,\tspeed: {joint.speed},\ttorque: {joint.torque}"
+                    )
             else:
                 break
 
@@ -82,19 +75,15 @@ def main():
 
             result = hand.move_joints(joints)
             if result:
-                time.sleep(1)
-                while True:
-                    hand_info = hand.get_hand_info()
-                    if hand_info.state != State.RUNNING:
-                        break
+                time.sleep(2)  # Wait for movement to complete
+
+                # Display current joint states
+                # Note: get_joints() may raise exceptions - will be caught by outer exception handler
                 current_joints = hand.get_joints()
                 for joint in current_joints:
                     print(
                         f"  {JointId(joint.id).name:<15}- state:{State(joint.state).name},\terror:{ErrorCode(joint.error).name},\tangle: {math.degrees(joint.angle):.2f}°,\tspeed: {joint.speed},\ttorque: {joint.torque}"
                     )
-                if (hand_info.state in [State.ABNORMAL_RUNNING, State.PROTECTIVE_STOP]or hand_info.error != ErrorCode.NORMAL):
-                    print("Please clear the fault and retry")
-                    break
             else:
                 break
 
