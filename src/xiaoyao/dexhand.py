@@ -71,9 +71,9 @@ class TactileSensorId(enum.Enum):
 @dataclass
 class TactileInfo:
     """触觉传感器信息数据类"""
-    _status: bool = False  # 传感器连接状态
-    _resultant_force: list[int] = None  # xyz合力数据
-    _distributed_force: list[int] = None  # 分布力数据
+    state: bool = False  # 传感器连接状态
+    resultant_force: list[int] = None  # xyz合力数据
+    distributed_force: list[int] = None  # 分布力数据
 
     def __post_init__(self):
         """初始化后设置默认值"""
@@ -105,9 +105,9 @@ class TactileInfo:
         else:
             return 0  # 返回默认值，避免索引错误
 
-    def get_status(self) -> bool:
+    def get_state(self) -> bool:
         """获取传感器连接状态"""
-        return self.status
+        return self.state
 
 
 @dataclass
@@ -784,41 +784,47 @@ class DexHand(object):
             logger.debug(f"Tactile data (560 bytes):\n{' '.join(f'{b:02x}' for b in tactile_data)}")
 
             tpdo = Tpdo.from_bytes(data)
-            logger.debug(f"Parsed TPDO tactile data:\n" + "\n".join([
-                           f"tactile_status: {tpdo.tactile_status}",
-                           f"thumb_tactile: {tpdo.thumb_tactile}",
-                           f"ff_tactile: {tpdo.ff_tactile}",
-                           f"mf_tactile: {tpdo.mf_tactile}",
-                           f"rf_tactile: {tpdo.rf_tactile}",
-                           f"lf_tactile: {tpdo.lf_tactile}"]))
+            logger.debug(
+                f"Parsed TPDO tactile data:\n"
+                + "\n".join(
+                    [
+                        f"tactile_state: {tpdo.tactile_state}",
+                        f"thumb_tactile: {tpdo.thumb_tactile}",
+                        f"ff_tactile: {tpdo.ff_tactile}",
+                        f"mf_tactile: {tpdo.mf_tactile}",
+                        f"rf_tactile: {tpdo.rf_tactile}",
+                        f"lf_tactile: {tpdo.lf_tactile}",
+                    ]
+                )
+            )
 
             # 返回一个结构化的字典，使用枚举作为键
             tactile_data = {
                 TactileSensorId.THUMB: TactileInfo(
-                    status=bool(tpdo.tactile_status.state & (1 << 0)),
+                    state=bool(tpdo.tactile_state.state & (1 << 0)),
                     resultant_force=tpdo.thumb_tactile.resultant_force,
-                    distributed_force=tpdo.thumb_tactile.sample_force
+                    distributed_force=tpdo.thumb_tactile.sample_force,
                 ),
                 TactileSensorId.FOREFINGER: TactileInfo(
-                    status=bool(tpdo.tactile_status.state & (1 << 1)),
+                    state=bool(tpdo.tactile_state.state & (1 << 1)),
                     resultant_force=tpdo.ff_tactile.resultant_force,
-                    distributed_force=tpdo.ff_tactile.sample_force
+                    distributed_force=tpdo.ff_tactile.sample_force,
                 ),
                 TactileSensorId.MIDDLE_FINGER: TactileInfo(
-                    status=bool(tpdo.tactile_status.state & (1 << 2)),
+                    state=bool(tpdo.tactile_state.state & (1 << 2)),
                     resultant_force=tpdo.mf_tactile.resultant_force,
-                    distributed_force=tpdo.mf_tactile.sample_force
+                    distributed_force=tpdo.mf_tactile.sample_force,
                 ),
                 TactileSensorId.RING_FINGER: TactileInfo(
-                    status=bool(tpdo.tactile_status.state & (1 << 3)),
+                    state=bool(tpdo.tactile_state.state & (1 << 3)),
                     resultant_force=tpdo.rf_tactile.resultant_force,
-                    distributed_force=tpdo.rf_tactile.sample_force
+                    distributed_force=tpdo.rf_tactile.sample_force,
                 ),
                 TactileSensorId.LITTLE_FINGER: TactileInfo(
-                    status=bool(tpdo.tactile_status.state & (1 << 4)),
+                    state=bool(tpdo.tactile_state.state & (1 << 4)),
                     resultant_force=tpdo.lf_tactile.resultant_force,
-                    distributed_force=tpdo.lf_tactile.sample_force
-                )
+                    distributed_force=tpdo.lf_tactile.sample_force,
+                ),
             }
 
             return tactile_data

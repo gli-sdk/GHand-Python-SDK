@@ -35,7 +35,7 @@ class JointTpdo:
 
 
 @dataclass
-class TactileSensorStatus:
+class TactileSensorState:
     """触觉传感器状态类"""
     state: int = 0  # uint8 状态码
     error: int = 0  # uint8 错误码
@@ -157,7 +157,7 @@ class Tpdo:
     lf_pip: JointTpdo
     lf_mcp: JointTpdo
     # tactile
-    tactile_status: TactileSensorStatus     # 触觉传感器状态
+    tactile_state: TactileSensorState     # 触觉传感器状态
     thumb_tactile: ThumbTactileData         # 大拇指触觉数据
     ff_tactile: FingerTactileData           # 食指触觉数据
     mf_tactile: FingerTactileData           # 中指触觉数据
@@ -194,7 +194,7 @@ class Tpdo:
                 JointTpdo(0, 0, 0.0, 0, 0),
                 JointTpdo(0, 0, 0.0, 0, 0),
                 # tactile
-                TactileSensorStatus(),
+                TactileSensorState(),
                 ThumbTactileData(),
                 FingerTactileData(),
                 FingerTactileData(),
@@ -228,9 +228,7 @@ class Tpdo:
         lf_pip = JointTpdo.from_bytes(data[132:140])  # bytes 132-139
         lf_mcp = JointTpdo.from_bytes(data[140:148])  # bytes 140-147
         # tactile 31 + 157 + 94*4 = 564 bytes
-        tactile_status = TactileSensorStatus.from_bytes(
-            data[148:150]
-        )  # bytes 148-149
+        tactile_state = TactileSensorState.from_bytes(data[148:150])  # bytes 148-149
 
         # 解析触觉数据并转换为N单位
         thumb_tactile_raw = ThumbTactileData.from_bytes(
@@ -261,7 +259,7 @@ class Tpdo:
                    mf_dip, mf_pip, mf_mcp,
                    rf_dip, rf_pip, rf_mcp,
                    lf_dip, lf_pip, lf_mcp,
-                   tactile_status, thumb_tactile, ff_tactile, mf_tactile, rf_tactile, lf_tactile)
+                   tactile_state, thumb_tactile, ff_tactile, mf_tactile, rf_tactile, lf_tactile)
 
 
 @dataclass

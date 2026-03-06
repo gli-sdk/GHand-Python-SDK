@@ -3,7 +3,7 @@ import logging
 from xiaoyao.dexhand import DexHand
 from xiaoyao import configure_logging
 
-# Configure SDK logging (shows connection status, warnings, errors)
+# Configure SDK logging (shows connection state, warnings, errors)
 configure_logging(level=logging.INFO)
 
 

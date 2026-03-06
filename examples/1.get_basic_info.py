@@ -2,7 +2,7 @@ import logging
 from xiaoyao.dexhand import DexHand, CommType
 from xiaoyao import configure_logging
 
-# Configure SDK logging (shows connection status, errors, etc.)
+# Configure SDK logging (shows connection state, errors, etc.)
 configure_logging(level=logging.INFO)
 
 def main():

@@ -21,8 +21,7 @@ def main():
     print("正在连接第一只灵巧手...")
     hand1 = DexHand()
     connected1 = hand1.open(
-        CommType.ETHERCAT,
-        "\\Device\\NPF_{FDC7358F-FC71-4446-8247-A53015F23C29}"
+        CommType.ETHERCAT, "\\Device\\NPF_{B1A930DF-53B0-483A-ABB8-6C3146F1FC2D}"
     )
     if not connected1:
         print("第一只手连接失败")
@@ -32,8 +31,7 @@ def main():
     print("正在连接第二只灵巧手...")
     hand2 = DexHand()
     connected2 = hand2.open(
-        CommType.ETHERCAT,
-        "\\Device\\NPF_{D40A6875-C1A4-499A-BD51-273F04D08604}"
+        CommType.ETHERCAT, "\\Device\\NPF_{5539C758-F9F9-482D-B319-1760CE5958A6}"
     )
     if not connected2:
         print("第二只手连接失败")
