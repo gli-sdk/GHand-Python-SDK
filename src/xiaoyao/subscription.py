@@ -34,8 +34,11 @@ class SubscriptionManager:
         self._running = False
         if self._thread:
             self._thread.join(timeout=1)
+            self._thread = None
         if self._dispatcher_thread:
             self._dispatcher_thread.join(timeout=1)
+            self._dispatcher_thread = None
+        self._data = None
 
     def _data_producer(self):
         """数据生产者线程"""
