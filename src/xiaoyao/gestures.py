@@ -9,7 +9,7 @@ import math
 import time
 import enum
 import logging
-from typing import Dict, Optional
+from typing import Dict
 
 from .dexhand import DexHand, JointId, Joint
 from .error import State, ErrorCode

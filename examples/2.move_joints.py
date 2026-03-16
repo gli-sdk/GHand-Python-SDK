@@ -4,6 +4,12 @@ import logging
 from xiaoyao.dexhand import DexHand, CommType, Joint, JointId
 from xiaoyao.error import State, ErrorCode
 from xiaoyao import configure_logging
+from xiaoyao.exceptions import (
+    DeviceDisconnectedError,
+    DeviceFaultError,
+    JointFaultError,
+    DataReceiveError
+)
 
 # Configure SDK logging (shows connection state, warnings, errors)
 configure_logging(level=logging.INFO)
@@ -93,10 +99,27 @@ def main():
                 print("Press Ctrl+C to stop the demo and exit\n")
 
     except KeyboardInterrupt:
-        hand.close()
         print("\nProgram interrupted by user.")
+    except DeviceDisconnectedError as e:
+        print(f"\n[Device Disconnected] {e.message}")
+        if e.reason:
+            print(f"Reason: {e.reason}")
+    except JointFaultError as e:
+        print(f"\n[Joint Fault] {e.message}")
+        if e.faulty_joints:
+            print("Faulty joints:")
+            for joint in e.faulty_joints:
+                print(f"  - {joint.joint_id}: state={joint.state.name}, error={joint.error_code.name}")
+    except DeviceFaultError as e:
+        print(f"\n[Device Fault] {e.message}")
+        if e.fault_info:
+            print(f"Details: {e.fault_info}")
+    except DataReceiveError as e:
+        print(f"\n[Data Receive Error] {e.message}")
+        if e.expected_length is not None and e.actual_length is not None:
+            print(f"Expected {e.expected_length} bytes, got {e.actual_length} bytes")
     except Exception as e:
-        print(f"[Fatal Error] {e}")
+        print(f"\n[Unexpected Error] {type(e).__name__}: {e}")
     finally:
         hand.close()
         time.sleep(0.5)

@@ -2,14 +2,15 @@
 xiaoyao-SDK 日志配置模块
 
 提供符合 SDK 标准的日志配置方案：
-- 默认静默（NullHandler）
-- 便捷配置函数
-- 完全用户可控
+- 默认输出 WARNING 和 ERROR 到 stderr
+- 支持升级到 INFO 或 DEBUG 级别
+- 支持可选的文件日志输出
+- 保持简单，只支持三个固定级别
 """
 
 import logging
 import sys
-from typing import Optional, Union
+from typing import Union
 
 
 # ============================================================================
@@ -59,23 +60,29 @@ LOG_COLORS = {
 
 def _init_package_loggers():
     """
-    包初始化时调用，为所有 logger 添加 NullHandler
+    包初始化时调用，创建默认的 WARNING 级别控制台 handler
 
     这确保了：
-    1. SDK 默认静默（不输出日志）
+    1. SDK 默认输出 WARNING 和 ERROR 到 stderr
     2. 不会产生 "No handler found" 警告
-    3. 用户可以完全控制日志行为
+    3. 用户可以通过 configure_logging() 升级到 INFO 或 DEBUG
     """
-    # 根 logger
+    # 防止重复初始化
     root_logger = logging.getLogger(ROOT_LOGGER_NAME)
-    if not root_logger.handlers:
-        root_logger.addHandler(logging.NullHandler())
+    if hasattr(root_logger, '_xiaoyao_initialized'):
+        return
 
-    # 模块 loggers
-    for module_name, logger_name in MODULE_LOGGERS.items():
-        module_logger = logging.getLogger(logger_name)
-        if not module_logger.handlers:
-            module_logger.addHandler(logging.NullHandler())
+    root_logger._xiaoyao_initialized = True
+
+    # 创建默认的 stderr handler，WARNING 级别
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setLevel(logging.WARNING)
+    handler.setFormatter(logging.Formatter(FORMAT_SIMPLE, DATEFMT_STANDARD))
+
+    root_logger.addHandler(handler)
+    root_logger._xiaoyao_stderr_handler = handler
+
+    # 模块 loggers 不需要单独的 handler，它们会继承根 logger 的配置
 
 
 # ============================================================================
@@ -83,172 +90,80 @@ def _init_package_loggers():
 # ============================================================================
 
 
-def configure_console(
-    level: Union[int, str] = logging.INFO,
-    format_string: str = FORMAT_SIMPLE,
-    datefmt: str = DATEFMT_STANDARD,
-    use_color: bool = False,
-) -> logging.Logger:
+def configure_console(level: Union[int, str]) -> None:
     """
-    配置控制台日志输出
+    配置控制台日志级别
+
+    只支持 INFO 和 DEBUG 两个级别，用于降低日志级别门槛（从默认 WARNING 升级）。
 
     Args:
-        level: 日志级别 (DEBUG, INFO, WARNING, ERROR)
-        format_string: 日志格式字符串
-        datefmt: 时间格式
-        use_color: 是否使用彩色输出（需要 colorlog）
+        level: 日志级别，只接受 logging.INFO 或 logging.DEBUG
 
-    Returns:
-        配置好的根 logger
+    Raises:
+        ValueError: 如果传入其他级别
 
     Example:
         >>> from xiaoyao.logging_config import configure_console
-        >>> configure_console(level=logging.DEBUG)
+        >>> configure_console(level=logging.INFO)  # 显示 INFO+ 的日志
+        >>> configure_console(level=logging.DEBUG)  # 显示所有日志
     """
+    # 验证级别
+    valid_levels = {logging.INFO, logging.DEBUG}
+    if level not in valid_levels:
+        raise ValueError(
+            f"只支持级别: INFO 或 DEBUG (收到: {logging.getLevelName(level)})"
+        )
+
     logger = logging.getLogger(ROOT_LOGGER_NAME)
+
+    # 获取或创建 stderr handler
+    if not hasattr(logger, '_xiaoyao_stderr_handler'):
+        # 理论上不应该到这里，因为 _init_package_loggers 已经创建了
+        handler = logging.StreamHandler(sys.stderr)
+        handler.setLevel(logging.WARNING)
+        handler.setFormatter(logging.Formatter(FORMAT_SIMPLE, DATEFMT_STANDARD))
+        logger.addHandler(handler)
+        logger._xiaoyao_stderr_handler = handler
+    else:
+        handler = logger._xiaoyao_stderr_handler
+
+    # 升级级别（如果用户请求的级别更低）
+    # WARNING=30, INFO=20, DEBUG=10
+    # 数字越小，级别越低（输出越多）
+    if level < handler.level:
+        handler.setLevel(level)
+
+    # 同时设置 logger 级别，确保消息能到达 handler
     logger.setLevel(level)
 
-    # 移除已存在的 handlers（避免重复）
-    logger.handlers.clear()
 
-    # 创建 handler
-    if use_color:
-        try:
-            import colorlog
-            handler = colorlog.StreamHandler(sys.stdout)
-            formatter = colorlog.ColoredFormatter(
-                format_string,
-                datefmt=datefmt,
-                log_colors=LOG_COLORS,
-            )
-        except ImportError:
-            # 降级到普通格式
-            handler = logging.StreamHandler(sys.stdout)
-            formatter = logging.Formatter(format_string, datefmt=datefmt)
-    else:
-        handler = logging.StreamHandler(sys.stdout)
-        formatter = logging.Formatter(format_string, datefmt=datefmt)
-
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-
-    return logger
-
-
-def configure_file(
-    filename: str,
-    level: Union[int, str] = logging.DEBUG,
-    format_string: str = FORMAT_VERBOSE,
-    datefmt: str = DATEFMT_ISO,
-    mode: str = "a",
-    encoding: str = "utf-8",
-) -> logging.Logger:
+def configure_file(filename: str, level: Union[int, str] = logging.DEBUG) -> None:
     """
     配置文件日志输出
 
+    文件日志与控制台日志独立，可以设置不同的级别。默认使用详细格式（包含文件名和行号）。
+
     Args:
         filename: 日志文件路径
-        level: 日志级别
-        format_string: 日志格式字符串
-        datefmt: 时间格式
-        mode: 文件打开模式 ('a' 追加, 'w' 覆盖)
-        encoding: 文件编码
-
-    Returns:
-        配置好的根 logger
+        level: 日志级别，默认为 DEBUG
 
     Example:
         >>> from xiaoyao.logging_config import configure_file
         >>> configure_file("xiaoyao.log", level=logging.DEBUG)
     """
     logger = logging.getLogger(ROOT_LOGGER_NAME)
-    logger.setLevel(level)
 
     # 创建 file handler
-    handler = logging.FileHandler(filename, mode=mode, encoding=encoding)
-    formatter = logging.Formatter(format_string, datefmt=datefmt)
-    handler.setFormatter(formatter)
+    handler = logging.FileHandler(filename, mode="a", encoding="utf-8")
+    handler.setLevel(level)
+    handler.setFormatter(logging.Formatter(FORMAT_VERBOSE, DATEFMT_ISO))
     logger.addHandler(handler)
 
-    return logger
-
-
-def configure_both(
-    level_console: Union[int, str] = logging.INFO,
-    level_file: Union[int, str] = logging.DEBUG,
-    filename: str = "xiaoyao.log",
-    use_color: bool = False,
-) -> logging.Logger:
-    """
-    同时配置控制台和文件日志
-
-    Args:
-        level_console: 控制台日志级别
-        level_file: 文件日志级别
-        filename: 日志文件路径
-        use_color: 控制台是否使用彩色
-
-    Returns:
-        配置好的根 logger
-
-    Example:
-        >>> from xiaoyao.logging_config import configure_both
-        >>> configure_both(level_console=logging.INFO, filename="debug.log")
-    """
-    logger = logging.getLogger(ROOT_LOGGER_NAME)
-    logger.setLevel(min(level_console, level_file))
-
-    # 清除现有 handlers
-    logger.handlers.clear()
-
-    # 控制台 handler
-    if use_color:
-        try:
-            import colorlog
-            console_handler = colorlog.StreamHandler(sys.stdout)
-            console_handler.setFormatter(
-                colorlog.ColoredFormatter(
-                    FORMAT_SIMPLE,
-                    datefmt=DATEFMT_STANDARD,
-                    log_colors=LOG_COLORS,
-                )
-            )
-        except ImportError:
-            console_handler = logging.StreamHandler(sys.stdout)
-            console_handler.setFormatter(
-                logging.Formatter(FORMAT_SIMPLE, DATEFMT_STANDARD)
-            )
-    else:
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setFormatter(
-            logging.Formatter(FORMAT_SIMPLE, DATEFMT_STANDARD)
-        )
-
-    console_handler.setLevel(level_console)
-    logger.addHandler(console_handler)
-
-    # 文件 handler
-    file_handler = logging.FileHandler(filename, encoding="utf-8")
-    file_handler.setFormatter(
-        logging.Formatter(FORMAT_VERBOSE, DATEFMT_ISO)
-    )
-    file_handler.setLevel(level_file)
-    logger.addHandler(file_handler)
-
-    return logger
-
-
-def disable_logging() -> None:
-    """
-    禁用 xiaoyao-SDK 的所有日志输出
-
-    Example:
-        >>> from xiaoyao.logging_config import disable_logging
-        >>> disable_logging()
-    """
-    logger = logging.getLogger(ROOT_LOGGER_NAME)
-    logger.setLevel(logging.CRITICAL + 1)
-    logger.propagate = False
+    # 设置 logger 级别为所有 handler 中最低的级别
+    # 这样可以确保所有 handler 都能接收到它们需要的消息
+    for h in logger.handlers:
+        if h.level < logger.level or logger.level == 0:
+            logger.setLevel(h.level)
 
 
 def get_logger(name: str = ROOT_LOGGER_NAME) -> logging.Logger:

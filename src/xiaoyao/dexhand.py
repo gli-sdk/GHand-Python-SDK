@@ -1,8 +1,6 @@
 import enum
 import math
 import logging
-import atexit
-import signal
 from dataclasses import dataclass
 from .ecatclient import EthercatClient
 from .subscription import SubscriptionManager
@@ -785,7 +783,7 @@ class DexHand(object):
 
             tpdo = Tpdo.from_bytes(data)
             logger.debug(
-                f"Parsed TPDO tactile data:\n"
+                "Parsed TPDO tactile data:\n"
                 + "\n".join(
                     [
                         f"tactile_state: {tpdo.tactile_state}",

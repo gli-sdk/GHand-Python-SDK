@@ -60,8 +60,6 @@ __all__ = [
     "configure_logging",
     "configure_logging_console",
     "configure_logging_file",
-    "configure_logging_both",
-    "disable_logging",
     "get_logger",
 ]
 
@@ -69,8 +67,6 @@ __all__ = [
 configure_logging = logging_config.configure_console
 configure_logging_console = logging_config.configure_console
 configure_logging_file = logging_config.configure_file
-configure_logging_both = logging_config.configure_both
-disable_logging = logging_config.disable_logging
 get_logger = logging_config.get_logger
 
 # SDK 加载日志（仅在启用日志时显示）

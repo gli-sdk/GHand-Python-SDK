@@ -237,53 +237,74 @@ sphinx-build -b html source build/html
 
 ## 日志配置
 
-### 基本使用
+### 默认行为
 
-SDK 默认是静默的，不会自动输出日志。如需查看日志，请显式启用：
+SDK 默认会自动输出 **WARNING** 和 **ERROR** 级别的日志到 stderr，无需任何配置：
+
+```python
+from xiaoyao import DexHand
+
+# SDK 自动输出 WARNING 和 ERROR 日志
+hand = DexHand()
+```
+
+### 升级日志级别
+
+如需查看更多日志信息（INFO 或 DEBUG），可以通过 `configure_logging()` 降低日志级别：
 
 ```python
 from xiaoyao import configure_logging, DexHand
 import logging
 
-# 启用控制台日志（INFO 级别）
+# 升级到 INFO 级别（显示 INFO、WARNING、ERROR）
 configure_logging(level=logging.INFO)
 
-# 使用 SDK
-hand = DexHand()
+# 升级到 DEBUG 级别（显示所有日志）
+configure_logging(level=logging.DEBUG)
 ```
 
-### 高级配置
+**注意：** 只支持三个级别：
+- **WARNING**（默认）：仅显示警告和错误
+- **INFO**：显示信息、警告和错误
+- **DEBUG**：显示所有日志（包括调试信息）
 
-#### 输出到文件
+### 文件日志
+
+如需将日志记录到文件，可以使用 `configure_logging_file()`：
 
 ```python
 from xiaoyao import configure_logging_file
 
-# 将日志写入文件
+# 将日志写入文件（DEBUG 级别）
 configure_logging_file("xiaoyao.log", level=logging.DEBUG)
 ```
 
-#### 同时输出到控制台和文件
+文件日志与控制台日志独立，可以设置不同的级别。例如：
+- 控制台：WARNING（默认）
+- 文件：DEBUG（记录所有详细信息）
+
+### 同时使用控制台和文件日志
 
 ```python
-from xiaoyao import configure_logging_both
+from xiaoyao import configure_logging, configure_logging_file
+import logging
 
-# 控制台 INFO，文件 DEBUG
-configure_logging_both(
-    level_console=logging.INFO,
-    level_file=logging.DEBUG,
-    filename="debug.log"
-)
+# 控制台显示 INFO+，文件记录 DEBUG+
+configure_logging(level=logging.INFO)
+configure_logging_file("xiaoyao.log", level=logging.DEBUG)
 ```
 
-#### 彩色日志输出（可选）
+### 日志级别说明
 
-```python
-from xiaoyao import configure_logging
+| 级别 | 数值 | 说明 | 默认输出 |
+|------|------|------|----------|
+| DEBUG | 10 | 调试信息 | ❌ |
+| INFO | 20 | 一般信息 | ❌ |
+| WARNING | 30 | 警告信息 | ✅ |
+| ERROR | 40 | 错误信息 | ✅ |
+| CRITICAL | 50 | 严重错误 | ✅ |
 
-# 启用彩色输出（需要安装 colorlog）
-configure_logging(level=logging.INFO, use_color=True)
-```
+**注意：** SDK 日志无法完全禁用，确保关键错误信息始终可见。
 
 #### 模块级别控制
 

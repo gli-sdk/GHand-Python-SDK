@@ -44,36 +44,37 @@ class EthercatClient(object):
         except Exception:
             pass  # 忽略析构时的任何异常
 
-    def _get_lock_file_path(self, device_id: str) -> str:
+    def _get_lock_file_path(self, adapter_name: str) -> str:
         """
-        生成设备锁文件路径
+        生成网卡锁文件路径
+        使用网卡名而不是 device_id
 
         Args:
-            device_id (str): 设备ID
+            adapter_name (str): 网卡名称
 
         Returns:
             str: 锁文件路径
         """
-        # 使用设备ID的哈希值作为锁文件名，避免特殊字符问题
-        device_hash = hashlib.md5(device_id.encode()).hexdigest()
+        # 使用网卡名的哈希值作为锁文件名，避免特殊字符问题
+        adapter_hash = hashlib.md5(adapter_name.encode()).hexdigest()
         system = platform.system()
         if system == "Windows":
             lock_dir = tempfile.gettempdir()
         else:
             lock_dir = "/tmp"
-        return os.path.join(lock_dir, f"xiaoyao_ethernet_{device_hash}.lock")
+        return os.path.join(lock_dir, f"xiaoyao_ethernet_{adapter_hash}.lock")
 
-    def _acquire_lock(self, device_id: str) -> bool:
+    def _acquire_lock(self, adapter_name: str) -> bool:
         """
-        尝试获取设备独占锁
+        尝试获取网卡独占锁
 
         Args:
-            device_id (str): 设备ID
+            adapter_name (str): 网卡名称
 
         Returns:
             bool: 成功获取锁返回True，否则返回False
         """
-        lock_path = self._get_lock_file_path(device_id)
+        lock_path = self._get_lock_file_path(adapter_name)
         try:
             # 尝试以独占模式创建/打开锁文件
             if platform.system() == "Windows":
@@ -84,7 +85,7 @@ class EthercatClient(object):
                     # 尝试锁定文件
                     msvcrt.locking(self._lock_file.fileno(), msvcrt.LK_NBLCK, 1)
                     # 写入当前进程信息
-                    self._lock_file.write(f"{os.getpid()}\n{device_id}\n")
+                    self._lock_file.write(f"{os.getpid()}\n{adapter_name}\n")
                     self._lock_file.flush()
                     self._lock_file_path = lock_path
                     return True
@@ -93,7 +94,7 @@ class EthercatClient(object):
                     if self._lock_file:
                         self._lock_file.close()
                     self._lock_file = None
-                    logger.warning(f"Device {device_id} is already locked by another process")
+                    logger.warning(f"Adapter {adapter_name} is already locked by another process")
                     return False
             else:
                 # Linux/Unix: 使用flock进行文件锁定
@@ -102,7 +103,7 @@ class EthercatClient(object):
                 try:
                     fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                     # 写入当前进程信息
-                    self._lock_file.write(f"{os.getpid()}\n{device_id}\n")
+                    self._lock_file.write(f"{os.getpid()}\n{adapter_name}\n")
                     self._lock_file.flush()
                     self._lock_file_path = lock_path
                     return True
@@ -111,10 +112,10 @@ class EthercatClient(object):
                     if self._lock_file:
                         self._lock_file.close()
                     self._lock_file = None
-                    logger.warning(f"Device {device_id} is already locked by another process")
+                    logger.warning(f"Adapter {adapter_name} is already locked by another process")
                     return False
         except Exception as e:
-            logger.error(f"Error acquiring lock for device {device_id}: {e}")
+            logger.error(f"Error acquiring lock for adapter {adapter_name}: {e}")
             if self._lock_file:
                 self._lock_file.close()
             self._lock_file = None
@@ -122,7 +123,7 @@ class EthercatClient(object):
 
     def _release_lock(self):
         """
-        释放设备独占锁
+        释放网卡独占锁
         """
         if self._lock_file is not None:
             try:
@@ -284,10 +285,10 @@ class EthercatClient(object):
 
     def connect(self, id):
         """
-        连接指定ID的设备
+        连接指定网卡名的设备
 
         Args:
-            id (str): 设备ID
+            id (str): 网卡名称
 
         Returns:
             bool: 连接成功返回True，失败返回False
@@ -295,9 +296,9 @@ class EthercatClient(object):
         if self._connected:
             return True
 
-        # 步骤1：尝试获取设备独占锁（防止同SDK多进程）
+        # 步骤1：尝试获取网卡独占锁（防止同SDK多进程）
         if not self._acquire_lock(id):
-            logger.error(f"Failed to connect: device {id} is already locked by another Python-SDK process")
+            logger.error(f"Failed to connect: adapter {id} is already locked by another process")
             return False
 
         try:
@@ -313,7 +314,7 @@ class EthercatClient(object):
             self._slave.is_lost = False
             self._master.read_state()  # 刷新状态
             return True
-        except Exception as e:
+        except Exception:
             logger.error(f"Error connecting to device {id}")
             self._release_lock()  # 异常时释放锁
             return False
@@ -465,7 +466,7 @@ class EthercatClient(object):
                 # 直接关闭主站
                 if self._master:
                     self._master.close()
-                    logger.error("Master closed")
+                    logger.info("Master closed")
                 self._slave = None
                 self._connected = False
 
