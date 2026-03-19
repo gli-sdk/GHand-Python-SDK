@@ -1,7 +1,7 @@
 import time
 import math
 import logging
-from xiaoyao.dexhand import DexHand, CommType, Joint, JointId
+from xiaoyao.dexhand import DexHand, CommType, Joint, JointId, CtrlMode
 from xiaoyao.error import State, ErrorCode
 from xiaoyao import configure_logging
 from xiaoyao.exceptions import (
@@ -48,7 +48,7 @@ def main():
                     Joint(id=joint_id, angle=math.radians(10), speed=100, torque=100)
                 )
 
-            result = hand.move_joints(joints, mode=2)
+            result = hand.move_joints(joints, mode=CtrlMode.SPEED)
             if result:
                 time.sleep(2)
                 current_joints = hand.get_joints()

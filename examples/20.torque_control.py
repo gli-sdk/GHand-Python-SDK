@@ -1,7 +1,7 @@
 import time
 import math
 import logging
-from xiaoyao.dexhand import DexHand, CommType, Joint, JointId
+from xiaoyao.dexhand import DexHand, CommType, Joint, JointId, CtrlMode
 from xiaoyao.error import State, ErrorCode
 from xiaoyao import configure_logging
 from xiaoyao.exceptions import (
@@ -46,7 +46,7 @@ def main():
                            JointId.RF_PIP, JointId.RF_MCP, JointId.LF_PIP, JointId.LF_MCP]:
                 joints.append(Joint(id=joint_id, angle=0.0, speed=0, torque=10))
 
-            result = hand.move_joints(joints, mode=1)
+            result = hand.move_joints(joints, mode=CtrlMode.TORQUE)
             if result:
                 time.sleep(2)
                 current_joints = hand.get_joints()
@@ -71,7 +71,7 @@ def main():
                            JointId.RF_PIP, JointId.RF_MCP, JointId.LF_PIP, JointId.LF_MCP]:
                 joints.append(Joint(id=joint_id, angle=0.0, speed=0, torque=0))
 
-            result = hand.move_joints(joints, mode=1)
+            result = hand.move_joints(joints, mode=CtrlMode.TORQUE)
             if result:
                 time.sleep(2)
                 current_joints = hand.get_joints()

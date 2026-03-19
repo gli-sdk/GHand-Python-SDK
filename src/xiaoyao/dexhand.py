@@ -494,20 +494,20 @@ class DexHand(object):
         pdo.speed = joint.speed
         pdo.torque = joint.torque
 
-    def move_joints(self, joints: list[Joint], mode: int = 0):
+    def move_joints(self, joints: list[Joint], mode: CtrlMode = CtrlMode.POSITION):
         """
         发送多个关节控制指令
 
         Args:
           joints (list[Joint]): 关节控制指令
-          mode (int, optional): 模式选择。0:位置模式;1:力矩模式;2:速度模式。默认为0
+          mode (CtrlMode, optional): 模式选择。位置模式/力矩模式/速度模式。默认为位置模式
 
         Returns:
           bool: 连接成功返回True，否则返回False
         """
         try:
             rpdo = Rpdo()
-            rpdo.mode = mode
+            rpdo.mode = mode.value
             rpdo.stop = 0
             for joint in joints:
                 # 应用关节限制检查
