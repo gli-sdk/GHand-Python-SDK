@@ -10,10 +10,10 @@ class HandTpdo:
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        expected_size = struct.calcsize('<BBH')
+        expected_size = struct.calcsize('<BBh')
         if len(data) < expected_size:
             return cls(0, 0, 0)
-        state, error, temp = struct.unpack_from('<BBH', data, 0)
+        state, error, temp = struct.unpack_from('<BBh', data, 0)
         return cls(state, error, temp)
 
 
