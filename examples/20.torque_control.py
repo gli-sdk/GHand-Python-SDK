@@ -12,7 +12,7 @@ from xiaoyao.exceptions import (
 )
 
 # Configure SDK logging (shows connection state, warnings, errors)
-configure_logging(level=logging.INFO)
+configure_logging(level=logging.DEBUG)
 
 def main():
     hand = DexHand()
@@ -39,12 +39,12 @@ def main():
             print(f"\n--- Cycle {cycle_count}: Torque control started ---")
 
             # Step 1: Apply torque to close fingers
-            print("\nStep 1: Applying torque to close fingers (torque=50)")
+            print("\nStep 1: Applying torque to close fingers (torque=10)")
             joints = []
             for joint_id in [JointId.THUMB_PIP, JointId.THUMB_MCP, JointId.FF_PIP,
                            JointId.FF_MCP, JointId.MF_PIP, JointId.MF_MCP,
                            JointId.RF_PIP, JointId.RF_MCP, JointId.LF_PIP, JointId.LF_MCP]:
-                joints.append(Joint(id=joint_id, angle=0.0, speed=0, torque=10))
+                joints.append(Joint(id=joint_id, torque=10))
 
             result = hand.move_joints(joints, mode=CtrlMode.TORQUE)
             if result:
@@ -64,12 +64,12 @@ def main():
                 break
 
             # Step 2: Release grip (zero torque)
-            print("\nStep 2: Releasing grip (torque=0)")
+            print("\nStep 2: Opening fingers (torque=-10)")
             joints = []
             for joint_id in [JointId.THUMB_PIP, JointId.THUMB_MCP, JointId.FF_PIP,
                            JointId.FF_MCP, JointId.MF_PIP, JointId.MF_MCP,
                            JointId.RF_PIP, JointId.RF_MCP, JointId.LF_PIP, JointId.LF_MCP]:
-                joints.append(Joint(id=joint_id, angle=0.0, speed=0, torque=0))
+                joints.append(Joint(id=joint_id,  torque=-10))
 
             result = hand.move_joints(joints, mode=CtrlMode.TORQUE)
             if result:

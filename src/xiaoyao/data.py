@@ -1,5 +1,6 @@
 import struct
 from dataclasses import dataclass, field  # 添加field导入
+from .error import State, ErrorCode
 
 
 @dataclass
@@ -15,6 +16,11 @@ class HandTpdo:
             return cls(0, 0, 0)
         state, error, temp = struct.unpack_from('<BBh', data, 0)
         return cls(state, error, temp)
+
+    def __str__(self):
+        state_name = State(self.state).name if self.state in [s.value for s in State] else self.state
+        error_name = ErrorCode(self.error).name if self.error in [e.value for e in ErrorCode] else self.error
+        return f"HandTpdo(state={state_name}, error={error_name}, temp={self.temp})"
 
 
 @dataclass
@@ -32,6 +38,11 @@ class JointTpdo:
             return cls(0, 0, 0.0, 0, 0)
         state, error, angle, speed, torque = struct.unpack_from('<BBfBB', data, 0)
         return cls(state, error, angle, speed, torque)
+
+    def __str__(self):
+        state_name = State(self.state).name if self.state in [s.value for s in State] else self.state
+        error_name = ErrorCode(self.error).name if self.error in [e.value for e in ErrorCode] else self.error
+        return f"JointTpdo(state={state_name}, error={error_name}, angle={self.angle:.3f}, speed={self.speed}, torque={self.torque})"
 
 
 @dataclass

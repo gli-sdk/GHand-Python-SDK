@@ -39,13 +39,13 @@ def main():
             print(f"\n--- Cycle {cycle_count}: Speed control started ---")
 
             # Step 1: Move fingers at specified speed
-            print("\nStep 1: Moving fingers at speed=50")
+            print("\nStep 1: Closing fingers (speed=100)")
             joints = []
             for joint_id in [JointId.THUMB_PIP, JointId.THUMB_MCP, JointId.FF_PIP,
                            JointId.FF_MCP, JointId.MF_PIP, JointId.MF_MCP,
                            JointId.RF_PIP, JointId.RF_MCP, JointId.LF_PIP, JointId.LF_MCP]:
                 joints.append(
-                    Joint(id=joint_id, angle=math.radians(10), speed=100, torque=100)
+                    Joint(id=joint_id, speed=100, torque=100)
                 )
 
             result = hand.move_joints(joints, mode=CtrlMode.SPEED)
@@ -65,30 +65,30 @@ def main():
                 print("Failed to send speed command")
                 break
 
-            # # Step 2: Stop movement (zero speed)
-            # print("\nStep 2: Stopping finger movement (speed=0)")
-            # joints = []
-            # for joint_id in [JointId.THUMB_PIP, JointId.THUMB_MCP, JointId.FF_PIP,
-            #                JointId.FF_MCP, JointId.MF_PIP, JointId.MF_MCP,
-            #                JointId.RF_PIP, JointId.RF_MCP, JointId.LF_PIP, JointId.LF_MCP]:
-            #     joints.append(Joint(id=joint_id, angle=0.0, speed=0, torque=0))
+            # Step 2: Stop movement (zero speed)
+            print("\nStep 2: Opening fingers (speed=-100)")
+            joints = []
+            for joint_id in [JointId.THUMB_PIP, JointId.THUMB_MCP, JointId.FF_PIP,
+                           JointId.FF_MCP, JointId.MF_PIP, JointId.MF_MCP,
+                           JointId.RF_PIP, JointId.RF_MCP, JointId.LF_PIP, JointId.LF_MCP]:
+                joints.append(Joint(id=joint_id, angle=0.0, speed=-100, torque=100))
 
-            # result = hand.move_joints(joints, mode=2)
-            # if result:
-            #     time.sleep(2)
-            #     current_joints = hand.get_joints()
-            #     print("Current joint states (stopped):")
-            #     for joint in current_joints:
-            #         if joint.id in [JointId.THUMB_PIP, JointId.FF_PIP, JointId.MF_PIP]:
-            #             print(
-            #                 f"  {JointId(joint.id).name:<15}- state:{State(joint.state).name},\t"
-            #                 f"error:{ErrorCode(joint.error).name},\t"
-            #                 f"angle: {math.degrees(joint.angle):.2f}°,\t"
-            #                 f"speed: {joint.speed},\ttorque: {joint.torque}"
-            #             )
-            # else:
-            #     print("Failed to send speed command")
-            #     break
+            result = hand.move_joints(joints, mode=CtrlMode.SPEED)
+            if result:
+                time.sleep(2)
+                current_joints = hand.get_joints()
+                print("Current joint states (stopped):")
+                for joint in current_joints:
+                    if joint.id in [JointId.THUMB_PIP, JointId.FF_PIP, JointId.MF_PIP]:
+                        print(
+                            f"  {JointId(joint.id).name:<15}- state:{State(joint.state).name},\t"
+                            f"error:{ErrorCode(joint.error).name},\t"
+                            f"angle: {math.degrees(joint.angle):.2f}°,\t"
+                            f"speed: {joint.speed},\ttorque: {joint.torque}"
+                        )
+            else:
+                print("Failed to send speed command")
+                break
 
             print(f"\n--- Cycle {cycle_count}: Speed control completed ---")
             if max_cycles == 0:

@@ -1,7 +1,9 @@
 import time
+import math
 import logging
 from xiaoyao.dexhand import DexHand
 from xiaoyao import configure_logging
+from xiaoyao.error import State, ErrorCode
 
 # Configure SDK logging (shows connection state, warnings, errors)
 configure_logging(level=logging.INFO)
@@ -16,8 +18,8 @@ def data_callback(tpdo):
     """
     print("Received TPDO data:")
     print(f"  Hand state: {tpdo.hand}")
-    print(f"  Thumb DIP angle: {tpdo.th_dip.angle}")
-    print(f"  FF MCP angle: {tpdo.ff_mcp.angle}")
+    print(f"  Thumb DIP: angle={math.degrees(tpdo.th_dip.angle):.1f}°, state={State(tpdo.th_dip.state).name}, error={ErrorCode(tpdo.th_dip.error).name}")
+    print(f"  FF MCP: angle={math.degrees(tpdo.ff_mcp.angle):.1f}°, state={State(tpdo.ff_mcp.state).name}, error={ErrorCode(tpdo.ff_mcp.error).name}")
     # 可以在这里处理接收到的数据
 
 def main():

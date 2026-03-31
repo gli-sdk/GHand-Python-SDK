@@ -164,7 +164,7 @@ def _wait_for_completion(hand: DexHand) -> bool:
         if hand_info.state != State.RUNNING:
             break
 
-    if hand_info.state in [State.ABNORMAL_RUNNING, State.PROTECTIVE_STOP] or \
+    if hand_info.state in [State.ABNORMAL_RUNNING, State.PROTECTIVE_STOPED] or \
        hand_info.error != ErrorCode.NORMAL:
         logger.warning("Action completed with error state. Please clear fault and retry.")
         return False

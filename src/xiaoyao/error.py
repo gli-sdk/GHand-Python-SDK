@@ -5,7 +5,7 @@ class State(IntEnum):
     STOPPED = 0  # 停止
     RUNNING = 1  # 运行中
     ABNORMAL_RUNNING = 2  # 异常运行
-    PROTECTIVE_STOP = 3  # 保护性停止
+    PROTECTIVE_STOPED = 3  # 保护性停止
 
 
 class ErrorCode(IntEnum):

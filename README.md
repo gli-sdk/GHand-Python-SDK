@@ -76,7 +76,7 @@ python setup.py install
 
 ```bash
 # 运行一个示例
-python examples/1.get_basic_info.py
+python examples/01.get_basic_info.py
 # 更多示例请查看 examples/ 目录
 ```
 
@@ -195,7 +195,7 @@ cd ~/xiaoyao-sdk
 
 ```bash
 # 在虚拟环境中使用 sudo 运行
-sudo venv/bin/python3 examples/1.get_basic_info.py
+sudo venv/bin/python3 examples/01.get_basic_info.py
 ```
 
 **方法 B: 不使用 sudo（需要配置 CAP_NET_RAW）**
@@ -294,18 +294,6 @@ configure_logging(level=logging.INFO)
 configure_logging_file("xiaoyao.log", level=logging.DEBUG)
 ```
 
-### 日志级别说明
-
-| 级别 | 数值 | 说明 | 默认输出 |
-|------|------|------|----------|
-| DEBUG | 10 | 调试信息 | ❌ |
-| INFO | 20 | 一般信息 | ❌ |
-| WARNING | 30 | 警告信息 | ✅ |
-| ERROR | 40 | 错误信息 | ✅ |
-| CRITICAL | 50 | 严重错误 | ✅ |
-
-**注意：** SDK 日志无法完全禁用，确保关键错误信息始终可见。
-
 #### 模块级别控制
 
 ```python
@@ -316,49 +304,6 @@ from xiaoyao import get_logger
 dexhand_logger = get_logger("dexhand")
 dexhand_logger.setLevel(logging.DEBUG)
 ```
-
-#### 完全禁用日志
-
-```python
-from xiaoyao import disable_logging
-
-disable_logging()
-```
-
-### 日志级别
-
-支持的日志级别（从低到高）：
-- `DEBUG` - 详细调试信息
-- `INFO` - 一般信息（默认）
-- `WARNING` - 警告信息
-- `ERROR` - 错误信息
-- `CRITICAL` - 严重错误
-
-### 示例
-
-查看 `examples/logging_basics.py` 和 `examples/logging_advanced.py` 了解更多用法。
-
-### 迁移指南（Breaking Change）
-
-**重要变更**：从 v1.1.0 升级到 v1.1.1，SDK 默认不再自动输出日志。
-
-如果您之前依赖 SDK 的自动日志输出，请在代码中添加一行：
-
-```python
-from xiaoyao import configure_logging
-configure_logging()  # 恢复之前的日志行为
-```
-
-或者继续使用标准的 Python logging 配置：
-
-```python
-import logging
-logging.basicConfig(level=logging.INFO)
-```
-
-详见 [日志最佳实践](https://docs.python.org/3/howto/logging.html#configuring-logging-for-a-library)。
-
----
 
 ## 异常处理
 
@@ -416,43 +361,8 @@ except DeviceFaultError as e:
         # 根据具体错误码处理
         if error_code == ErrorCode.MOTOR_STALLED:
             print("电机堵转！")
-        elif state == State.PROTECTIVE_STOP:
+        elif state == State.PROTECTIVE_STOPED:
             print("保护性停止！")
-```
-
-### 迁移指南
-
-**Breaking Change**: v1.1.0 引入破坏性变更 - `get_hand_info()` 和 `get_joints()` 现在会抛出异常。
-
-#### 旧代码 (v1.0.x)
-
-```python
-# 旧方式 - 手动检查返回值
-info = hand.get_hand_info()
-if info.error != 0:
-    print(f"错误: {info.error}")
-    return
-
-joints = hand.get_joints()
-if not joints:
-    print("获取失败")
-    return
-```
-
-#### 新代码 (v1.1.1+)
-
-```python
-# 新方式 - 使用异常处理
-try:
-    info = hand.get_hand_info()
-    joints = hand.get_joints()
-    # 正常处理数据
-except DeviceFaultError as e:
-    print(f"设备故障: {e.fault_info.error_code.name}")
-    return
-except JointFaultError as e:
-    print(f"关节故障: {len(e.faulty_joints)} 个")
-    return
 ```
 
 我们欢迎社区的贡献！如果您有任何问题、建议或发现了 Bug，请通过 Issue Tracker 提交。

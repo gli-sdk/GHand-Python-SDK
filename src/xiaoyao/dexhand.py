@@ -119,8 +119,8 @@ class HandInfo:
 class Joint:
     id: int = JointId.THUMB_DIP
     angle: float = 0.0
-    speed: int = 0.0
-    torque: int = 0.0
+    speed: int = 0
+    torque: int = 0
     state: State = State.STOPPED  # 关节状态
     error: ErrorCode = ErrorCode.NORMAL  # 错误码
 
@@ -201,6 +201,65 @@ class DexHand(object):
         elif joint.angle > limit[1]:
             joint.angle = limit[1]
             logger.warning(f"[Joint] ID: {JointId(joint.id).name} angle above limit, clamped to max value {math.degrees(limit[1]):.2f} degrees")
+
+    def _check_speed_limit(self, joint: Joint, mode: CtrlMode):
+        """
+        检查关节速度是否在有效范围内，根据控制模式应用不同的限制
+
+        Args:
+          joint (Joint): 关节对象
+          mode (CtrlMode): 控制模式
+
+        """
+        if mode == CtrlMode.POSITION:
+            # 位置模式：速度范围 0-100，负数取绝对值，绝对值>100取100
+            if joint.speed < 0:
+                joint.speed = abs(joint.speed)
+                logger.warning(f"[Joint] ID: {JointId(joint.id).name} speed is negative in POSITION mode, converted to absolute value {joint.speed}")
+            if joint.speed > 100:
+                original_speed = joint.speed
+                joint.speed = 100
+                logger.warning(f"[Joint] ID: {JointId(joint.id).name} speed {original_speed} exceeds limit in POSITION mode, clamped to 100")
+        elif mode == CtrlMode.SPEED:
+            # 速度模式：速度范围 -100到100
+            if joint.speed < -100:
+                original_speed = joint.speed
+                joint.speed = -100
+                logger.warning(f"[Joint] ID: {JointId(joint.id).name} speed {original_speed} below limit in SPEED mode, clamped to -100")
+            elif joint.speed > 100:
+                original_speed = joint.speed
+                joint.speed = 100
+                logger.warning(f"[Joint] ID: {JointId(joint.id).name} speed {original_speed} exceeds limit in SPEED mode, clamped to 100")
+        # 力矩模式：速度不影响，不进行检查
+
+    def _check_torque_limit(self, joint: Joint, mode: CtrlMode):
+        """
+        检查关节力矩是否在有效范围内，根据控制模式应用不同的限制
+
+        Args:
+          joint (Joint): 关节对象
+          mode (CtrlMode): 控制模式
+
+        """
+        if mode in [CtrlMode.POSITION, CtrlMode.SPEED]:
+            # 位置模式和速度模式：力矩范围 0-100，负数取绝对值，绝对值>100取100
+            if joint.torque < 0:
+                joint.torque = abs(joint.torque)
+                logger.warning(f"[Joint] ID: {JointId(joint.id).name} torque is negative in {mode.name} mode, converted to absolute value {joint.torque}")
+            if joint.torque > 100:
+                original_torque = joint.torque
+                joint.torque = 100
+                logger.warning(f"[Joint] ID: {JointId(joint.id).name} torque {original_torque} exceeds limit in {mode.name} mode, clamped to 100")
+        elif mode == CtrlMode.TORQUE:
+            # 力矩模式：力矩范围 -100到100
+            if joint.torque < -100:
+                original_torque = joint.torque
+                joint.torque = -100
+                logger.warning(f"[Joint] ID: {JointId(joint.id).name} torque {original_torque} below limit in TORQUE mode, clamped to -100")
+            elif joint.torque > 100:
+                original_torque = joint.torque
+                joint.torque = 100
+                logger.warning(f"[Joint] ID: {JointId(joint.id).name} torque {original_torque} exceeds limit in TORQUE mode, clamped to 100")
 
     def get_connectable_devices(self) -> list[str]:
         """
@@ -363,12 +422,13 @@ class DexHand(object):
         获取产品序列号
 
         Returns:
-            str: 获取成功返回产品序列号，失败返回空字符串""
+            int: 获取成功返回产品序列号，失败返回0
         """
         try:
-            serial_number = self._client.sdo_read(0x1018, 0x04)
+            serial_number = int.from_bytes(
+                self._client.sdo_read(0x1018, 0x04), byteorder='little')
         except Exception:
-            return ""
+            return 0
         return serial_number
 
     def fault_clearance(self) -> bool:
@@ -510,7 +570,10 @@ class DexHand(object):
             rpdo.mode = mode.value
             rpdo.stop = 0
             for joint in joints:
-                # 应用关节限制检查
+                # 应用速度和力矩限制检查
+                self._check_speed_limit(joint, mode)
+                self._check_torque_limit(joint, mode)
+                # 应用关节角度限制检查
                 if joint.id == JointId.THUMB_PIP:
                     self._check_joint_limit(joint, self._th_pip_limit)
                     self._joint_to_pdo(joint, rpdo.th_pip)
@@ -638,7 +701,10 @@ class DexHand(object):
 
             for joint_id, joint_tpdo in joint_mappings:
                 # 检查关节故障
-                if joint_tpdo.error != 0 or joint_tpdo.state in [State.ABNORMAL_RUNNING, State.PROTECTIVE_STOP]:
+                if joint_tpdo.error != ErrorCode.NORMAL or joint_tpdo.state in [
+                    State.ABNORMAL_RUNNING,
+                    State.PROTECTIVE_STOPED,
+                ]:
                     faulty_joints.append(JointFaultInfo(
                         joint_id=JointId(joint_id).name,
                         state=State(joint_tpdo.state),
@@ -721,7 +787,7 @@ class DexHand(object):
                 raise DeviceFaultError(error_msg, fault_info=fault_info)
 
             # 检查异常运行状态（虽然你说 state=2/3 时一定 error!=0，但为了保险再检查一次）
-            if tpdo.hand.state in [State.ABNORMAL_RUNNING, State.PROTECTIVE_STOP]:
+            if tpdo.hand.state in [State.ABNORMAL_RUNNING, State.PROTECTIVE_STOPED]:
                 # 如果 error == 0 但状态异常，也抛出异常
                 if tpdo.hand.error == 0:
                     fault_info = FaultInfo(

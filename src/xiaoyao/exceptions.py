@@ -42,7 +42,7 @@ _ERROR_MESSAGES = {
 }
 
 _STATE_MESSAGES = {
-    State.PROTECTIVE_STOP: "设备进入保护性停止状态",
+    State.PROTECTIVE_STOPED: "设备进入保护性停止状态",
     State.ABNORMAL_RUNNING: "设备运行异常",
 }
 
@@ -66,7 +66,7 @@ def get_fault_message(error_code: ErrorCode, state: Optional[State] = None, **co
         base_msg = "设备正常运行"
 
     # 如果有状态异常，添加状态信息
-    if state and state in [State.PROTECTIVE_STOP, State.ABNORMAL_RUNNING]:
+    if state and state in [State.PROTECTIVE_STOPED, State.ABNORMAL_RUNNING]:
         state_msg = _STATE_MESSAGES.get(state, f"异常状态: {state.name}")
         if error_code == ErrorCode.NORMAL:
             return f"{state_msg}，但错误码为0"
@@ -135,7 +135,7 @@ class DeviceFaultError(XiaoyaoError):
 
     当设备处于故障状态时抛出，包括：
     - state = 2 (ABNORMAL_RUNNING)
-    - state = 3 (PROTECTIVE_STOP)
+    - state = 3 (PROTECTIVE_STOPED)
     - error != 0
     """
 
