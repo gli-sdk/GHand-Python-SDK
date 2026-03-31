@@ -10,9 +10,9 @@ author = 'glitech'
 autodoc_member_order = 'bysource'
 
 # The short X.Y version
-version = '1.0'
+version = '1.1'
 # The full version, including alpha/beta/rc tags
-release = '1.0.1'
+release = '1.1.0'
 
 # -- General configuration ---------------------------------------------------
 extensions = [

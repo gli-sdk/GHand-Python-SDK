@@ -11,11 +11,11 @@ class SubscriptionManager:
         self._lock = threading.Lock()
         self._running = False
         self._thread = None
+        self._dispatcher_thread = None
         # 如果提供了客户端实例，则使用它，否则创建新的实例
         self._client = client if client else EthercatClient()
         self._data = None
         self._sub_id_counter = 0
-        self._lock = threading.Lock()
         self._subscribers = {}
         self._is_client_owner = client is None  # 标记是否拥有客户端实例
 
@@ -34,8 +34,11 @@ class SubscriptionManager:
         self._running = False
         if self._thread:
             self._thread.join(timeout=1)
+            self._thread = None
         if self._dispatcher_thread:
             self._dispatcher_thread.join(timeout=1)
+            self._dispatcher_thread = None
+        self._data = None
 
     def _data_producer(self):
         """数据生产者线程"""
@@ -73,5 +76,8 @@ class SubscriptionManager:
         with self._lock:
             if sub_id in self._subscribers:
                 del self._subscribers[sub_id]
+                # 如果没有订阅者了，自动停止
+                if not self._subscribers:
+                    self.stop()
                 return True
             return False

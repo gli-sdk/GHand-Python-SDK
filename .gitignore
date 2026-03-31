@@ -3,3 +3,14 @@ test
 build
 dist
 *.egg-info
+.idea/
+docs/build/
+nul
+.claude/
+openspec/
+scan_code.py
+package.sh
+package.bat
+.vscode/settings.json
+.gitignore
+CHANGELOG.md

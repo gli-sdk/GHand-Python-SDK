@@ -1,5 +1,5 @@
 SDK_VERSION_MAJOR = 1
-SDK_VERSION_MINOR = 0
+SDK_VERSION_MINOR = 1
 SDK_VERSION_REVISION = 2
 
 __version__ = "{}.{}.{}".format(
