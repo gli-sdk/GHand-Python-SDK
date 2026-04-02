@@ -16,6 +16,16 @@ from .exceptions import (
     get_fault_message
 )
 
+# 尝试导入碰撞检测异常（可选依赖）
+try:
+    from .collision.exceptions import CollisionCheckError
+except ImportError:
+    # 如果碰撞检测模块未安装，定义一个占位符
+    from .exceptions import XiaoyaoError
+    class CollisionCheckError(XiaoyaoError):
+        """碰撞检测错误（碰撞检测功能未安装）"""
+        pass
+
 logger = logging.getLogger("xiaoyao.dexhand")
 
 class HandType(enum.Enum):
@@ -161,6 +171,9 @@ class DexHand(object):
         self._sub_manager = SubscriptionManager(self._client)
         self._opened = False
         self._set_joint_limit()
+        # 碰撞检测相关属性
+        self._safety_margin = 0.0  # 默认安全边距
+        self._collision_checker = None  # 延迟加载
 
     def __del__(self):
         """
@@ -902,3 +915,142 @@ class DexHand(object):
                 f"Failed to communicate with device: {e}",
                 reason=str(e)
             ) from e
+
+    # ==================== 碰撞检测相关方法 ====================
+
+    def set_safety_margin(self, margin: float) -> None:
+        """
+        设置碰撞检测的安全边距
+
+        Args:
+            margin: 安全边距，范围 [0.0, 1.0]
+                    0.0 = 无边距（精确接触）
+                    1.0 = 最大边距（2mm）
+
+        Raises:
+            ValueError: 如果 margin 超出 [0.0, 1.0] 范围
+
+        Example:
+            >>> hand = DexHand()
+            >>> hand.open(CommType.ETHERCAT, "auto")
+            >>> hand.set_safety_margin(0.5)  # 设置1mm安全边距
+        """
+        # 限制在有效范围内
+        if margin < 0.0 or margin > 1.0:
+            logger.warning(
+                f"Safety margin {margin} out of range [0.0, 1.0], clamping to valid range"
+            )
+            margin = max(0.0, min(1.0, margin))
+
+        self._safety_margin = margin
+        logger.info(f"Collision safety margin set to {margin} ({margin * 2:.1f} mm)")
+
+    def move_safe_joints(self, joints: list[Joint], mode: CtrlMode = CtrlMode.POSITION) -> bool:
+        """
+        安全移动关节（自动进行碰撞检测）
+
+        在移动关节前自动进行碰撞检测。如果检测到碰撞，
+        自动使用安全角度替代目标角度。
+
+        Args:
+            joints: 关节列表
+            mode: 控制模式（默认位置模式）
+
+        Returns:
+            bool: 移动成功返回True，失败返回False
+
+        Raises:
+            CollisionCheckError: 碰撞检测失败（数据文件缺失等）
+
+        Example:
+            >>> hand = DexHand()
+            >>> hand.open(CommType.ETHERCAT, "auto")
+            >>> hand.set_safety_margin(0.5)
+            >>> joints = [Joint(id=JointId.THUMB_PIP, angle=1.5, speed=100, torque=100)]
+            >>> success = hand.move_safe_joints(joints)
+            >>> if success:
+            ...     print("Movement completed safely")
+        """
+        # 5.3.1 延迟加载CollisionSDK
+        if self._collision_checker is None:
+            try:
+                from xiaoyao.collision.core.sdk import CollisionSDK
+                self._collision_checker = CollisionSDK()
+            except ImportError as e:
+                logger.error(f"碰撞检测功能不可用: {e}")
+                raise CollisionCheckError(
+                    "碰撞检测功能需要额外的依赖项。"
+                    "请运行: pip install -e .[collision]"
+                ) from e
+
+        # 获取当前关节状态（用于填充未指定的关节）
+        current_joints = None
+        if self._opened:
+            try:
+                current_joints = self.get_joints()
+            except Exception:
+                # 如果获取失败，使用默认值（0度）
+                logger.debug("无法获取当前关节状态，使用默认值（0度）")
+
+        # 5.3.2-5.3.3 转换Joint列表为numpy数组并调用CollisionSDK
+        from xiaoyao.collision.converter import joints_to_nparray, nparray_to_joints
+
+        # 转换为numpy数组
+        target_angles = joints_to_nparray(joints, current_joints)
+
+        # 调用CollisionSDK进行碰撞检测
+        result = self._collision_checker.collision_check(
+            target_angles=target_angles,
+            safety_margin=self._safety_margin
+        )
+
+        # 5.3.4 处理碰撞结果
+        if result.has_collision:
+            # 5.3.5 记录碰撞日志（INFO级别）
+            collision_info = ", ".join([
+                f"{pair.get('link1', '?')} <-> {pair.get('link2', '?')}"
+                for pair in (result.collision_pairs or [])
+            ])
+            logger.info(
+                f"Collision detected between: {collision_info}. "
+                f"Using safe angles instead of target angles."
+            )
+
+            # 使用安全角度创建新的关节列表，保留原始的 speed 和 torque
+            safe_joints = nparray_to_joints(
+                result.safe_angles,
+                reference_joints=joints  # 保留原始关节的 speed 和 torque
+            )
+            joints = safe_joints
+
+        # 5.3.6 调用现有的move_joints()执行移动
+        return self.move_joints(joints, mode)
+
+    def _joints_to_angles(self, joints: list[Joint], current_joints: list[Joint] | None = None):
+        """
+        将Joint列表转换为numpy数组（私有方法）
+
+        Args:
+            joints: 关节列表
+            current_joints: 当前关节状态（用于填充未指定的关节）
+
+        Returns:
+            np.ndarray: 18个关节角度的数组
+        """
+        from xiaoyao.collision.converter import joints_to_nparray
+        return joints_to_nparray(joints, current_joints)
+
+    def _angles_to_joints(self, angles, speed: int = 100, torque: int = 100) -> list[Joint]:
+        """
+        将numpy数组转换为Joint列表（私有方法）
+
+        Args:
+            angles: 18个关节角度的numpy数组
+            speed: 所有关节的速度参数
+            torque: 所有关节的力矩参数
+
+        Returns:
+            list[Joint]: 18个Joint对象的列表
+        """
+        from xiaoyao.collision.converter import nparray_to_joints
+        return nparray_to_joints(angles, speed, torque)

@@ -1,0 +1,10 @@
+# 碰撞检测功能的可选依赖
+# 安装方法：pip install -e .[collision]
+# 或：pip install -r requirements-collision.txt
+
+numpy
+pandas
+trimesh
+numpy-stl
+networkx
+scipy
