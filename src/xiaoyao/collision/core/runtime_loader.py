@@ -28,14 +28,14 @@ def _get_default_data_path() -> str:
             # Python 3.8
             import importlib_resources as resources
 
-        # 获取 xiaoyao.data.collision 路径
-        collision_path = resources.files('xiaoyao.data') / 'collision'
+        # 获取 xiaoyao.collision_data.collision 路径
+        collision_path = resources.files('xiaoyao.collision_data') / 'collision'
         return str(collision_path)
     except Exception:
         # 回退：使用相对路径
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        # xiaoyao/collision/core/ -> xiaoyao/data/collision/
-        return os.path.abspath(os.path.join(current_dir, '../../data/collision'))
+        # xiaoyao/collision/core/ -> xiaoyao/collision_data/collision/
+        return os.path.abspath(os.path.join(current_dir, '../../collision_data/collision'))
 
 
 @dataclass

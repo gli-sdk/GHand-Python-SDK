@@ -40,6 +40,9 @@ def joints_to_nparray(joints: list[Joint], current_joints: list[Joint] | None = 
         if 0 <= joint.id < 18:
             angles[joint.id] = joint.angle
 
+    # 规范化处理：避免 -0.0（确保所有接近0的值都是正0）
+    angles = np.where(np.abs(angles) < 1e-10, 0.0, angles)
+
     return angles
 
 

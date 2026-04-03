@@ -20,13 +20,13 @@ def get_collision_data_path() -> str:
         str: 碰撞检测数据目录的绝对路径
 
     Example:
-        >>> from xiaoyao.data import get_collision_data_path
+        >>> from xiaoyao.collision_data import get_collision_data_path
         >>> data_path = get_collision_data_path()
         >>> print(f"Collision data at: {data_path}")
     """
     try:
         # 使用 importlib.resources 获取包数据路径
-        ref = resources.files('xiaoyao.data') / 'collision'
+        ref = resources.files('xiaoyao.collision_data') / 'collision'
         # 转换为字符串路径（兼容性）
         return str(ref)
     except Exception as e:

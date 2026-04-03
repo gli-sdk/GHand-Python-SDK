@@ -558,12 +558,7 @@ class DexHand(object):
           joint (Joint): 关节对象
           pdo (JointRpdo): PDO对象
         """
-        # THUMB_ROTATION 在固件层面有 30 度偏移，发送时需要补偿
-        # 固件期望 0-90 度，SDK 逻辑范围是 -30 到 60 度
-        if joint.id == JointId.THUMB_ROTATION:
-            pdo.angle = joint.angle + math.radians(30)
-        else:
-            pdo.angle = joint.angle
+        pdo.angle = joint.angle
         pdo.speed = joint.speed
         pdo.torque = joint.torque
 
@@ -626,6 +621,10 @@ class DexHand(object):
                 elif joint.id == JointId.LF_MCP:
                     self._check_joint_limit(joint, self._lf_mcp_limit)
                     self._joint_to_pdo(joint, rpdo.lf_mcp)
+                elif joint.id in [JointId.THUMB_DIP, JointId.FF_DIP, JointId.MF_DIP, JointId.RF_DIP, JointId.LF_DIP]:
+                    # DIP 关节是从动关节（passive joints），不需要主动控制
+                    logger.debug(f"Skipping passive joint: {JointId(joint.id).name}")
+                    continue
                 else:
                     logger.warning(f"[Joint] Invalid joint ID: {joint.id}")
                     return False
@@ -724,10 +723,10 @@ class DexHand(object):
                         error_code=ErrorCode(joint_tpdo.error)
                     ))
 
-                # THUMB_ROTATION 角度补偿
+                # 规范化角度：避免 -0.0
                 angle = joint_tpdo.angle
-                if joint_id == JointId.THUMB_ROTATION:
-                    angle = angle - math.radians(30)
+                if abs(angle) < 1e-10:
+                    angle = 0.0
 
                 joints.append(
                     Joint(
@@ -1007,10 +1006,14 @@ class DexHand(object):
         # 5.3.4 处理碰撞结果
         if result.has_collision:
             # 5.3.5 记录碰撞日志（INFO级别）
-            collision_info = ", ".join([
-                f"{pair.get('link1', '?')} <-> {pair.get('link2', '?')}"
-                for pair in (result.collision_pairs or [])
-            ])
+            # collision_pairs 是字符串列表，例如 ['TH-PIP', 'IF-PIP'] 或 ['TH-MCP', 'plane']
+            collision_links = result.collision_pairs or []
+            if collision_links:
+                # 将碰撞的连杆用 " <-> " 连接显示
+                collision_info = " <-> ".join(collision_links)
+            else:
+                collision_info = "unknown collision"
+
             logger.info(
                 f"Collision detected between: {collision_info}. "
                 f"Using safe angles instead of target angles."

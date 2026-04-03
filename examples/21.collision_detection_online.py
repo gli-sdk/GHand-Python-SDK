@@ -22,27 +22,27 @@ def main():
         connected = hand.open(CommType.ETHERCAT, "auto")
 
         if not connected:
-            print("❌ 设备连接失败")
+            print("[ERROR] 设备连接失败")
             return
 
-        print("✓ 设备连接成功\n")
+        print("[OK] 设备连接成功\n")
 
         # 设置安全边距
         hand.set_safety_margin(0.3)  # 0.3mm
-        print("✓ 安全边距已设置为 0.3mm\n")
+        print("[OK] 安全边距已设置为 0.3mm\n")
 
         # 测试1：移动到安全姿态
         print("--- 测试1：移动到安全姿态 ---")
         joints1 = [
-            Joint(id=JointId.THUMB_PIP, angle=math.radians(70), speed=100, torque=100),
+            Joint(id=JointId.THUMB_PIP, angle=math.radians(66), speed=100, torque=100),
             Joint(id=JointId.THUMB_SWING, angle=math.radians(52), speed=100, torque=100),
-            Joint(id=JointId.THUMB_ROTATION,angle=math.radians(-10),speed=100,torque=100,),
+            Joint(id=JointId.THUMB_ROTATION,angle=math.radians(0),speed=100,torque=100,),
             Joint(id=JointId.FF_PIP, angle=math.radians(30), speed=100, torque=100),
             Joint(id=JointId.FF_MCP, angle=math.radians(70), speed=100, torque=100),
         ]
         success = hand.move_safe_joints(joints1)
         if success:
-            print("✓ 移动成功")
+            print("[OK] 移动成功")
             time.sleep(2)
 
         # 显示当前状态
@@ -94,10 +94,10 @@ def main():
         print("===== 演示完成 =====")
 
     except CollisionCheckError as e:
-        print(f"\n❌ 碰撞检测错误: {e.reason}")
+        print(f"\n[ERROR] 碰撞检测错误: {e.reason}")
 
     except Exception as e:
-        print(f"\n❌ 错误: {type(e).__name__}: {e}")
+        print(f"\n[ERROR] 错误: {type(e).__name__}: {e}")
 
     finally:
         hand.close()

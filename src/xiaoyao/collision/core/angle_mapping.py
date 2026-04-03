@@ -31,24 +31,24 @@ EXTERNAL_JOINT_ORDER = (
 
 # External input angle limits in radians, matching EXTERNAL_JOINT_ORDER.
 EXTERNAL_JOINT_LIMITS = (
-    (0.0, 1.0472),     # THUMB_DIP
-    (0.0, 1.2217),     # THUMB_PIP
-    (0.0, 0.8727),     # THUMB_MCP
-    (0.0, 1.2220),     # THUMB_SWING
-    (-0.1510, 1.0472), # THUMB_ROTATION
-    (0.0, 1.0472),     # FF_DIP
-    (0.0, 1.2217),     # FF_PIP
-    (0.0, 1.2217),     # FF_MCP
-    (-0.1745, 0.1745), # FF_SWING
-    (0.0, 1.0472),     # MF_DIP
-    (0.0, 1.2217),     # MF_PIP
-    (0.0, 1.2217),     # MF_MCP
-    (0.0, 1.0472),     # RF_DIP
-    (0.0, 1.2217),     # RF_PIP
-    (0.0, 1.2217),     # RF_MCP
-    (0.0, 0.8727),     # LF_DIP
-    (0.0, 1.0472),     # LF_PIP
-    (0.0, 1.2217),     # LF_MCP
+    (-0.1, 1.0473),  # THUMB_DIP
+    (-0.1, 1.2218),  # THUMB_PIP
+    (-0.1, 0.8728),  # THUMB_MCP
+    (-0.1, 1.2221),  # THUMB_SWING
+    (-0.1746, 1.0473),  # THUMB_ROTATION
+    (-0.1, 1.0473),  # FF_DIP
+    (-0.1, 1.2218),  # FF_PIP
+    (-0.1, 1.2218),  # FF_MCP
+    (-0.1746, 0.1746),  # FF_SWING
+    (-0.1, 1.0473),  # MF_DIP
+    (-0.1, 1.2218),  # MF_PIP
+    (-0.1, 1.2218),  # MF_MCP
+    (-0.1, 1.0473),  # RF_DIP
+    (-0.1, 1.2218),  # RF_PIP
+    (-0.1, 1.2218),  # RF_MCP
+    (-0.1, 0.8728),  # LF_DIP
+    (-0.1, 1.0473),  # LF_PIP
+    (-0.1, 1.2218),  # LF_MCP
 )
 
 
@@ -107,12 +107,18 @@ def validate_external_angles(angles: Iterable[float]) -> list[float]:
     for index, value in enumerate(normalized_angles):
         if not math.isfinite(value):
             raise ValueError(f'external_angles[{index}] must be finite, got {value!r}')
+
+        # 规范化处理：避免 -0.0 导致的范围检查失败
+        if abs(normalized_angles[index]) < 1e-10:
+            normalized_angles[index] = 0.0
+
         min_limit, max_limit = EXTERNAL_JOINT_LIMITS[index]
         joint_name = EXTERNAL_JOINT_ORDER[index]
-        if value < min_limit or value > max_limit:
+        check_value = normalized_angles[index]
+        if check_value < min_limit or check_value > max_limit:
             raise ValueError(
                 f'external_angles[{index}] ({joint_name}) is out of range: '
-                f'got {value:.4f} rad, expected [{min_limit:.4f}, {max_limit:.4f}] rad'
+                f'got {check_value:.4f} rad, expected [{min_limit:.4f}, {max_limit:.4f}] rad'
             )
 
     return normalized_angles
