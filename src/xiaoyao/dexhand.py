@@ -175,9 +175,9 @@ class DexHand(object):
         self._th_pip_limit = (0, math.radians(66))
         self._th_mcp_limit = (0, math.radians(50))
         self._th_swing_limit = (0, math.radians(90))
-        self._th_rot_limit = (math.radians(-30), math.radians(60))
+        self._th_rot_limit = (math.radians(-10), math.radians(60))
         self._ff_pip_limit = (0, math.radians(80))
-        self._ff_mcp_limit = (0, math.radians(90))
+        self._ff_mcp_limit = (0, math.radians(85))
         self._ff_swing_limit = (math.radians(-10), math.radians(10))
         self._mf_pip_limit = (0, math.radians(90))
         self._mf_mcp_limit = (0, math.radians(90))
@@ -545,12 +545,7 @@ class DexHand(object):
           joint (Joint): 关节对象
           pdo (JointRpdo): PDO对象
         """
-        # THUMB_ROTATION 在固件层面有 30 度偏移，发送时需要补偿
-        # 固件期望 0-90 度，SDK 逻辑范围是 -30 到 60 度
-        if joint.id == JointId.THUMB_ROTATION:
-            pdo.angle = joint.angle + math.radians(30)
-        else:
-            pdo.angle = joint.angle
+        pdo.angle = joint.angle
         pdo.speed = joint.speed
         pdo.torque = joint.torque
 
@@ -710,16 +705,10 @@ class DexHand(object):
                         state=State(joint_tpdo.state),
                         error_code=ErrorCode(joint_tpdo.error)
                     ))
-
-                # THUMB_ROTATION 角度补偿
-                angle = joint_tpdo.angle
-                if joint_id == JointId.THUMB_ROTATION:
-                    angle = angle - math.radians(30)
-
                 joints.append(
                     Joint(
                         id=joint_id,
-                        angle=angle,
+                        angle=joint_tpdo.angle,
                         speed=joint_tpdo.speed,
                         torque=joint_tpdo.torque,
                         state=State(joint_tpdo.state),
