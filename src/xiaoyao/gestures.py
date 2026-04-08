@@ -153,16 +153,20 @@ def _wait_for_completion(hand: DexHand) -> bool:
     Returns:
         bool: 成功返回 True，失败返回 False
     """
-    while True:
-        hand_info = hand.get_hand_info()
-        if hand_info.state == State.RUNNING:
-            break
-        time.sleep(0.01)  # 避免 CPU 占用过高
+    start_time = time.time()
+    has_been_running = False
 
     while True:
         hand_info = hand.get_hand_info()
-        if hand_info.state != State.RUNNING:
+        if hand_info.state == State.RUNNING:
+            has_been_running = True
+        elif has_been_running:
+            # 场景 A：从 RUNNING 变为 STOPPED，立刻判定完成
             break
+        elif time.time() - start_time >= 0.02:
+            # 场景 B：一直是 STOPPED，20ms 观察期后判定完成
+            break
+        time.sleep(0.005)
 
     if hand_info.state in [State.ABNORMAL_RUNNING, State.PROTECTIVE_STOPED] or \
        hand_info.error != ErrorCode.NORMAL:

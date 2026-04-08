@@ -431,6 +431,27 @@ class DexHand(object):
             return 0
         return serial_number
 
+    def get_motor_driver_version(self):
+        """
+        获取电机驱动版本号
+
+        Returns:
+            tuple: (主版本号, 子版本号1, 子版本号2)，获取失败返回 (0, 0, 0)
+        """
+        try:
+            main_ver = int.from_bytes(
+                self._client.sdo_read(0x2007, 0x01), byteorder="little"
+            )
+            sub1_ver = int.from_bytes(
+                self._client.sdo_read(0x2007, 0x02), byteorder="little"
+            )
+            sub2_ver = int.from_bytes(
+                self._client.sdo_read(0x2007, 0x03), byteorder="little"
+            )
+        except Exception:
+            return (0, 0, 0)
+        return (main_ver, sub1_ver, sub2_ver)
+
     def fault_clearance(self) -> bool:
         """
         故障清除
