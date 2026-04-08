@@ -19,7 +19,7 @@ from .exceptions import (
 
 # 尝试导入碰撞检测异常（可选依赖）
 try:
-    from .collision.exceptions import CollisionCheckError
+    from .collision_detection.src.exceptions import CollisionCheckError
 except ImportError:
     # 如果碰撞检测模块未安装，定义一个占位符
     class CollisionCheckError(XiaoyaoError):

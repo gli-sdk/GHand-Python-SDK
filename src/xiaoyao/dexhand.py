@@ -18,7 +18,7 @@ from .exceptions import (
 
 # 尝试导入碰撞检测异常（可选依赖）
 try:
-    from .collision.exceptions import CollisionCheckError
+    from .collision_detection.src.exceptions import CollisionCheckError
 except ImportError:
     # 如果碰撞检测模块未安装，定义一个占位符
     from .exceptions import XiaoyaoError
@@ -973,7 +973,7 @@ class DexHand(object):
         # 5.3.1 延迟加载CollisionSDK
         if self._collision_checker is None:
             try:
-                from xiaoyao.collision.core.sdk import CollisionSDK
+                from xiaoyao.collision_detection.src.sdk import CollisionSDK
                 self._collision_checker = CollisionSDK()
             except ImportError as e:
                 logger.error(f"碰撞检测功能不可用: {e}")
@@ -992,7 +992,7 @@ class DexHand(object):
                 logger.debug("无法获取当前关节状态，使用默认值（0度）")
 
         # 5.3.2-5.3.3 转换Joint列表为numpy数组并调用CollisionSDK
-        from xiaoyao.collision.converter import joints_to_nparray, nparray_to_joints
+        from xiaoyao.collision_detection.src.converter import joints_to_nparray, nparray_to_joints
 
         # 转换为numpy数组
         target_angles = joints_to_nparray(joints, current_joints)
@@ -1026,6 +1026,22 @@ class DexHand(object):
             )
             joints = safe_joints
 
+            # 合并打印目标角度和安全角度的对比表格（度）
+            print("=== 碰撞检测 - 角度对比 (单位: 度) ===")
+            print("-" * 70)
+            print(f"{'关节名称':<18} {'目标角度':<12} {'安全角度':<12}")
+            print("-" * 70)
+
+            for i in range(18):
+                joint_name = JointId(i).name
+                target_deg = math.degrees(target_angles[i])
+                safe_deg = math.degrees(result.safe_angles[i])
+                print(f"{joint_name:<25} {target_deg:<12.2f} {safe_deg:<12.2f}")
+
+            print("-" * 70)
+            print()
+            
+
         # 5.3.6 调用现有的move_joints()执行移动
         return self.move_joints(joints, mode)
 
@@ -1040,7 +1056,7 @@ class DexHand(object):
         Returns:
             np.ndarray: 18个关节角度的数组
         """
-        from xiaoyao.collision.converter import joints_to_nparray
+        from xiaoyao.collision_detection.src.converter import joints_to_nparray
         return joints_to_nparray(joints, current_joints)
 
     def _angles_to_joints(self, angles, speed: int = 100, torque: int = 100) -> list[Joint]:
@@ -1055,5 +1071,5 @@ class DexHand(object):
         Returns:
             list[Joint]: 18个Joint对象的列表
         """
-        from xiaoyao.collision.converter import nparray_to_joints
+        from xiaoyao.collision_detection.src.converter import nparray_to_joints
         return nparray_to_joints(angles, speed, torque)
