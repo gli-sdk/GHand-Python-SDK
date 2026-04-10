@@ -17,7 +17,7 @@ from .exceptions import (
     JointFaultInfo
 )
 from .version import __version__
-from .gestures import GestureType, execute_gesture, get_all_gestures, get_gesture_name
+from .gestures import GestureType, execute_gesture, get_all_gestures
 
 # ==============================================================================
 # 日志初始化：符合 SDK 标准
@@ -55,7 +55,6 @@ __all__ = [
     "GestureType",
     "execute_gesture",
     "get_all_gestures",
-    "get_gesture_name",
     # 日志配置函数
     "configure_logging",
     "configure_logging_console",

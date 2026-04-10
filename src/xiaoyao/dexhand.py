@@ -174,7 +174,7 @@ class DexHand(object):
         """
         self._th_pip_limit = (0, math.radians(66))
         self._th_mcp_limit = (0, math.radians(50))
-        self._th_swing_limit = (0, math.radians(90))
+        self._th_swing_limit = (math.radians(20), math.radians(90))
         self._th_rot_limit = (math.radians(-10), math.radians(60))
         self._ff_pip_limit = (0, math.radians(80))
         self._ff_mcp_limit = (0, math.radians(85))
@@ -498,7 +498,8 @@ class DexHand(object):
                 return True
             else:
                 return False
-        except Exception:
+        except Exception as e:
+            logger.error(f"tactile_open error: {e}", exc_info=True)
             return False
 
     def tactile_close(self) -> bool:
@@ -533,10 +534,14 @@ class DexHand(object):
             result_data = self._client.sdo_read(0x2004, 0x03)
             # 检查结果区数据，如果为0则成功，为1则失败
             if result_data == b'\x00':
+                logger.debug("Tactile zero calibration successful")
                 return True
             else:
+                logger.error(f"tactile_zero failed with result data: {result_data}")
                 return False
-        except Exception:
+
+        except Exception as e:
+            logger.error(f"tactile_zero error: {e}", exc_info=True)
             return False
 
     def get_hand_type(self) -> HandType:
