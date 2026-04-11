@@ -124,7 +124,7 @@ class Joint:
     state: State = State.STOPPED  # 关节状态
     error: ErrorCode = ErrorCode.NORMAL  # 错误码
 
-    def create_joint_positions(joint_angles_dict):
+    def create_joint_positions(joint_angles_dict,speed=100, torque=100):
         """
         根据关节角度字典创建关节列表
 
@@ -135,16 +135,9 @@ class Joint:
             list: Joint对象列表
         """
         joints = []
-        default_speed = 100
-        default_torque = 100
 
         for joint_id, angle in joint_angles_dict.items():
-            joints.append(Joint(
-                id=joint_id,
-                angle=angle,
-                speed=default_speed,
-                torque=default_torque
-            ))
+            joints.append(Joint(id=joint_id, angle=angle, speed=speed, torque=torque))
 
         return joints
 
