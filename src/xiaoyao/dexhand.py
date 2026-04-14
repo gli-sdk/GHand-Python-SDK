@@ -16,15 +16,33 @@ from .exceptions import (
     get_fault_message
 )
 
-# 尝试导入碰撞检测异常（可选依赖）
+# 尝试导入碰撞检测类型和异常（可选依赖）
 try:
-    from .collision_detection.src.exceptions import CollisionCheckError
+    from collision_sdk import (
+        CollisionSDK,
+        CollisionCheckError,
+        CollisionCheckResult,
+    )
+    from collision_sdk.converter import joints_to_nparray, nparray_to_joints
 except ImportError:
-    # 如果碰撞检测模块未安装，定义一个占位符
+    # 如果碰撞检测模块未安装，定义占位符
     from .exceptions import XiaoyaoError
     class CollisionCheckError(XiaoyaoError):
         """碰撞检测错误（碰撞检测功能未安装）"""
         pass
+    class CollisionCheckResult:
+        """碰撞检测结果占位符"""
+        def __init__(self, has_collision=False, safe_angles=None, collision_pairs=None):
+            self.has_collision = has_collision
+            self.safe_angles = safe_angles
+            self.collision_pairs = collision_pairs
+    class CollisionSDK:
+        """碰撞检测 SDK 占位符"""
+        pass
+    def joints_to_nparray(joints, current_joints=None):
+        raise NotImplementedError("碰撞检测模块未安装")
+    def nparray_to_joints(angles, speed=100, torque=100):
+        raise NotImplementedError("碰撞检测模块未安装")
 
 logger = logging.getLogger("xiaoyao.dexhand")
 
@@ -944,12 +962,78 @@ class DexHand(object):
         self._safety_margin = margin
         logger.info(f"Collision safety margin set to {margin} ({margin * 2:.1f} mm)")
 
+    def check_collision(self, joints: list[Joint]) -> CollisionCheckResult:
+        """
+        检查目标关节姿态是否会发生碰撞。
+
+        此方法仅进行碰撞检测并返回结果，不会执行任何关节运动。
+        如果检测到碰撞，返回的结果中会包含安全角度。
+
+        Args:
+            joints: 关节列表。未指定的关节将使用当前关节角度（设备已连接）
+                    或 0°（设备未连接）填充。
+
+        Returns:
+            CollisionCheckResult: 碰撞检测结果，包含 has_collision、safe_angles 和
+                                   collision_pairs。
+
+        Raises:
+            CollisionCheckError: 碰撞检测功能未安装或数据文件缺失。
+
+        Example:
+            >>> hand = DexHand()
+            >>> result = hand.check_collision(joints)
+            >>> if result.has_collision:
+            ...     print("检测到碰撞，使用安全角度")
+            ...     joints = hand._angles_to_joints(result.safe_angles)
+        """
+        # 5.2.1 延迟加载 CollisionSDK
+        if self._collision_checker is None:
+            try:
+                self._collision_checker = CollisionSDK()
+            except ImportError as e:
+                logger.error(f"碰撞检测功能不可用: {e}")
+                raise CollisionCheckError(
+                    "碰撞检测功能需要额外的依赖项。"
+                    "请运行: pip install -e .[collision]"
+                ) from e
+
+        # 获取当前关节状态（用于填充未指定的关节）
+        current_joints = None
+        if self._opened:
+            try:
+                current_joints = self.get_joints()
+            except Exception:
+                logger.debug("无法获取当前关节状态，使用默认值（0度）")
+
+        # 5.2.2 转换 Joint 列表为 numpy 数组
+        target_angles = joints_to_nparray(joints, current_joints)
+
+        # 5.2.3 调用 CollisionSDK 进行碰撞检测
+        result = self._collision_checker.collision_check(
+            target_angles=target_angles,
+            safety_margin=self._safety_margin
+        )
+
+        # 若未碰撞，将 safe_angles 设为 target_angles 便于调用方统一处理
+        if not result.has_collision:
+            result = CollisionCheckResult(
+                has_collision=False,
+                safe_angles=target_angles.copy(),
+                collision_pairs=None,
+            )
+
+        return result
+
     def move_safe_joints(self, joints: list[Joint], mode: CtrlMode = CtrlMode.POSITION) -> bool:
         """
-        安全移动关节（自动进行碰撞检测）
+        安全移动关节（自动进行碰撞检测）。
 
         在移动关节前自动进行碰撞检测。如果检测到碰撞，
         自动使用安全角度替代目标角度。
+
+        此方法内部调用 `check_collision()` 并基于其结果执行运动，
+        行为与签名均保持向后兼容。
 
         Args:
             joints: 关节列表
@@ -970,46 +1054,19 @@ class DexHand(object):
             >>> if success:
             ...     print("Movement completed safely")
         """
-        # 5.3.1 延迟加载CollisionSDK
-        if self._collision_checker is None:
-            try:
-                from xiaoyao.collision_detection.src.sdk import CollisionSDK
-                self._collision_checker = CollisionSDK()
-            except ImportError as e:
-                logger.error(f"碰撞检测功能不可用: {e}")
-                raise CollisionCheckError(
-                    "碰撞检测功能需要额外的依赖项。"
-                    "请运行: pip install -e .[collision]"
-                ) from e
+        # 5.3.1 调用 check_collision 进行碰撞检测
+        result = self.check_collision(joints)
 
-        # 获取当前关节状态（用于填充未指定的关节）
-        current_joints = None
-        if self._opened:
-            try:
-                current_joints = self.get_joints()
-            except Exception:
-                # 如果获取失败，使用默认值（0度）
-                logger.debug("无法获取当前关节状态，使用默认值（0度）")
+        # 记录目标角度的 numpy 副本，用于后续打印对比
+        target_angles = None
+        if result.has_collision and result.safe_angles is not None:
+            target_angles = joints_to_nparray(joints)
 
-        # 5.3.2-5.3.3 转换Joint列表为numpy数组并调用CollisionSDK
-        from xiaoyao.collision_detection.src.converter import joints_to_nparray, nparray_to_joints
-
-        # 转换为numpy数组
-        target_angles = joints_to_nparray(joints, current_joints)
-
-        # 调用CollisionSDK进行碰撞检测
-        result = self._collision_checker.collision_check(
-            target_angles=target_angles,
-            safety_margin=self._safety_margin
-        )
-
-        # 5.3.4 处理碰撞结果
+        # 5.3.2 处理碰撞结果
         if result.has_collision:
-            # 5.3.5 记录碰撞日志（INFO级别）
-            # collision_pairs 是字符串列表，例如 ['TH-PIP', 'IF-PIP'] 或 ['TH-MCP', 'plane']
+            # 5.3.3 记录碰撞日志（INFO级别）
             collision_links = result.collision_pairs or []
             if collision_links:
-                # 将碰撞的连杆用 " <-> " 连接显示
                 collision_info = " <-> ".join(collision_links)
             else:
                 collision_info = "unknown collision"
@@ -1019,30 +1076,27 @@ class DexHand(object):
                 f"Using safe angles instead of target angles."
             )
 
-            # 使用安全角度创建新的关节列表，保留原始的 speed 和 torque
-            safe_joints = nparray_to_joints(
-                result.safe_angles,
-                reference_joints=joints  # 保留原始关节的 speed 和 torque
-            )
+            # 使用安全角度创建新的关节列表
+            safe_joints = nparray_to_joints(result.safe_angles)
             joints = safe_joints
 
-            # 合并打印目标角度和安全角度的对比表格（度）
-            print("=== 碰撞检测 - 角度对比 (单位: 度) ===")
-            print("-" * 70)
-            print(f"{'关节名称':<18} {'目标角度':<12} {'安全角度':<12}")
-            print("-" * 70)
+            # 打印目标角度和安全角度的对比表格（度）
+            if target_angles is not None:
+                print("=== 碰撞检测 - 角度对比 (单位: 度) ===")
+                print("-" * 70)
+                print(f"{'关节名称':<18} {'目标角度':<12} {'安全角度':<12}")
+                print("-" * 70)
 
-            for i in range(18):
-                joint_name = JointId(i).name
-                target_deg = math.degrees(target_angles[i])
-                safe_deg = math.degrees(result.safe_angles[i])
-                print(f"{joint_name:<25} {target_deg:<12.2f} {safe_deg:<12.2f}")
+                for i in range(18):
+                    joint_name = JointId(i).name
+                    target_deg = math.degrees(target_angles[i])
+                    safe_deg = math.degrees(result.safe_angles[i])
+                    print(f"{joint_name:<25} {target_deg:<12.2f} {safe_deg:<12.2f}")
 
-            print("-" * 70)
-            print()
-            
+                print("-" * 70)
+                print()
 
-        # 5.3.6 调用现有的move_joints()执行移动
+        # 5.3.4 调用现有的 move_joints() 执行移动
         return self.move_joints(joints, mode)
 
     def _joints_to_angles(self, joints: list[Joint], current_joints: list[Joint] | None = None):
@@ -1056,7 +1110,6 @@ class DexHand(object):
         Returns:
             np.ndarray: 18个关节角度的数组
         """
-        from xiaoyao.collision_detection.src.converter import joints_to_nparray
         return joints_to_nparray(joints, current_joints)
 
     def _angles_to_joints(self, angles, speed: int = 100, torque: int = 100) -> list[Joint]:
@@ -1071,5 +1124,4 @@ class DexHand(object):
         Returns:
             list[Joint]: 18个Joint对象的列表
         """
-        from xiaoyao.collision_detection.src.converter import nparray_to_joints
         return nparray_to_joints(angles, speed, torque)
