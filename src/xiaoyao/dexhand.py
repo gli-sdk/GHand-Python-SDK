@@ -1011,79 +1011,7 @@ class DexHand(object):
                 safe_angles=target_angles.copy(),
                 collision_pairs=None,
             )
-
         return result
-
-    def move_safe_joints(self, joints: list[Joint], mode: CtrlMode = CtrlMode.POSITION) -> bool:
-        """
-        安全移动关节（自动进行碰撞检测）。
-
-        在移动关节前自动进行碰撞检测。如果检测到碰撞，
-        自动使用安全角度替代目标角度。
-
-        此方法内部调用 `check_collision()` 并基于其结果执行运动，
-        行为与签名均保持向后兼容。
-
-        Args:
-            joints: 关节列表
-            mode: 控制模式（默认位置模式）
-
-        Returns:
-            bool: 移动成功返回True，失败返回False
-
-        Example:
-            >>> hand = DexHand()
-            >>> hand.open(CommType.ETHERCAT, "auto")
-            >>> hand.set_safety_margin(0.5)
-            >>> joints = [Joint(id=JointId.THUMB_PIP, angle=1.5, speed=100, torque=100)]
-            >>> success = hand.move_safe_joints(joints)
-            >>> if success:
-            ...     print("Movement completed safely")
-        """
-        # 5.3.1 调用 check_collision 进行碰撞检测
-        result = self.check_collision(joints)
-
-        # 记录目标角度的 numpy 副本，用于后续打印对比
-        target_angles = None
-        if result.has_collision and result.safe_angles is not None:
-            target_angles = joints_to_nparray(joints)
-
-        # 5.3.2 处理碰撞结果
-        if result.has_collision:
-            # 5.3.3 记录碰撞日志（INFO级别）
-            collision_links = result.collision_pairs or []
-            if collision_links:
-                collision_info = " <-> ".join(collision_links)
-            else:
-                collision_info = "unknown collision"
-
-            logger.info(
-                f"Collision detected between: {collision_info}. "
-                f"Using safe angles instead of target angles."
-            )
-
-            # 使用安全角度创建新的关节列表
-            safe_joints = nparray_to_joints(result.safe_angles)
-            joints = safe_joints
-
-            # 打印目标角度和安全角度的对比表格（度）
-            if target_angles is not None:
-                print("=== 碰撞检测 - 角度对比 (单位: 度) ===")
-                print("-" * 70)
-                print(f"{'关节名称':<18} {'目标角度':<12} {'安全角度':<12}")
-                print("-" * 70)
-
-                for i in range(18):
-                    joint_name = JointId(i).name
-                    target_deg = math.degrees(target_angles[i])
-                    safe_deg = math.degrees(result.safe_angles[i])
-                    print(f"{joint_name:<25} {target_deg:<12.2f} {safe_deg:<12.2f}")
-
-                print("-" * 70)
-                print()
-
-        # 5.3.4 调用现有的 move_joints() 执行移动
-        return self.move_joints(joints, mode)
 
     def _joints_to_angles(self, joints: list[Joint], current_joints: list[Joint] | None = None):
         """

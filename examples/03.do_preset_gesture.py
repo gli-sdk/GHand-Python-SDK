@@ -9,7 +9,7 @@ from xiaoyao import (
 )
 
 # Configure SDK logging (shows connection state, warnings, errors)
-configure_logging(level=logging.INFO)
+# configure_logging(level=logging.INFO)
 
 
 def main():

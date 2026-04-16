@@ -24,9 +24,9 @@ thumb_press = {
 }
 
 ff_press = {
-    JointId.THUMB_PIP: math.radians(75),
-    JointId.THUMB_MCP: math.radians(0),
-    JointId.THUMB_SWING: math.radians(0),
+    JointId.THUMB_PIP: math.radians(30),
+    JointId.THUMB_MCP: math.radians(20),
+    JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
     JointId.FF_PIP: math.radians(0),
     JointId.FF_MCP: math.radians(0),
@@ -40,9 +40,9 @@ ff_press = {
 }
 
 mf_press = {
-    JointId.THUMB_PIP: math.radians(75),
+    JointId.THUMB_PIP: math.radians(60),
     JointId.THUMB_MCP: math.radians(0),
-    JointId.THUMB_SWING: math.radians(0),
+    JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
     JointId.FF_PIP: math.radians(75),
     JointId.FF_MCP: math.radians(70),
@@ -56,9 +56,9 @@ mf_press = {
 }
 
 rf_press = {
-    JointId.THUMB_PIP: math.radians(75),
+    JointId.THUMB_PIP: math.radians(66),
     JointId.THUMB_MCP: math.radians(0),
-    JointId.THUMB_SWING: math.radians(0),
+    JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
     JointId.FF_PIP: math.radians(75),
     JointId.FF_MCP: math.radians(70),
@@ -72,9 +72,9 @@ rf_press = {
 }
 
 lf_press = {
-    JointId.THUMB_PIP: math.radians(75),
+    JointId.THUMB_PIP: math.radians(66),
     JointId.THUMB_MCP: math.radians(0),
-    JointId.THUMB_SWING: math.radians(0),
+    JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
     JointId.FF_PIP: math.radians(75),
     JointId.FF_MCP: math.radians(70),
@@ -92,7 +92,7 @@ open_hand = {
     # 全部手指都在零位
     JointId.THUMB_PIP: math.radians(0),
     JointId.THUMB_MCP: math.radians(0),
-    JointId.THUMB_SWING: math.radians(0),
+    JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
     JointId.FF_PIP: math.radians(0),
     JointId.FF_MCP: math.radians(0),

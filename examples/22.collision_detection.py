@@ -59,7 +59,7 @@ def main():
             print(f"碰撞对: {collision_info}\n")
 
             # 打印目标角度和安全角度的对比
-            target_angles = joints_to_nparray(target_joints)
+            target_angles = joints_to_nparray(target_joints,hand.get_joints())
             print("=== 碰撞检测 - 角度对比 (单位: 度) ===")
             print("-" * 70)
             print(f"{'关节名称':<18} {'目标角度':<12} {'安全角度':<12}")

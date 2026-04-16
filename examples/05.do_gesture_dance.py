@@ -24,7 +24,7 @@ FLEX_CYCLE_COUNT = 4
 # 拇指触碰其他手指的手势
 thumb_touch_little_finger = {
     JointId.THUMB_PIP: math.radians(20),
-    JointId.THUMB_MCP: math.radians(55),
+    JointId.THUMB_MCP: math.radians(50),
     JointId.THUMB_SWING: math.radians(60),
     JointId.THUMB_ROTATION: math.radians(0),
     JointId.LF_PIP: math.radians(56),
@@ -41,7 +41,7 @@ thumb_touch_little_finger = {
 
 thumb_touch_ring_finger = {
     JointId.THUMB_PIP: math.radians(19),
-    JointId.THUMB_MCP: math.radians(41.25),
+    JointId.THUMB_MCP: math.radians(38),
     JointId.THUMB_SWING: math.radians(45),
     JointId.THUMB_ROTATION: math.radians(0),
     JointId.RF_PIP: math.radians(67),
@@ -58,7 +58,7 @@ thumb_touch_ring_finger = {
 
 thumb_touch_middle_finger = {
     JointId.THUMB_PIP: math.radians(17),
-    JointId.THUMB_MCP: math.radians(27.5),
+    JointId.THUMB_MCP: math.radians(27),
     JointId.THUMB_SWING: math.radians(30),
     JointId.THUMB_ROTATION: math.radians(0),
     JointId.MF_PIP: math.radians(40),
@@ -75,8 +75,8 @@ thumb_touch_middle_finger = {
 
 thumb_touch_index_finger = {
     JointId.THUMB_PIP: math.radians(13),
-    JointId.THUMB_MCP: math.radians(13.5),
-    JointId.THUMB_SWING: math.radians(15),
+    JointId.THUMB_MCP: math.radians(14),
+    JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
     JointId.FF_PIP: math.radians(51),
     JointId.FF_MCP: math.radians(46),
@@ -92,9 +92,9 @@ thumb_touch_index_finger = {
 
 # 单独张开手指的手势
 open_index_finger = {
-    JointId.THUMB_PIP: math.radians(70),
-    JointId.THUMB_MCP: math.radians(55),
-    JointId.THUMB_SWING: math.radians(0),
+    JointId.THUMB_PIP: math.radians(30),
+    JointId.THUMB_MCP: math.radians(20),
+    JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
     # 张开食指
     JointId.FF_PIP: math.radians(0),
@@ -105,14 +105,14 @@ open_index_finger = {
     JointId.MF_MCP: math.radians(70),
     JointId.RF_PIP: math.radians(75),
     JointId.RF_MCP: math.radians(70),
-    JointId.LF_PIP: math.radians(75),
+    JointId.LF_PIP: math.radians(70),
     JointId.LF_MCP: math.radians(70),
 }
 
 open_middle_finger = {
-    JointId.THUMB_PIP: math.radians(70),
-    JointId.THUMB_MCP: math.radians(55),
-    JointId.THUMB_SWING: math.radians(0),
+    JointId.THUMB_PIP: math.radians(30),
+    JointId.THUMB_MCP: math.radians(20),
+    JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
     # 张开食指
     JointId.FF_PIP: math.radians(0),
@@ -123,14 +123,14 @@ open_middle_finger = {
     # 其他关节保持零位
     JointId.RF_PIP: math.radians(75),
     JointId.RF_MCP: math.radians(70),
-    JointId.LF_PIP: math.radians(75),
+    JointId.LF_PIP: math.radians(70),
     JointId.LF_MCP: math.radians(70),
 }
 
 open_ring_finger = {
-    JointId.THUMB_PIP: math.radians(70),
-    JointId.THUMB_MCP: math.radians(55),
-    JointId.THUMB_SWING: math.radians(0),
+    JointId.THUMB_PIP: math.radians(30),
+    JointId.THUMB_MCP: math.radians(20),
+    JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
     # 张开无名指
     JointId.FF_PIP: math.radians(0),
@@ -141,14 +141,14 @@ open_ring_finger = {
     JointId.RF_PIP: math.radians(0),
     JointId.RF_MCP: math.radians(0),
     # 其他关节保持零位
-    JointId.LF_PIP: math.radians(75),
+    JointId.LF_PIP: math.radians(70),
     JointId.LF_MCP: math.radians(70),
 }
 
 open_little_finger = {
-    JointId.THUMB_PIP: math.radians(70),
-    JointId.THUMB_MCP: math.radians(55),
-    JointId.THUMB_SWING: math.radians(0),
+    JointId.THUMB_PIP: math.radians(30),
+    JointId.THUMB_MCP: math.radians(20),
+    JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
     # 张开小拇指
     JointId.FF_PIP: math.radians(0),
@@ -164,38 +164,37 @@ open_little_finger = {
 
 # 食指摆动手势
 index_finger_swing_neg = {
-    JointId.THUMB_PIP: math.radians(70),
-    JointId.THUMB_MCP: math.radians(55),
-    JointId.THUMB_SWING: math.radians(0),
+    JointId.THUMB_PIP: math.radians(30),
+    JointId.THUMB_MCP: math.radians(20),
+    JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
     # 侧摆-15度
     JointId.FF_PIP: math.radians(0),
     JointId.FF_MCP: math.radians(0),
-    JointId.FF_SWING: math.radians(-15),
+    JointId.FF_SWING: math.radians(-10),
 
     JointId.MF_PIP: math.radians(75),
     JointId.MF_MCP: math.radians(70),
     JointId.RF_PIP: math.radians(75),
     JointId.RF_MCP: math.radians(70),
-    JointId.LF_PIP: math.radians(75),
+    JointId.LF_PIP: math.radians(70),
     JointId.LF_MCP: math.radians(70),
 }
 
 index_finger_swing_pos = {
-    JointId.THUMB_PIP: math.radians(70),
-    JointId.THUMB_MCP: math.radians(55),
-    JointId.THUMB_SWING: math.radians(0),
+    JointId.THUMB_PIP: math.radians(30),
+    JointId.THUMB_MCP: math.radians(20),
+    JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
     # 侧摆15度
     JointId.FF_PIP: math.radians(0),
     JointId.FF_MCP: math.radians(0),
-    JointId.FF_SWING: math.radians(15),
-
+    JointId.FF_SWING: math.radians(10),
     JointId.MF_PIP: math.radians(75),
     JointId.MF_MCP: math.radians(70),
     JointId.RF_PIP: math.radians(75),
     JointId.RF_MCP: math.radians(70),
-    JointId.LF_PIP: math.radians(75),
+    JointId.LF_PIP: math.radians(74),
     JointId.LF_MCP: math.radians(70),
 }
 
@@ -203,7 +202,7 @@ index_finger_swing_pos = {
 flex_all_fingers = {
     JointId.THUMB_PIP: math.radians(0),
     JointId.THUMB_MCP: math.radians(0),
-    JointId.THUMB_SWING: math.radians(0),
+    JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
 
     JointId.FF_PIP: math.radians(75),
@@ -214,14 +213,14 @@ flex_all_fingers = {
     JointId.RF_PIP: math.radians(75),
     JointId.RF_MCP: math.radians(70),
 
-    JointId.LF_PIP: math.radians(75),
+    JointId.LF_PIP: math.radians(74),
     JointId.LF_MCP: math.radians(70),
 }
 
 flex_ring_and_little_fingers = {
     JointId.THUMB_PIP: math.radians(0),
     JointId.THUMB_MCP: math.radians(0),
-    JointId.THUMB_SWING: math.radians(0),
+    JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
     JointId.FF_PIP: math.radians(0),
     JointId.FF_MCP: math.radians(0),
@@ -231,14 +230,14 @@ flex_ring_and_little_fingers = {
 
     JointId.RF_PIP: math.radians(75),
     JointId.RF_MCP: math.radians(70),
-    JointId.LF_PIP: math.radians(75),
+    JointId.LF_PIP: math.radians(74),
     JointId.LF_MCP: math.radians(70),
 }
 
 flex_middle_ring_little_fingers = {
     JointId.THUMB_PIP: math.radians(0),
     JointId.THUMB_MCP: math.radians(0),
-    JointId.THUMB_SWING: math.radians(0),
+    JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
     JointId.FF_PIP: math.radians(0),
     JointId.FF_MCP: math.radians(0),
@@ -248,14 +247,14 @@ flex_middle_ring_little_fingers = {
     JointId.MF_MCP: math.radians(70),
     JointId.RF_PIP: math.radians(75),
     JointId.RF_MCP: math.radians(70),
-    JointId.LF_PIP: math.radians(75),
+    JointId.LF_PIP: math.radians(74),
     JointId.LF_MCP: math.radians(70),
 }
 
 flex_little_finger = {
     JointId.THUMB_PIP: math.radians(0),
     JointId.THUMB_MCP: math.radians(0),
-    JointId.THUMB_SWING: math.radians(0),
+    JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
     JointId.FF_PIP: math.radians(0),
     JointId.FF_MCP: math.radians(0),
@@ -265,14 +264,14 @@ flex_little_finger = {
     JointId.RF_PIP: math.radians(0),
     JointId.RF_MCP: math.radians(0),
 
-    JointId.LF_PIP: math.radians(75),
+    JointId.LF_PIP: math.radians(74),
     JointId.LF_MCP: math.radians(70),
 }
 
 flex_index_finger = {
     JointId.THUMB_PIP: math.radians(0),
     JointId.THUMB_MCP: math.radians(0),
-    JointId.THUMB_SWING: math.radians(0),
+    JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
     JointId.FF_PIP: math.radians(75),
     JointId.FF_MCP: math.radians(70),
@@ -288,7 +287,7 @@ flex_index_finger = {
 flex_middle_finger = {
     JointId.THUMB_PIP: math.radians(0),
     JointId.THUMB_MCP: math.radians(0),
-    JointId.THUMB_SWING: math.radians(0),
+    JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
     JointId.FF_PIP: math.radians(0),
     JointId.FF_MCP: math.radians(0),
@@ -304,7 +303,7 @@ flex_middle_finger = {
 flex_index_middle_and_ring_fingers = {
     JointId.THUMB_PIP: math.radians(0),
     JointId.THUMB_MCP: math.radians(0),
-    JointId.THUMB_SWING: math.radians(0),
+    JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
     JointId.FF_PIP: math.radians(75),
     JointId.FF_MCP: math.radians(70),
