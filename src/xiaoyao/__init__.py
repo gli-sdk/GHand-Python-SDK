@@ -17,19 +17,6 @@ from .exceptions import (
     JointFaultInfo
 )
 
-# 尝试导入碰撞检测异常（可选依赖）
-try:
-    from collision_sdk import CollisionCheckError
-except ImportError:
-    # 如果碰撞检测模块未安装，定义一个占位符
-    class CollisionCheckError(XiaoyaoError):
-        """碰撞检测错误（碰撞检测功能未安装）"""
-        def __init__(self, reason: str):
-            super().__init__(
-                f"{reason}\n\n"
-                f"提示：碰撞检测功能需要额外的依赖项。\n"
-                f"请运行: pip install -e .[collision]"
-            )
 from .version import __version__
 from .gestures import GestureType, execute_gesture, get_all_gestures, get_gesture_name
 
@@ -61,7 +48,6 @@ __all__ = [
     "DeviceFaultError",
     "JointFaultError",
     "DataReceiveError",
-    "CollisionCheckError",
     "FaultInfo",
     "JointFaultInfo",
     # 版本

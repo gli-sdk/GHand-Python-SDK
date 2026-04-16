@@ -16,33 +16,9 @@ from .exceptions import (
     get_fault_message
 )
 
-# 尝试导入碰撞检测类型和异常（可选依赖）
-try:
-    from collision_sdk import (
-        CollisionSDK,
-        CollisionCheckError,
-        CollisionCheckResult,
-    )
-    from collision_sdk.converter import joints_to_nparray, nparray_to_joints
-except ImportError:
-    # 如果碰撞检测模块未安装，定义占位符
-    from .exceptions import XiaoyaoError
-    class CollisionCheckError(XiaoyaoError):
-        """碰撞检测错误（碰撞检测功能未安装）"""
-        pass
-    class CollisionCheckResult:
-        """碰撞检测结果占位符"""
-        def __init__(self, has_collision=False, safe_angles=None, collision_pairs=None):
-            self.has_collision = has_collision
-            self.safe_angles = safe_angles
-            self.collision_pairs = collision_pairs
-    class CollisionSDK:
-        """碰撞检测 SDK 占位符"""
-        pass
-    def joints_to_nparray(joints, current_joints=None):
-        raise NotImplementedError("碰撞检测模块未安装")
-    def nparray_to_joints(angles, speed=100, torque=100):
-        raise NotImplementedError("碰撞检测模块未安装")
+from collision_sdk import CollisionSDK, CollisionCheckResult
+
+from .converter import joints_to_nparray, nparray_to_joints
 
 logger = logging.getLogger("xiaoyao.dexhand")
 
@@ -962,6 +938,12 @@ class DexHand(object):
         self._safety_margin = margin
         logger.info(f"Collision safety margin set to {margin} ({margin * 2:.1f} mm)")
 
+    def _ensure_collision_checker(self):
+        """确保碰撞检测器已初始化（延迟加载）"""
+        if self._collision_checker is None:
+            self._collision_checker = CollisionSDK()
+        return self._collision_checker
+
     def check_collision(self, joints: list[Joint]) -> CollisionCheckResult:
         """
         检查目标关节姿态是否会发生碰撞。
@@ -977,9 +959,6 @@ class DexHand(object):
             CollisionCheckResult: 碰撞检测结果，包含 has_collision、safe_angles 和
                                    collision_pairs。
 
-        Raises:
-            CollisionCheckError: 碰撞检测功能未安装或数据文件缺失。
-
         Example:
             >>> hand = DexHand()
             >>> result = hand.check_collision(joints)
@@ -987,16 +966,7 @@ class DexHand(object):
             ...     print("检测到碰撞，使用安全角度")
             ...     joints = hand._angles_to_joints(result.safe_angles)
         """
-        # 5.2.1 延迟加载 CollisionSDK
-        if self._collision_checker is None:
-            try:
-                self._collision_checker = CollisionSDK()
-            except ImportError as e:
-                logger.error(f"碰撞检测功能不可用: {e}")
-                raise CollisionCheckError(
-                    "碰撞检测功能需要额外的依赖项。"
-                    "请运行: pip install -e .[collision]"
-                ) from e
+        collision_checker = self._ensure_collision_checker()
 
         # 获取当前关节状态（用于填充未指定的关节）
         current_joints = None
@@ -1006,11 +976,11 @@ class DexHand(object):
             except Exception:
                 logger.debug("无法获取当前关节状态，使用默认值（0度）")
 
-        # 5.2.2 转换 Joint 列表为 numpy 数组
+        # 转换 Joint 列表为 numpy 数组
         target_angles = joints_to_nparray(joints, current_joints)
 
-        # 5.2.3 调用 CollisionSDK 进行碰撞检测
-        result = self._collision_checker.collision_check(
+        # 调用 CollisionSDK 进行碰撞检测
+        result = collision_checker.collision_check(
             target_angles=target_angles,
             safety_margin=self._safety_margin
         )
@@ -1041,9 +1011,6 @@ class DexHand(object):
 
         Returns:
             bool: 移动成功返回True，失败返回False
-
-        Raises:
-            CollisionCheckError: 碰撞检测失败（数据文件缺失等）
 
         Example:
             >>> hand = DexHand()

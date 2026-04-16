@@ -9,7 +9,8 @@
 import time
 import math
 import logging
-from xiaoyao import configure_logging, CollisionCheckError
+from xiaoyao import configure_logging
+from xiaoyao.converter import joints_to_nparray, nparray_to_joints
 from xiaoyao.dexhand import DexHand, CommType, Joint, JointId
 
 # 配置日志
@@ -58,8 +59,6 @@ def main():
             print(f"碰撞对: {collision_info}\n")
 
             # 打印目标角度和安全角度的对比
-            from collision_sdk.converter import joints_to_nparray
-
             target_angles = joints_to_nparray(target_joints)
             print("=== 碰撞检测 - 角度对比 (单位: 度) ===")
             print("-" * 70)
@@ -76,7 +75,6 @@ def main():
             print()
 
             # 第二步：使用安全角度运动
-            from collision_sdk.converter import nparray_to_joints
             safe_joints = nparray_to_joints(
                 result.safe_angles,
                 speed=DEFAULT_SPEED,
@@ -101,8 +99,6 @@ def main():
 
         print("\n===== 演示完成 =====")
 
-    except CollisionCheckError as e:
-        print(f"\n[ERROR] 碰撞检测错误: {e.reason}")
 
     except Exception as e:
         print(f"\n[ERROR] 错误: {type(e).__name__}: {e}")
