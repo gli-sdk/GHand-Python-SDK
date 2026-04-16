@@ -16,6 +16,10 @@ from .exceptions import (
     get_fault_message
 )
 
+from collision_sdk import CollisionSDK, CollisionCheckResult
+
+from .converter import joints_to_nparray, nparray_to_joints
+
 logger = logging.getLogger("xiaoyao.dexhand")
 
 class HandType(enum.Enum):
@@ -154,6 +158,9 @@ class DexHand(object):
         self._sub_manager = SubscriptionManager(self._client)
         self._opened = False
         self._set_joint_limit()
+        # 碰撞检测相关属性
+        self._safety_margin = 0.0  # 默认安全边距
+        self._collision_checker = None  # 延迟加载
 
     def __del__(self):
         """
@@ -627,6 +634,10 @@ class DexHand(object):
                 elif joint.id == JointId.LF_MCP:
                     self._check_joint_limit(joint, self._lf_mcp_limit)
                     self._joint_to_pdo(joint, rpdo.lf_mcp)
+                elif joint.id in [JointId.THUMB_DIP, JointId.FF_DIP, JointId.MF_DIP, JointId.RF_DIP, JointId.LF_DIP]:
+                    # DIP 关节是从动关节（passive joints），不需要主动控制
+                    logger.debug(f"Skipping passive joint: {JointId(joint.id).name}")
+                    continue
                 else:
                     logger.warning(f"[Joint] Invalid joint ID: {joint.id}")
                     return False
@@ -724,6 +735,12 @@ class DexHand(object):
                         state=State(joint_tpdo.state),
                         error_code=ErrorCode(joint_tpdo.error)
                     ))
+
+                # 规范化角度：避免 -0.0
+                angle = joint_tpdo.angle
+                if abs(angle) < 1e-10:
+                    angle = 0.0
+
                 joints.append(
                     Joint(
                         id=joint_id,
@@ -910,3 +927,187 @@ class DexHand(object):
                 f"Failed to communicate with device: {e}",
                 reason=str(e)
             ) from e
+
+    # ==================== 碰撞检测相关方法 ====================
+
+    def set_safety_margin(self, margin: float) -> None:
+        """
+        设置碰撞检测的安全边距
+
+        Args:
+            margin: 安全边距，范围 [0.0, 1.0]
+                    0.0 = 无边距（精确接触）
+                    1.0 = 最大边距（2mm）
+
+        Raises:
+            ValueError: 如果 margin 超出 [0.0, 1.0] 范围
+
+        Example:
+            >>> hand = DexHand()
+            >>> hand.open(CommType.ETHERCAT, "auto")
+            >>> hand.set_safety_margin(0.5)  # 设置1mm安全边距
+        """
+        # 限制在有效范围内
+        if margin < 0.0 or margin > 1.0:
+            logger.warning(
+                f"Safety margin {margin} out of range [0.0, 1.0], clamping to valid range"
+            )
+            margin = max(0.0, min(1.0, margin))
+
+        self._safety_margin = margin
+        logger.info(f"Collision safety margin set to {margin} ({margin * 2:.1f} mm)")
+
+    def _ensure_collision_checker(self):
+        """确保碰撞检测器已初始化（延迟加载）"""
+        if self._collision_checker is None:
+            self._collision_checker = CollisionSDK()
+        return self._collision_checker
+
+    def check_collision(self, joints: list[Joint]) -> CollisionCheckResult:
+        """
+        检查目标关节姿态是否会发生碰撞。
+
+        此方法仅进行碰撞检测并返回结果，不会执行任何关节运动。
+        如果检测到碰撞，返回的结果中会包含安全角度。
+
+        Args:
+            joints: 关节列表。未指定的关节将使用当前关节角度（设备已连接）
+                    或 0°（设备未连接）填充。
+
+        Returns:
+            CollisionCheckResult: 碰撞检测结果，包含 has_collision、safe_angles 和
+                                   collision_pairs。
+
+        Example:
+            >>> hand = DexHand()
+            >>> result = hand.check_collision(joints)
+            >>> if result.has_collision:
+            ...     print("检测到碰撞，使用安全角度")
+            ...     joints = hand._angles_to_joints(result.safe_angles)
+        """
+        collision_checker = self._ensure_collision_checker()
+
+        # 获取当前关节状态（用于填充未指定的关节）
+        current_joints = None
+        if self._opened:
+            try:
+                current_joints = self.get_joints()
+            except Exception:
+                logger.debug("无法获取当前关节状态，使用默认值（0度）")
+
+        # 转换 Joint 列表为 numpy 数组
+        target_angles = joints_to_nparray(joints, current_joints)
+
+        # 调用 CollisionSDK 进行碰撞检测
+        result = collision_checker.collision_check(
+            target_angles=target_angles,
+            safety_margin=self._safety_margin
+        )
+
+        # 若未碰撞，将 safe_angles 设为 target_angles 便于调用方统一处理
+        if not result.has_collision:
+            result = CollisionCheckResult(
+                has_collision=False,
+                safe_angles=target_angles.copy(),
+                collision_pairs=None,
+            )
+
+        return result
+
+    def move_safe_joints(self, joints: list[Joint], mode: CtrlMode = CtrlMode.POSITION) -> bool:
+        """
+        安全移动关节（自动进行碰撞检测）。
+
+        在移动关节前自动进行碰撞检测。如果检测到碰撞，
+        自动使用安全角度替代目标角度。
+
+        此方法内部调用 `check_collision()` 并基于其结果执行运动，
+        行为与签名均保持向后兼容。
+
+        Args:
+            joints: 关节列表
+            mode: 控制模式（默认位置模式）
+
+        Returns:
+            bool: 移动成功返回True，失败返回False
+
+        Example:
+            >>> hand = DexHand()
+            >>> hand.open(CommType.ETHERCAT, "auto")
+            >>> hand.set_safety_margin(0.5)
+            >>> joints = [Joint(id=JointId.THUMB_PIP, angle=1.5, speed=100, torque=100)]
+            >>> success = hand.move_safe_joints(joints)
+            >>> if success:
+            ...     print("Movement completed safely")
+        """
+        # 5.3.1 调用 check_collision 进行碰撞检测
+        result = self.check_collision(joints)
+
+        # 记录目标角度的 numpy 副本，用于后续打印对比
+        target_angles = None
+        if result.has_collision and result.safe_angles is not None:
+            target_angles = joints_to_nparray(joints)
+
+        # 5.3.2 处理碰撞结果
+        if result.has_collision:
+            # 5.3.3 记录碰撞日志（INFO级别）
+            collision_links = result.collision_pairs or []
+            if collision_links:
+                collision_info = " <-> ".join(collision_links)
+            else:
+                collision_info = "unknown collision"
+
+            logger.info(
+                f"Collision detected between: {collision_info}. "
+                f"Using safe angles instead of target angles."
+            )
+
+            # 使用安全角度创建新的关节列表
+            safe_joints = nparray_to_joints(result.safe_angles)
+            joints = safe_joints
+
+            # 打印目标角度和安全角度的对比表格（度）
+            if target_angles is not None:
+                print("=== 碰撞检测 - 角度对比 (单位: 度) ===")
+                print("-" * 70)
+                print(f"{'关节名称':<18} {'目标角度':<12} {'安全角度':<12}")
+                print("-" * 70)
+
+                for i in range(18):
+                    joint_name = JointId(i).name
+                    target_deg = math.degrees(target_angles[i])
+                    safe_deg = math.degrees(result.safe_angles[i])
+                    print(f"{joint_name:<25} {target_deg:<12.2f} {safe_deg:<12.2f}")
+
+                print("-" * 70)
+                print()
+
+        # 5.3.4 调用现有的 move_joints() 执行移动
+        return self.move_joints(joints, mode)
+
+    def _joints_to_angles(self, joints: list[Joint], current_joints: list[Joint] | None = None):
+        """
+        将Joint列表转换为numpy数组（私有方法）
+
+        Args:
+            joints: 关节列表
+            current_joints: 当前关节状态（用于填充未指定的关节）
+
+        Returns:
+            np.ndarray: 18个关节角度的数组
+        """
+        return joints_to_nparray(joints, current_joints)
+
+    def _angles_to_joints(self, angles, speed: int = 100, torque: int = 100) -> list[Joint]:
+        """
+        将numpy数组转换为Joint列表（私有方法）
+
+        Args:
+            angles: 18个关节角度的numpy数组
+            speed: 所有关节的速度参数
+            torque: 所有关节的力矩参数
+
+        Returns:
+            list[Joint]: 18个Joint对象的列表
+        """
+        return nparray_to_joints(angles, speed, torque)
