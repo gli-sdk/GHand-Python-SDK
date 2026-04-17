@@ -24,8 +24,6 @@ def main():
             return
 
         print("\n=== Torque Control Mode Demo ===")
-        print("This demo controls finger joints using torque mode")
-        print("Torque values control the force applied by each joint\n")
 
         # Torque control cycle
         cycle_count = 0
@@ -35,20 +33,6 @@ def main():
             cycle_count += 1
             if max_cycles > 0 and cycle_count > max_cycles:
                 break
-
-            # joints = []
-            # joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(36), speed=50, torque=100))
-            # joints.append(Joint(id=JointId.THUMB_SWING, angle=math.radians(70), speed=50, torque=100))
-            # joints.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(10), speed=50, torque=100))
-            # joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(51), speed=50, torque=100))
-            # joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(46), speed=50, torque=100))
-            # joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(40), speed=50, torque=100))
-
-            # result = hand.move_joints(joints)
-            # if result:
-            #     time.sleep(2)  # Wait for movement to complete
-
-            # print(f"\n--- Cycle {cycle_count}: Torque control started ---")
 
             # Step 1: Apply torque to close fingers
             print("\nStep 1: Applying torque to close fingers (torque=10)")
