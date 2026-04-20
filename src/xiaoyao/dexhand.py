@@ -304,9 +304,8 @@ class DexHand(object):
                 for id in id_list:
                     connected = self._client.connect(id)
                     if connected:
-                        run_success = self._client.run()
-                        if run_success:
-                            self._opened = True
+                        self._opened = self._client.run()
+                        if self._opened:
                             logger.info(f"Device opened successfully (ID: {id})")
                             break
                         else:
@@ -316,8 +315,12 @@ class DexHand(object):
             else:
                 connected = self._client.connect(id)
                 if connected:
-                    run_success = self._client.run()
-                    self._opened = run_success
+                    self._opened = self._client.run()
+                    if self._opened:
+                        logger.info(f"Device opened successfully (ID: {id})")
+                    else:
+                        logger.error(f"Failed to open device (ID: {id})")
+                        self._client.disconnect()
         elif type == CommType.CANFD:
             pass
         elif type == CommType.RS485:
