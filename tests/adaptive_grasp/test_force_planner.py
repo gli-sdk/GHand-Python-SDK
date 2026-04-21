@@ -1,7 +1,7 @@
 import math
 import pytest
 from xiaoyao.adaptive_grasp.config import AdaptiveGraspConfig
-from xiaoyao.adaptive_grasp.force_planner import ObjectProfile, ForcePlanner, ForceDecision
+from xiaoyao.adaptive_grasp.force_planner import ObjectProfile, ObjectProfileRegistry, ForcePlanner, ForceDecision
 from xiaoyao.adaptive_grasp.tactile import TactileAnalysis
 from xiaoyao.dexhand import TactileSensorId, JointId
 
@@ -75,3 +75,10 @@ def test_fragile_mode_limits_speed_and_step():
     assert decision.is_fragile_mode is True
     # speed 应被限制：20 * 0.7 = 14
     assert decision.next_torque <= int(20 * 0.7)
+
+
+def test_registry_lookup():
+    profile = ObjectProfileRegistry.get("tofu")
+    assert profile is not None
+    assert profile.is_fragile is True
+    assert "tofu" in ObjectProfileRegistry.list_names()
