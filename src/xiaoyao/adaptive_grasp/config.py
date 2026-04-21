@@ -179,6 +179,17 @@ class AdaptiveGraspConfig:
     # 数值稳定项（防分母为零）
     # 数值稳定小量，避免分母为 0。
     epsilon: float = 1e-6
+    # V2.0 新增参数
+    # 安全系数 S_f，范围 [1.2, 2.0]，默认 1.5
+    safety_factor: float = 1.5
+    # 基础夹持力 F_base（N），默认 0.5
+    base_holding_force: float = 0.5
+    # 滑移防抖连续周期阈值
+    slip_detect_debounce_cycles: int = 3
+    # 易损模式速度降低比例
+    fragile_speed_reduction: float = 0.7
+    # 易损模式角增量/力矩步进降低比例
+    fragile_step_reduction: float = 0.5
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.stiffness <= 1.0:
@@ -227,6 +238,16 @@ class AdaptiveGraspConfig:
             raise ValueError("I_min must be <= I_max")
         if self.epsilon <= 0:
             raise ValueError("epsilon must be > 0")
+        if not 1.2 <= self.safety_factor <= 2.0:
+            raise ValueError("safety_factor must be in [1.2, 2.0]")
+        if self.base_holding_force < 0:
+            raise ValueError("base_holding_force must be >= 0")
+        if self.slip_detect_debounce_cycles <= 0:
+            raise ValueError("slip_detect_debounce_cycles must be > 0")
+        if not 0.0 < self.fragile_speed_reduction <= 1.0:
+            raise ValueError("fragile_speed_reduction must be in (0.0, 1.0]")
+        if not 0.0 < self.fragile_step_reduction <= 1.0:
+            raise ValueError("fragile_step_reduction must be in (0.0, 1.0]")
 
         if self.max_normal_force_per_finger is None:
             self.max_normal_force_per_finger = 0.1 + 2.9 * self.stiffness
