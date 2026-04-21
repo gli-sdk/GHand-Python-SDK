@@ -1,5 +1,6 @@
 import math
 import threading
+import time
 
 import pytest
 
@@ -181,6 +182,14 @@ def test_adaptive_hold_auto_release_uses_release_payload():
         assert joint.torque == cfg.release_open_torque
 
 
+class _ContactHand(_PositionTraceHand):
+    def get_tactile_data(self):
+        return {
+            TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 2.0),
+            TactileSensorId.FOREFINGER: _FakeTactileInfo(0.0, 0.0, 2.0),
+        }
+
+
 class _ReleaseFeedbackHand(_PositionTraceHand):
     def __init__(self, feedback_angles: list[dict[JointId, float]]):
         super().__init__()
@@ -231,3 +240,21 @@ def test_release_fails_when_timeout_before_settled(monkeypatch):
 
     assert g.release() is False
     assert g.state == GraspState.ERROR
+
+
+def test_full_grasp_state_transitions(monkeypatch):
+    hand = _ContactHand()
+    cfg = AdaptiveGraspConfig(
+        release_hold_time_s=0.05,
+        control_period_s=0.01,
+    )
+    grasper = AdaptiveGrasper(hand, cfg)
+
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
+
+    assert grasper.grasp() is True
+    assert grasper.state == GraspState.ADAPTIVE_HOLDING
+
+    time.sleep(0.1)
+    grasper.release()
+    assert grasper.state in (GraspState.COMPLETED, GraspState.RELEASING)
