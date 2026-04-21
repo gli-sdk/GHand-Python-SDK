@@ -1,0 +1,186 @@
+<!DOCTYPE html><html><head>
+      <title>自适应抓取的需求文档</title>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      
+      <link rel="stylesheet" href="file:///c:\Users\huangkai\.vscode\extensions\shd101wyy.markdown-preview-enhanced-0.8.23\crossnote\dependencies\katex\katex.min.css">
+      
+      
+      
+      
+      
+      
+      
+      <style>
+      code[class*=language-],pre[class*=language-]{color:#333;background:0 0;font-family:Consolas,"Liberation Mono",Menlo,Courier,monospace;text-align:left;white-space:pre;word-spacing:normal;word-break:normal;word-wrap:normal;line-height:1.4;-moz-tab-size:8;-o-tab-size:8;tab-size:8;-webkit-hyphens:none;-moz-hyphens:none;-ms-hyphens:none;hyphens:none}pre[class*=language-]{padding:.8em;overflow:auto;border-radius:3px;background:#f5f5f5}:not(pre)>code[class*=language-]{padding:.1em;border-radius:.3em;white-space:normal;background:#f5f5f5}.token.blockquote,.token.comment{color:#969896}.token.cdata{color:#183691}.token.doctype,.token.macro.property,.token.punctuation,.token.variable{color:#333}.token.builtin,.token.important,.token.keyword,.token.operator,.token.rule{color:#a71d5d}.token.attr-value,.token.regex,.token.string,.token.url{color:#183691}.token.atrule,.token.boolean,.token.code,.token.command,.token.constant,.token.entity,.token.number,.token.property,.token.symbol{color:#0086b3}.token.prolog,.token.selector,.token.tag{color:#63a35c}.token.attr-name,.token.class,.token.class-name,.token.function,.token.id,.token.namespace,.token.pseudo-class,.token.pseudo-element,.token.url-reference .token.variable{color:#795da3}.token.entity{cursor:help}.token.title,.token.title .token.punctuation{font-weight:700;color:#1d3e81}.token.list{color:#ed6a43}.token.inserted{background-color:#eaffea;color:#55a532}.token.deleted{background-color:#ffecec;color:#bd2c00}.token.bold{font-weight:700}.token.italic{font-style:italic}.language-json .token.property{color:#183691}.language-markup .token.tag .token.punctuation{color:#333}.language-css .token.function,code.language-css{color:#0086b3}.language-yaml .token.atrule{color:#63a35c}code.language-yaml{color:#183691}.language-ruby .token.function{color:#333}.language-markdown .token.url{color:#795da3}.language-makefile .token.symbol{color:#795da3}.language-makefile .token.variable{color:#183691}.language-makefile .token.builtin{color:#0086b3}.language-bash .token.keyword{color:#0086b3}pre[data-line]{position:relative;padding:1em 0 1em 3em}pre[data-line] .line-highlight-wrapper{position:absolute;top:0;left:0;background-color:transparent;display:block;width:100%}pre[data-line] .line-highlight{position:absolute;left:0;right:0;padding:inherit 0;margin-top:1em;background:hsla(24,20%,50%,.08);background:linear-gradient(to right,hsla(24,20%,50%,.1) 70%,hsla(24,20%,50%,0));pointer-events:none;line-height:inherit;white-space:pre}pre[data-line] .line-highlight:before,pre[data-line] .line-highlight[data-end]:after{content:attr(data-start);position:absolute;top:.4em;left:.6em;min-width:1em;padding:0 .5em;background-color:hsla(24,20%,50%,.4);color:#f4f1ef;font:bold 65%/1.5 sans-serif;text-align:center;vertical-align:.3em;border-radius:999px;text-shadow:none;box-shadow:0 1px #fff}pre[data-line] .line-highlight[data-end]:after{content:attr(data-end);top:auto;bottom:.4em}html body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,freesans,sans-serif;font-size:16px;line-height:1.6;color:#333;background-color:#fff;overflow:initial;box-sizing:border-box;word-wrap:break-word}html body>:first-child{margin-top:0}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{line-height:1.2;margin-top:1em;margin-bottom:16px;color:#000}html body h1{font-size:2.25em;font-weight:300;padding-bottom:.3em}html body h2{font-size:1.75em;font-weight:400;padding-bottom:.3em}html body h3{font-size:1.5em;font-weight:500}html body h4{font-size:1.25em;font-weight:600}html body h5{font-size:1.1em;font-weight:600}html body h6{font-size:1em;font-weight:600}html body h1,html body h2,html body h3,html body h4,html body h5{font-weight:600}html body h5{font-size:1em}html body h6{color:#5c5c5c}html body strong{color:#000}html body del{color:#5c5c5c}html body a:not([href]){color:inherit;text-decoration:none}html body a{color:#08c;text-decoration:none}html body a:hover{color:#00a3f5;text-decoration:none}html body img{max-width:100%}html body>p{margin-top:0;margin-bottom:16px;word-wrap:break-word}html body>ol,html body>ul{margin-bottom:16px}html body ol,html body ul{padding-left:2em}html body ol.no-list,html body ul.no-list{padding:0;list-style-type:none}html body ol ol,html body ol ul,html body ul ol,html body ul ul{margin-top:0;margin-bottom:0}html body li{margin-bottom:0}html body li.task-list-item{list-style:none}html body li>p{margin-top:0;margin-bottom:0}html body .task-list-item-checkbox{margin:0 .2em .25em -1.8em;vertical-align:middle}html body .task-list-item-checkbox:hover{cursor:pointer}html body blockquote{margin:16px 0;font-size:inherit;padding:0 15px;color:#5c5c5c;background-color:#f0f0f0;border-left:4px solid #d6d6d6}html body blockquote>:first-child{margin-top:0}html body blockquote>:last-child{margin-bottom:0}html body hr{height:4px;margin:32px 0;background-color:#d6d6d6;border:0 none}html body table{margin:10px 0 15px 0;border-collapse:collapse;border-spacing:0;display:block;width:100%;overflow:auto;word-break:normal;word-break:keep-all}html body table th{font-weight:700;color:#000}html body table td,html body table th{border:1px solid #d6d6d6;padding:6px 13px}html body dl{padding:0}html body dl dt{padding:0;margin-top:16px;font-size:1em;font-style:italic;font-weight:700}html body dl dd{padding:0 16px;margin-bottom:16px}html body code{font-family:Menlo,Monaco,Consolas,'Courier New',monospace;font-size:.85em;color:#000;background-color:#f0f0f0;border-radius:3px;padding:.2em 0}html body code::after,html body code::before{letter-spacing:-.2em;content:'\00a0'}html body pre>code{padding:0;margin:0;word-break:normal;white-space:pre;background:0 0;border:0}html body .highlight{margin-bottom:16px}html body .highlight pre,html body pre{padding:1em;overflow:auto;line-height:1.45;border:#d6d6d6;border-radius:3px}html body .highlight pre{margin-bottom:0;word-break:normal}html body pre code,html body pre tt{display:inline;max-width:initial;padding:0;margin:0;overflow:initial;line-height:inherit;word-wrap:normal;background-color:transparent;border:0}html body pre code:after,html body pre code:before,html body pre tt:after,html body pre tt:before{content:normal}html body blockquote,html body dl,html body ol,html body p,html body pre,html body ul{margin-top:0;margin-bottom:16px}html body kbd{color:#000;border:1px solid #d6d6d6;border-bottom:2px solid #c7c7c7;padding:2px 4px;background-color:#f0f0f0;border-radius:3px}@media print{html body{background-color:#fff}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{color:#000;page-break-after:avoid}html body blockquote{color:#5c5c5c}html body pre{page-break-inside:avoid}html body table{display:table}html body img{display:block;max-width:100%;max-height:100%}html body code,html body pre{word-wrap:break-word;white-space:pre}}.markdown-preview{width:100%;height:100%;box-sizing:border-box}.markdown-preview ul{list-style:disc}.markdown-preview ul ul{list-style:circle}.markdown-preview ul ul ul{list-style:square}.markdown-preview ol{list-style:decimal}.markdown-preview ol ol,.markdown-preview ul ol{list-style-type:lower-roman}.markdown-preview ol ol ol,.markdown-preview ol ul ol,.markdown-preview ul ol ol,.markdown-preview ul ul ol{list-style-type:lower-alpha}.markdown-preview .newpage,.markdown-preview .pagebreak{page-break-before:always}.markdown-preview pre.line-numbers{position:relative;padding-left:3.8em;counter-reset:linenumber}.markdown-preview pre.line-numbers>code{position:relative}.markdown-preview pre.line-numbers .line-numbers-rows{position:absolute;pointer-events:none;top:1em;font-size:100%;left:0;width:3em;letter-spacing:-1px;border-right:1px solid #999;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.markdown-preview pre.line-numbers .line-numbers-rows>span{pointer-events:none;display:block;counter-increment:linenumber}.markdown-preview pre.line-numbers .line-numbers-rows>span:before{content:counter(linenumber);color:#999;display:block;padding-right:.8em;text-align:right}.markdown-preview .mathjax-exps .MathJax_Display{text-align:center!important}.markdown-preview:not([data-for=preview]) .code-chunk .code-chunk-btn-group{display:none}.markdown-preview:not([data-for=preview]) .code-chunk .status{display:none}.markdown-preview:not([data-for=preview]) .code-chunk .output-div{margin-bottom:16px}.markdown-preview .md-toc{padding:0}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link div,.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link p{display:inline}.markdown-preview .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}.scrollbar-style::-webkit-scrollbar{width:8px}.scrollbar-style::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}.scrollbar-style::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,.66);border:4px solid rgba(150,150,150,.66);background-clip:content-box}html body[for=html-export]:not([data-presentation-mode]){position:relative;width:100%;height:100%;top:0;left:0;margin:0;padding:0;overflow:auto}html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{position:relative;top:0;min-height:100vh}@media screen and (min-width:914px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{padding:2em calc(50% - 457px + 2em)}}@media screen and (max-width:914px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{font-size:14px!important;padding:1em}}@media print{html body[for=html-export]:not([data-presentation-mode]) #sidebar-toc-btn{display:none}}html body[for=html-export]:not([data-presentation-mode]) #sidebar-toc-btn{position:fixed;bottom:8px;left:8px;font-size:28px;cursor:pointer;color:inherit;z-index:99;width:32px;text-align:center;opacity:.4}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] #sidebar-toc-btn{opacity:1}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc{position:fixed;top:0;left:0;width:300px;height:100%;padding:32px 0 48px 0;font-size:14px;box-shadow:0 0 4px rgba(150,150,150,.33);box-sizing:border-box;overflow:auto;background-color:inherit}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar{width:8px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,.66);border:4px solid rgba(150,150,150,.66);background-clip:content-box}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc a{text-decoration:none}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc{padding:0 16px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link div,html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link p{display:inline}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{left:300px;width:calc(100% - 300px);padding:2em calc(50% - 457px - 300px / 2);margin:0;box-sizing:border-box}@media screen and (max-width:1274px){html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{width:100%}}html body[for=html-export]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .markdown-preview{left:50%;transform:translateX(-50%)}html body[for=html-export]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .md-sidebar-toc{display:none}
+/* Please visit the URL below for more information: */
+/*   https://shd101wyy.github.io/markdown-preview-enhanced/#/customize-css */
+
+      </style>
+      <script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script>
+    </head>
+    <body for="html-export">
+      <div class="crossnote markdown-preview  ">
+      
+<h1 id="自适应抓取功能需求文档">自适应抓取功能需求文档 </h1>
+<p><strong>日期</strong>: 2026-04-21<br>
+<strong>功能</strong>: 基于触觉反馈的自适应抓取</p>
+<h2 id="1-背景">1. 背景 </h2>
+<p>具身机器人本体在使用灵巧手时，会用灵巧手取抓取物品，在搬运或移动的过程中，物品有滑脱的风险，而通过触觉传感器，能感知物体的滑移趋势，通过反馈微调关节角度，增加法向力，减少滑脱的情况。</p>
+<h2 id="2-总体功能要求">2. 总体功能要求： </h2>
+<p>灵巧手运控算法稳定抓取模块需具备“感知-判断-控制-反馈”闭环能力，集成力感知、滑移检测、力调节三大核心功能，无需人工干预，自动适配不同材质、不同形状的抓取物体（预设常见物体参数库，支持参数扩展），确保抓取过程稳定、安全、可控。</p>
+<h2 id="21-前置条件">2.1 前置条件 </h2>
+<p>值得指出的是，实现该功能需要设置如下前提：</p>
+<ul>
+<li>1）对于被抓取物体，其抓取姿态一般由“大脑”生成，在本功能中，抓取姿态为已知条件。</li>
+<li>2）泛化性问题：一般情况下，需要针对不同的物体进行抓取进而验证自适应抓取的泛化性。在本功能中，将不同的物体抽象为几类进行泛化性的测试，计划采用圆柱、球体、立方体、圆环环面、四棱锥、香蕉、豆腐、金属铁块进行自适应抓取测试。</li>
+</ul>
+<h2 id="3-详细功能需求">3. 详细功能需求： </h2>
+<h3 id="31-稳定抓持功能">3.1 稳定抓持功能 </h3>
+<h4 id="311-抓取力自适应调节">3.1.1 抓取力自适应调节 </h4>
+<ul>
+<li>功能描述：算法根据抓取物体的材质、重量、形状（预设参数或实时识别），自动计算并输出最优初始抓取力，避免抓取力过小导致物体滑移，或抓取力过大损伤物体。</li>
+<li>具体要求：
+<ol>
+<li>预设物体参数库：包含常见物体（如金属块、塑料件、水果）的材质硬度、重量、安全抓取力范围，支持手动添加、编辑物体参数。</li>
+<li>初始抓取力设置：根据物体重量、材质硬度，自动计算初始抓取力或预设值抓取力，确保初始抓取力处于物体安全范围内。</li>
+<li>抓取力校准：抓取过程中，实时采集手指力传感器数据，与预设安全范围对比，若初始抓取力偏差超过±5N，自动微调抓取力至合理范围。</li>
+</ol>
+</li>
+<li>判定标准：初始抓取力落在物体预设安全范围内，抓取后10s内物体无滑移、无明显变形（易损物体无破损）。</li>
+</ul>
+<h4 id="312-抓取姿态稳定控制">3.1.2 抓取姿态稳定控制 </h4>
+<ul>
+<li>功能描述：抓取过程中，算法实时调节灵巧手各关节角度，确保物体姿态保持预设角度（如水平、垂直），避免物体倾斜、翻转，实现姿态稳定。</li>
+<li>具体要求：
+<ol>
+<li>人眼观测：稳定抓取后，人眼观察抓取物品的倾斜角度、翻转角度。</li>
+<li>视觉传感器（可选）：实时采集物体姿态数据（倾斜角度、翻转角度）</li>
+</ol>
+</li>
+<li>判定标准：抓取后，人眼观察无明显倾斜、翻转或视觉传感器测量物体姿态倾斜角度≤5°、反转角度≤5°，持续保持稳定，无明显晃动。</li>
+</ul>
+<h4 id="313-损伤防护控制">3.1.3 损伤防护控制 </h4>
+<ul>
+<li>功能描述：针对易损物体（如豆腐、香蕉），算法具备损伤防护机制，避免抓取力过大导致物体破损、变形。</li>
+<li>具体要求：
+<ol>
+<li>易损物体识别：支持通过参数库标记易损物体，或通过视觉传感器（可选）识别易损物体特征，自动切换至“损伤防护模式”。</li>
+<li>抓取力限制：易损物体的最大抓取力不得超过预设安全阈值（可配置，根据物体材质设定），一旦接近阈值（达到阈值的90%），通过相关措施（减少关节角度、减小关节角度增量）减少抓取力/抓取力的增量，避免物体变形、变形。</li>
+<li>关节动作限制：损伤防护模式下，灵巧手关节动作速度降低30%，避免动作过快产生冲击，损伤物体。</li>
+</ol>
+</li>
+<li>判定标准：易损物体抓取后无破损、无变形，抓取力始终≤预设安全阈值。</li>
+</ul>
+<h2 id="32-动态增稳功能">3.2 动态增稳功能 </h2>
+<h3 id="321-滑移趋势检测">3.2.1 滑移趋势检测 </h3>
+<ul>
+<li>功能描述：抓取过程中（包括静态夹持、动态移动过程），实时检测物体是否存在滑移趋势，及时触发增稳策略，避免物体滑移掉落。</li>
+<li>具体要求：
+<ol>
+<li>滑移检测参数：通过手指力传感器采集摩擦力数据（触觉传感器的合力和分力），综合判断滑移趋势</li>
+<li>检测频率：≥60Hz，确保滑移趋势及时被捕捉，避免延迟导致物体滑移。</li>
+<li>误判防护：排除因手指微小振动、传感器噪声导致的误检测，设置防抖阈值（如连续3个采样周期检测到滑移趋势，才判定为存在滑移风险）。</li>
+</ol>
+</li>
+<li>判定标准：滑移趋势检测准确率≥95%，无明显误判、漏判，滑移趋势出现后≤50ms内被检测到。</li>
+</ul>
+<h3 id="322-自动增稳控制">3.2.2 自动增稳控制 </h3>
+<ul>
+<li>功能描述：当检测到物体存在滑移趋势时，算法自动启动增稳策略，通过调节灵巧手关节角度，抑制滑移，确保抓取稳定。</li>
+<li>具体要求：
+<ol>
+<li>增稳策略：优先通过微调关节角度来实现抓取力增稳；</li>
+<li>增稳响应：滑移趋势检测确认后，≤50ms内启动增稳策略，增稳过程平稳，无明显冲击，避免因突然增力导致物体损伤。</li>
+</ol>
+</li>
+<li>判定标准：增稳策略启动后，≤0.5s内抑制滑移趋势，物体无明显位移，后续保持稳定抓取，无二次滑移。</li>
+</ul>
+<h3 id="323-时间超限释放保护">3.2.3 时间超限释放保护 </h3>
+<ul>
+<li>
+<p>功能描述：在自适应保持阶段，系统持续监测抓持时长。当抓持时间达到预设上限时，无论当前触觉状态是否稳定、是否存在滑移趋势，均自动触发安全释放流程，驱动灵巧手张开至安全姿态，防止电机长时间运行温度累积过大，烧毁电机。（补充：后期若硬件支持，将通过读取电机温度传感器，以电机温度为释放保护信号，进行释放保护）</p>
+</li>
+<li>
+<p>具体要求：</p>
+<ol>
+<li>超时阈值设定：支持通过配置参数设定最大保持时长，默认值为 20秒，可根据实际要求进行设定。该阈值在自适应保持阶段开始计时时生效，一旦进入该状态即启动计时器。</li>
+<li>超时检测与触发：检测频率与控制周期同步，每个周期检查一次已持续时间。当时间超时时，立即触发超时释放。时间超限释放的优先级高于滑移增稳和法向力超限卸力——即超时发生后不再执行任何收紧或微调动作，直接进入释放流程。</li>
+<li>安全释放执行：触发后，采用位置模式下发张开姿态。</li>
+</ol>
+</li>
+<li>
+<p>判定标准：达到超时阈值后，≤ 50 ms内启动释放流程；释放完成后，灵巧手所有主动关节回到张开姿态，电机电流回落至空载水平.</p>
+</li>
+</ul>
+<h2 id="33-辅助功能需求">3.3 辅助功能需求 </h2>
+<h3 id="331-异常处理">3.3.1 异常处理 </h3>
+<ul>
+<li>功能描述：针对抓取过程中的异常情况（如传感器故障、物体掉落、灵巧手空抓），具备异常处理能力，避免设备损坏或任务失败。</li>
+<li>具体要求：
+<ol>
+<li>
+<p>传感器故障：若触觉力传感器无连接、灵巧手关节角度数据异常（如数据突变、无数据），算法自动停止抓取动作，触发报警信号，记录故障信息。</p>
+</li>
+<li>
+<p>灵巧手空抓：当灵巧手闭合找接触时，灵巧手关节动作角度大于阈值且触觉传感器没有接触信号，自动松开手指，停止控制，手指张开，触发报警信号。</p>
+</li>
+<li>
+<p>抓取物体丢失：物体掉落时/人为移走抓取物品，触觉传感器从有接触信号跳变至无接触信号，自动停止抓取动作，手指张开，触发报警信号，记录故障信息。</p>
+</li>
+</ol>
+</li>
+</ul>
+<h3 id="333-参数可配置">3.3.3 参数可配置 </h3>
+<ul>
+<li>功能描述：支持算法关键参数的手动配置、修改，适配不同场景、不同物体的抓取需求，无需修改算法代码。</li>
+<li>可配置参数包括：安全系数、滑移检测阈值、法向力安全阈值等。</li>
+</ul>
+<h2 id="4量化指标">4.量化指标 </h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">指标项</th>
+<th style="text-align:left">目标值</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">单手指抓取法向力量程</td>
+<td style="text-align:left">0.5 N ~ 15 N</td>
+<td style="text-align:left">覆盖从易损柔性件到刚度大固体的抓取力范围</td>
+</tr>
+<tr>
+<td style="text-align:left">触觉反馈更新周期</td>
+<td style="text-align:left">&lt; 0.2 s</td>
+<td style="text-align:left">触觉传感器刷新率 83.3 Hz</td>
+</tr>
+<tr>
+<td style="text-align:left">接触时间</td>
+<td style="text-align:left">&lt; 1 s</td>
+<td style="text-align:left">从预抓取姿态到检测到有效接触</td>
+</tr>
+<tr>
+<td style="text-align:left">控制周期</td>
+<td style="text-align:left">≤50ms</td>
+<td style="text-align:left">自适应保持阶段的控制周期</td>
+</tr>
+</tbody>
+</table>
+
+      </div>
+      
+      
+    
+    
+    
+    
+    
+    
+  
+    </body></html>
