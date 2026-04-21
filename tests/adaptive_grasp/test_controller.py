@@ -4,12 +4,13 @@ import time
 
 import pytest
 
+import xiaoyao
 from xiaoyao.adaptive_grasp import AdaptiveGraspConfig, AdaptiveGrasper, GraspState
 from xiaoyao.adaptive_grasp.safety import SafetyReport, SafetyStatus
 from xiaoyao.adaptive_grasp.tactile import TactileAnalysis
 from xiaoyao.dexhand import CtrlMode, Joint, JointId, TactileSensorId
-
-
+print(xiaoyao.adaptive_grasp.__file__)
+print("hello world")
 class _FakeTactileInfo:
     def __init__(self, fx: float, fy: float, fz: float):
         self._fx = fx
