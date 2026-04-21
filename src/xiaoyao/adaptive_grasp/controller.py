@@ -7,7 +7,10 @@ from typing import Mapping
 from xiaoyao.dexhand import CtrlMode, DexHand, Joint, JointId, TactileSensorId
 
 from .config import AdaptiveGraspConfig
+from .force_planner import ForcePlanner, ObjectProfile
+from .safety import SafetyMonitor, SafetyStatus
 from .states import GraspState
+from .tactile import TactileAnalyzer
 
 
 class AdaptiveGrasper:
@@ -58,6 +61,11 @@ class AdaptiveGrasper:
         self._tactile_windows: dict[TactileSensorId, deque[float]] = {}
         self._hold_joint_angles: dict[JointId, float] = {}
         self._hold_joint_angle_baseline: dict[JointId, float] = {}
+
+        self.tactile = TactileAnalyzer(self.config)
+        self.force_planner = ForcePlanner(self.config, profile=None)
+        self.safety = SafetyMonitor(self.config)
+
         self._reset_runtime_state()
 
     def grasp(self) -> bool:
@@ -76,6 +84,7 @@ class AdaptiveGrasper:
                 self._running = False
                 return False
 
+            self.force_planner.set_baseline_angles(self._hold_joint_angles)
             self._start_adaptive_control()
             return True
         except Exception:
@@ -152,39 +161,53 @@ class AdaptiveGrasper:
             time.sleep(self.config.control_period_s)
 
     def _run_control_step(self) -> bool:
+        # 最高优先级：超时释放
         if self._should_auto_release():
             return self._perform_release(join_control_thread=False)
 
         tactile_data = self._safe_get_tactile_data()
+        joints_feedback = self._safe_get_joints()
+
+        # 安全监控
+        safety_report = self.safety.check(
+            tactile_data=tactile_data,
+            joint_feedback=joints_feedback,
+            state=self.state,
+        )
+        if safety_report.status == SafetyStatus.FAULT:
+            self.state = GraspState.ERROR
+            self._running = False
+            return False
+        if safety_report.status == SafetyStatus.WARN:
+            # 冻结本周期，保持姿态
+            return True
+
         if not tactile_data:
             return False
 
-        # 1) 感知：更新切向力窗口（用于滑移风险估计）。
-        for finger, info in tactile_data.items():
-            ft = math.sqrt(info.get_force_x() ** 2 + info.get_force_y() ** 2)
-            if finger in self._tactile_windows:
-                self._tactile_windows[finger].append(ft)
+        # 触觉分析
+        analysis = self.tactile.update(tactile_data)
 
-        # 2) 控制：计算方差风险、法向力，得到角度控制量和扭矩策略输出。
-        variance = self._calculate_variance()
-        finger_fz = {finger: abs(info.get_force_z()) for finger, info in tactile_data.items()}
-        max_fz = max(finger_fz.values()) if finger_fz else 0.0
-        control_u = self._compute_control_u(variance=variance, max_fz=max_fz)
-        next_torque = self._calculate_next_torque(finger_fz=finger_fz, variance=variance)
+        # 获取当前关节角度用于力规划
+        current_angles = self._hold_joint_angles
+        if joints_feedback:
+            current_angles = {joint.id: joint.angle for joint in joints_feedback}
 
-        if next_torque == self.current_torque and abs(control_u) <= self.config.epsilon:
+        # 力规划
+        decision = self.force_planner.compute(analysis, current_angles)
+
+        if abs(decision.control_u) <= self.config.epsilon:
             return True
 
-        # 3) 执行：POSITION 模式下发下一步关节目标。
-        next_hold_joint_angles = self._get_next_hold_joint_angles(control_u)
+        # 执行：POSITION 模式下发
         joints = self._build_hold_position_joints(
-            torque_value=next_torque,
-            hold_joint_angles=next_hold_joint_angles,
+            torque_value=decision.next_torque,
+            hold_joint_angles=decision.target_angles,
         )
         ok = self.hand.move_joints(joints, mode=CtrlMode.POSITION)
         if ok:
-            self._hold_joint_angles = next_hold_joint_angles
-            self.current_torque = next_torque
+            self._hold_joint_angles = decision.target_angles
+            self.current_torque = decision.next_torque
         return ok
 
     def _safe_get_tactile_data(self):
@@ -222,6 +245,9 @@ class AdaptiveGrasper:
         self._adaptive_hold_started_at = None
         self._pid_integral = 0.0
         self._pid_prev_error = 0.0
+        self.tactile.reset()
+        self.force_planner.reset()
+        self.safety.reset()
 
     def _build_position_joints(
         self,

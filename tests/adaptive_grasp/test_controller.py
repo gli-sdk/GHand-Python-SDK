@@ -4,6 +4,8 @@ import threading
 import pytest
 
 from xiaoyao.adaptive_grasp import AdaptiveGraspConfig, AdaptiveGrasper, GraspState
+from xiaoyao.adaptive_grasp.safety import SafetyReport, SafetyStatus
+from xiaoyao.adaptive_grasp.tactile import TactileAnalysis
 from xiaoyao.dexhand import CtrlMode, Joint, JointId, TactileSensorId
 
 
@@ -61,7 +63,17 @@ def test_adaptive_hold_sends_position_payload_with_config_limits(monkeypatch):
     grasper.state = GraspState.ADAPTIVE_HOLDING
     grasper.current_torque = 10
 
-    monkeypatch.setattr(grasper, "_calculate_variance", lambda: 0.5)
+    monkeypatch.setattr(
+        grasper.tactile,
+        "update",
+        lambda _data: TactileAnalysis(
+            variance=0.5,
+            slip_risk=1.0,
+            slip_confirmed=True,
+            finger_fz={TactileSensorId.THUMB: 0.2, TactileSensorId.FOREFINGER: 0.2},
+            total_fz=0.4,
+        ),
+    )
 
     assert grasper._run_control_step() is True
     assert len(hand.calls) == 1
@@ -88,7 +100,17 @@ def test_adaptive_hold_delta_and_allocation_follow_config(monkeypatch):
     grasper.current_torque = 10
     initial_angles = dict(grasper._hold_joint_angles)
 
-    monkeypatch.setattr(grasper, "_calculate_variance", lambda: 0.5)
+    monkeypatch.setattr(
+        grasper.tactile,
+        "update",
+        lambda _data: TactileAnalysis(
+            variance=0.5,
+            slip_risk=1.0,
+            slip_confirmed=True,
+            finger_fz={TactileSensorId.THUMB: 0.2, TactileSensorId.FOREFINGER: 0.2},
+            total_fz=0.4,
+        ),
+    )
 
     assert grasper._run_control_step() is True
     call = hand.calls[0]
@@ -103,46 +125,6 @@ def test_adaptive_hold_delta_and_allocation_follow_config(monkeypatch):
     assert mcp_delta / pip_delta == pytest.approx(config.K_MCP / config.K_PIP, rel=1e-3)
 
 
-def test_compute_control_u_uses_ff_and_pid_terms():
-    cfg = AdaptiveGraspConfig(
-        variance_baseline=0.0,
-        variance_threshold=1.0,
-        max_normal_force_per_finger=1.0,
-        s_ref=0.2,
-        K_s=2.0,
-        K_n=3.0,
-        K_p=4.0,
-        K_i=0.0,
-        K_d=0.0,
-    )
-    g = AdaptiveGrasper(_PositionTraceHand(), cfg)
-
-    u = g._compute_control_u(variance=0.5, max_fz=1.2)
-    assert u == pytest.approx(-0.8, rel=1e-3, abs=1e-3)
-
-
-def test_compute_control_u_integral_is_clipped():
-    cfg = AdaptiveGraspConfig(
-        variance_baseline=0.0,
-        variance_threshold=1.0,
-        max_normal_force_per_finger=1.0,
-        s_ref=1.0,
-        K_s=0.0,
-        K_n=0.0,
-        K_p=0.0,
-        K_i=1.0,
-        K_d=0.0,
-        I_min=-0.05,
-        I_max=0.05,
-        control_period_s=0.1,
-    )
-    g = AdaptiveGrasper(_PositionTraceHand(), cfg)
-
-    for _ in range(10):
-        g._compute_control_u(variance=0.0, max_fz=0.0)
-    assert g._pid_integral == pytest.approx(cfg.I_max)
-
-
 def test_clip_clamps_and_handles_inverted_bounds():
     g = AdaptiveGrasper(_PositionTraceHand(), AdaptiveGraspConfig())
 
@@ -150,6 +132,27 @@ def test_clip_clamps_and_handles_inverted_bounds():
     assert g._clip(-1.0, 0.0, 10.0) == pytest.approx(0.0)
     assert g._clip(11.0, 0.0, 10.0) == pytest.approx(10.0)
     assert g._clip(3.0, 2.0, 1.0) == pytest.approx(2.0)
+
+
+def test_controller_delegates_to_submodules(monkeypatch):
+    hand = _PositionTraceHand()
+    cfg = AdaptiveGraspConfig(
+        variance_threshold=0.1,
+        max_normal_force_per_finger=1.0,
+    )
+    grasper = AdaptiveGrasper(hand, cfg)
+    grasper.state = GraspState.ADAPTIVE_HOLDING
+    grasper.current_torque = 10
+
+    monkeypatch.setattr(
+        grasper.safety,
+        "check",
+        lambda **kwargs: SafetyReport(SafetyStatus.FAULT),
+    )
+
+    assert grasper._run_control_step() is False
+    assert grasper.state == GraspState.ERROR
+    assert grasper._running is False
 
 
 def test_adaptive_hold_auto_release_uses_release_payload():
