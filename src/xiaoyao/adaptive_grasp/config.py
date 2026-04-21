@@ -99,8 +99,6 @@ _PRE_GRASP_PRESET_DEGREE = {
 
 @dataclass
 class AdaptiveGraspConfig:
-    """自适应抓取配置（与adaptive-grasp-design.md 对齐）。"""
-
     # 1.预抓取姿态（OPEN -> PRE_GRASP 阶段）
     # 预抓取关节目标角（单位：弧度）；为空时按预设自动生成。
     pre_grasp_pose: dict[JointId, float] = field(default_factory=dict)
@@ -111,13 +109,13 @@ class AdaptiveGraspConfig:
     # CLOSING_TO_CONTACT 阶段初始力矩（TORQUE 模式）。
     base_torque: int = 15
     # 接触判定阈值（所有传感器法向力绝对值之和）。
-    contact_threshold_z: float = 0.5
+    contact_threshold_z: float = 1.5
     # 触觉滑动窗口长度（用于方差估计）。
     sliding_window_size: int = 10
     # 力矩步进增量（风险上升时用于收紧）。
     torque_adjust_step: int = 5
     # 力矩命令上限（同时受硬件 [-100,100] 限制）。
-    max_torque: int = 50
+    max_torque: int = 80
     # OPEN/PRE_GRASP/CLOSING 等阶段超时（秒）。
     phase_timeout: float = 10.0
     # 离散控制周期 Ts（秒）。

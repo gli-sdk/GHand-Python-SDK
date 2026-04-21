@@ -37,19 +37,19 @@ def main():
 
             # Configure joint angles for gesture 1
             joints = []
-            joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(30), speed=100, torque=100))
-            joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(30), speed=100, torque=100))
-            joints.append(Joint(id=JointId.THUMB_SWING, angle=math.radians(30), speed=100, torque=100))
-            joints.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(0), speed=100, torque=100))
-            joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(30), speed=100, torque=100))
-            joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(30), speed=100, torque=100))
+            joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(20), speed=100, torque=100))
+            joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(22), speed=100, torque=100))
+            joints.append(Joint(id=JointId.THUMB_SWING, angle=math.radians(85), speed=100, torque=100))
+            joints.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(2), speed=100, torque=100))
+            joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(45), speed=100, torque=100))
+            joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(45), speed=100, torque=100))
             joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(0), speed=100, torque=100))
-            joints.append(Joint(id=JointId.MF_PIP, angle=math.radians(30), speed=100, torque=100))
-            joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(30), speed=100, torque=100))
-            joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(30), speed=100, torque=100))
-            joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(30), speed=100, torque=100))
-            joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(30), speed=100, torque=100))
-            joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(30), speed=100, torque=100))
+            joints.append(Joint(id=JointId.MF_PIP, angle=math.radians(45), speed=100, torque=100))
+            joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(49), speed=100, torque=100))
+            joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(0), speed=100, torque=100))
+            joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(0), speed=100, torque=100))
+            joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(0), speed=100, torque=100))
+            joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(0), speed=100, torque=100))
 
             result = hand.move_joints(joints)
             if result:
