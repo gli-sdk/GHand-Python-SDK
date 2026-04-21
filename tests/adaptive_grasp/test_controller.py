@@ -1,0 +1,230 @@
+import math
+import threading
+
+import pytest
+
+from xiaoyao.adaptive_grasp import AdaptiveGraspConfig, AdaptiveGrasper, GraspState
+from xiaoyao.dexhand import CtrlMode, Joint, JointId, TactileSensorId
+
+
+class _FakeTactileInfo:
+    def __init__(self, fx: float, fy: float, fz: float):
+        self._fx = fx
+        self._fy = fy
+        self._fz = fz
+
+    def get_force_x(self) -> float:
+        return self._fx
+
+    def get_force_y(self) -> float:
+        return self._fy
+
+    def get_force_z(self) -> float:
+        return self._fz
+
+
+class _PositionTraceHand:
+    def __init__(self):
+        self.calls: list[dict] = []
+
+    def move_joints(self, joints, mode=None):  # noqa: ANN001
+        self.calls.append({"mode": mode, "joints": list(joints)})
+        return True
+
+    def get_tactile_data(self):
+        return {
+            TactileSensorId.THUMB: _FakeTactileInfo(0.2, 0.2, 0.2),
+            TactileSensorId.FOREFINGER: _FakeTactileInfo(0.1, 0.1, 0.2),
+        }
+
+    def stop(self):
+        return None
+
+    def get_joints(self):
+        return []
+
+
+def _joint_map(call):
+    return {joint.id: joint for joint in call["joints"]}
+
+
+def test_adaptive_hold_sends_position_payload_with_config_limits(monkeypatch):
+    hand = _PositionTraceHand()
+    config = AdaptiveGraspConfig(
+        position_speed_limit=17,
+        position_torque_limit=29,
+        torque_adjust_step=8,
+        variance_threshold=0.1,
+        max_normal_force_per_finger=1.0,
+    )
+    grasper = AdaptiveGrasper(hand, config)
+    grasper.state = GraspState.ADAPTIVE_HOLDING
+    grasper.current_torque = 10
+
+    monkeypatch.setattr(grasper, "_calculate_variance", lambda: 0.5)
+
+    assert grasper._run_control_step() is True
+    assert len(hand.calls) == 1
+    call = hand.calls[0]
+    assert call["mode"] == CtrlMode.POSITION
+    assert call["joints"]
+    for joint in call["joints"]:
+        assert joint.speed == config.position_speed_limit
+        assert 0 <= joint.torque <= config.position_torque_limit
+
+
+def test_adaptive_hold_delta_and_allocation_follow_config(monkeypatch):
+    hand = _PositionTraceHand()
+    config = AdaptiveGraspConfig(
+        delta_theta_limit=math.radians(0.4),
+        K_MCP=0.6,
+        K_PIP=0.4,
+        torque_adjust_step=30,
+        variance_threshold=0.1,
+        max_normal_force_per_finger=1.0,
+    )
+    grasper = AdaptiveGrasper(hand, config)
+    grasper.state = GraspState.ADAPTIVE_HOLDING
+    grasper.current_torque = 10
+    initial_angles = dict(grasper._hold_joint_angles)
+
+    monkeypatch.setattr(grasper, "_calculate_variance", lambda: 0.5)
+
+    assert grasper._run_control_step() is True
+    call = hand.calls[0]
+    joints = _joint_map(call)
+
+    mcp_delta = joints[JointId.THUMB_MCP].angle - initial_angles[JointId.THUMB_MCP]
+    pip_delta = joints[JointId.THUMB_PIP].angle - initial_angles[JointId.THUMB_PIP]
+
+    assert mcp_delta > 0
+    assert pip_delta > 0
+    assert (mcp_delta + pip_delta) <= config.delta_theta_limit + 1e-9
+    assert mcp_delta / pip_delta == pytest.approx(config.K_MCP / config.K_PIP, rel=1e-3)
+
+
+def test_compute_control_u_uses_ff_and_pid_terms():
+    cfg = AdaptiveGraspConfig(
+        variance_baseline=0.0,
+        variance_threshold=1.0,
+        max_normal_force_per_finger=1.0,
+        s_ref=0.2,
+        K_s=2.0,
+        K_n=3.0,
+        K_p=4.0,
+        K_i=0.0,
+        K_d=0.0,
+    )
+    g = AdaptiveGrasper(_PositionTraceHand(), cfg)
+
+    u = g._compute_control_u(variance=0.5, max_fz=1.2)
+    assert u == pytest.approx(-0.8, rel=1e-3, abs=1e-3)
+
+
+def test_compute_control_u_integral_is_clipped():
+    cfg = AdaptiveGraspConfig(
+        variance_baseline=0.0,
+        variance_threshold=1.0,
+        max_normal_force_per_finger=1.0,
+        s_ref=1.0,
+        K_s=0.0,
+        K_n=0.0,
+        K_p=0.0,
+        K_i=1.0,
+        K_d=0.0,
+        I_min=-0.05,
+        I_max=0.05,
+        control_period_s=0.1,
+    )
+    g = AdaptiveGrasper(_PositionTraceHand(), cfg)
+
+    for _ in range(10):
+        g._compute_control_u(variance=0.0, max_fz=0.0)
+    assert g._pid_integral == pytest.approx(cfg.I_max)
+
+
+def test_clip_clamps_and_handles_inverted_bounds():
+    g = AdaptiveGrasper(_PositionTraceHand(), AdaptiveGraspConfig())
+
+    assert g._clip(5.0, 0.0, 10.0) == pytest.approx(5.0)
+    assert g._clip(-1.0, 0.0, 10.0) == pytest.approx(0.0)
+    assert g._clip(11.0, 0.0, 10.0) == pytest.approx(10.0)
+    assert g._clip(3.0, 2.0, 1.0) == pytest.approx(2.0)
+
+
+def test_adaptive_hold_auto_release_uses_release_payload():
+    hand = _PositionTraceHand()
+    cfg = AdaptiveGraspConfig(
+        release_hold_time_s=0.5,
+        release_open_speed=13,
+        release_open_torque=31,
+    )
+    g = AdaptiveGrasper(hand, cfg)
+    g.state = GraspState.ADAPTIVE_HOLDING
+    g._running = True
+    g._control_thread = threading.current_thread()
+    g._adaptive_hold_started_at = 10.0
+    g._get_monotonic_time = lambda: 10.5
+
+    assert g._run_control_step() is True
+    assert g.state == GraspState.COMPLETED
+    assert g._running is False
+    assert len(hand.calls) == 1
+    call = hand.calls[0]
+    assert call["mode"] == CtrlMode.POSITION
+    assert call["joints"]
+    for joint in call["joints"]:
+        assert joint.speed == cfg.release_open_speed
+        assert joint.torque == cfg.release_open_torque
+
+
+class _ReleaseFeedbackHand(_PositionTraceHand):
+    def __init__(self, feedback_angles: list[dict[JointId, float]]):
+        super().__init__()
+        self._feedback_angles = list(feedback_angles)
+        self._idx = 0
+
+    def get_joints(self):
+        if self._idx < len(self._feedback_angles):
+            angles = self._feedback_angles[self._idx]
+            self._idx += 1
+        else:
+            angles = self._feedback_angles[-1]
+        return [Joint(id=joint_id, angle=angle) for joint_id, angle in angles.items()]
+
+
+def test_release_waits_until_joints_settled(monkeypatch):
+    cfg = AdaptiveGraspConfig(
+        release_timeout_s=0.2,
+        release_check_cycles=2,
+        theta_err_th=math.radians(2.0),
+    )
+    target = AdaptiveGrasper(_PositionTraceHand(), cfg)._get_open_pose()
+    hand = _ReleaseFeedbackHand([target, target, target])
+    g = AdaptiveGrasper(hand, cfg)
+    g._running = True
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
+    t = {"v": 0.0}
+    g._get_monotonic_time = lambda: (t.__setitem__("v", t["v"] + 0.01) or t["v"])
+
+    assert g.release() is True
+    assert g.state == GraspState.COMPLETED
+
+
+def test_release_fails_when_timeout_before_settled(monkeypatch):
+    cfg = AdaptiveGraspConfig(
+        release_timeout_s=0.02,
+        release_check_cycles=2,
+        theta_err_th=math.radians(1.0),
+    )
+    target = AdaptiveGrasper(_PositionTraceHand(), cfg)._get_open_pose()
+    far = {joint_id: angle + math.radians(10.0) for joint_id, angle in target.items()}
+    hand = _ReleaseFeedbackHand([far, far, far, far])
+    g = AdaptiveGrasper(hand, cfg)
+    g._running = True
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
+    t = {"v": 0.0}
+    g._get_monotonic_time = lambda: (t.__setitem__("v", t["v"] + 0.01) or t["v"])
+
+    assert g.release() is False
+    assert g.state == GraspState.ERROR
