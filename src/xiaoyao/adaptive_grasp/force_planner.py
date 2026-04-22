@@ -4,7 +4,7 @@ from typing import Optional
 
 from xiaoyao.dexhand import JointId, TactileSensorId
 from .config import AdaptiveGraspConfig
-from .tactile import TactileAnalysis
+from .tactility import TactileAnalysis
 
 
 _G = 9.8

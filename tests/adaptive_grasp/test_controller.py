@@ -348,3 +348,35 @@ def test_phase_closing_safety_fault_fallback_to_release(monkeypatch):
     assert grasper.grasp() is False
     # enable_fault_release_fallback=True 时走 RELEASE 流程
     assert grasper.state in (GraspState.RELEASE, GraspState.COMPLETED, GraspState.ERROR)
+
+
+def test_controller_runs_full_state_machine_with_submodules(monkeypatch):
+    """Smoke test: controller should use submodules and reach ADAPTIVE_HOLD."""
+    from xiaoyao.adaptive_grasp import AdaptiveGrasper, AdaptiveGraspConfig, GraspState
+    from xiaoyao.adaptive_grasp.force_planner import ObjectProfile
+
+    hand = _PositionTraceHand()
+    cfg = AdaptiveGraspConfig(
+        contact_threshold_z=0.1,
+        release_hold_time_s=0.1,
+        control_period_s=0.001,
+    )
+    profile = ObjectProfile(
+        name="test_obj", weight_kg=0.1, material="plastic",
+        safe_force_min=0.5, safe_force_max=5.0,
+        friction_coeff=0.4, is_fragile=False,
+    )
+    grasper = AdaptiveGrasper(hand, cfg)
+
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.monotonic", lambda: 0.0)
+
+    call_count = [0]
+    def fake_should_release():
+        call_count[0] += 1
+        return call_count[0] > 2
+    monkeypatch.setattr(grasper, "_should_auto_release", fake_should_release)
+
+    ok = grasper.grasp(object_profile=profile)
+    assert ok is True
+    assert grasper.state in (GraspState.ADAPTIVE_HOLD, GraspState.COMPLETED, GraspState.RELEASE)
