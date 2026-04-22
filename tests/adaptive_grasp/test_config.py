@@ -99,3 +99,30 @@ def test_safety_factor_bounds():
 def test_slip_detect_debounce_positive():
     with pytest.raises(ValueError):
         AdaptiveGraspConfig(slip_detect_debounce_cycles=0)
+
+
+def test_variance_direction_friction_weights_sum_to_one():
+    cfg = AdaptiveGraspConfig()
+    assert cfg.variance_weight == pytest.approx(0.5)
+    assert cfg.direction_weight == pytest.approx(0.3)
+    assert cfg.friction_weight == pytest.approx(0.2)
+    total = cfg.variance_weight + cfg.direction_weight + cfg.friction_weight
+    assert total == pytest.approx(1.0)
+
+
+def test_weight_bounds_and_normalization():
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(variance_weight=-0.1)
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(direction_weight=1.1)
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(friction_weight=1.1)
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(variance_weight=0.5, direction_weight=0.5, friction_weight=0.5)
+
+
+def test_default_friction_coeff():
+    cfg = AdaptiveGraspConfig()
+    assert cfg.default_friction_coeff == pytest.approx(0.5)
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(default_friction_coeff=0.0)

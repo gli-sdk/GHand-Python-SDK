@@ -179,7 +179,7 @@ class AdaptiveGraspConfig:
     # 数值稳定项（防分母为零）
     # 数值稳定小量，避免分母为 0。
     epsilon: float = 1e-6
-    # V2.0 新增参数
+    # 新增参数
     # 安全系数 S_f，范围 [1.2, 2.0]，默认 1.5
     safety_factor: float = 1.5
     # 基础夹持力 F_base（N），默认 0.5
@@ -190,6 +190,14 @@ class AdaptiveGraspConfig:
     fragile_speed_reduction: float = 0.7
     # 易损模式角增量/力矩步进降低比例
     fragile_step_reduction: float = 0.5
+    # 三指标融合权重，满足 α + β + γ = 1
+    variance_weight: float = 0.5
+    direction_weight: float = 0.3
+    friction_weight: float = 0.2
+    # 默认摩擦系数，物体参数库未提供时 fallback
+    default_friction_coeff: float = 0.5
+    # 异常降级使能：SafetyMonitor 返回 FAULT 时是否走 RELEASE 安全张开（True）或直接进入 ERROR（False）
+    enable_fault_release_fallback: bool = True
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.stiffness <= 1.0:
@@ -248,6 +256,16 @@ class AdaptiveGraspConfig:
             raise ValueError("fragile_speed_reduction must be in (0.0, 1.0]")
         if not 0.0 < self.fragile_step_reduction <= 1.0:
             raise ValueError("fragile_step_reduction must be in (0.0, 1.0]")
+        if not 0.0 <= self.variance_weight <= 1.0:
+            raise ValueError("variance_weight must be in [0.0, 1.0]")
+        if not 0.0 <= self.direction_weight <= 1.0:
+            raise ValueError("direction_weight must be in [0.0, 1.0]")
+        if not 0.0 <= self.friction_weight <= 1.0:
+            raise ValueError("friction_weight must be in [0.0, 1.0]")
+        if not math.isclose(self.variance_weight + self.direction_weight + self.friction_weight, 1.0, abs_tol=1e-6):
+            raise ValueError("variance_weight + direction_weight + friction_weight must equal 1.0")
+        if self.default_friction_coeff <= 0:
+            raise ValueError("default_friction_coeff must be > 0")
 
         if self.max_normal_force_per_finger is None:
             self.max_normal_force_per_finger = 0.1 + 2.9 * self.stiffness

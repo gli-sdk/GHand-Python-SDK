@@ -1,10 +1,11 @@
 import math
 import threading
 import time
-from collections import deque
 from typing import Mapping
 
-from xiaoyao.dexhand import CtrlMode, DexHand, Joint, JointId, TactileSensorId
+import logging
+
+from xiaoyao.dexhand import CtrlMode, DexHand, Joint, JointId
 
 from .config import AdaptiveGraspConfig
 from .force_planner import ForcePlanner, ObjectProfile
@@ -12,12 +13,10 @@ from .safety import SafetyMonitor, SafetyStatus
 from .states import GraspState
 from .tactile import TactileAnalyzer
 
+_logger = logging.getLogger("xiaoyao.adaptive_grasp.controller")
+
 
 class AdaptiveGrasper:
-    # 控制量到关节总角增量的映射系数：u 每增加 1，对应闭合约 0.5°。
-    _HOLD_CLOSURE_STEP_PER_TORQUE = math.radians(0.5)
-    # 相对 ADAPTIVE_HOLD 基线角度的累计变化保护上限（防止持续收紧/放松过度）。
-    _HOLD_CLOSURE_MAX_DELTA = math.radians(20.0)
     _TORQUE_JOINTS = (
         JointId.THUMB_PIP,
         JointId.THUMB_MCP,
@@ -29,20 +28,6 @@ class AdaptiveGrasper:
         JointId.RF_MCP,
         JointId.LF_PIP,
         JointId.LF_MCP,
-    )
-    _MCP_JOINTS = (
-        JointId.THUMB_MCP,
-        JointId.FF_MCP,
-        JointId.MF_MCP,
-        JointId.RF_MCP,
-        JointId.LF_MCP,
-    )
-    _PIP_JOINTS = (
-        JointId.THUMB_PIP,
-        JointId.FF_PIP,
-        JointId.MF_PIP,
-        JointId.RF_PIP,
-        JointId.LF_PIP,
     )
 
     def __init__(self, hand: DexHand, config: AdaptiveGraspConfig | None = None):
@@ -56,15 +41,20 @@ class AdaptiveGrasper:
         self._control_thread: threading.Thread | None = None
         self._adaptive_hold_started_at: float | None = None
         self._get_monotonic_time = time.monotonic
-        self._pid_integral: float = 0.0
-        self._pid_prev_error: float = 0.0
-        self._tactile_windows: dict[TactileSensorId, deque[float]] = {}
         self._hold_joint_angles: dict[JointId, float] = {}
-        self._hold_joint_angle_baseline: dict[JointId, float] = {}
 
         self.tactile = TactileAnalyzer(self.config)
         self.force_planner = ForcePlanner(self.config, profile=None)
         self.safety = SafetyMonitor(self.config)
+
+        self._reset_runtime_state()
+
+    def set_object_profile(self, profile: ObjectProfile | None = None) -> None:
+        self.force_planner = ForcePlanner(self.config, profile=profile)
+        if profile is not None:
+            self.tactile.set_friction_coeff(profile.friction_coeff)
+        else:
+            self.tactile.set_friction_coeff(self.config.default_friction_coeff)
 
         self._reset_runtime_state()
 
@@ -88,6 +78,7 @@ class AdaptiveGrasper:
             self._start_adaptive_control()
             return True
         except Exception:
+            _logger.exception("grasp failed with exception")
             self.state = GraspState.ERROR
             self._running = False
             return False
@@ -106,58 +97,145 @@ class AdaptiveGrasper:
         return self.state
 
     def _phase_open(self) -> bool:
-        self.state = GraspState.OPENING
+        self.state = GraspState.OPEN
         # OPEN 阶段统一使用 POSITION 模式到张开姿态。
-        joints = self._build_position_joints(self._get_open_pose(),speed = 20,torque=20)
+        speed = int(20 * self.config.fragile_speed_reduction) if self.force_planner.is_fragile_mode else 20
+        torque = 20
+        joints = self._build_position_joints(self._get_open_pose(), speed=speed, torque=torque)
         ok = self.hand.move_joints(joints, mode=CtrlMode.POSITION)
         if ok:
             time.sleep(2)
         return ok
 
     def _phase_pre_grasp(self) -> bool:
-        self.state = GraspState.PRE_GRASPING
+        self.state = GraspState.PRE_GRASP
         # PRE_GRASP 阶段到预抓取姿态，给后续闭合留足形态先验。
-        joints = self._build_position_joints(self.config.pre_grasp_pose,speed=50,torque=50)
+        speed = int(50 * self.config.fragile_speed_reduction) if self.force_planner.is_fragile_mode else 50
+        torque = 50
+        joints = self._build_position_joints(self.config.pre_grasp_pose, speed=speed, torque=torque)
         ok = self.hand.move_joints(joints, mode=CtrlMode.POSITION)
         if ok:
             time.sleep(5)
         return ok
 
     def _phase_closing(self) -> bool:
-        self.state = GraspState.CLOSING
+        self.state = GraspState.CLOSING_TO_CONTACT
         start = time.time()
         torque = int(self._clamp_torque(self.config.base_torque))
         self.current_torque = torque
 
         while self._running:
             if (time.time() - start) > self.config.phase_timeout:
+                _logger.error("phase closing timeout")
                 return False
 
             # 接触前在 TORQUE 模式下闭合找接触。
             joints = self._build_torque_joints(self.current_torque)
             if not self.hand.move_joints(joints, mode=CtrlMode.TORQUE):
+                _logger.error("move_joints failed in phase closing")
                 return False
 
             tactile_data = self._safe_get_tactile_data()
+            joints_feedback = self._safe_get_joints()
+
+            # 安全监控：空抓、传感器故障
+            safety_report = self.safety.check(
+                tactile_data=tactile_data,
+                joint_feedback=joints_feedback,
+                state=self.state,
+            )
+            if safety_report.status == SafetyStatus.FAULT:
+                _logger.error(
+                    "safety fault in closing: type=%s message=%s",
+                    safety_report.fault_type,
+                    safety_report.message,
+                )
+                if self.config.enable_fault_release_fallback:
+                    return self._perform_release(join_control_thread=False)
+                self.state = GraspState.ERROR
+                self._running = False
+                return False
+            if safety_report.status == SafetyStatus.WARN:
+                # 轻微异常（如单次数据丢包），冻结本周期，保持当前姿态
+                time.sleep(self.config.control_period_s)
+                continue
+
             if tactile_data:
                 total_fz = sum(abs(info.get_force_z()) for info in tactile_data.values())
                 if total_fz >= self.config.contact_threshold_z:
-                    # 达到接触阈值后切入 ADAPTIVE_HOLD。
-                    return True
+                    # 达到接触阈值后，先做法向力校准，再切入 ADAPTIVE_HOLD。
+                    if self._calibrate_closing_force(tactile_data, start):
+                        return True
+                    _logger.error("force calibration failed")
+                    return False
 
             time.sleep(self.config.control_period_s)
 
         return False
 
+    def _calibrate_closing_force(
+        self,
+        tactile_data: dict,
+        phase_start: float,
+        max_cycles: int = 2,
+    ) -> bool:
+        # 接触后法向力校准：在 1~2 个周期内将总法向力修正到 F_init ± 2 N。
+        F_init = self.force_planner.F_init
+        step = self.config.torque_adjust_step
+        if self.force_planner.is_fragile_mode:
+            step = int(step * self.config.fragile_step_reduction)
+
+        # 90% 阈值提前减速：任一手指法向力接近上限时，步进增量临时降低 50%
+        max_finger_fz = max(
+            (abs(info.get_force_z()) for info in tactile_data.values()),
+            default=0.0,
+        )
+        if max_finger_fz >= 0.9 * self.config.max_normal_force_per_finger:
+            step = max(1, int(step * 0.5))
+
+        for _ in range(max_cycles):
+            if (time.time() - phase_start) > self.config.phase_timeout:
+                return False
+            if not self._running:
+                return False
+
+            total_fz = sum(abs(info.get_force_z()) for info in tactile_data.values())
+            if abs(total_fz - F_init) <= 2.0:
+                return True
+
+            if total_fz < F_init:
+                self.current_torque = int(self._clamp_torque(self.current_torque + step))
+            else:
+                self.current_torque = int(self._clamp_torque(self.current_torque - step))
+
+            joints = self._build_torque_joints(self.current_torque)
+            if not self.hand.move_joints(joints, mode=CtrlMode.TORQUE):
+                return False
+            time.sleep(self.config.control_period_s)
+
+            tactile_data = self._safe_get_tactile_data()
+            if not tactile_data:
+                return False
+
+        # 微调结束后再次检查
+        total_fz = sum(abs(info.get_force_z()) for info in tactile_data.values())
+        return abs(total_fz - F_init) <= 2.0
+
     def _start_adaptive_control(self) -> None:
-        self.state = GraspState.ADAPTIVE_HOLDING
+        self.state = GraspState.ADAPTIVE_HOLD
         self._adaptive_hold_started_at = self._get_monotonic_time()
         self._control_thread = threading.Thread(target=self._adaptive_control_loop, daemon=True)
         self._control_thread.start()
 
     def _adaptive_control_loop(self) -> None:
         while self._running:
-            self._run_control_step()
+            try:
+                self._run_control_step()
+            except Exception:
+                _logger.exception("adaptive control loop error")
+                self._running = False
+                self.state = GraspState.ERROR
+                break
             time.sleep(self.config.control_period_s)
 
     def _run_control_step(self) -> bool:
@@ -175,6 +253,15 @@ class AdaptiveGrasper:
             state=self.state,
         )
         if safety_report.status == SafetyStatus.FAULT:
+            _logger.error(
+                "safety fault detected: type=%s message=%s",
+                safety_report.fault_type,
+                safety_report.message,
+            )
+            if self.config.enable_fault_release_fallback:
+                # 异常降级：走 RELEASE 安全张开流程，避免直接停机导致手指保持夹紧
+                return self._perform_release(join_control_thread=False)
+            # 调试模式：直接停机报错
             self.state = GraspState.ERROR
             self._running = False
             return False
@@ -191,7 +278,7 @@ class AdaptiveGrasper:
         # 获取当前关节角度用于力规划
         current_angles = self._hold_joint_angles
         if joints_feedback:
-            current_angles = {joint.id: joint.angle for joint in joints_feedback}
+            current_angles = self._extract_joint_angles(joints_feedback)
 
         # 力规划
         decision = self.force_planner.compute(analysis, current_angles)
@@ -225,8 +312,21 @@ class AdaptiveGrasper:
         except Exception:
             return None
 
+    @staticmethod
+    def _extract_joint_angles(joints_feedback: list) -> dict[JointId, float]:
+        angles: dict[JointId, float] = {}
+        for j in joints_feedback:
+            jid = getattr(j, "id", j.get("id") if isinstance(j, dict) else None)
+            jangle = getattr(j, "angle", j.get("angle", 0.0) if isinstance(j, dict) else 0.0)
+            if jid is not None:
+                angles[jid] = float(jangle)
+        return angles
+
     def _build_torque_joints(self, torque: int) -> list[Joint]:
-        return [Joint(id=joint_id, torque=torque) for joint_id in self._TORQUE_JOINTS]
+        joints = [Joint(id=joint_id, torque=torque) for joint_id in self._TORQUE_JOINTS]
+        joints.append(Joint(id=JointId.THUMB_SWING, torque=5))
+        joints.append(Joint(id=JointId.THUMB_ROTATION, torque=5))
+        return joints
 
     def _init_hold_joint_angles(self) -> dict[JointId, float]:
         return {
@@ -235,16 +335,9 @@ class AdaptiveGrasper:
         }
 
     def _reset_runtime_state(self) -> None:
-        self._tactile_windows = {
-            finger: deque(maxlen=self.config.sliding_window_size)
-            for finger in TactileSensorId
-        }
         self._hold_joint_angles = self._init_hold_joint_angles()
-        self._hold_joint_angle_baseline = dict(self._hold_joint_angles)
         self.current_torque = int(self._clamp_torque(self.config.base_torque))
         self._adaptive_hold_started_at = None
-        self._pid_integral = 0.0
-        self._pid_prev_error = 0.0
         self.tactile.reset()
         self.force_planner.reset()
         self.safety.reset()
@@ -297,79 +390,6 @@ class AdaptiveGrasper:
             )
         return joints
 
-    def _get_next_hold_joint_angles(self, control_u: float) -> dict[JointId, float]:
-        # 控制量很小时直接保持当前目标，避免抖动。
-        if abs(control_u) <= self._HOLD_CLOSURE_STEP_PER_TORQUE:
-            return dict(self._hold_joint_angles)
-
-        # 先把控制量映射为“总角增量”，再做单周期限幅。
-        raw_total_delta = float(control_u) * self._HOLD_CLOSURE_STEP_PER_TORQUE
-        total_delta = self._clip(
-            value=raw_total_delta,
-            lower=-float(self.config.delta_theta_limit),
-            upper=float(self.config.delta_theta_limit),
-        )
-        # 按配置系数把总增量分配给 MCP 与 PIP。
-        mcp_delta = total_delta * float(self.config.K_MCP)
-        pip_delta = total_delta * float(self.config.K_PIP)
-
-        next_angles = dict(self._hold_joint_angles)
-        for joint_id in self._TORQUE_JOINTS:
-            baseline_angle = self._hold_joint_angle_baseline.get(joint_id, 0.0)
-            current_angle = next_angles.get(joint_id, baseline_angle)
-            # 每个关节都相对进入 ADAPTIVE_HOLD 的基线角做累计保护限幅。
-            min_angle = baseline_angle - self._HOLD_CLOSURE_MAX_DELTA
-            max_angle = baseline_angle + self._HOLD_CLOSURE_MAX_DELTA
-            if joint_id in self._MCP_JOINTS:
-                next_value = current_angle + mcp_delta
-            else:
-                next_value = current_angle + pip_delta
-            next_angles[joint_id] = self._clip(next_value, min_angle, max_angle)
-        return next_angles
-
-    def _normalize_slip_risk(self, variance: float) -> float:
-        cfg = self.config
-        if variance <= cfg.variance_baseline:
-            return 0.0
-        if variance >= cfg.variance_threshold:
-            return 1.0
-        denom = (cfg.variance_threshold - cfg.variance_baseline) + cfg.epsilon
-        return self._clip(
-            value=(variance - cfg.variance_baseline) / denom,
-            lower=0.0,
-            upper=1.0,
-        )
-
-    def _normal_force_error(self, max_fz: float) -> float:
-        limit = self.config.max_normal_force_per_finger
-        return self._clip(
-            value=(max_fz - limit) / (limit + self.config.epsilon),
-            lower=0.0,
-            upper=float("inf"),
-        )
-
-    def _compute_control_u(self, variance: float, max_fz: float) -> float:
-        # 前馈项：滑移风险推动收紧，法向超限推动卸力。
-        s_k = self._normalize_slip_risk(variance)
-        e_nk = self._normal_force_error(max_fz)
-        u_ff = (self.config.K_s * s_k) - (self.config.K_n * e_nk)
-
-        # PID 项：围绕 s_ref 调节，积分项带上下限以避免积分饱和。
-        e_k = self.config.s_ref - s_k
-        self._pid_integral = self._clip(
-            value=self._pid_integral + (e_k * self.config.control_period_s),
-            lower=self.config.I_min,
-            upper=self.config.I_max,
-        )
-        derivative = (e_k - self._pid_prev_error) / self.config.control_period_s
-        self._pid_prev_error = e_k
-        u_pid = (
-            (self.config.K_p * e_k)
-            + (self.config.K_i * self._pid_integral)
-            + (self.config.K_d * derivative)
-        )
-        return u_ff + u_pid
-
     def _should_auto_release(self) -> bool:
         if self._adaptive_hold_started_at is None:
             return False
@@ -377,7 +397,7 @@ class AdaptiveGrasper:
         return elapsed >= self.config.release_hold_time_s
 
     def _perform_release(self, join_control_thread: bool) -> bool:
-        self.state = GraspState.RELEASING
+        self.state = GraspState.RELEASE
         self._running = False
         self._adaptive_hold_started_at = None
 
@@ -398,6 +418,7 @@ class AdaptiveGrasper:
         # 先发一次 RELEASE 张开指令；若失败直接报错返回。
         ok = self.hand.move_joints(joints, mode=CtrlMode.POSITION)
         if not ok:
+            _logger.error("release move_joints failed")
             self.state = GraspState.ERROR
             return False
 
@@ -424,39 +445,14 @@ class AdaptiveGrasper:
                 else:
                     settled_cycles = 0
                 time.sleep(self.config.control_period_s)
+            _logger.error("release joint settle timeout")
             self.state = GraspState.ERROR
             return False
 
         self.state = GraspState.COMPLETED if ok else GraspState.ERROR
+        if not ok:
+            _logger.error("release failed after move_joints")
         return ok
-
-    def _calculate_variance(self) -> float:
-        values = []
-        for window in self._tactile_windows.values():
-            if len(window) < 3:
-                continue
-            mean = sum(window) / len(window)
-            var = sum((item - mean) ** 2 for item in window) / len(window)
-            values.append(var)
-        return max(values) if values else 0.0
-
-    def _calculate_torque_from_slip(self, finger_fz: dict[TactileSensorId, float], variance: float) -> int:
-        if not finger_fz:
-            return self.current_torque
-        if any(fz >= self.config.max_normal_force_per_finger for fz in finger_fz.values()):
-            return self.current_torque
-
-        if variance >= self.config.variance_threshold:
-            target = self.current_torque + self.config.torque_adjust_step
-            return int(round(self._clamp_torque(target)))
-
-        return self.current_torque
-
-    def _calculate_next_torque(self, finger_fz: dict[TactileSensorId, float], variance: float) -> int:
-        if not finger_fz:
-            return self.current_torque
-
-        return self._calculate_torque_from_slip(finger_fz=finger_fz, variance=variance)
 
     def _clip(self, value: float, lower: float, upper: float) -> float:
         value_f = float(value)

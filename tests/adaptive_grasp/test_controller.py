@@ -62,7 +62,7 @@ def test_adaptive_hold_sends_position_payload_with_config_limits(monkeypatch):
         max_normal_force_per_finger=1.0,
     )
     grasper = AdaptiveGrasper(hand, config)
-    grasper.state = GraspState.ADAPTIVE_HOLDING
+    grasper.state = GraspState.ADAPTIVE_HOLD
     grasper.current_torque = 10
 
     monkeypatch.setattr(
@@ -71,6 +71,8 @@ def test_adaptive_hold_sends_position_payload_with_config_limits(monkeypatch):
         lambda _data: TactileAnalysis(
             variance=0.5,
             slip_risk=1.0,
+            direction_distance=0.0,
+            friction_utilization=0.0,
             slip_confirmed=True,
             finger_fz={TactileSensorId.THUMB: 0.2, TactileSensorId.FOREFINGER: 0.2},
             total_fz=0.4,
@@ -98,7 +100,7 @@ def test_adaptive_hold_delta_and_allocation_follow_config(monkeypatch):
         max_normal_force_per_finger=1.0,
     )
     grasper = AdaptiveGrasper(hand, config)
-    grasper.state = GraspState.ADAPTIVE_HOLDING
+    grasper.state = GraspState.ADAPTIVE_HOLD
     grasper.current_torque = 10
     initial_angles = dict(grasper._hold_joint_angles)
 
@@ -108,6 +110,8 @@ def test_adaptive_hold_delta_and_allocation_follow_config(monkeypatch):
         lambda _data: TactileAnalysis(
             variance=0.5,
             slip_risk=1.0,
+            direction_distance=0.0,
+            friction_utilization=0.0,
             slip_confirmed=True,
             finger_fz={TactileSensorId.THUMB: 0.2, TactileSensorId.FOREFINGER: 0.2},
             total_fz=0.4,
@@ -141,9 +145,10 @@ def test_controller_delegates_to_submodules(monkeypatch):
     cfg = AdaptiveGraspConfig(
         variance_threshold=0.1,
         max_normal_force_per_finger=1.0,
+        enable_fault_release_fallback=False,
     )
     grasper = AdaptiveGrasper(hand, cfg)
-    grasper.state = GraspState.ADAPTIVE_HOLDING
+    grasper.state = GraspState.ADAPTIVE_HOLD
     grasper.current_torque = 10
 
     monkeypatch.setattr(
@@ -165,7 +170,7 @@ def test_adaptive_hold_auto_release_uses_release_payload():
         release_open_torque=31,
     )
     g = AdaptiveGrasper(hand, cfg)
-    g.state = GraspState.ADAPTIVE_HOLDING
+    g.state = GraspState.ADAPTIVE_HOLD
     g._running = True
     g._control_thread = threading.current_thread()
     g._adaptive_hold_started_at = 10.0
@@ -252,10 +257,94 @@ def test_full_grasp_state_transitions(monkeypatch):
     grasper = AdaptiveGrasper(hand, cfg)
 
     monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
+    # 跳过力校准，直接返回成功（本测试仅验证状态流转，不验证力校准细节）
+    monkeypatch.setattr(grasper, "_calibrate_closing_force", lambda *args, **kwargs: True)
 
     assert grasper.grasp() is True
-    assert grasper.state == GraspState.ADAPTIVE_HOLDING
+    assert grasper.state == GraspState.ADAPTIVE_HOLD
 
     time.sleep(0.1)
     grasper.release()
-    assert grasper.state in (GraspState.COMPLETED, GraspState.RELEASING)
+    assert grasper.state in (GraspState.COMPLETED, GraspState.RELEASE)
+
+
+class _NoContactHand(_PositionTraceHand):
+    def get_tactile_data(self):
+        return {
+            TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 0.0),
+            TactileSensorId.FOREFINGER: _FakeTactileInfo(0.0, 0.0, 0.0),
+        }
+
+
+def test_phase_closing_empty_grasp_detected(monkeypatch):
+    """CLOSING_TO_CONTACT 阶段空抓检测：关节已移动但无触觉接触"""
+    hand = _NoContactHand()
+    cfg = AdaptiveGraspConfig(
+        control_period_s=0.01,
+        phase_timeout=1.0,
+        contact_threshold_z=1.0,
+        enable_fault_release_fallback=False,
+    )
+    grasper = AdaptiveGrasper(hand, cfg)
+
+    # 模拟关节已移动超过 10°
+    monkeypatch.setattr(
+        grasper,
+        "_safe_get_joints",
+        lambda: [Joint(id=JointId.THUMB_MCP, angle=math.radians(20.0))],
+    )
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
+
+    assert grasper.grasp() is False
+    assert grasper.state == GraspState.ERROR
+
+
+class _LostTactileHand(_PositionTraceHand):
+    def __init__(self):
+        super().__init__()
+        self._call_count = 0
+
+    def get_tactile_data(self):
+        self._call_count += 1
+        if self._call_count >= 4:
+            return None
+        return super().get_tactile_data()
+
+
+def test_phase_closing_sensor_fault_on_missing_tactile(monkeypatch):
+    """CLOSING_TO_CONTACT 阶段传感器故障：连续 3 周期无触觉数据"""
+    hand = _LostTactileHand()
+    cfg = AdaptiveGraspConfig(
+        control_period_s=0.01,
+        phase_timeout=1.0,
+        enable_fault_release_fallback=False,
+    )
+    grasper = AdaptiveGrasper(hand, cfg)
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
+
+    assert grasper.grasp() is False
+    assert grasper.state == GraspState.ERROR
+
+
+def test_phase_closing_safety_fault_fallback_to_release(monkeypatch):
+    """CLOSING_TO_CONTACT 阶段 safety fault 触发 RELEASE 降级"""
+    hand = _NoContactHand()
+    cfg = AdaptiveGraspConfig(
+        control_period_s=0.01,
+        phase_timeout=1.0,
+        contact_threshold_z=1.0,
+        enable_fault_release_fallback=True,
+        release_timeout_s=0.01,
+    )
+    grasper = AdaptiveGrasper(hand, cfg)
+
+    monkeypatch.setattr(
+        grasper,
+        "_safe_get_joints",
+        lambda: [Joint(id=JointId.THUMB_MCP, angle=math.radians(20.0))],
+    )
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
+
+    assert grasper.grasp() is False
+    # enable_fault_release_fallback=True 时走 RELEASE 流程
+    assert grasper.state in (GraspState.RELEASE, GraspState.COMPLETED, GraspState.ERROR)

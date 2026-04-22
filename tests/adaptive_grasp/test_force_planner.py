@@ -2,7 +2,7 @@ import math
 import pytest
 from xiaoyao.adaptive_grasp.config import AdaptiveGraspConfig
 from xiaoyao.adaptive_grasp.force_planner import ObjectProfile, ObjectProfileRegistry, ForcePlanner, ForceDecision
-from xiaoyao.adaptive_grasp.tactile import TactileAnalysis
+from xiaoyao.adaptive_grasp.tactile import TactileAnalysis, PerFingerAnalysis
 from xiaoyao.dexhand import TactileSensorId, JointId
 
 
@@ -36,7 +36,8 @@ def test_force_planner_pid_around_normal_force():
     planner = ForcePlanner(cfg, profile)
 
     analysis = TactileAnalysis(
-        variance=0.0, slip_risk=0.0, slip_confirmed=False,
+        variance=0.0, slip_risk=0.0, direction_distance=0.0, friction_utilization=0.0,
+        slip_confirmed=False,
         finger_fz={TactileSensorId.THUMB: 2.0},
         total_fz=2.0,
     )
@@ -65,7 +66,8 @@ def test_fragile_mode_limits_speed_and_step():
     assert planner.is_fragile_mode is True
 
     analysis = TactileAnalysis(
-        variance=0.0, slip_risk=0.0, slip_confirmed=False,
+        variance=0.0, slip_risk=0.0, direction_distance=0.0, friction_utilization=0.0,
+        slip_confirmed=False,
         finger_fz={TactileSensorId.THUMB: 0.5},
         total_fz=0.5,
     )
@@ -75,6 +77,55 @@ def test_fragile_mode_limits_speed_and_step():
     assert decision.is_fragile_mode is True
     # speed 应被限制：20 * 0.7 = 14
     assert decision.next_torque <= int(20 * 0.7)
+
+
+def test_per_finger_independent_control():
+    cfg = AdaptiveGraspConfig(
+        K_p=1.0, K_i=0.0, K_d=0.0,
+        max_normal_force_per_finger=5.0,
+        control_period_s=0.01,
+    )
+    profile = ObjectProfile(
+        name="test", weight_kg=0.2, material="plastic",
+        safe_force_min=1.0, safe_force_max=10.0,
+        friction_coeff=0.4, is_fragile=False,
+    )
+    planner = ForcePlanner(cfg, profile)
+    # F_init = 0.2*9.8*1.5 + 0.5 = 3.44；双指 => F_n,ref ≈ 1.72
+
+    analysis = TactileAnalysis(
+        variance=0.0, slip_risk=0.0, direction_distance=0.0, friction_utilization=0.0,
+        slip_confirmed=False,
+        finger_fz={TactileSensorId.THUMB: 2.0, TactileSensorId.FOREFINGER: 0.5},
+        total_fz=2.5,
+        per_finger={
+            TactileSensorId.THUMB: PerFingerAnalysis(
+                variance=0.0, s_k=0.0, d_k=0.0, r_k=0.0, s_total=0.0,
+                slip_confirmed=False, fz=2.0,
+            ),
+            TactileSensorId.FOREFINGER: PerFingerAnalysis(
+                variance=0.0, s_k=0.0, d_k=0.0, r_k=0.0, s_total=0.0,
+                slip_confirmed=False, fz=0.5,
+            ),
+        },
+    )
+    angles = {
+        JointId.THUMB_MCP: 0.0, JointId.THUMB_PIP: 0.0,
+        JointId.FF_MCP: 0.0, JointId.FF_PIP: 0.0,
+    }
+    decision = planner.compute(analysis, angles)
+
+    thumb_mcp = decision.target_angles[JointId.THUMB_MCP]
+    thumb_pip = decision.target_angles[JointId.THUMB_PIP]
+    ff_mcp = decision.target_angles[JointId.FF_MCP]
+    ff_pip = decision.target_angles[JointId.FF_PIP]
+
+    # THUMB: F_n=2.0 > F_n,ref≈1.72 => 卸力（角度减小）
+    assert thumb_mcp < 0.0
+    assert thumb_pip < 0.0
+    # FOREFINGER: F_n=0.5 < F_n,ref≈1.72 => 收紧（角度增大）
+    assert ff_mcp > 0.0
+    assert ff_pip > 0.0
 
 
 def test_registry_lookup():
