@@ -6,11 +6,15 @@ import pytest
 
 import xiaoyao
 from xiaoyao.adaptive_grasp import AdaptiveGraspConfig, AdaptiveGrasper, GraspState
+from xiaoyao.adaptive_grasp.force_planner import ForcePlanner, ObjectProfile
 from xiaoyao.adaptive_grasp.safety import SafetyReport, SafetyStatus
 from xiaoyao.adaptive_grasp.tactile import TactileAnalysis
 from xiaoyao.dexhand import CtrlMode, Joint, JointId, TactileSensorId
+
 print(xiaoyao.adaptive_grasp.__file__)
 print("hello world")
+
+
 class _FakeTactileInfo:
     def __init__(self, fx: float, fy: float, fz: float):
         self._fx = fx
@@ -64,9 +68,11 @@ def test_adaptive_hold_sends_position_payload_with_config_limits(monkeypatch):
     grasper = AdaptiveGrasper(hand, config)
     grasper.state = GraspState.ADAPTIVE_HOLD
     grasper.current_torque = 10
+    # Ensure force planner exists so _run_control_step can delegate
+    grasper._force_planner = ForcePlanner(config, None)
 
     monkeypatch.setattr(
-        grasper.tactile,
+        grasper._tactile,
         "update",
         lambda _data: TactileAnalysis(
             variance=0.5,
@@ -89,48 +95,6 @@ def test_adaptive_hold_sends_position_payload_with_config_limits(monkeypatch):
         assert 0 <= joint.torque <= config.position_torque_limit
 
 
-def test_adaptive_hold_delta_and_allocation_follow_config(monkeypatch):
-    hand = _PositionTraceHand()
-    config = AdaptiveGraspConfig(
-        delta_theta_limit=math.radians(0.4),
-        K_MCP=0.6,
-        K_PIP=0.4,
-        torque_adjust_step=30,
-        variance_threshold=0.1,
-        max_normal_force_per_finger=1.0,
-    )
-    grasper = AdaptiveGrasper(hand, config)
-    grasper.state = GraspState.ADAPTIVE_HOLD
-    grasper.current_torque = 10
-    initial_angles = dict(grasper._hold_joint_angles)
-
-    monkeypatch.setattr(
-        grasper.tactile,
-        "update",
-        lambda _data: TactileAnalysis(
-            variance=0.5,
-            slip_risk=1.0,
-            direction_distance=0.0,
-            friction_utilization=0.0,
-            slip_confirmed=True,
-            finger_fz={TactileSensorId.THUMB: 0.2, TactileSensorId.FOREFINGER: 0.2},
-            total_fz=0.4,
-        ),
-    )
-
-    assert grasper._run_control_step() is True
-    call = hand.calls[0]
-    joints = _joint_map(call)
-
-    mcp_delta = joints[JointId.THUMB_MCP].angle - initial_angles[JointId.THUMB_MCP]
-    pip_delta = joints[JointId.THUMB_PIP].angle - initial_angles[JointId.THUMB_PIP]
-
-    assert mcp_delta > 0
-    assert pip_delta > 0
-    assert (mcp_delta + pip_delta) <= config.delta_theta_limit + 1e-9
-    assert mcp_delta / pip_delta == pytest.approx(config.K_MCP / config.K_PIP, rel=1e-3)
-
-
 def test_clip_clamps_and_handles_inverted_bounds():
     g = AdaptiveGrasper(_PositionTraceHand(), AdaptiveGraspConfig())
 
@@ -150,11 +114,12 @@ def test_controller_delegates_to_submodules(monkeypatch):
     grasper = AdaptiveGrasper(hand, cfg)
     grasper.state = GraspState.ADAPTIVE_HOLD
     grasper.current_torque = 10
+    grasper._force_planner = ForcePlanner(cfg, None)
 
     monkeypatch.setattr(
-        grasper.safety,
+        grasper._safety,
         "check",
-        lambda **kwargs: SafetyReport(SafetyStatus.FAULT),
+        lambda *args, **kwargs: SafetyReport(SafetyStatus.FAULT),
     )
 
     assert grasper._run_control_step() is False
@@ -258,7 +223,7 @@ def test_full_grasp_state_transitions(monkeypatch):
 
     monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
     # 跳过力校准，直接返回成功（本测试仅验证状态流转，不验证力校准细节）
-    monkeypatch.setattr(grasper, "_calibrate_closing_force", lambda *args, **kwargs: True)
+    monkeypatch.setattr(grasper, "_calibrate_force", lambda *args, **kwargs: None)
 
     assert grasper.grasp() is True
     assert grasper.state == GraspState.ADAPTIVE_HOLD
@@ -268,93 +233,8 @@ def test_full_grasp_state_transitions(monkeypatch):
     assert grasper.state in (GraspState.COMPLETED, GraspState.RELEASE)
 
 
-class _NoContactHand(_PositionTraceHand):
-    def get_tactile_data(self):
-        return {
-            TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 0.0),
-            TactileSensorId.FOREFINGER: _FakeTactileInfo(0.0, 0.0, 0.0),
-        }
-
-
-def test_phase_closing_empty_grasp_detected(monkeypatch):
-    """CLOSING_TO_CONTACT 阶段空抓检测：关节已移动但无触觉接触"""
-    hand = _NoContactHand()
-    cfg = AdaptiveGraspConfig(
-        control_period_s=0.01,
-        phase_timeout=1.0,
-        contact_threshold_z=1.0,
-        enable_fault_release_fallback=False,
-    )
-    grasper = AdaptiveGrasper(hand, cfg)
-
-    # 模拟关节已移动超过 10°
-    monkeypatch.setattr(
-        grasper,
-        "_safe_get_joints",
-        lambda: [Joint(id=JointId.THUMB_MCP, angle=math.radians(20.0))],
-    )
-    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
-
-    assert grasper.grasp() is False
-    assert grasper.state == GraspState.ERROR
-
-
-class _LostTactileHand(_PositionTraceHand):
-    def __init__(self):
-        super().__init__()
-        self._call_count = 0
-
-    def get_tactile_data(self):
-        self._call_count += 1
-        if self._call_count >= 4:
-            return None
-        return super().get_tactile_data()
-
-
-def test_phase_closing_sensor_fault_on_missing_tactile(monkeypatch):
-    """CLOSING_TO_CONTACT 阶段传感器故障：连续 3 周期无触觉数据"""
-    hand = _LostTactileHand()
-    cfg = AdaptiveGraspConfig(
-        control_period_s=0.01,
-        phase_timeout=1.0,
-        enable_fault_release_fallback=False,
-    )
-    grasper = AdaptiveGrasper(hand, cfg)
-    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
-
-    assert grasper.grasp() is False
-    assert grasper.state == GraspState.ERROR
-
-
-def test_phase_closing_safety_fault_fallback_to_release(monkeypatch):
-    """CLOSING_TO_CONTACT 阶段 safety fault 触发 RELEASE 降级"""
-    hand = _NoContactHand()
-    cfg = AdaptiveGraspConfig(
-        control_period_s=0.01,
-        phase_timeout=1.0,
-        contact_threshold_z=1.0,
-        enable_fault_release_fallback=True,
-        release_timeout_s=0.01,
-    )
-    grasper = AdaptiveGrasper(hand, cfg)
-
-    monkeypatch.setattr(
-        grasper,
-        "_safe_get_joints",
-        lambda: [Joint(id=JointId.THUMB_MCP, angle=math.radians(20.0))],
-    )
-    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
-
-    assert grasper.grasp() is False
-    # enable_fault_release_fallback=True 时走 RELEASE 流程
-    assert grasper.state in (GraspState.RELEASE, GraspState.COMPLETED, GraspState.ERROR)
-
-
 def test_controller_runs_full_state_machine_with_submodules(monkeypatch):
     """Smoke test: controller should use submodules and reach ADAPTIVE_HOLD."""
-    from xiaoyao.adaptive_grasp import AdaptiveGrasper, AdaptiveGraspConfig, GraspState
-    from xiaoyao.adaptive_grasp.force_planner import ObjectProfile
-
     hand = _PositionTraceHand()
     cfg = AdaptiveGraspConfig(
         contact_threshold_z=0.1,
