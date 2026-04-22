@@ -150,9 +150,13 @@ F_init = clip(F_init, safe_force_min, safe_force_max)
 | `cos_x_k` | 第 `k` 周期与 `k-1` 周期之间 `Fx` 向量的余弦相似度 |
 | `cos_y_k` | 第 `k` 周期与 `k-1` 周期之间 `Fy` 向量的余弦相似度 |
 | `d_k` | 力场方向一致性距离指标，`d_k ∈ [0,1]`，越大表示力场畸变越严重 |
-| `s_{total,k}` | 综合滑移风险指标，`s_{total,k} = α*s_k + β*d_k`，归一化到 `[0,1]` |
-| `α` | 方差风险权重，默认 `0.6` |
-| `β` | 方向一致性风险权重，默认 `0.4`，满足 `α + β = 1` |
+| `s_{total,k}` | 综合滑移风险指标，`s_{total,k} = α*s_k + β*d_k + γ*r_k`，归一化到 `[0,1]` |
+| `α` | 方差风险权重，默认 `0.5` |
+| `β` | 方向一致性风险权重，默认 `0.3` |
+| `γ` | 摩擦利用率风险权重，默认 `0.2`，满足 `α + β + γ = 1` |
+| `μ_eff,k` | 第 `k` 周期的摩擦利用率，`μ_eff,k = F_t,k / (F_n,k + ε)` |
+| `r_k` | 摩擦利用率风险指标，`r_k ∈ [0,1]`，越大表示越接近摩擦临界 |
+| `μ_ref` | 参考摩擦系数，取自 `ObjectProfile.friction_coeff` |
 | `slip_count` | 连续风险周期计数器 |
 | `max_slip_count` | 滑移防抖计数器阈值，默认 `3` |
 
@@ -189,9 +193,9 @@ s_k = clip((v_k - v_0) / (v_th - v_0 + ε), 0, 1)
 
 需求要求滑移检测准确率 ≥ 95%，且滑移趋势出现后 ≤ 50 ms 内被检测到，并引入**多周期防抖机制**：
 
-1. **单周期风险标记**：当 `s_{total,k} >= 0.5` 时，标记该周期存在潜在滑移风险。综合指标 `s_{total,k}` 由方差风险 `s_k` 与方向一致性距离 `d_k`（见 6.1.4）加权融合得到：
+1. **单周期风险标记**：当 `s_{total,k} >= 0.5` 时，标记该周期存在潜在滑移风险。综合指标 `s_{total,k}` 由方差风险 `s_k`、方向一致性距离 `d_k`（见 6.1.4）与摩擦利用率风险 `r_k`（见 6.1.5）三指标加权融合得到：
    ```
-   s_{total,k} = α * s_k + β * d_k      # α + β = 1, 默认 α = 0.6, β = 0.4
+   s_{total,k} = α * s_k + β * d_k + γ * r_k      # α + β + γ = 1, 默认 α = 0.5, β = 0.3, γ = 0.2
    ```
 2. **防抖计数器 `slip_count`**：
    - 若当前周期标记为风险，则 `slip_count += 1`
@@ -235,6 +239,45 @@ d_k = sqrt((1 - cos_x_k)^2 + (1 - cos_y_k)^2) / sqrt(2)
 | `d_k`（方向一致性） | 切向力**空间分布的结构畸变** | 接触面转移、姿态旋转、缓慢滑移 | 各点同向同幅抖动（分布不变，仅幅值跳变） |
 
 `d_k` 可与 `s_k` 加权融合为 `s_{total,k}`（见 6.1.3），使系统同时覆盖“抖动型”与“转向型”滑移。
+
+#### 6.1.5 摩擦利用率风险
+
+为弥补统计指标（`s_k`、`d_k`）对**物理临界状态**的预判盲区，引入基于库仑摩擦模型的摩擦利用率检测。
+
+**物理直觉**：滑移的物理本质是切向力 `F_t` 超过法向力 `F_n` 与摩擦系数 `μ` 的乘积。即使切向力分布稳定、无显著畸变，只要 `F_t` 已接近或达到 `μ·F_n`，滑移风险即处于高位。该指标直接度量当前接触状态与摩擦临界的接近程度。
+
+**计算步骤**：
+
+第 `k` 周期，计算摩擦利用率：
+```
+μ_eff,k = F_t,k / (F_n,k + ε)
+```
+
+其中：
+- `F_t,k = sqrt(F_x,k^2 + F_y,k^2)`：单指切向合力幅值
+- `F_n,k`：单指法向力（由触觉传感器 `F_z` 或经标定后的法向估计值）
+
+以物体参数库中的参考摩擦系数 `μ_ref`（`ObjectProfile.friction_coeff`）为基准，归一化风险指标：
+```
+r_k = clip(μ_eff,k / μ_ref, 0, 1)
+```
+
+**工程约束**：
+- 结果严格限幅到 `[0, 1]`
+- `μ_ref` 需由物体参数库提供，若缺失则取默认 `0.5` 并记录警告
+- `F_n,k` 过小（如 `< 0.1 N`）时，`r_k` 可信度下降，应结合 `F_n,k` 幅值做置信度衰减
+
+**控制意义**：`r_k` 越接近 1，表明当前切向力已越接近摩擦极限，滑移风险越高；`r_k` 越接近 0，表明摩擦余量充足。
+
+**与统计指标的互补性**：
+
+| 指标 | 捕捉特征 | 敏感场景 | 盲区 |
+|:---|:---|:---|:---|
+| `s_k`（方差） | 切向力**幅值的时间抖动** | 高频微滑移、振动 | 缓慢平稳滑移、摩擦临界但未抖动 |
+| `d_k`（方向一致性） | 切向力**空间分布的结构畸变** | 接触面转移、姿态旋转 | 各点同向同幅滑动 |
+| `r_k`（摩擦利用率） | **物理临界接近度** | 静摩擦极限、重力分量增大 | 摩擦系数标定误差、法向力传感器噪声 |
+
+三指标加权融合为 `s_{total,k}`（见 6.1.3），使系统同时覆盖“抖动型”“转向型”与“临界型”滑移。
 
 ### 6.2 单指闭环控制律
 
@@ -438,8 +481,10 @@ K_{MCP}, K_{PIP} ∈ [0, 1]
 | 安全策略 | `base_holding_force` | `AdaptiveGraspConfig` | 基础夹持力 `F_base`（N），默认 `0.5` |
 | 滑移检测 | `slip_detect_debounce_cycles` | `AdaptiveGraspConfig` | 滑移防抖计数器阈值 `max_slip_count`，默认 `3` |
 | 滑移检测 | `variance_threshold` | `AdaptiveGraspConfig` | 滑移判定方差阈值 `v_th`；为空时由 `stiffness` 估计 |
-| 滑移检测 | `variance_weight` | `AdaptiveGraspConfig` | 方差风险融合权重 `α`，默认 `0.6` |
-| 滑移检测 | `direction_weight` | `AdaptiveGraspConfig` | 方向一致性风险融合权重 `β`，默认 `0.4`，满足 `α + β = 1` |
+| 滑移检测 | `variance_weight` | `AdaptiveGraspConfig` | 方差风险融合权重 `α`，默认 `0.5` |
+| 滑移检测 | `direction_weight` | `AdaptiveGraspConfig` | 方向一致性风险融合权重 `β`，默认 `0.3` |
+| 滑移检测 | `friction_weight` | `AdaptiveGraspConfig` | 摩擦利用率风险融合权重 `γ`，默认 `0.2`，满足 `α + β + γ = 1` |
+| 滑移检测 | `default_friction_coeff` | `AdaptiveGraspConfig` | 默认摩擦系数 `μ_ref`，当物体参数库未提供时 fallback，默认 `0.5` |
 | 力控制 | `max_normal_force_per_finger` | `AdaptiveGraspConfig` | 单指法向力安全上限 `F_{n,max}`（N）；为空时由 `stiffness` 估计 |
 | 损伤防护 | `fragile_speed_reduction` | `AdaptiveGraspConfig` | 易损模式速度降低比例，默认 `0.7` |
 | 损伤防护 | `fragile_step_reduction` | `AdaptiveGraspConfig` | 易损模式角增量/力矩步进降低比例，默认 `0.5` |
@@ -465,6 +510,7 @@ class TactileAnalysis:
     variance: float           # v_k
     slip_risk: float          # s_{total,k}, [0,1]
     direction_distance: float # d_k, [0,1]
+    friction_utilization: float # r_k, [0,1]
     slip_confirmed: bool      # slip_count >= max_slip_count
     finger_fz: dict[TactileSensorId, float]  # 各指法向力
     total_fz: float           # 法向力总和
@@ -536,8 +582,10 @@ class SafetyMonitor:
 | `position_speed_limit` | — | **√** `10 ~ 20` | POSITION 模式下速度上限约束 |
 | `position_torque_limit` | — | **√** `20 ~ 35` | POSITION 模式下力矩上限约束（软物体取低值） |
 | `s_ref` | `s_ref` | **√** `0.2 ~ 0.3` | 目标滑移风险水平（保留但不用于 PID 误差） |
-| `variance_weight` | `α` | **√** `0.6` | 方差风险 `s_k` 的融合权重 |
-| `direction_weight` | `β` | **√** `0.4` | 方向一致性距离 `d_k` 的融合权重，满足 `α + β = 1` |
+| `variance_weight` | `α` | **√** `0.5` | 方差风险 `s_k` 的融合权重 |
+| `direction_weight` | `β` | **√** `0.3` | 方向一致性距离 `d_k` 的融合权重 |
+| `friction_weight` | `γ` | **√** `0.2` | 摩擦利用率风险 `r_k` 的融合权重，满足 `α + β + γ = 1` |
+| `default_friction_coeff` | `μ_ref` | **√** `0.5` | 物体参数库未提供时的默认摩擦系数 |
 | `K_s` | `K_s` | **—** 需标定 | 滑移风险增益 |
 | `K_n` | `K_n` | **—** 需标定 | 法向超限抑制增益 |
 | `K_p` | `K_p` | **—** 需调参 | PID 比例增益 |
@@ -563,7 +611,8 @@ class SafetyMonitor:
 
 - **物体参数库**：支持按物体材质/重量自动计算初始夹持力并校准。
 - **滑移防抖**：引入 `slip_count` 计数器，避免传感器噪声导致的误增稳。
-- **空间一致性检测**：引入基于触觉阵列 `F_x`/`F_y` 空间分布余弦相似度的方向一致性距离 `d_k`，与方差指标 `s_k` 加权融合为 `s_{total,k}`，互补覆盖“抖动型”与“转向型”滑移。
+- **空间一致性检测**：引入基于触觉阵列 `F_x`/`F_y` 空间分布余弦相似度的方向一致性距离 `d_k`，与方差指标 `s_k` 加权融合，互补覆盖“抖动型”与“转向型”滑移。
+- **摩擦利用率检测**：引入基于库仑摩擦模型的摩擦利用率 `r_k = μ_eff,k / μ_ref`，将法向力纳入滑移判据，弥补统计指标对物理临界状态的预判盲区。
 - **法向力 PID**：PID 误差从滑移风险 `s_k` 改为法向力 `F_{n,k}`，直接对准“抓取力自适应调节”需求。
 - **损伤防护模式**：针对易损物体自动降低速度和增量限幅。
 - **异常处理**：传感器故障、空抓、物体掉落均触发报警并进入安全状态。
@@ -579,17 +628,18 @@ class SafetyMonitor:
 
 ## 15. 落地计划
 
-1. 新建 `tactile.py` 模块，实现滑动窗口、方差计算、滑移风险归一化、空间一致性距离 `d_k`（阵列 `F_x`/`F_y` 余弦相似度）、双指标加权融合 `s_{total,k}`、防抖计数器 `slip_count`。
+1. 新建 `tactile.py` 模块，实现滑动窗口、方差计算、滑移风险归一化、空间一致性距离 `d_k`（阵列 `F_x`/`F_y` 余弦相似度）、摩擦利用率 `r_k`、三指标加权融合 `s_{total,k}`、防抖计数器 `slip_count`。
 2. 新建 `force_planner.py` 模块，实现 `ObjectProfile` 参数库、初始夹持力计算、法向力 PID 控制律、损伤防护模式限幅。
 3. 新建 `safety.py` 模块，实现 `SafetyMonitor` 及三级异常检测（传感器故障、空抓、物体掉落）。
 4. 重构 `controller.py`：保留状态机骨架，将感知/控制/安全逻辑委托给三个子模块；移除 V1.0 中内嵌的方差计算、力矩调整等逻辑。
 5. 在 `config.py` 中补充 V2.0 新增参数项：
    - `safety_factor`、`base_holding_force`、`slip_detect_debounce_cycles`
-   - `variance_weight`、`direction_weight`
+   - `variance_weight`、`direction_weight`、`friction_weight`
+   - `default_friction_coeff`
    - `fragile_speed_reduction`、`fragile_step_reduction`
 6. 更新 `states.py`（如有必要）。
 7. 补充各模块的单元测试：
-   - `test_tactile.py`：方差计算、空间一致性距离 `d_k`、双指标融合、防抖计数器
+   - `test_tactile.py`：方差计算、空间一致性距离 `d_k`、摩擦利用率 `r_k`、三指标融合、防抖计数器
    - `test_force_planner.py`：F_init 计算、PID 输出、损伤防护限幅
    - `test_safety.py`：各异常场景检测
    - `test_controller.py`：状态机流转、子模块集成
