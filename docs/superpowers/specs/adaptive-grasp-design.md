@@ -20,7 +20,7 @@
 | 指标项 | 目标值 | 说明 |
 |:---|:---|:---|
 | 单手指抓取法向力量程 | 0.5 N ~ 15 N | 覆盖从易损柔性件到金属块的夹持力范围 |
-| 触觉反馈响应时间 | < 0.2 s | 触觉传感器刷新率 83.3 Hz，控制周期 5 ms ~ 10 ms |
+| 触觉反馈响应时间 | < 0.2 s | 触觉传感器刷新率 83.3 Hz，控制周期 ≤50 ms |
 | 接触时间 | < 1 s | 从预抓取姿态到检测到有效接触 |
 | 抓取成功率 | ≥ 0.8 | 抓取成功率需在标准测试工况下（室温、无外力扰动、正常传感器标定状态）验证。 |
 
@@ -57,7 +57,7 @@
 - `OPEN → PRE_GRASP`: 张开动作完成。
 - `PRE_GRASP → CLOSING_TO_CONTACT`: 预抓姿态到位。
 - `CLOSING_TO_CONTACT → ADAPTIVE_HOLD`: 触觉接触阈值满足（检测到有效接触）。
-- `ADAPTIVE_HOLD → RELEASE`: 任务完成、外部停止命令、超时（默认 20s）或异常触发降级。
+- `ADAPTIVE_HOLD → RELEASE`: 任务完成、外部停止命令、超时（默认 20s）或异常触发降级，降级至`OPEN`状态。
 
 ### 3.2 完整流程详述
 
@@ -147,6 +147,12 @@ F_init = clip(F_init, safe_force_min, safe_force_max)
 | `I_k` | 误差积分项，`I_k = Σ e_k T_s`（带限幅/防积分饱和） |
 | `T_s` | 控制周期 |
 | `ε` | 小正数，防止分母为零并增强数值稳定性 |
+| `cos_x_k` | 第 `k` 周期与 `k-1` 周期之间 `Fx` 向量的余弦相似度 |
+| `cos_y_k` | 第 `k` 周期与 `k-1` 周期之间 `Fy` 向量的余弦相似度 |
+| `d_k` | 力场方向一致性距离指标，`d_k ∈ [0,1]`，越大表示力场畸变越严重 |
+| `s_{total,k}` | 综合滑移风险指标，`s_{total,k} = α*s_k + β*d_k`，归一化到 `[0,1]` |
+| `α` | 方差风险权重，默认 `0.6` |
+| `β` | 方向一致性风险权重，默认 `0.4`，满足 `α + β = 1` |
 | `slip_count` | 连续风险周期计数器 |
 | `max_slip_count` | 滑移防抖计数器阈值，默认 `3` |
 
@@ -183,23 +189,62 @@ s_k = clip((v_k - v_0) / (v_th - v_0 + ε), 0, 1)
 
 需求要求滑移检测准确率 ≥ 95%，且滑移趋势出现后 ≤ 50 ms 内被检测到，并引入**多周期防抖机制**：
 
-1. **单周期风险标记**：当 `s_k >= 0.5`（即 `v_k` 超过基线与阈值的中点）时，标记该周期存在潜在滑移风险。
+1. **单周期风险标记**：当 `s_{total,k} >= 0.5` 时，标记该周期存在潜在滑移风险。综合指标 `s_{total,k}` 由方差风险 `s_k` 与方向一致性距离 `d_k`（见 6.1.4）加权融合得到：
+   ```
+   s_{total,k} = α * s_k + β * d_k      # α + β = 1, 默认 α = 0.6, β = 0.4
+   ```
 2. **防抖计数器 `slip_count`**：
    - 若当前周期标记为风险，则 `slip_count += 1`
    - 若当前周期无风险，则 `slip_count = max(0, slip_count - 1)`（衰减机制，避免噪声导致的频繁跳变）
 3. **正式判定**：当 `slip_count >= max_slip_count`（默认 `max_slip_count=3`，对应 3 个连续控制周期）时，正式判定为存在滑移趋势，触发增稳策略。
 
+#### 6.1.4 空间一致性（方向一致性距离）
 
+为弥补单一方差指标对**缓慢平稳滑移**的检测盲区，引入基于触觉阵列力场空间分布的方向一致性检测。
+
+**物理直觉**：稳定抓持时，各阵列点的切向力空间分布模式（方向与相对大小）相对稳定；滑移发生时接触面相对运动，力场空间结构发生畸变，`F_x` 与 `F_y` 的分布模式同步改变。
+
+**计算步骤**：
+
+设第 `k` 周期所有触觉阵列点的切向力分量为高维向量：
+- `Fx_k = [F_x1,k, F_x2,k, ..., F_xN,k]`
+- `Fy_k = [F_y1,k, F_y2,k, ..., F_yN,k]`
+
+分别计算相邻周期的余弦相似度：
+```
+cos_x_k = (Fx_k · Fx_{k-1}) / (||Fx_k|| * ||Fx_{k-1}|| + ε)
+cos_y_k = (Fy_k · Fy_{k-1}) / (||Fy_k|| * ||Fy_{k-1}|| + ε)
+```
+
+将 `[cos_x_k, cos_y_k]` 视为二维平面上的点，计算其到稳定点 `[1, 1]` 的欧氏距离，并归一化到 `[0, 1]`：
+```
+d_k = sqrt((1 - cos_x_k)^2 + (1 - cos_y_k)^2) / sqrt(2)
+```
+
+**工程约束**：
+- 结果严格限幅到 `[0, 1]`
+- 第 `k=0` 周期无历史数据，`d_0 = 0`
+
+**控制意义**：`d_k` 越接近 1，表明力场空间分布畸变越严重，滑移风险越高；`d_k` 越接近 0，表明力场分布稳定。
+
+**与方差指标的互补性**：
+
+| 指标 | 捕捉特征 | 敏感场景 | 盲区 |
+|:---|:---|:---|:---|
+| `s_k`（方差） | 各点切向力**幅值的时间抖动** | 高频微滑移、振动 | 缓慢平稳滑移（方差低，但力场已偏移） |
+| `d_k`（方向一致性） | 切向力**空间分布的结构畸变** | 接触面转移、姿态旋转、缓慢滑移 | 各点同向同幅抖动（分布不变，仅幅值跳变） |
+
+`d_k` 可与 `s_k` 加权融合为 `s_{total,k}`（见 6.1.3），使系统同时覆盖“抖动型”与“转向型”滑移。
 
 ### 6.2 单指闭环控制律
 
 **前馈项**：
 
 ```
-u_{ff,k} = K_s * s_k - K_n * e_{n,k}
+u_{ff,k} = K_s * s_{total,k} - K_n * e_{n,k}
 ```
 
-其中法向超限误差为：
+其中综合滑移风险指标 `s_{total,k}` 由 6.1.3 计算，法向超限误差为：
 
 ```
 e_{n,k} = max(0, (F_{n,k} - F_{n,max}) / (F_{n,max} + ε))
@@ -393,6 +438,8 @@ K_{MCP}, K_{PIP} ∈ [0, 1]
 | 安全策略 | `base_holding_force` | `AdaptiveGraspConfig` | 基础夹持力 `F_base`（N），默认 `0.5` |
 | 滑移检测 | `slip_detect_debounce_cycles` | `AdaptiveGraspConfig` | 滑移防抖计数器阈值 `max_slip_count`，默认 `3` |
 | 滑移检测 | `variance_threshold` | `AdaptiveGraspConfig` | 滑移判定方差阈值 `v_th`；为空时由 `stiffness` 估计 |
+| 滑移检测 | `variance_weight` | `AdaptiveGraspConfig` | 方差风险融合权重 `α`，默认 `0.6` |
+| 滑移检测 | `direction_weight` | `AdaptiveGraspConfig` | 方向一致性风险融合权重 `β`，默认 `0.4`，满足 `α + β = 1` |
 | 力控制 | `max_normal_force_per_finger` | `AdaptiveGraspConfig` | 单指法向力安全上限 `F_{n,max}`（N）；为空时由 `stiffness` 估计 |
 | 损伤防护 | `fragile_speed_reduction` | `AdaptiveGraspConfig` | 易损模式速度降低比例，默认 `0.7` |
 | 损伤防护 | `fragile_step_reduction` | `AdaptiveGraspConfig` | 易损模式角增量/力矩步进降低比例，默认 `0.5` |
@@ -416,7 +463,8 @@ K_{MCP}, K_{PIP} ∈ [0, 1]
 @dataclass
 class TactileAnalysis:
     variance: float           # v_k
-    slip_risk: float          # s_k, [0,1]
+    slip_risk: float          # s_{total,k}, [0,1]
+    direction_distance: float # d_k, [0,1]
     slip_confirmed: bool      # slip_count >= max_slip_count
     finger_fz: dict[TactileSensorId, float]  # 各指法向力
     total_fz: float           # 法向力总和
@@ -488,6 +536,8 @@ class SafetyMonitor:
 | `position_speed_limit` | — | **√** `10 ~ 20` | POSITION 模式下速度上限约束 |
 | `position_torque_limit` | — | **√** `20 ~ 35` | POSITION 模式下力矩上限约束（软物体取低值） |
 | `s_ref` | `s_ref` | **√** `0.2 ~ 0.3` | 目标滑移风险水平（保留但不用于 PID 误差） |
+| `variance_weight` | `α` | **√** `0.6` | 方差风险 `s_k` 的融合权重 |
+| `direction_weight` | `β` | **√** `0.4` | 方向一致性距离 `d_k` 的融合权重，满足 `α + β = 1` |
 | `K_s` | `K_s` | **—** 需标定 | 滑移风险增益 |
 | `K_n` | `K_n` | **—** 需标定 | 法向超限抑制增益 |
 | `K_p` | `K_p` | **—** 需调参 | PID 比例增益 |
@@ -513,6 +563,7 @@ class SafetyMonitor:
 
 - **物体参数库**：支持按物体材质/重量自动计算初始夹持力并校准。
 - **滑移防抖**：引入 `slip_count` 计数器，避免传感器噪声导致的误增稳。
+- **空间一致性检测**：引入基于触觉阵列 `F_x`/`F_y` 空间分布余弦相似度的方向一致性距离 `d_k`，与方差指标 `s_k` 加权融合为 `s_{total,k}`，互补覆盖“抖动型”与“转向型”滑移。
 - **法向力 PID**：PID 误差从滑移风险 `s_k` 改为法向力 `F_{n,k}`，直接对准“抓取力自适应调节”需求。
 - **损伤防护模式**：针对易损物体自动降低速度和增量限幅。
 - **异常处理**：传感器故障、空抓、物体掉落均触发报警并进入安全状态。
@@ -528,16 +579,17 @@ class SafetyMonitor:
 
 ## 15. 落地计划
 
-1. 新建 `tactile.py` 模块，实现滑动窗口、方差计算、滑移风险归一化、防抖计数器 `slip_count`。
+1. 新建 `tactile.py` 模块，实现滑动窗口、方差计算、滑移风险归一化、空间一致性距离 `d_k`（阵列 `F_x`/`F_y` 余弦相似度）、双指标加权融合 `s_{total,k}`、防抖计数器 `slip_count`。
 2. 新建 `force_planner.py` 模块，实现 `ObjectProfile` 参数库、初始夹持力计算、法向力 PID 控制律、损伤防护模式限幅。
 3. 新建 `safety.py` 模块，实现 `SafetyMonitor` 及三级异常检测（传感器故障、空抓、物体掉落）。
 4. 重构 `controller.py`：保留状态机骨架，将感知/控制/安全逻辑委托给三个子模块；移除 V1.0 中内嵌的方差计算、力矩调整等逻辑。
 5. 在 `config.py` 中补充 V2.0 新增参数项：
    - `safety_factor`、`base_holding_force`、`slip_detect_debounce_cycles`
+   - `variance_weight`、`direction_weight`
    - `fragile_speed_reduction`、`fragile_step_reduction`
 6. 更新 `states.py`（如有必要）。
 7. 补充各模块的单元测试：
-   - `test_tactile.py`：方差计算、防抖计数器
+   - `test_tactile.py`：方差计算、空间一致性距离 `d_k`、双指标融合、防抖计数器
    - `test_force_planner.py`：F_init 计算、PID 输出、损伤防护限幅
    - `test_safety.py`：各异常场景检测
    - `test_controller.py`：状态机流转、子模块集成
