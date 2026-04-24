@@ -6,9 +6,10 @@ import pytest
 
 import xiaoyao
 from xiaoyao.adaptive_grasp import AdaptiveGraspConfig, AdaptiveGrasper, GraspState
-from xiaoyao.adaptive_grasp.force_planner import ForcePlanner, ObjectProfile
+from xiaoyao.adaptive_grasp.object_profile import ObjectProfile
+from xiaoyao.adaptive_grasp.force_planner import ForcePlanner
 from xiaoyao.adaptive_grasp.safety import SafetyReport, SafetyStatus
-from xiaoyao.adaptive_grasp.tactile import TactileAnalysis
+from xiaoyao.adaptive_grasp.tactility import TactileAnalysis
 from xiaoyao.dexhand import CtrlMode, Joint, JointId, TactileSensorId
 
 print(xiaoyao.adaptive_grasp.__file__)
@@ -96,12 +97,12 @@ def test_adaptive_hold_sends_position_payload_with_config_limits(monkeypatch):
 
 
 def test_clip_clamps_and_handles_inverted_bounds():
-    g = AdaptiveGrasper(_PositionTraceHand(), AdaptiveGraspConfig())
+    from xiaoyao.adaptive_grasp.utils import clip
 
-    assert g._clip(5.0, 0.0, 10.0) == pytest.approx(5.0)
-    assert g._clip(-1.0, 0.0, 10.0) == pytest.approx(0.0)
-    assert g._clip(11.0, 0.0, 10.0) == pytest.approx(10.0)
-    assert g._clip(3.0, 2.0, 1.0) == pytest.approx(2.0)
+    assert clip(5.0, 0.0, 10.0) == pytest.approx(5.0)
+    assert clip(-1.0, 0.0, 10.0) == pytest.approx(0.0)
+    assert clip(11.0, 0.0, 10.0) == pytest.approx(10.0)
+    assert clip(3.0, 2.0, 1.0) == pytest.approx(2.0)
 
 
 def test_controller_delegates_to_submodules(monkeypatch):
@@ -225,12 +226,58 @@ def test_full_grasp_state_transitions(monkeypatch):
     # 跳过力校准，直接返回成功（本测试仅验证状态流转，不验证力校准细节）
     monkeypatch.setattr(grasper, "_calibrate_force", lambda *args, **kwargs: None)
 
-    assert grasper.grasp() is True
+    assert grasper.grasp_core() is True
     assert grasper.state == GraspState.ADAPTIVE_HOLD
 
     time.sleep(0.1)
     grasper.release()
     assert grasper.state in (GraspState.COMPLETED, GraspState.RELEASE)
+
+
+def test_perform_release_waits_for_control_thread(monkeypatch):
+    """wait_control_thread=True should join the alive control thread."""
+    hand = _PositionTraceHand()
+    g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
+    g._running = True
+    g.state = GraspState.ADAPTIVE_HOLD
+
+    joined = [False]
+    def fake_loop():
+        while not joined[0]:
+            time.sleep(0.001)
+
+    t = threading.Thread(target=fake_loop, daemon=True)
+    t.start()
+    g._control_thread = t
+
+    original_join = t.join
+    def tracking_join(timeout=None):
+        joined[0] = True
+        original_join(timeout=timeout)
+    monkeypatch.setattr(t, "join", tracking_join)
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
+
+    g._perform_release(wait_control_thread=True)
+    assert joined[0] is True
+    assert g.state == GraspState.COMPLETED
+    assert g._running is False
+
+
+def test_perform_release_from_control_thread_does_not_deadlock(monkeypatch):
+    """wait_control_thread=False should skip join when called inside the control thread."""
+    hand = _PositionTraceHand()
+    g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
+    g._running = True
+    g.state = GraspState.ADAPTIVE_HOLD
+    g._control_thread = threading.current_thread()
+
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
+
+    # Must return immediately without attempting to join itself
+    result = g._perform_release(wait_control_thread=False)
+    assert result is True
+    assert g.state == GraspState.COMPLETED
+    assert g._running is False
 
 
 def test_controller_runs_full_state_machine_with_submodules(monkeypatch):
@@ -257,6 +304,6 @@ def test_controller_runs_full_state_machine_with_submodules(monkeypatch):
         return call_count[0] > 2
     monkeypatch.setattr(grasper, "_should_auto_release", fake_should_release)
 
-    ok = grasper.grasp(object_profile=profile)
+    ok = grasper.grasp_core(object_profile=profile)
     assert ok is True
     assert grasper.state in (GraspState.ADAPTIVE_HOLD, GraspState.COMPLETED, GraspState.RELEASE)

@@ -48,7 +48,7 @@ def test_release_and_pid_defaults():
     assert cfg.release_open_speed == 30
     assert cfg.release_open_torque == 30
     assert cfg.release_timeout_s == 5.0
-    assert cfg.release_check_cycles == 5
+    assert cfg.release_check_cycles == 3
     assert cfg.s_ref == pytest.approx(0.25)
 
 
@@ -123,6 +123,6 @@ def test_weight_bounds_and_normalization():
 
 def test_default_friction_coeff():
     cfg = AdaptiveGraspConfig()
-    assert cfg.default_friction_coeff == pytest.approx(0.5)
+    assert cfg.default_friction_coeff == pytest.approx(0.7)
     with pytest.raises(ValueError):
         AdaptiveGraspConfig(default_friction_coeff=0.0)

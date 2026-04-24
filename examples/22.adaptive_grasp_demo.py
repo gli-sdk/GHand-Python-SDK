@@ -23,7 +23,6 @@ from xiaoyao.exceptions import DataReceiveError, DeviceDisconnectedError, Device
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Adaptive grasp demo.")
-    parser.add_argument("--stiffness", type=float, default=0.3)
     parser.add_argument("--base_torque", type=int, default=30)
     parser.add_argument("--max-torque", type=int, default=80)
     parser.add_argument("--max-normal-force", type=float, default=0.5)
@@ -45,7 +44,6 @@ def build_parser() -> argparse.ArgumentParser:
 
 def build_config(args: argparse.Namespace) -> AdaptiveGraspConfig:
     return AdaptiveGraspConfig(
-        stiffness=args.stiffness,
         base_torque=args.base_torque,
         max_torque=args.max_torque,
         max_normal_force_per_finger=args.max_normal_force,
@@ -178,7 +176,7 @@ def main() -> None:
         )
         print(f"Pre-grasp preset={config.pre_grasp_preset} (DIP passive)")
 
-        if not grasper.grasp():
+        if not grasper.grasp_core():
             print(f"Grasp failed. state={grasper.get_state().value}")
             return
 

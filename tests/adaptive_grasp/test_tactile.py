@@ -1,7 +1,7 @@
 import math
 import pytest
 from xiaoyao.adaptive_grasp.config import AdaptiveGraspConfig
-from xiaoyao.adaptive_grasp.tactile import TactileAnalyzer, TactileAnalysis
+from xiaoyao.adaptive_grasp.tactility import TactileAnalyzer, TactileAnalysis
 from xiaoyao.dexhand import TactileSensorId
 
 

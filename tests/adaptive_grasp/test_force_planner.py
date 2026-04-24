@@ -1,8 +1,9 @@
 import math
 import pytest
 from xiaoyao.adaptive_grasp.config import AdaptiveGraspConfig
-from xiaoyao.adaptive_grasp.force_planner import ObjectProfile, ObjectProfileRegistry, ForcePlanner, ForceDecision
-from xiaoyao.adaptive_grasp.tactile import TactileAnalysis, PerFingerAnalysis
+from xiaoyao.adaptive_grasp.object_profile import ObjectProfile, ObjectProfileRegistry
+from xiaoyao.adaptive_grasp.force_planner import ForcePlanner, ForceDecision
+from xiaoyao.adaptive_grasp.tactility import TactileAnalysis, PerFingerAnalysis
 from xiaoyao.dexhand import TactileSensorId, JointId
 
 

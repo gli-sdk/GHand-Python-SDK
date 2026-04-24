@@ -34,9 +34,10 @@ class TactileAnalyzer:
     def __init__(self, config: AdaptiveGraspConfig):
         self.config = config
         self._friction_coeff = config.default_friction_coeff
+        # 只实例化活跃手指的滑动窗口，避免非参与手指产生噪声干扰
         self._windows: dict[TactileSensorId, deque[float]] = {
             finger: deque(maxlen=config.sliding_window_size)
-            for finger in TactileSensorId
+            for finger in config.active_fingers
         }
         self._slip_count: dict[TactileSensorId, int] = {}
         self._prev_fx: dict[TactileSensorId, list[float]] = {}
@@ -54,6 +55,8 @@ class TactileAnalyzer:
         per_finger: dict[TactileSensorId, PerFingerAnalysis] = {}
 
         for finger, info in tactile_data.items():
+            if finger not in cfg.active_fingers:
+                continue  # 跳过非活跃手指，避免不参与的手指产生误触发
             fx = info.get_force_x()
             fy = info.get_force_y()
             fz = abs(info.get_force_z())
@@ -130,7 +133,8 @@ class TactileAnalyzer:
     def reset(self) -> None:
         for window in self._windows.values():
             window.clear()
-        self._slip_count.clear()
+        # 只清理活跃手指的历史状态，避免残留数据影响下一轮控制
+        self._slip_count = {f: 0 for f in self.config.active_fingers}
         self._prev_fx.clear()
         self._prev_fy.clear()
 
