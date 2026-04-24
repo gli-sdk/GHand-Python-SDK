@@ -3,6 +3,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any
 
+from xiaoyao.adaptive_grasp.utils import clip
 from xiaoyao.dexhand import TactileSensorId
 from .config import AdaptiveGraspConfig
 
@@ -66,6 +67,8 @@ class TactileAnalyzer:
             total_fz += fz
 
         for finger, info in tactile_data.items():
+            if finger not in cfg.active_fingers:
+                continue
             fz = finger_fz[finger]
             fx = info.get_force_x()
             fy = info.get_force_y()
@@ -145,7 +148,7 @@ class TactileAnalyzer:
         if variance >= cfg.variance_threshold:
             return 1.0
         denom = (cfg.variance_threshold - cfg.variance_baseline) + cfg.epsilon
-        return min(1.0, max(0.0, (variance - cfg.variance_baseline) / denom))
+        return  clip((variance - cfg.variance_baseline) / denom,lower=0,upper=1)
 
     def _calculate_finger_direction_distance(
         self, finger: TactileSensorId, info: Any

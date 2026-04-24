@@ -4,6 +4,10 @@ from typing import Optional
 
 @dataclass
 class ObjectProfile:
+    """抓取物品的材质库，包含物品的基本属性
+    
+    
+    """
     name: str
     weight_kg: float
     material: str
@@ -70,6 +74,17 @@ ObjectProfileRegistry.register(
         safe_force_min=0.5,
         safe_force_max=4.0,
         friction_coeff=0.8,
+        is_fragile=True,
+    )
+)
+ObjectProfileRegistry.register(
+    ObjectProfile(
+        name="egg",
+        weight_kg=0.07,
+        material="egg",
+        safe_force_min=0.5,
+        safe_force_max=5,
+        friction_coeff=0.9,
         is_fragile=True,
     )
 )

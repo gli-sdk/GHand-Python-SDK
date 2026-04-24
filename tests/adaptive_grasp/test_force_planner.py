@@ -43,7 +43,8 @@ def test_force_planner_pid_around_normal_force():
         total_fz=2.0,
     )
     angles = {JointId.THUMB_MCP: 0.0, JointId.THUMB_PIP: 0.0}
-    decision = planner.compute(analysis, angles)
+    decisions = planner.compute(analysis, angles)
+    decision = decisions[TactileSensorId.THUMB]
 
     # F_init = 0.1*9.8*1.5 + 0.5 = 1.97；单指 F_n,ref ≈ 1.97
     # e = 1.97 - 2.0 = -0.03；u_pid = -0.03；u_ff = 0
@@ -73,7 +74,8 @@ def test_fragile_mode_limits_speed_and_step():
         total_fz=0.5,
     )
     angles = {JointId.THUMB_MCP: 0.0, JointId.THUMB_PIP: 0.0}
-    decision = planner.compute(analysis, angles)
+    decisions = planner.compute(analysis, angles)
+    decision = decisions[TactileSensorId.THUMB]
 
     assert decision.is_fragile_mode is True
     # speed 应被限制：20 * 0.7 = 14
@@ -114,12 +116,12 @@ def test_per_finger_independent_control():
         JointId.THUMB_MCP: 0.0, JointId.THUMB_PIP: 0.0,
         JointId.FF_MCP: 0.0, JointId.FF_PIP: 0.0,
     }
-    decision = planner.compute(analysis, angles)
+    decisions = planner.compute(analysis, angles)
 
-    thumb_mcp = decision.target_angles[JointId.THUMB_MCP]
-    thumb_pip = decision.target_angles[JointId.THUMB_PIP]
-    ff_mcp = decision.target_angles[JointId.FF_MCP]
-    ff_pip = decision.target_angles[JointId.FF_PIP]
+    thumb_mcp = decisions[TactileSensorId.THUMB].target_angles[JointId.THUMB_MCP]
+    thumb_pip = decisions[TactileSensorId.THUMB].target_angles[JointId.THUMB_PIP]
+    ff_mcp = decisions[TactileSensorId.FOREFINGER].target_angles[JointId.FF_MCP]
+    ff_pip = decisions[TactileSensorId.FOREFINGER].target_angles[JointId.FF_PIP]
 
     # THUMB: F_n=2.0 > F_n,ref≈1.72 => 卸力（角度减小）
     assert thumb_mcp < 0.0

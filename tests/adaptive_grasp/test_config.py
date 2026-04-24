@@ -8,9 +8,9 @@ from xiaoyao.adaptive_grasp import AdaptiveGraspConfig
 def test_position_hold_defaults():
     cfg = AdaptiveGraspConfig()
 
-    assert cfg.position_speed_limit == 20
-    assert cfg.position_torque_limit == 35
-    assert cfg.delta_theta_limit == pytest.approx(math.radians(2.0))
+    assert cfg.position_speed_limit == 15
+    assert cfg.position_torque_limit == 15
+    assert cfg.delta_theta_limit == pytest.approx(math.radians(4.0))
     assert cfg.K_MCP == pytest.approx(0.5)
     assert cfg.K_PIP == pytest.approx(0.5)
 
@@ -85,7 +85,7 @@ def test_v2_params_defaults():
     assert cfg.safety_factor == pytest.approx(1.5)
     assert cfg.base_holding_force == pytest.approx(0.5)
     assert cfg.slip_detect_debounce_cycles == 3
-    assert cfg.fragile_speed_reduction == pytest.approx(0.7)
+    assert cfg.fragile_speed_reduction == pytest.approx(0.8)
     assert cfg.fragile_step_reduction == pytest.approx(0.5)
 
 

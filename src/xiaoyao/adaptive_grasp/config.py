@@ -1,5 +1,6 @@
 import math
 from dataclasses import dataclass, field
+from typing import Optional
 
 from xiaoyao.dexhand import JointId, TactileSensorId
 
@@ -105,11 +106,22 @@ _PRE_GRASP_PRESET_DEGREE = {
 
 
 @dataclass
+class PerFingerPidConfig:
+    """单指独立 PID 参数配置；字段为 None 时回退到全局 AdaptiveGraspConfig 参数。"""
+    K_p: Optional[float] = None
+    K_i: Optional[float] = None
+    K_d: Optional[float] = None
+    I_min: Optional[float] = None
+    I_max: Optional[float] = None
+
+
+@dataclass
 class AdaptiveGraspConfig:
     # 1.预抓取姿态（OPEN -> PRE_GRASP 阶段）
     pre_grasp_pose: dict[JointId, float] = field(default_factory=dict) # 预抓取关节目标角（单位：弧度）；为空时按预设自动生成。
     pre_grasp_preset: str = "two_finger_pinch" # 预抓取姿态预设名称。
     active_fingers: set[TactileSensorId] = field(default_factory=set) # 参与闭环控制的手指集合；为空时按 preset 自动推导。
+    per_finger_pid: dict[TactileSensorId, PerFingerPidConfig] = field(default_factory=dict) # 单指独立 PID 参数；未配置的手指回退到全局 K_p/K_i/K_d。
     #=============================================================================
     # 2.CLOSING_TO_CONTACT 阶段基础参数
     base_torque: int = 15 # CLOSING_TO_CONTACT 阶段初始力矩（TORQUE 模式）。
@@ -118,17 +130,17 @@ class AdaptiveGraspConfig:
     torque_adjust_step: int = 5 # 力矩步进增量。
     max_torque: int = 80 # 力矩命令上限（同时受硬件 [-100,100] 限制）。
     phase_timeout: float = 10.0 # OPEN/PRE_GRASP/CLOSING 等阶段超时（秒）。
-    control_period_s: float = 0.02 # 离散控制周期 Ts（秒）。
+    control_period_s: float = 0.02 # 离散控制周期 Ts（秒），（优先使用函数传入的dt，其次使用前后帧的时间差，最后使用这个默认值）
     #=============================================================================
     # 触觉统计与阈值（v_0 / v_th）
-    max_normal_force_per_finger: float = 25.0 # 单指法向力上限 Fn,max N；
-    variance_threshold: float = 0.003    # 滑移方差阈值 v_th；
-    variance_baseline: float = 0.0 # 滑移方差基线 v_0。
+    max_normal_force_per_finger: float = 25.0 # 单指法向力上限 Fn,max N，触觉传感器最大量程；
+    variance_threshold: float = 0.003    # 滑移方差阈值 v_th（需标定）；
+    variance_baseline: float = 0.00001 # 滑移方差基线 v_0（需标定）。
 
     # ADAPTIVE_HOLD 的 POSITION 闭环约束
-    position_speed_limit: int = 20 # ADAPTIVE_HOLD 阶段 POSITION 指令速度上限。
-    position_torque_limit: int = 35 # ADAPTIVE_HOLD 阶段 POSITION 指令力矩上限。
-    delta_theta_limit: float = math.radians(2) # 单周期总角增量限幅 Delta theta_max（弧度）。
+    position_speed_limit: int = 15 # ADAPTIVE_HOLD 阶段 POSITION 指令速度限幅。
+    position_torque_limit: int = 15 # ADAPTIVE_HOLD 阶段 POSITION 指令力矩限幅。
+    delta_theta_limit: float = math.radians(4) # 单周期总角增量限幅 Delta theta_max（弧度）。
     # MCP/PIP 角增量分配系数，满足 K_MCP + K_PIP = 1
     K_MCP: float = 0.5 # MCP 角增量分配系数
     K_PIP: float = 0.5 # PIP 角增量分配系数
@@ -146,9 +158,9 @@ class AdaptiveGraspConfig:
     s_ref: float = 0.25 # 目标滑移风险水平 s_ref。
     K_s: float = 1.0 # 滑移前馈增益 K_s。
     K_n: float = 1.0 # 法向超限抑制增益 K_n。
-    K_p: float = 0.0 # PID 比例增益 K_p。
-    K_i: float = 0.0 # PID 积分增益 K_i。
-    K_d: float = 0.0 # PID 微分增益 K_d。
+    K_p: float = 0.5 # PID 比例增益 K_p。
+    K_i: float = 0.01 # PID 积分增益 K_i。
+    K_d: float = 0.005 # PID 微分增益 K_d。
     # 积分项限幅（防积分饱和）
     I_min: float = -1.0 # PID 积分项下限（防积分饱和）。
     I_max: float = 1.0 # PID 积分项上限（防积分饱和）。
@@ -158,7 +170,8 @@ class AdaptiveGraspConfig:
     safety_factor: float = 1.5 # 安全系数 S_f，范围 [1.2, 2.0]，默认 1.5
     base_holding_force: float = 0.5 # 基础夹持力 F_base（N），默认 0.5
     slip_detect_debounce_cycles: int = 3 # 滑移防抖连续周期阈值
-    fragile_speed_reduction: float = 0.7 # 易损模式速度降低比例
+    fragile_speed_reduction: float = 0.8 # 易损模式速度降低比例
+    fragile_torque_reduction: float = 0.8 # 易损模式力矩降低比例
     fragile_step_reduction: float = 0.5 # 易损模式角增量/力矩步进降低比例
     # 三指标融合权重，满足 α + β + γ = 1
     variance_weight: float = 0.5

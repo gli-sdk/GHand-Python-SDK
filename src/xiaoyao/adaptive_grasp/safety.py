@@ -28,16 +28,16 @@ class SafetyMonitor:
     def __init__(self, config: AdaptiveGraspConfig):
         self.config = config
         self._last_total_fz: float = 0.0
+        self._last_finger_count: int = 0
         self._consecutive_no_data: int = 0
         self._prev_joint_feedback: dict[Any, float] = {}
+        self._closing_baseline_angles: dict[Any, float] = {}  # CLOSING 启动时的初始角度（空抓判断 baseline）
 
-    @staticmethod
-    def _get_angle(joint: Any) -> float:
-        if hasattr(joint, "angle"):
-            return float(joint.angle)
-        if isinstance(joint, dict):
-            return float(joint.get("angle", 0.0))
-        return 0.0
+    def set_closing_baseline(self, joint_feedback: list) -> None:
+        """记录 CLOSING 阶段启动时的初始关节角度，作为空抓判断的基准。"""
+        self._closing_baseline_angles = {
+            j.id: j.angle for j in joint_feedback
+        }
 
     def check(
         self,
@@ -51,9 +51,7 @@ class SafetyMonitor:
         if joint_feedback is not None and len(joint_feedback) >= 1:
             current_angles: dict[Any, float] = {}
             for j in joint_feedback:
-                jid = getattr(j, "id", j.get("id") if isinstance(j, dict) else None)
-                if jid is not None:
-                    current_angles[jid] = self._get_angle(j)
+                current_angles[j.id] = j.angle
             if self._prev_joint_feedback:
                 for jid, angle in current_angles.items():
                     prev = self._prev_joint_feedback.get(jid)
@@ -74,29 +72,40 @@ class SafetyMonitor:
         else:
             self._consecutive_no_data = 0
 
+        current_finger_count = len(tactile_data) if tactile_data else 0
         total_fz = sum(abs(info.get_force_z()) for info in tactile_data.values()) if tactile_data else 0.0
 
-        # 空抓检测（仅在 CLOSING 阶段）
+        # 空抓检测（仅在 CLOSING 阶段）：基于相对于启动 baseline 的角度变化
         if state == GraspState.CLOSING_TO_CONTACT and total_fz < cfg.contact_threshold_z:
-            if joint_feedback:
-                max_angle = max(
-                    (abs(self._get_angle(j)) for j in joint_feedback),
-                    default=0.0
+            if joint_feedback and self._closing_baseline_angles:
+                max_delta = max(
+                    (
+                        abs(j.angle - self._closing_baseline_angles.get(j.id, 0.0))
+                        for j in joint_feedback
+                    ),
+                    default=0.0,
                 )
-                if max_angle > math.radians(10.0):
-                    _logger.error("Empty grasp detected: max_angle=%.1f°", math.degrees(max_angle))
+                if max_delta > math.radians(10.0):
+                    _logger.error("Empty grasp detected: max_delta=%.1f°", math.degrees(max_delta))
                     return SafetyReport(SafetyStatus.FAULT, "empty_grasp", "No contact while joints moved")
 
-        # 物体掉落检测
+        # 物体掉落检测：仅在手指数量未减少时触发，避免部分传感器缺失导致误报
         if state == GraspState.ADAPTIVE_HOLD:
-            if self._last_total_fz >= cfg.contact_threshold_z and total_fz < cfg.contact_threshold_z:
+            if (
+                self._last_total_fz >= cfg.contact_threshold_z
+                and total_fz < cfg.contact_threshold_z
+                and current_finger_count >= self._last_finger_count
+            ):
                 _logger.error("Object dropped: last_fz=%.2f current_fz=%.2f", self._last_total_fz, total_fz)
                 return SafetyReport(SafetyStatus.FAULT, "object_dropped", "Contact lost in adaptive hold")
 
         self._last_total_fz = total_fz
+        self._last_finger_count = current_finger_count
         return SafetyReport(SafetyStatus.OK)
 
     def reset(self) -> None:
         self._last_total_fz = 0.0
+        self._last_finger_count = 0
         self._consecutive_no_data = 0
         self._prev_joint_feedback.clear()
+        self._closing_baseline_angles.clear()
