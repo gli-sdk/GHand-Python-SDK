@@ -138,6 +138,7 @@ class AdaptiveGraspConfig:
     max_torque: int = 80 # 力矩命令上限（同时受硬件 [-100,100] 限制）。
     phase_timeout: float = 10.0 # 张开/预抓取/闭合等阶段超时（秒）。
     control_period_s: float = 0.02 # 离散控制周期 Ts（秒），（优先使用函数传入的dt，其次使用前后帧的时间差，最后使用这个默认值）
+    tactile_sensor_update_period_s: float = 0.015 # 触觉传感器数据更新周期15ms。
     #=============================================================================
     # 触觉统计与阈值（v_0 / v_th）
     max_normal_force_per_finger: float = 25.0 # 单指法向力上限 Fn,max N，触觉传感器最大量程；

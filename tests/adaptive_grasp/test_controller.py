@@ -72,7 +72,8 @@ def test_adaptive_hold_sends_position_payload_with_config_limits(monkeypatch):
     grasper.current_torque = 10
     # Ensure force planner exists so _run_control_step can delegate
     grasper._force_planner = ForcePlanner(config, None)
-    grasper._store_tactile_snapshot(hand.get_tactile_data(), sample_time_s=0.0)
+    grasper._latest_tactile_data = hand.get_tactile_data()
+    grasper._last_tactile_sample_time_s = 0.0
 
     monkeypatch.setattr(
         grasper._tactile,
@@ -371,11 +372,24 @@ def test_closing_ignores_inactive_finger_noise(monkeypatch):
         now["v"] += 0.001
         return now["v"]
     grasper._get_monotonic_time = monotonic_step
-    grasper._start_tactile_capture()
+
+    # 模拟订阅回调逐帧更新触觉数据（不活动手指的噪声不应触发接触）
+    reads = iter([
+        {
+            TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 0.0),
+            TactileSensorId.FOREFINGER: _FakeTactileInfo(0.0, 0.0, 0.0),
+            TactileSensorId.MIDDLE_FINGER: _FakeTactileInfo(0.0, 0.0, 2.0),
+        },
+        {
+            TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 2.0),
+            TactileSensorId.FOREFINGER: _FakeTactileInfo(0.0, 0.0, 2.0),
+            TactileSensorId.MIDDLE_FINGER: _FakeTactileInfo(0.0, 0.0, 0.0),
+        },
+    ])
+    monkeypatch.setattr(grasper, "_safe_get_tactile_data", lambda: next(reads))
+    monkeypatch.setattr(grasper, "_safe_get_joints", lambda: [])
 
     assert grasper._phase_closing() is True
-    grasper._stop_tactile_capture()
-    assert hand._tactile_reads >= 2
 
 
 def test_calibrate_force_ignores_inactive_finger_noise(monkeypatch):
@@ -406,10 +420,8 @@ def test_control_step_updates_tactile_data_age(monkeypatch):
 
     times = iter([1.0, 1.02])
     grasper._get_monotonic_time = lambda: next(times)
-    grasper._store_tactile_snapshot(
-        {TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 0.0)},
-        sample_time_s=1.005,
-    )
+    grasper._latest_tactile_data = {TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 0.0)}
+    grasper._last_tactile_sample_time_s = 1.005
     monkeypatch.setattr(grasper, "_safe_get_joints", lambda: [])
     monkeypatch.setattr(
         grasper._safety,
@@ -471,13 +483,11 @@ def test_control_step_uses_cached_tactile_snapshot(monkeypatch):
         raise AssertionError("control step should read cached tactile data")
 
     hand.get_tactile_data = fail_direct_read
-    grasper._store_tactile_snapshot(
-        {
-            TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 0.2),
-            TactileSensorId.FOREFINGER: _FakeTactileInfo(0.0, 0.0, 0.2),
-        },
-        sample_time_s=1.0,
-    )
+    grasper._latest_tactile_data = {
+        TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 0.2),
+        TactileSensorId.FOREFINGER: _FakeTactileInfo(0.0, 0.0, 0.2),
+    }
+    grasper._last_tactile_sample_time_s = 1.0
 
     times = iter([1.02, 1.03])
     grasper._get_monotonic_time = lambda: next(times)
@@ -506,28 +516,75 @@ def test_control_step_uses_cached_tactile_snapshot(monkeypatch):
     assert grasper.last_tactile_data_age_s == pytest.approx(0.03, abs=1e-6)
 
 
-def test_tactile_capture_polls_without_thread():
+def test_sensor_subscription_callback_updates_cache():
+    """订阅回调应正确解析 Tpdo 并更新触觉/关节缓存。"""
+    from types import SimpleNamespace
+
     hand = _PositionTraceHand()
-    cfg = AdaptiveGraspConfig(control_period_s=0.02)
+    cfg = AdaptiveGraspConfig(control_period_s=0.02, pre_grasp_preset="two_finger_pinch")
     grasper = AdaptiveGrasper(hand, cfg)
 
     now = {"v": 1.0}
     grasper._get_monotonic_time = lambda: now["v"]
 
-    grasper._start_tactile_capture()
-    assert not hasattr(grasper, "_tactile_thread")
-    assert grasper._get_tactile_snapshot() is not None
+    def make_tactile(fz: float):
+        return SimpleNamespace(resultant_force=fz, sample_force=[0.0] * 16)
 
-    hand.get_tactile_data = lambda: {
-        TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 1.0),
-    }
-    now["v"] = 1.01
-    grasper._poll_tactile_if_due()
-    assert grasper._get_tactile_snapshot()[TactileSensorId.THUMB].get_force_z() == pytest.approx(0.2)
+    def make_joint(angle: float):
+        return SimpleNamespace(angle=angle, speed=0, torque=0, state=0, error=0)
 
-    now["v"] = 1.02
-    grasper._poll_tactile_if_due()
-    assert grasper._get_tactile_snapshot()[TactileSensorId.THUMB].get_force_z() == pytest.approx(1.0)
+    tpdo = SimpleNamespace(
+        tactile_state=SimpleNamespace(state=0b11111),
+        thumb_tactile=make_tactile(0.2),
+        ff_tactile=make_tactile(0.3),
+        mf_tactile=make_tactile(0.5),
+        rf_tactile=make_tactile(0.7),
+        lf_tactile=make_tactile(0.9),
+        th_dip=make_joint(0.1),
+        th_pip=make_joint(0.2),
+        th_mcp=make_joint(0.3),
+        th_swing=make_joint(0.4),
+        th_rot=make_joint(0.5),
+        ff_dip=make_joint(0.6),
+        ff_pip=make_joint(0.7),
+        ff_mcp=make_joint(0.8),
+        ff_swing=make_joint(0.9),
+        mf_dip=make_joint(1.0),
+        mf_pip=make_joint(1.1),
+        mf_mcp=make_joint(1.2),
+        rf_dip=make_joint(1.3),
+        rf_pip=make_joint(1.4),
+        rf_mcp=make_joint(1.5),
+        lf_dip=make_joint(1.6),
+        lf_pip=make_joint(1.7),
+        lf_mcp=make_joint(1.8),
+    )
+
+    grasper._sensor_update_callback(tpdo)
+
+    # 触觉缓存应仅包含活动手指（two_finger_pinch -> THUMB + FOREFINGER）
+    assert grasper._latest_tactile_data is not None
+    assert TactileSensorId.THUMB in grasper._latest_tactile_data
+    assert TactileSensorId.FOREFINGER in grasper._latest_tactile_data
+    assert TactileSensorId.MIDDLE_FINGER not in grasper._latest_tactile_data
+    assert grasper._latest_tactile_data[TactileSensorId.THUMB].get_force_z() == pytest.approx(0.2)
+    assert grasper._latest_tactile_data[TactileSensorId.FOREFINGER].get_force_z() == pytest.approx(0.3)
+    assert grasper._last_tactile_sample_time_s == 1.0
+
+    # 关节缓存应包含所有关节
+    assert grasper._latest_joint_feedback is not None
+    joint_map = {j.id: j for j in grasper._latest_joint_feedback}
+    assert JointId.THUMB_PIP in joint_map
+    assert joint_map[JointId.THUMB_PIP].angle == pytest.approx(0.2)
+    assert JointId.LF_MCP in joint_map
+    assert joint_map[JointId.LF_MCP].angle == pytest.approx(1.8)
+
+    # 第二次回调应覆盖旧数据
+    tpdo.thumb_tactile = make_tactile(1.0)
+    now["v"] = 2.0
+    grasper._sensor_update_callback(tpdo)
+    assert grasper._latest_tactile_data[TactileSensorId.THUMB].get_force_z() == pytest.approx(1.0)
+    assert grasper._last_tactile_sample_time_s == 2.0
 
 
 def test_build_torque_joints_sets_inactive_to_zero():

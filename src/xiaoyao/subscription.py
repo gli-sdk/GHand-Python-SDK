@@ -42,12 +42,20 @@ class SubscriptionManager:
 
     def _data_producer(self):
         """数据生产者线程"""
+        consecutive_errors = 0
         while self._running:
             try:
                 data = self._client.recv_data()
                 self._data = data
+                consecutive_errors = 0
             except Exception as e:
-                logger.error(f"Error receiving data: {e}")
+                consecutive_errors += 1
+                logger.error(f"Error receiving data: {e} (consecutive: {consecutive_errors})")
+                if consecutive_errors >= 3:
+                    logger.error("Data producer encountered too many consecutive errors, clearing stale data")
+                    self._data = None
+                time.sleep(min(0.1 * (2 ** min(consecutive_errors, 5)), 5.0))
+                continue
             time.sleep(0.1)
 
     def _data_dispatcher(self):
@@ -61,15 +69,15 @@ class SubscriptionManager:
                             callback(self._data, *args, **kwargs)
                         except Exception as e:
                             logger.error(f"Error in callback {sub_id}: {e}")
-            time.sleep(0.1)
+            time.sleep(0.05)
 
     def subscribe(self, callback: Optional[Callable] = None, *args, **kwargs):
         with self._lock:
             self._sub_id_counter += 1
             sub_id = self._sub_id_counter
             self._subscribers[sub_id] = (callback, args, kwargs)
-        if not self._running:
-            self.start()
+            if not self._running:
+                self.start()
         return sub_id
 
     def unsubscribe(self, sub_id):
