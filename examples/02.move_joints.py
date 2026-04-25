@@ -49,7 +49,7 @@ def main():
             joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(0), speed=100, torque=100))
             joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(0), speed=100, torque=100))
             joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(0), speed=100, torque=100))
-            joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(0), speed=100, torque=100))
+            # joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(0), speed=100, torque=100))
 
             result = hand.move_joints(joints)
             if result:

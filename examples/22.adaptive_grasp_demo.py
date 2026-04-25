@@ -85,19 +85,10 @@ class TactileLogger:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Adaptive grasp demo.")
-    parser.add_argument("--base_torque", type=int, default=30)
-    parser.add_argument("--max-torque", type=int, default=80)
-    parser.add_argument("--max-normal-force", type=float, default=0.5)
-    parser.add_argument("--variance-threshold", type=float, default=0.06)
-    parser.add_argument("--hold-time", type=float, default=20.0)
-    parser.add_argument("--release-hold-time", type=float, default=20.0)
-    parser.add_argument("--release-open-speed", type=int, default=50)
-    parser.add_argument("--release-open-torque", type=int, default=50)
-    parser.add_argument("--contact_threshold_z", type=float, default=0.8)
     parser.add_argument(
         "--pre-grasp-preset",
         type=str,
-        default="three_finger_pinch",
+        default="two_finger_pinch",
         choices=["two_finger_pinch", "three_finger_pinch", "four_finger_grasp", "five_finger_grasp"],
         help="Pre-grasp preset from grasp table. DIP joints are passive and excluded.",
     )
@@ -119,15 +110,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def build_config(args: argparse.Namespace) -> AdaptiveGraspConfig:
     return AdaptiveGraspConfig(
-        base_torque=args.base_torque,
-        max_torque=args.max_torque,
-        max_normal_force_per_finger=args.max_normal_force,
-        variance_threshold=args.variance_threshold,
-        contact_threshold_z=args.contact_threshold_z,
         pre_grasp_preset=args.pre_grasp_preset,
-        release_hold_time_s=args.release_hold_time,
-        release_open_speed=args.release_open_speed,
-        release_open_torque=args.release_open_torque,
     )
 
 
@@ -188,12 +171,12 @@ def main() -> None:
         print(f"Pre-grasp preset={config.pre_grasp_preset} (DIP passive)")
 
         if not grasper.grasp_core(object_profile=object_profile):
-            print(f"Grasp failed. state={grasper.get_state().value}")
+            print(f"Grasp failed++. state={grasper.get_state().value}")
             return
 
         print("Grasp started. Holding...")
         start = time.time()
-        while (time.time() - start) < args.hold_time:
+        while (time.time() - start) < config.demo_hold_time_s:
             elapsed = time.time() - start
             state_val = grasper.get_state().value
             status_line = (

@@ -47,12 +47,12 @@ _PRE_GRASP_PRESET_DEGREE = {
         JointId.MF_MCP: 0.0,
         JointId.MF_PIP: 0.0,
         JointId.FF_SWING: 0.0,
-        JointId.FF_MCP: 45.0,
-        JointId.FF_PIP: 45.0,
-        JointId.THUMB_ROTATION: 2.0,
-        JointId.THUMB_SWING: 46.0,
-        JointId.THUMB_MCP: 22.0,
-        JointId.THUMB_PIP: 20.0,
+        JointId.FF_MCP: 58.0,
+        JointId.FF_PIP: 0.0,
+        JointId.THUMB_ROTATION: 17.0,
+        JointId.THUMB_SWING: 90.0,
+        JointId.THUMB_MCP: 3.0,
+        JointId.THUMB_PIP: 0.0,
     },
     # 三指捏(食指-中指-大拇指)
     "three_finger_pinch": {
@@ -119,17 +119,24 @@ class PerFingerPidConfig:
 class AdaptiveGraspConfig:
     # 1.预抓取姿态（OPEN -> PRE_GRASP 阶段）
     pre_grasp_pose: dict[JointId, float] = field(default_factory=dict) # 预抓取关节目标角（单位：弧度）；为空时按预设自动生成。
+    #预抓取姿态设定：
+    """"
+    two_finger_pinch: 两指捏(食指-大拇指)
+    three_finger_pinch: 三指捏(食指-中指-大拇指)
+    four_finger_grasp: 四指握
+    five_finger_grasp: 五指握
+    """
     pre_grasp_preset: str = "two_finger_pinch" # 预抓取姿态预设名称。
-    active_fingers: set[TactileSensorId] = field(default_factory=set) # 参与闭环控制的手指集合；为空时按 preset 自动推导。
+    active_fingers: set[TactileSensorId] = field(default_factory=set) # 参与闭环控制的手指集合；为空时按预设自动推导。
     per_finger_pid: dict[TactileSensorId, PerFingerPidConfig] = field(default_factory=dict) # 单指独立 PID 参数；未配置的手指回退到全局 K_p/K_i/K_d。
     #=============================================================================
-    # 2.CLOSING_TO_CONTACT 阶段基础参数
-    base_torque: int = 15 # CLOSING_TO_CONTACT 阶段初始力矩（TORQUE 模式）。
-    contact_threshold_z: float = 1.5 # 接触判定阈值（所有传感器法向力绝对值之和）。
+    # 2.闭合接触阶段基础参数
+    base_torque: int = 10 # 闭合接触阶段初始力矩（力矩模式）。
+    contact_threshold_z: float = 0.5 # 接触判定阈值（所有传感器法向力绝对值之和）。
     sliding_window_size: int = 10 # 触觉滑动窗口长度（用于方差估计）。
     torque_adjust_step: int = 5 # 力矩步进增量。
     max_torque: int = 80 # 力矩命令上限（同时受硬件 [-100,100] 限制）。
-    phase_timeout: float = 10.0 # OPEN/PRE_GRASP/CLOSING 等阶段超时（秒）。
+    phase_timeout: float = 10.0 # 张开/预抓取/闭合等阶段超时（秒）。
     control_period_s: float = 0.02 # 离散控制周期 Ts（秒），（优先使用函数传入的dt，其次使用前后帧的时间差，最后使用这个默认值）
     #=============================================================================
     # 触觉统计与阈值（v_0 / v_th）
@@ -137,21 +144,22 @@ class AdaptiveGraspConfig:
     variance_threshold: float = 0.003    # 滑移方差阈值 v_th（需标定）；
     variance_baseline: float = 0.00001 # 滑移方差基线 v_0（需标定）。
 
-    # ADAPTIVE_HOLD 的 POSITION 闭环约束
-    position_speed_limit: int = 15 # ADAPTIVE_HOLD 阶段 POSITION 指令速度限幅。
-    position_torque_limit: int = 15 # ADAPTIVE_HOLD 阶段 POSITION 指令力矩限幅。
-    delta_theta_limit: float = math.radians(4) # 单周期总角增量限幅 Delta theta_max（弧度）。
+    # 自适应保持阶段的位置闭环约束
+    position_speed_limit: int = 15 # 自适应保持阶段位置指令速度限幅。
+    position_torque_limit: int = 15 # 自适应保持阶段位置指令力矩限幅。
+    delta_theta_limit: float = math.radians(4) # 单周期总角增量限幅（弧度）。
     # MCP/PIP 角增量分配系数，满足 K_MCP + K_PIP = 1
     K_MCP: float = 0.5 # MCP 角增量分配系数
     K_PIP: float = 0.5 # PIP 角增量分配系数
     #=============================================================================
-    # RELEASE 阶段参数（超时触发与安全张开）
-    release_hold_time_s: float = 20.0 # ADAPTIVE_HOLD 超时后自动进入 RELEASE 的时长（秒）。
-    release_open_speed: int = 30 # RELEASE 阶段安全张开速度。
-    release_open_torque: int = 30 # RELEASE 阶段安全张开力矩。
-    release_timeout_s: float = 5.0 # RELEASE 到位等待超时（秒）。
-    theta_err_th: float = math.radians(2.0) # RELEASE 到位角误差阈值（弧度）。
-    release_check_cycles: int = 3 # RELEASE 连续到位判定周期数。
+    # 释放阶段参数（超时触发与安全张开）
+    demo_hold_time_s: float = 5.0 # 演示程序中主动保持的时长（秒），仅用于示例 22.adaptive_grasp_demo.py。
+    release_hold_time_s: float = 20.0 # 自适应保持超时后自动进入释放的时长（秒）。
+    release_open_speed: int = 30 # 释放阶段安全张开速度。
+    release_open_torque: int = 30 # 释放阶段安全张开力矩。
+    release_timeout_s: float = 5.0 # 释放到位等待超时（秒）。
+    theta_err_th: float = math.radians(2.0) # 释放到位角误差阈值（弧度）。
+    release_check_cycles: int = 3 # 释放连续到位判定周期数。
     #=============================================================================
     # 前馈 + PID 控制律参数（u_k = u_ff + u_pid）
     # s_ref: 目标滑移风险；K_s/K_n: 前馈增益；K_p/K_i/K_d: PID 增益
@@ -168,7 +176,7 @@ class AdaptiveGraspConfig:
     epsilon: float = 1e-6 # 数值稳定小量，避免分母为 0。
     # 新增参数
     safety_factor: float = 1.5 # 安全系数 S_f，范围 [1.2, 2.0]，默认 1.5
-    base_holding_force: float = 0.5 # 基础夹持力 F_base（N），默认 0.5
+    base_holding_force: float = 0.5 # 基础夹持力（N），默认 0.5
     slip_detect_debounce_cycles: int = 3 # 滑移防抖连续周期阈值
     fragile_speed_reduction: float = 0.8 # 易损模式速度降低比例
     fragile_torque_reduction: float = 0.8 # 易损模式力矩降低比例
@@ -177,8 +185,8 @@ class AdaptiveGraspConfig:
     variance_weight: float = 0.5
     direction_weight: float = 0.3
     friction_weight: float = 0.2
-    default_friction_coeff: float = 0.7 # 默认摩擦系数，物体参数库未提供时 fallback
-    enable_fault_release_fallback: bool = True # 异常降级使能：SafetyMonitor 返回 FAULT 时是否走 RELEASE 安全张开（True）或直接进入 ERROR（False）
+    default_friction_coeff: float = 0.7 # 默认摩擦系数，物体参数库未提供时回退使用
+    enable_fault_release_fallback: bool = True # 异常降级使能：安全监控返回故障时是否执行释放安全张开（True）或直接进入错误（False）
 
     def __post_init__(self) -> None:
         if self.sliding_window_size < 3:
@@ -258,14 +266,14 @@ class AdaptiveGraspConfig:
         else:
             self.pre_grasp_pose = self._build_pre_grasp_pose_from_preset()
 
-        # 若未显式指定活跃手指，按 preset 自动推导；若 preset 未知则默认全开。
+        # 若未显式指定活跃手指，按预设自动推导；若预设未知则默认全开。
         if not self.active_fingers:
             self.active_fingers = set(_PRESET_ACTIVE_FINGERS.get(self.pre_grasp_preset, set(TactileSensorId)))
 
     def _build_pre_grasp_pose_from_preset(self) -> dict[JointId, float]:
         if self.pre_grasp_preset not in _PRE_GRASP_PRESET_DEGREE:
             supported = ", ".join(sorted(_PRE_GRASP_PRESET_DEGREE.keys()))
-            raise ValueError(f"pre_grasp_preset must be one of: {supported}")
+            raise ValueError(f"pre_grasp_preset 必须是以下之一: {supported}")
 
         # 预设表按角度维护，统一在这里转换成弧度，避免单位混用。
         degrees_map = _PRE_GRASP_PRESET_DEGREE[self.pre_grasp_preset]

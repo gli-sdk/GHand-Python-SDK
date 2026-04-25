@@ -47,21 +47,23 @@ class SafetyMonitor:
     ) -> SafetyReport:
         cfg = self.config
 
-        # 传感器故障：数据突变或无数据
-        if joint_feedback is not None and len(joint_feedback) >= 1:
-            current_angles: dict[Any, float] = {}
-            for j in joint_feedback:
-                current_angles[j.id] = j.angle
-            if self._prev_joint_feedback:
-                for jid, angle in current_angles.items():
-                    prev = self._prev_joint_feedback.get(jid)
-                    if prev is not None and abs(angle - prev) > math.radians(30.0):
-                        _logger.error(
-                            "Joint angle spike on %s: %.1f°",
-                            jid, math.degrees(abs(angle - prev)),
-                        )
-                        return SafetyReport(SafetyStatus.FAULT, "sensor_fault", f"Joint angle spike on {jid}")
-            self._prev_joint_feedback = current_angles
+        # 传感器故障：无数据
+        # if joint_feedback is not None and len(joint_feedback) >= 1:
+        #     current_angles: dict[Any, float] = {}
+        #     for j in joint_feedback:
+        #         current_angles[j.id] = j.angle
+        #     if self._prev_joint_feedback:
+        #         for jid, angle in current_angles.items():
+        #             prev = self._prev_joint_feedback.get(jid)
+        #             if prev is not None and abs(angle - prev) > math.radians(30.0):
+        #                 _logger.error(
+        #                     "Joint angle spike on %s: %.1f°",
+        #                     jid, math.degrees(abs(angle - prev)),
+        #                 )
+        #                 return SafetyReport(SafetyStatus.FAULT, "sensor_fault", f"Joint angle spike on {jid}")
+        #     self._prev_joint_feedback = current_angles
+        if joint_feedback is None:
+            return SafetyReport(SafetyStatus.FAULT, "sensor_fault", "Joint feedback missing")
 
         if tactile_data is None:
             self._consecutive_no_data += 1
@@ -75,19 +77,6 @@ class SafetyMonitor:
         current_finger_count = len(tactile_data) if tactile_data else 0
         total_fz = sum(abs(info.get_force_z()) for info in tactile_data.values()) if tactile_data else 0.0
 
-        # 空抓检测（仅在 CLOSING 阶段）：基于相对于启动 baseline 的角度变化
-        if state == GraspState.CLOSING_TO_CONTACT and total_fz < cfg.contact_threshold_z:
-            if joint_feedback and self._closing_baseline_angles:
-                max_delta = max(
-                    (
-                        abs(j.angle - self._closing_baseline_angles.get(j.id, 0.0))
-                        for j in joint_feedback
-                    ),
-                    default=0.0,
-                )
-                if max_delta > math.radians(10.0):
-                    _logger.error("Empty grasp detected: max_delta=%.1f°", math.degrees(max_delta))
-                    return SafetyReport(SafetyStatus.FAULT, "empty_grasp", "No contact while joints moved")
 
         # 物体掉落检测：仅在手指数量未减少时触发，避免部分传感器缺失导致误报
         if state == GraspState.ADAPTIVE_HOLD:
@@ -101,6 +90,24 @@ class SafetyMonitor:
 
         self._last_total_fz = total_fz
         self._last_finger_count = current_finger_count
+        return SafetyReport(SafetyStatus.OK)
+    def IsGraspEmpty(self,
+        joint_feedback: Optional[list],
+        state: GraspState,) -> SafetyReport:
+        """基于当前触觉数据和关节反馈判断是否抓空。"""
+        cfg = self.config
+        while(state == GraspState.CLOSING_TO_CONTACT ):
+            if joint_feedback and self._closing_baseline_angles:
+                max_delta = max(
+                    (
+                        abs(j.angle - self._closing_baseline_angles.get(j.id, 0.0))
+                        for j in joint_feedback
+                    ),
+                    default=0.0,
+                )
+                if max_delta > math.radians(30.0):
+                    _logger.error("Empty grasp detected: max_delta=%.1f°", math.degrees(max_delta))
+                    return SafetyReport(SafetyStatus.FAULT, "empty_grasp", "No contact while joints moved")
         return SafetyReport(SafetyStatus.OK)
 
     def reset(self) -> None:
