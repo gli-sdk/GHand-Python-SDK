@@ -176,7 +176,7 @@ class AdaptiveGrasper:
                 return False
 
             if tactile_data:
-                total_fz = sum(abs(info.get_force_z()) for info in tactile_data.values())
+                total_fz = self._sum_active_finger_normal_force(tactile_data)
                 if total_fz >= self.config.contact_threshold_z:
                     # Force calibration before entering ADAPTIVE_HOLD
                     self._calibrate_force(tactile_data)
@@ -195,6 +195,7 @@ class AdaptiveGrasper:
             return
         for _ in range(2): # 最多校准 2 步
             total_fz = sum(abs(info.get_force_z()) for info in tactile_data.values())
+            total_fz = self._sum_active_finger_normal_force(tactile_data)
             if abs(total_fz - F_init) <= 2.0:
                 break
             step = self.config.torque_adjust_step
@@ -298,6 +299,13 @@ class AdaptiveGrasper:
         if joint_feedback:
             return {j.id: j.angle for j in joint_feedback}
         return self._init_hold_joint_angles()
+
+    def _sum_active_finger_normal_force(self, tactile_data: Mapping[TactileSensorId, Any]) -> float:
+        return sum(
+            abs(info.get_force_z())
+            for finger, info in tactile_data.items()
+            if finger in self.config.active_fingers
+        )
 
     def _build_torque_joints(self, torque: int) -> list[Joint]:
         return [Joint(id=joint_id, torque=torque) for joint_id in self._torque_joints]

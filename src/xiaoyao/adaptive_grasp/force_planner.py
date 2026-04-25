@@ -88,10 +88,19 @@ class ForcePlanner:
             return self.profile.safe_force_max / finger_count
         return self.config.max_normal_force_per_finger
 
+    def _get_effective_contact_count(self, finger_fz: dict[TactileSensorId, float]) -> int:
+        active_finger_count = max(len(self.config.active_fingers), 1)
+        contacting_fingers = sum(
+            1
+            for finger in self.config.active_fingers
+            if finger_fz.get(finger, 0.0) > self.config.epsilon
+        )
+        return contacting_fingers or active_finger_count
+
     def _is_near_limit(self, finger_fz: dict[TactileSensorId, float], finger_count: int) -> bool:
         """判断是否有手指法向力超过 90% 上限（接近硬件/安全极限）。"""
         threshold = 0.9 * self._get_max_normal_force_per_finger(finger_count)
-        return any(fz >= threshold for fz in finger_fz.values())
+        return any(finger_fz.get(finger, 0.0) >= threshold for finger in self.config.active_fingers)
 
     def compute(
         self, analysis: TactileAnalysis, current_angles: dict[JointId, float], dt: Optional[float] = None
@@ -117,7 +126,7 @@ class ForcePlanner:
             actual_dt = cfg.control_period_s
         self._last_compute_time = time.time()
 
-        finger_count = max(len(cfg.active_fingers), 1)
+        finger_count = self._get_effective_contact_count(analysis.finger_fz)
         near_limit = self._is_near_limit(analysis.finger_fz, finger_count)
         decisions: dict[TactileSensorId, ForceDecision] = {}
 

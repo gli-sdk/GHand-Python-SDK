@@ -136,3 +136,74 @@ def test_registry_lookup():
     assert profile is not None
     assert profile.is_fragile is True
     assert "tofu" in ObjectProfileRegistry.list_names()
+
+
+def test_force_planner_uses_only_contacting_active_fingers_for_force_split():
+    cfg = AdaptiveGraspConfig(
+        pre_grasp_preset="five_finger_grasp",
+        K_p=1.0,
+        K_i=0.0,
+        K_d=0.0,
+        control_period_s=0.01,
+    )
+    profile = ObjectProfile(
+        name="test", weight_kg=0.2, material="plastic",
+        safe_force_min=1.0, safe_force_max=10.0,
+        friction_coeff=0.4, is_fragile=False,
+    )
+    planner = ForcePlanner(cfg, profile)
+
+    analysis = TactileAnalysis(
+        variance=0.0,
+        slip_risk=0.0,
+        direction_distance=0.0,
+        friction_utilization=0.0,
+        slip_confirmed=False,
+        finger_fz={
+            TactileSensorId.THUMB: 1.0,
+            TactileSensorId.FOREFINGER: 1.0,
+            TactileSensorId.MIDDLE_FINGER: 0.0,
+            TactileSensorId.RING_FINGER: 0.0,
+            TactileSensorId.LITTLE_FINGER: 0.0,
+        },
+        total_fz=2.0,
+        per_finger={
+            TactileSensorId.THUMB: PerFingerAnalysis(
+                variance=0.0, s_k=0.0, d_k=0.0, r_k=0.0, s_total=0.0,
+                slip_confirmed=False, fz=1.0,
+            ),
+            TactileSensorId.FOREFINGER: PerFingerAnalysis(
+                variance=0.0, s_k=0.0, d_k=0.0, r_k=0.0, s_total=0.0,
+                slip_confirmed=False, fz=1.0,
+            ),
+            TactileSensorId.MIDDLE_FINGER: PerFingerAnalysis(
+                variance=0.0, s_k=0.0, d_k=0.0, r_k=0.0, s_total=0.0,
+                slip_confirmed=False, fz=0.0,
+            ),
+            TactileSensorId.RING_FINGER: PerFingerAnalysis(
+                variance=0.0, s_k=0.0, d_k=0.0, r_k=0.0, s_total=0.0,
+                slip_confirmed=False, fz=0.0,
+            ),
+            TactileSensorId.LITTLE_FINGER: PerFingerAnalysis(
+                variance=0.0, s_k=0.0, d_k=0.0, r_k=0.0, s_total=0.0,
+                slip_confirmed=False, fz=0.0,
+            ),
+        },
+    )
+    angles = {
+        JointId.THUMB_MCP: 0.0,
+        JointId.THUMB_PIP: 0.0,
+        JointId.FF_MCP: 0.0,
+        JointId.FF_PIP: 0.0,
+        JointId.MF_MCP: 0.0,
+        JointId.MF_PIP: 0.0,
+        JointId.RF_MCP: 0.0,
+        JointId.RF_PIP: 0.0,
+        JointId.LF_MCP: 0.0,
+        JointId.LF_PIP: 0.0,
+    }
+
+    decisions = planner.compute(analysis, angles)
+
+    assert decisions[TactileSensorId.THUMB].target_angles[JointId.THUMB_MCP] > 0.0
+    assert decisions[TactileSensorId.FOREFINGER].target_angles[JointId.FF_MCP] > 0.0

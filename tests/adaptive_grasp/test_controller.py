@@ -177,6 +177,46 @@ class _ReleaseFeedbackHand(_PositionTraceHand):
         return [Joint(id=joint_id, angle=angle) for joint_id, angle in angles.items()]
 
 
+class _NoisyInactiveFingerHand(_PositionTraceHand):
+    def __init__(self):
+        super().__init__()
+        self._tactile_reads = 0
+
+    def get_tactile_data(self):
+        self._tactile_reads += 1
+        if self._tactile_reads == 1:
+            return {
+                TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 0.0),
+                TactileSensorId.FOREFINGER: _FakeTactileInfo(0.0, 0.0, 0.0),
+                TactileSensorId.MIDDLE_FINGER: _FakeTactileInfo(0.0, 0.0, 2.0),
+            }
+        return {
+            TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 2.0),
+            TactileSensorId.FOREFINGER: _FakeTactileInfo(0.0, 0.0, 2.0),
+            TactileSensorId.MIDDLE_FINGER: _FakeTactileInfo(0.0, 0.0, 0.0),
+        }
+
+
+class _CalibrationNoiseHand(_PositionTraceHand):
+    def __init__(self):
+        super().__init__()
+        self._tactile_reads = 0
+
+    def get_tactile_data(self):
+        self._tactile_reads += 1
+        if self._tactile_reads == 1:
+            return {
+                TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 1.0),
+                TactileSensorId.FOREFINGER: _FakeTactileInfo(0.0, 0.0, 1.0),
+                TactileSensorId.MIDDLE_FINGER: _FakeTactileInfo(0.0, 0.0, 8.0),
+            }
+        return {
+            TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 1.0),
+            TactileSensorId.FOREFINGER: _FakeTactileInfo(0.0, 0.0, 1.0),
+            TactileSensorId.MIDDLE_FINGER: _FakeTactileInfo(0.0, 0.0, 8.0),
+        }
+
+
 def test_release_waits_until_joints_settled(monkeypatch):
     cfg = AdaptiveGraspConfig(
         release_timeout_s=0.2,
@@ -307,3 +347,41 @@ def test_controller_runs_full_state_machine_with_submodules(monkeypatch):
     ok = grasper.grasp_core(object_profile=profile)
     assert ok is True
     assert grasper.state in (GraspState.ADAPTIVE_HOLD, GraspState.COMPLETED, GraspState.RELEASE)
+
+
+def test_closing_ignores_inactive_finger_noise(monkeypatch):
+    hand = _NoisyInactiveFingerHand()
+    cfg = AdaptiveGraspConfig(
+        pre_grasp_preset="two_finger_pinch",
+        contact_threshold_z=1.0,
+        phase_timeout=0.1,
+        control_period_s=0.001,
+    )
+    grasper = AdaptiveGrasper(hand, cfg)
+    grasper._running = True
+    grasper._force_planner = ForcePlanner(cfg, None)
+
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
+    monkeypatch.setattr(grasper, "_calibrate_force", lambda *args, **kwargs: None)
+
+    assert grasper._phase_closing() is True
+    assert hand._tactile_reads >= 2
+
+
+def test_calibrate_force_ignores_inactive_finger_noise(monkeypatch):
+    hand = _CalibrationNoiseHand()
+    cfg = AdaptiveGraspConfig(
+        pre_grasp_preset="two_finger_pinch",
+        torque_adjust_step=5,
+        base_holding_force=6.0,
+    )
+    grasper = AdaptiveGrasper(hand, cfg)
+    grasper._force_planner = ForcePlanner(cfg, None)
+    grasper.current_torque = 10
+
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
+
+    tactile_data = hand.get_tactile_data()
+    grasper._calibrate_force(tactile_data)
+
+    assert grasper.current_torque > 10
