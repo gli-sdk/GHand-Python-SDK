@@ -47,9 +47,38 @@ _PRE_GRASP_PRESET_DEGREE = {
         JointId.MF_MCP: 0.0,
         JointId.MF_PIP: 0.0,
         JointId.FF_SWING: 0.0,
-        JointId.FF_MCP: 58.0,
-        JointId.FF_PIP: 0.0,
-        JointId.THUMB_ROTATION: 17.0,
+        # 大物品
+        # JointId.FF_MCP: 31.0,
+        # JointId.FF_PIP: 22.0,
+        # JointId.THUMB_ROTATION: -2.0,
+        # JointId.THUMB_SWING: 90.0,
+        # JointId.THUMB_MCP: 0.0,
+        # JointId.THUMB_PIP: 0.0,
+        # 小物品
+        # JointId.FF_MCP: 55.0,
+        # JointId.FF_PIP: 0.0,
+        # JointId.THUMB_ROTATION: -2.0,
+        # JointId.THUMB_SWING: 90.0,
+        # JointId.THUMB_MCP: 3.0,
+        # JointId.THUMB_PIP: 0.0,
+        # # 圆锥
+        # JointId.FF_MCP: 58.0,
+        # JointId.FF_PIP: 0.0,
+        # JointId.THUMB_ROTATION: -2.0,
+        # JointId.THUMB_SWING: 90.0,
+        # JointId.THUMB_MCP: 0.0,
+        # JointId.THUMB_PIP: 0.0,
+        # 大球
+        # JointId.FF_MCP: 23.0,
+        # JointId.FF_PIP: 39.0,
+        # JointId.THUMB_ROTATION: -3.0,
+        # JointId.THUMB_SWING: 90.0,
+        # JointId.THUMB_MCP: 0.0,
+        # JointId.THUMB_PIP: 0.0,
+        #气球
+        JointId.FF_MCP: 10.0,
+        JointId.FF_PIP: 30.0,
+        JointId.THUMB_ROTATION: 0.0,
         JointId.THUMB_SWING: 90.0,
         JointId.THUMB_MCP: 3.0,
         JointId.THUMB_PIP: 0.0,
@@ -106,6 +135,25 @@ _PRE_GRASP_PRESET_DEGREE = {
 
 
 @dataclass
+class MaterialProperties:
+    """材质属性：定义一类材质的默认物理/安全参数。"""
+    friction_coeff: float = 0.7
+    safe_force_min: float = 0.5
+    safe_force_max: float = 10.0
+    is_fragile: bool = False
+
+
+_DEFAULT_MATERIAL_LIBRARY: dict[str, MaterialProperties] = {
+    "metal": MaterialProperties(friction_coeff=0.9, safe_force_min=2.0, safe_force_max=15.0, is_fragile=False),
+    "plastic": MaterialProperties(friction_coeff=0.9, safe_force_min=0.5, safe_force_max=5.0, is_fragile=False),
+    "glass": MaterialProperties(friction_coeff=0.5, safe_force_min=0.5, safe_force_max=8.0, is_fragile=True),
+    "tofu": MaterialProperties(friction_coeff=0.9, safe_force_min=0.5, safe_force_max=3.0, is_fragile=True),
+    "fruit": MaterialProperties(friction_coeff=0.8, safe_force_min=0.5, safe_force_max=4.0, is_fragile=True),
+    "egg": MaterialProperties(friction_coeff=0.9, safe_force_min=0.5, safe_force_max=1.0, is_fragile=True),
+}
+
+
+@dataclass
 class PerFingerPidConfig:
     """单指独立 PID 参数配置；字段为 None 时回退到全局 AdaptiveGraspConfig 参数。"""
     K_p: Optional[float] = None
@@ -119,6 +167,9 @@ class PerFingerPidConfig:
 class AdaptiveGraspConfig:
     # 1.预抓取姿态（OPEN -> PRE_GRASP 阶段）
     pre_grasp_pose: dict[JointId, float] = field(default_factory=dict) # 预抓取关节目标角（单位：弧度）；为空时按预设自动生成。
+    # 材质库配置
+    default_material: str = "egg" # 默认材质名称，用于 ObjectProfile 未显式指定材质属性时的回退。
+    material_library: dict[str, MaterialProperties] = field(default_factory=dict) # 材质库映射；为空时自动填充内置默认值。
     #预抓取姿态设定：
     """"
     two_finger_pinch: 两指捏(食指-大拇指)
@@ -132,7 +183,7 @@ class AdaptiveGraspConfig:
     #=============================================================================
     # 2.闭合接触阶段基础参数
     base_torque: int = 10 # 闭合接触阶段初始力矩（力矩模式）。
-    contact_threshold_z: float = 0.5 # 接触判定阈值（所有传感器法向力绝对值之和）。
+    contact_threshold_z: float = 0.2 # 接触判定阈值（所有传感器法向力绝对值之和）。
     sliding_window_size: int = 10 # 触觉滑动窗口长度（用于方差估计）。
     torque_adjust_step: int = 5 # 力矩步进增量。
     max_torque: int = 80 # 力矩命令上限（同时受硬件 [-100,100] 限制）。
@@ -158,7 +209,7 @@ class AdaptiveGraspConfig:
     release_hold_time_s: float = 20.0 # 自适应保持超时后自动进入释放的时长（秒）。
     release_open_speed: int = 30 # 释放阶段安全张开速度。
     release_open_torque: int = 30 # 释放阶段安全张开力矩。
-    release_timeout_s: float = 5.0 # 释放到位等待超时（秒）。
+    release_timeout_s: float = 10.0 # 释放到位等待超时（秒）。
     theta_err_th: float = math.radians(2.0) # 释放到位角误差阈值（弧度）。
     release_check_cycles: int = 3 # 释放连续到位判定周期数。
     #=============================================================================
@@ -167,9 +218,9 @@ class AdaptiveGraspConfig:
     s_ref: float = 0.25 # 目标滑移风险水平 s_ref。
     K_s: float = 1.0 # 滑移前馈增益 K_s。
     K_n: float = 1.0 # 法向超限抑制增益 K_n。
-    K_p: float = 0.5 # PID 比例增益 K_p。
-    K_i: float = 0.01 # PID 积分增益 K_i。
-    K_d: float = 0.005 # PID 微分增益 K_d。
+    K_p: float = 0.01 # PID 比例增益 K_p。
+    K_i: float = 0.0001 # PID 积分增益 K_i。
+    K_d: float = 0.000 # PID 微分增益 K_d。
     # 积分项限幅（防积分饱和）
     I_min: float = -1.0 # PID 积分项下限（防积分饱和）。
     I_max: float = 1.0 # PID 积分项上限（防积分饱和）。
@@ -179,6 +230,7 @@ class AdaptiveGraspConfig:
     safety_factor: float = 1.5 # 安全系数 S_f，范围 [1.2, 2.0]，默认 1.5
     base_holding_force: float = 0.5 # 基础夹持力（N），默认 0.5
     slip_detect_debounce_cycles: int = 3 # 滑移防抖连续周期阈值
+    drop_detect_debounce_cycles: int = 3 # 物体掉落检测防抖连续周期阈值
     fragile_speed_reduction: float = 0.8 # 易损模式速度降低比例
     fragile_torque_reduction: float = 0.8 # 易损模式力矩降低比例
     fragile_step_reduction: float = 0.5 # 易损模式角增量/力矩步进降低比例
@@ -188,8 +240,22 @@ class AdaptiveGraspConfig:
     friction_weight: float = 0.2
     default_friction_coeff: float = 0.7 # 默认摩擦系数，物体参数库未提供时回退使用
     enable_fault_release_fallback: bool = True # 异常降级使能：安全监控返回故障时是否执行释放安全张开（True）或直接进入错误（False）
-    enable_visualization: bool = False # 是否启用实时触觉数据可视化窗口（ADAPTIVE_HOLD 阶段）
+    enable_visualization: bool = True # 是否启用实时触觉数据可视化窗口（ADAPTIVE_HOLD 阶段）
     visualization_backend: str = "TkAgg" # matplotlib 后端（如 TkAgg、Agg、Qt5Agg 等）
+    #=============================================================================
+    # 闭合阶段运动停滞检测（触觉阈值不足时的备用接触判定）
+    closing_stall_angle_threshold: float = math.radians(0.5) # 单周期关节停滞角度阈值（弧度）
+    closing_stall_cycles: int = 5 # 连续停滞周期数才判定为接触
+    
+
+    def set_material_library(self, library: dict[str, MaterialProperties]) -> None:
+        """覆盖当前材质库，常用于从外部配置文件加载自定义材质集合。"""
+        self.material_library = dict(library)
+
+    def get_material(self, material: Optional[str] = None) -> MaterialProperties:
+        """按名称查询材质属性；未找到或名称为空时返回默认材质属性。"""
+        name = material or self.default_material
+        return self.material_library.get(name, MaterialProperties())
 
     def __post_init__(self) -> None:
         if self.sliding_window_size < 3:
@@ -244,6 +310,8 @@ class AdaptiveGraspConfig:
             raise ValueError("base_holding_force must be >= 0")
         if self.slip_detect_debounce_cycles <= 0:
             raise ValueError("slip_detect_debounce_cycles must be > 0")
+        if self.drop_detect_debounce_cycles <= 0:
+            raise ValueError("drop_detect_debounce_cycles must be > 0")
         if not 0.0 < self.fragile_speed_reduction <= 1.0:
             raise ValueError("fragile_speed_reduction must be in (0.0, 1.0]")
         if not 0.0 < self.fragile_step_reduction <= 1.0:
@@ -264,6 +332,16 @@ class AdaptiveGraspConfig:
             raise ValueError("variance_threshold must be >= 0")
         if self.variance_baseline >= self.variance_threshold:
             raise ValueError("variance_baseline must be < variance_threshold")
+        if self.closing_stall_angle_threshold <= 0:
+            raise ValueError("closing_stall_angle_threshold must be > 0")
+        if self.closing_stall_cycles <= 0:
+            raise ValueError("closing_stall_cycles must be > 0")
+
+        if not self.material_library:
+            self.material_library = dict(_DEFAULT_MATERIAL_LIBRARY)
+        if self.default_material not in self.material_library:
+            supported = ", ".join(sorted(self.material_library.keys()))
+            raise ValueError(f"default_material must be one of: {supported}")
 
         if self.pre_grasp_pose:
             filtered = self._filter_passive_dip_joints(self.pre_grasp_pose)

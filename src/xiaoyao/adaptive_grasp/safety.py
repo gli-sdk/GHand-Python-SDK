@@ -1,6 +1,7 @@
 import math
 from dataclasses import dataclass
 from enum import Enum
+import time
 from typing import Any, Optional
 
 import logging
@@ -30,6 +31,7 @@ class SafetyMonitor:
         self._last_total_fz: float = 0.0
         self._last_finger_count: int = 0
         self._consecutive_no_data: int = 0
+        self._consecutive_drop_cycles: int = 0
         self._closing_baseline_angles: dict[Any, float] = {}  # CLOSING 启动时的初始角度（空抓判断 baseline）
 
     def set_closing_baseline(self, joint_feedback: list) -> None:
@@ -60,7 +62,7 @@ class SafetyMonitor:
 
         current_finger_count = len(tactile_data)
         total_fz = sum(abs(info.get_force_z()) for info in tactile_data.values())
-
+        
         # 物体掉落检测：仅在手指数量未减少时触发，避免部分传感器缺失导致误报
         if state == GraspState.ADAPTIVE_HOLD:
             if (
@@ -68,8 +70,12 @@ class SafetyMonitor:
                 and total_fz < cfg.contact_threshold_z
                 and current_finger_count >= self._last_finger_count
             ):
-                _logger.error("Object dropped: last_fz=%.2f current_fz=%.2f", self._last_total_fz, total_fz)
-                return SafetyReport(SafetyStatus.FAULT, "object_dropped", "Contact lost in adaptive hold")
+                self._consecutive_drop_cycles += 1
+                if self._consecutive_drop_cycles >= cfg.drop_detect_debounce_cycles:
+                    _logger.error("Object dropped: last_fz=%.2f current_fz=%.2f", self._last_total_fz, total_fz)
+                    return SafetyReport(SafetyStatus.FAULT, "object_dropped", "Contact lost in adaptive hold")
+            else:
+                self._consecutive_drop_cycles = 0
 
         self._last_total_fz = total_fz
         self._last_finger_count = current_finger_count
@@ -90,7 +96,7 @@ class SafetyMonitor:
             (abs(j.angle - self._closing_baseline_angles.get(j.id, 0.0)) for j in joint_feedback),
             default=0.0,
         )
-        if max_delta > math.radians(30.0):
+        if max_delta > math.radians(40.0):
             _logger.error("Empty grasp detected: max_delta=%.1f°", math.degrees(max_delta))
             return SafetyReport(SafetyStatus.FAULT, "empty_grasp", "No contact while joints moved")
         return SafetyReport(SafetyStatus.OK)
@@ -99,4 +105,5 @@ class SafetyMonitor:
         self._last_total_fz = 0.0
         self._last_finger_count = 0
         self._consecutive_no_data = 0
+        self._consecutive_drop_cycles = 0
         self._closing_baseline_angles.clear()

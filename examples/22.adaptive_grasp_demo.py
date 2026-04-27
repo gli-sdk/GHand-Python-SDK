@@ -3,6 +3,7 @@ import csv
 import logging
 from datetime import datetime
 from pathlib import Path
+from sqlite3 import adapters
 import sys
 import time
 from typing import Optional
@@ -108,10 +109,15 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print per-finger tactile analysis during adaptive hold.",
     )
+    parser.add_argument(
+        "--visualize",
+        action="store_true",
+        help="Enable real-time tactile data visualization window.",
+    )
     return parser
 
 
-HOLD_TIME_S = 5.0
+
 
 
 def _print_verbose(grasper: AdaptiveGrasper) -> None:
@@ -176,7 +182,7 @@ def main() -> None:
 
         print("Grasp started. Holding...")
         start = time.time()
-        while (time.time() - start) < HOLD_TIME_S:
+        while (time.time() - start) < config.release_hold_time_s:
             elapsed = time.time() - start
             state_val = grasper.get_state().value
             status_line = (

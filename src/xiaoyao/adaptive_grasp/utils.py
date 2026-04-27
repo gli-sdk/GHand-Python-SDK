@@ -21,3 +21,11 @@ JOINT_TO_FINGER: dict[JointId, TactileSensorId] = {
     JointId.LF_PIP: TactileSensorId.LITTLE_FINGER,
     JointId.LF_MCP: TactileSensorId.LITTLE_FINGER,
 }
+
+FINGER_TO_MCP_PIP: dict[TactileSensorId, tuple[JointId, JointId]] = {
+    TactileSensorId.THUMB: (JointId.THUMB_MCP, JointId.THUMB_PIP),
+    TactileSensorId.FOREFINGER: (JointId.FF_MCP, JointId.FF_PIP),
+    TactileSensorId.MIDDLE_FINGER: (JointId.MF_MCP, JointId.MF_PIP),
+    TactileSensorId.RING_FINGER: (JointId.RF_MCP, JointId.RF_PIP),
+    TactileSensorId.LITTLE_FINGER: (JointId.LF_MCP, JointId.LF_PIP),
+}

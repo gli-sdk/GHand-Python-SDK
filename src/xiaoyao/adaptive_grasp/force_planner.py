@@ -53,7 +53,8 @@ class ForcePlanner:
     def __init__(self, config: AdaptiveGraspConfig, profile: Optional[ObjectProfile] = None):
         self.config = config
         self.profile = profile
-        self.F_init = self._compute_F_init()              # 初始目标夹持力（N）
+        # self.F_init = self._compute_F_init()              # 初始目标夹持力（N）
+        self.F_init =1.0
         self.is_fragile_mode = profile.is_fragile if profile else False  # 是否易碎物体
 
         self._finger_pid: dict[TactileSensorId, _FingerPidState] = {}

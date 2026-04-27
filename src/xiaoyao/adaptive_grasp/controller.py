@@ -87,6 +87,7 @@ class AdaptiveGrasper:
                 object_profile.friction_coeff if object_profile else self.config.default_friction_coeff,
             )
             self._start_sensor_subscription()
+            # 顺序启动 张开阶段-预抓阶段-闭合阶段，任何阶段失败都直接进入错误状态
             for phase_method, name in (
                 (self._phase_open, "OPEN"),
                 (self._phase_pre_grasp, "PRE_GRASP"),
@@ -121,6 +122,11 @@ class AdaptiveGrasper:
             self._visualizer.stop()
         self.hand.stop()
         self.state = GraspState.STOPPED
+
+    def stop_visualizer(self) -> None:
+        """显式关闭可视化窗口；release 阶段不会自动调用，由用户按需手动关闭。"""
+        if self._visualizer is not None:
+            self._visualizer.stop()
 
     def get_state(self) -> GraspState:
         return self.state
@@ -174,14 +180,17 @@ class AdaptiveGrasper:
 
     def _phase_closing(self) -> bool:
         self.state = GraspState.CLOSING_TO_CONTACT
-        start = time.time()
+        start = self._get_monotonic_time()
         self.current_torque = int(clip(self.config.base_torque, -100.0, self.config.max_torque))
 
         if joints_feedback := self._safe_get_joints():
             self._safety.set_closing_baseline(joints_feedback)
 
+        stall_counter = 0
+        prev_angles: dict[JointId, float] = {}
+
         while self._running:
-            if (time.time() - start) > self.config.phase_timeout:
+            if (self._get_monotonic_time() - start) > self.config.phase_timeout:
                 _logger.error("CLOSING phase timeout")
                 return False
 
@@ -204,7 +213,31 @@ class AdaptiveGrasper:
                 time.sleep(self.config.control_period_s)
                 return True
 
+            # 备用接触判定：力矩-运动停滞检测
+            current_angles = {j.id: j.angle for j in joint_feedback}
+            if self._is_joints_stalled(prev_angles, current_angles):
+                stall_counter += 1
+                _logger.debug("CLOSING: joint stall detected (%d/%d)", stall_counter, self.config.closing_stall_cycles)
+                if stall_counter >= self.config.closing_stall_cycles:
+                    _logger.info("CLOSING: torque-stall contact confirmed")
+                    self._calibrate_force()
+                    time.sleep(self.config.control_period_s)
+                    return True
+            else:
+                stall_counter = 0
+            prev_angles = current_angles
+
         return False
+
+    def _is_joints_stalled(self, prev: dict[JointId, float], current: dict[JointId, float]) -> bool:
+        """判断活跃关节是否在阻力=动力平衡时陷入停滞（有力推但推不动）。"""
+        if not prev or not current:
+            return False
+        for joint_id in self._torque_joints:
+            delta = abs(current.get(joint_id, 0.0) - prev.get(joint_id, 0.0))
+            if delta > self.config.closing_stall_angle_threshold:
+                return False
+        return True
 
     def _calibrate_force(self) -> None:
         """使用 1-2 步力矩调整，使总法向力匹配 F_init，误差控制在 ±2N 内。"""
@@ -213,7 +246,7 @@ class AdaptiveGrasper:
         F_init = self._force_planner.F_init
         if F_init <= 0:
             return
-        for _ in range(2): # 最多校准 2 步
+        for _ in range(5): # 最多校准 5 步
             total_fz = self._sensor.sum_active_finger_normal_force()
             if abs(total_fz - F_init) <= 2.0:
                 break
@@ -280,11 +313,11 @@ class AdaptiveGrasper:
         # 2) 触觉分析
         analysis = self._tactile.update(tactile_data)
         self._last_tactile_analysis = analysis
-        if self._visualizer is not None and tactile_data is not None:
-            self._visualizer.update(tactile_data, analysis, timestamp=control_step_start_s)
 
         # 3) 力规划
         current_angles = self._get_current_angles(joint_feedback)
+        if self._visualizer is not None and tactile_data is not None:
+            self._visualizer.update(tactile_data, analysis, joint_angles=current_angles, timestamp=control_step_start_s)
         if self._force_planner is not None:
             decisions = self._force_planner.compute(analysis, current_angles)
             self._last_force_decisions = decisions
@@ -330,10 +363,11 @@ class AdaptiveGrasper:
             self._last_tactile_data_age_s = None
             return None
         self._last_tactile_data_age_s = self._sensor.data_age_s(self._get_monotonic_time())
-        for finger, info in tactile_data.items():
-            if not getattr(info, "state", True):
-                _logger.error("TACTILE: active finger %s data invalid (state=False)", finger)
-                return None
+        
+        # for finger, info in tactile_data.items():
+        #     if not getattr(info, "state", True):
+        #         _logger.error("TACTILE: active finger %s data invalid (state=False)", finger)
+        #         return None
         return tactile_data
 
     def _safe_get_joints(self) -> Optional[list]:
@@ -353,6 +387,7 @@ class AdaptiveGrasper:
             Joint(id=joint_id, torque=torque) if joint_id in active else Joint(id=joint_id, angle=0.0, speed=0, torque=0)
             for joint_id in AdaptiveGrasper._TORQUE_JOINTS
         ]
+        # 避免因力矩模式，未发送电流时，大拇指侧摆和旋转力矩默认为零，而不是关节保持状态
         joints += [
             Joint(id=JointId.THUMB_ROTATION, angle=0.0, speed=0, torque=5),
             Joint(id=JointId.THUMB_SWING, angle=0.0, speed=0, torque=5),
@@ -404,7 +439,7 @@ class AdaptiveGrasper:
             torque_value = self.current_torque
         limited_torque = int(
             clip(
-                abs(torque_value),
+                abs(torque_value), #位置模式的力矩默认为正值
                 0.0,
                 float(self.config.position_torque_limit),
             ) # 限幅到位置模式力矩上限
@@ -427,14 +462,13 @@ class AdaptiveGrasper:
             return False
         elapsed = self._get_monotonic_time() - self._adaptive_hold_started_at
         return elapsed >= self.config.release_hold_time_s
-
     def _perform_release(self, wait_control_thread: bool) -> bool:
         self.state = GraspState.RELEASE
         self._running = False
         self._adaptive_hold_started_at = None
         self._stop_sensor_subscription()
-        if self._visualizer is not None:
-            self._visualizer.stop()
+        # if self._visualizer is not None:
+        #     self._visualizer.stop()
 
         control_thread = self._control_thread
         if (
@@ -443,7 +477,7 @@ class AdaptiveGrasper:
             and control_thread.is_alive()
             and control_thread is not threading.current_thread()
         ):
-            control_thread.join(timeout=1.0) # 等待控制线程优雅退出
+            control_thread.join(timeout=2.0) # 等待控制线程优雅退出
 
         joints = self._build_position_joints(
             self._get_open_pose(),
@@ -490,7 +524,7 @@ class AdaptiveGrasper:
                 return False
             actual = {j.id: j.angle for j in joints_feedback}
             is_settled = all(
-                abs(actual.get(joint_id, target_angle) - target_angle) <= theta_err_th
+                joint_id in actual and abs(actual[joint_id] - target_angle) <= theta_err_th
                 for joint_id, target_angle in target_pose.items()
             )
             if is_settled:
@@ -507,7 +541,7 @@ class AdaptiveGrasper:
         return {
             JointId.THUMB_PIP: math.radians(0),
             JointId.THUMB_MCP: math.radians(0),
-            JointId.THUMB_SWING: math.radians(0),
+            JointId.THUMB_SWING: math.radians(20),
             JointId.THUMB_ROTATION: math.radians(0),
             JointId.FF_PIP: math.radians(0),
             JointId.FF_MCP: math.radians(0),

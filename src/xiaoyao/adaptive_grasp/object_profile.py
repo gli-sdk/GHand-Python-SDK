@@ -61,7 +61,7 @@ ObjectProfileRegistry.register(
         weight_kg=0.05,
         material="tofu",
         safe_force_min=0.5,
-        safe_force_max=3.0,
+        safe_force_max=2.0,
         friction_coeff=0.9,
         is_fragile=True,
     )
@@ -83,7 +83,7 @@ ObjectProfileRegistry.register(
         weight_kg=0.07,
         material="egg",
         safe_force_min=0.5,
-        safe_force_max=5,
+        safe_force_max=2.0,
         friction_coeff=0.9,
         is_fragile=True,
     )

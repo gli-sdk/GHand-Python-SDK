@@ -8,8 +8,9 @@ from typing import Any, Optional
 import matplotlib
 import matplotlib.pyplot as plt
 
-from xiaoyao.dexhand import TactileInfo, TactileSensorId
+from xiaoyao.dexhand import JointId, TactileInfo, TactileSensorId
 from .tactility import TactileAnalysis
+from .utils import FINGER_TO_MCP_PIP
 
 _logger = logging.getLogger("xiaoyao.adaptive_grasp.visualization")
 
@@ -17,8 +18,9 @@ _logger = logging.getLogger("xiaoyao.adaptive_grasp.visualization")
 class TactileVisualizer:
     """实时绘制活动手指触觉指标的可视化工具。
 
-    布局为 n×5 子图（n = 活动手指数）：
+    布局为 n×7 子图（n = 活动手指数）：
       第1列 法向力 | 第2列 切向力 | 第3列 方差 | 第4列 方向一致性 | 第5列 摩擦利用率
+      第6列 MCP 角度 | 第7列 PIP 角度
     横轴为时间，纵轴为对应数值。
     """
 
@@ -26,7 +28,7 @@ class TactileVisualizer:
         self,
         active_fingers: set[TactileSensorId],
         max_points: int = 300,
-        update_interval: float = 0.1,
+        update_interval: float = 0.01,
         figsize_width: float = 16,
         figsize_height_per_finger: float = 2.5,
         backend: str = "TkAgg",
@@ -44,6 +46,8 @@ class TactileVisualizer:
                 "variance": deque(maxlen=max_points),
                 "direction": deque(maxlen=max_points),
                 "friction": deque(maxlen=max_points),
+                "mcp_deg": deque(maxlen=max_points),
+                "pip_deg": deque(maxlen=max_points),
             }
             for finger in self._active_fingers
         }
@@ -82,8 +86,9 @@ class TactileVisualizer:
         """停止绘图线程并关闭窗口。"""
         self._running = False
         if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=2.0)
+            self._thread.join(timeout=20.0)
         if self._fig is not None:
+            print("closing figure")
             plt.close(self._fig)
             self._fig = None
 
@@ -94,6 +99,7 @@ class TactileVisualizer:
         self,
         tactile_data: dict[TactileSensorId, Any],
         analysis: TactileAnalysis,
+        joint_angles: Optional[dict[JointId, float]] = None,
         timestamp: Optional[float] = None,
     ) -> None:
         """推送最新触觉数据与分析结果，加入缓存队列。"""
@@ -116,6 +122,20 @@ class TactileVisualizer:
                     for key in ("fz", "ft", "variance", "direction", "friction"):
                         self._data[finger][key].append(None)
 
+                mcp_id, pip_id = FINGER_TO_MCP_PIP[finger]
+                if joint_angles is not None:
+                    mcp_angle = joint_angles.get(mcp_id)
+                    pip_angle = joint_angles.get(pip_id)
+                    self._data[finger]["mcp_deg"].append(
+                        math.degrees(mcp_angle) if mcp_angle is not None else None
+                    )
+                    self._data[finger]["pip_deg"].append(
+                        math.degrees(pip_angle) if pip_angle is not None else None
+                    )
+                else:
+                    self._data[finger]["mcp_deg"].append(None)
+                    self._data[finger]["pip_deg"].append(None)
+
     # ------------------------------------------------------------------
     # 内部绘图线程
     # ------------------------------------------------------------------
@@ -123,13 +143,17 @@ class TactileVisualizer:
         plt.ion()
         n = len(self._active_fingers)
         self._fig, self._axes = plt.subplots(
-            n, 5, figsize=self._figsize, sharex="col"
+            n, 7, figsize=self._figsize, sharex="col"
         )
         if n == 1:
             self._axes = self._axes.reshape(1, -1)
 
-        _PLOT_KEYS = ("fz", "ft", "variance", "direction", "friction")
-        titles = ["normal force Fz (N)", "tangential force Ft (N)", "Ft Variance", "Ft direction consistency", "tangential force Friction"]
+        _PLOT_KEYS = ("fz", "ft", "variance", "direction", "friction", "mcp_deg", "pip_deg")
+        titles = [
+            "normal force Fz (N)", "tangential force Ft (N)", "Ft Variance",
+            "Ft direction consistency", "tangential force Friction",
+            "MCP angle (deg)", "PIP angle (deg)",
+        ]
         for j, title in enumerate(titles):
             self._axes[0, j].set_title(title, fontsize=10)
 
@@ -154,13 +178,13 @@ class TactileVisualizer:
                     try:
                         t_list = list(self._timestamps)
                         for finger in self._active_fingers:
-                            for key in ("fz", "ft", "variance", "direction", "friction"):
+                            for key in _PLOT_KEYS:
                                 self._lines[finger][key].set_data(
                                     t_list, list(self._data[finger][key]),
                                 )
 
                         for i in range(n):
-                            for j in range(5):
+                            for j in range(7):
                                 self._axes[i, j].relim()
                                 self._axes[i, j].autoscale_view()
 
