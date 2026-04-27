@@ -198,6 +198,10 @@ class ForcePlanner:
         )
 
     def _compute_unified_control_u(self, analysis: TactileAnalysis, finger_count: int, dt: float) -> float:
+        """无 per_finger 时回退：用大拇指代表整体计算统一 control_u。
+
+        注意：统一控制复用 THUMB 的 PID 状态以保持向后兼容。
+        """
         F_n_ref = self.F_init / finger_count
         max_fz_limit = self._get_max_normal_force_per_finger(finger_count)
         max_fz = max(analysis.finger_fz.values()) if analysis.finger_fz else 0.0
