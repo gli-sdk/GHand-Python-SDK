@@ -96,7 +96,7 @@ class SafetyMonitor:
         state: GraspState,) -> SafetyReport:
         """基于当前触觉数据和关节反馈判断是否抓空。"""
         cfg = self.config
-        while(state == GraspState.CLOSING_TO_CONTACT ):
+        if state == GraspState.CLOSING_TO_CONTACT:
             if joint_feedback and self._closing_baseline_angles:
                 max_delta = max(
                     (

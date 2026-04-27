@@ -79,12 +79,12 @@ def test_adaptive_hold_sends_position_payload_with_config_limits(monkeypatch):
     grasper.current_torque = 10
     grasper._force_planner = ForcePlanner(config, None)
     # 通过缓存提供传感器数据（模拟 subscribe 回调已更新）
-    grasper._latest_tactile_data = {
+    grasper._sensor._latest_tactile_data = {
         TactileSensorId.THUMB: _FakeTactileInfo(0.2, 0.2, 0.2),
         TactileSensorId.FOREFINGER: _FakeTactileInfo(0.1, 0.1, 0.2),
     }
-    grasper._last_tactile_sample_time_s = 0.0
-    grasper._latest_joint_feedback = []
+    grasper._sensor._last_sample_time_s = 0.0
+    grasper._sensor._latest_joint_feedback = []
 
     monkeypatch.setattr(
         grasper._tactile,
@@ -130,10 +130,10 @@ def test_controller_delegates_to_submodules(monkeypatch):
     grasper.state = GraspState.ADAPTIVE_HOLD
     grasper.current_torque = 10
     grasper._force_planner = ForcePlanner(cfg, None)
-    grasper._latest_tactile_data = {
+    grasper._sensor._latest_tactile_data = {
         TactileSensorId.THUMB: _FakeTactileInfo(0.2, 0.2, 0.2),
     }
-    grasper._latest_joint_feedback = []
+    grasper._sensor._latest_joint_feedback = []
 
     monkeypatch.setattr(
         grasper._safety,
@@ -159,7 +159,7 @@ def test_adaptive_hold_auto_release_uses_release_payload():
     g._control_thread = threading.current_thread()
     g._adaptive_hold_started_at = 10.0
     g._get_monotonic_time = lambda: 10.5
-    g._latest_joint_feedback = []
+    g._sensor._latest_joint_feedback = []
 
     assert g._run_control_step() is True
     assert g.state == GraspState.COMPLETED
@@ -193,9 +193,9 @@ def test_release_waits_until_joints_settled(monkeypatch):
         [Joint(id=joint_id, angle=angle) for joint_id, angle in target.items()],
         [Joint(id=joint_id, angle=angle) for joint_id, angle in target.items()],
     ])
-    g._latest_joint_feedback = next(feedback_sequence)
+    g._sensor._latest_joint_feedback = next(feedback_sequence)
     monkeypatch.setattr(
-        g, "_safe_get_joints", lambda: next(feedback_sequence, g._latest_joint_feedback)
+        g, "_safe_get_joints", lambda: next(feedback_sequence, g._sensor._latest_joint_feedback)
     )
     monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
     t = {"v": 0.0}
@@ -222,9 +222,9 @@ def test_release_fails_when_timeout_before_settled(monkeypatch):
         [Joint(id=joint_id, angle=angle) for joint_id, angle in far.items()],
         [Joint(id=joint_id, angle=angle) for joint_id, angle in far.items()],
     ])
-    g._latest_joint_feedback = next(feedback_sequence)
+    g._sensor._latest_joint_feedback = next(feedback_sequence)
     monkeypatch.setattr(
-        g, "_safe_get_joints", lambda: next(feedback_sequence, g._latest_joint_feedback)
+        g, "_safe_get_joints", lambda: next(feedback_sequence, g._sensor._latest_joint_feedback)
     )
     monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
     t = {"v": 0.0}
@@ -245,7 +245,9 @@ def test_full_grasp_state_transitions(monkeypatch):
     monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
     monkeypatch.setattr(grasper, "_calibrate_force", lambda *args, **kwargs: None)
     monkeypatch.setattr(grasper, "_should_auto_release", lambda: False)
-    # 模拟 subscribe 回调在 CLOSING 阶段提供触觉数据
+    # 避免 grasp_core 内部调用 _start_sensor_subscription / _reset_runtime_state 清空缓存
+    monkeypatch.setattr(grasper, "_start_sensor_subscription", lambda: None)
+    monkeypatch.setattr(grasper._sensor, "sum_active_finger_normal_force", lambda: 4.0)
     monkeypatch.setattr(
         grasper,
         "_safe_get_tactile_data",
@@ -270,7 +272,7 @@ def test_perform_release_waits_for_control_thread(monkeypatch):
     g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
     g._running = True
     g.state = GraspState.ADAPTIVE_HOLD
-    g._latest_joint_feedback = []
+    g._sensor._latest_joint_feedback = []
 
     joined = [False]
     def fake_loop():
@@ -301,7 +303,7 @@ def test_perform_release_from_control_thread_does_not_deadlock(monkeypatch):
     g._running = True
     g.state = GraspState.ADAPTIVE_HOLD
     g._control_thread = threading.current_thread()
-    g._latest_joint_feedback = []
+    g._sensor._latest_joint_feedback = []
 
     monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
 
@@ -328,6 +330,9 @@ def test_controller_runs_full_state_machine_with_submodules(monkeypatch):
 
     monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
     monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.monotonic", lambda: 0.0)
+    # 避免 grasp_core 内部调用 _start_sensor_subscription / _reset_runtime_state 清空缓存
+    monkeypatch.setattr(grasper, "_start_sensor_subscription", lambda: None)
+    monkeypatch.setattr(grasper._sensor, "sum_active_finger_normal_force", lambda: 4.0)
     monkeypatch.setattr(
         grasper,
         "_safe_get_tactile_data",
@@ -381,7 +386,11 @@ def test_closing_ignores_inactive_finger_noise(monkeypatch):
             TactileSensorId.MIDDLE_FINGER: _FakeTactileInfo(0.0, 0.0, 0.0),
         },
     ])
-    monkeypatch.setattr(grasper, "_safe_get_tactile_data", lambda: next(reads))
+    def mock_get_tactile():
+        data = next(reads)
+        grasper._sensor._latest_tactile_data = data
+        return data
+    monkeypatch.setattr(grasper, "_safe_get_tactile_data", mock_get_tactile)
     monkeypatch.setattr(grasper, "_safe_get_joints", lambda: [])
 
     assert grasper._phase_closing() is True
@@ -405,7 +414,8 @@ def test_calibrate_force_ignores_inactive_finger_noise(monkeypatch):
         TactileSensorId.FOREFINGER: _FakeTactileInfo(0.0, 0.0, 1.0),
         TactileSensorId.MIDDLE_FINGER: _FakeTactileInfo(0.0, 0.0, 8.0),
     }
-    grasper._calibrate_force(tactile_data)
+    grasper._sensor._latest_tactile_data = tactile_data
+    grasper._calibrate_force()
 
     assert grasper.current_torque > 10
 
@@ -419,9 +429,9 @@ def test_control_step_updates_tactile_data_age(monkeypatch):
 
     times = iter([1.0, 1.02])
     grasper._get_monotonic_time = lambda: next(times)
-    grasper._latest_tactile_data = {TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 0.0)}
-    grasper._last_tactile_sample_time_s = 1.005
-    grasper._latest_joint_feedback = []
+    grasper._sensor._latest_tactile_data = {TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 0.0)}
+    grasper._sensor._last_sample_time_s = 1.005
+    grasper._sensor._latest_joint_feedback = []
     monkeypatch.setattr(
         grasper._safety,
         "check",
@@ -482,12 +492,12 @@ def test_control_step_uses_cached_tactile_snapshot(monkeypatch):
         raise AssertionError("control step should read cached tactile data")
 
     hand.get_tactile_data = fail_direct_read
-    grasper._latest_tactile_data = {
+    grasper._sensor._latest_tactile_data = {
         TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 0.2),
         TactileSensorId.FOREFINGER: _FakeTactileInfo(0.0, 0.0, 0.2),
     }
-    grasper._last_tactile_sample_time_s = 1.0
-    grasper._latest_joint_feedback = []
+    grasper._sensor._last_sample_time_s = 1.0
+    grasper._sensor._latest_joint_feedback = []
 
     times = iter([1.02, 1.03])
     grasper._get_monotonic_time = lambda: next(times)
@@ -525,6 +535,7 @@ def test_sensor_subscription_callback_updates_cache():
 
     now = {"v": 1.0}
     grasper._get_monotonic_time = lambda: now["v"]
+    grasper._sensor._get_monotonic_time = lambda: now["v"]
 
     def make_tactile(fz: float):
         return SimpleNamespace(resultant_force=[0.0, 0.0, fz], sample_force=[0.0] * 16)
@@ -559,18 +570,18 @@ def test_sensor_subscription_callback_updates_cache():
         lf_mcp=make_joint(1.8),
     )
 
-    grasper._sensor_update_callback(tpdo)
+    grasper._sensor._on_data(tpdo)
 
-    assert grasper._latest_tactile_data is not None
-    assert TactileSensorId.THUMB in grasper._latest_tactile_data
-    assert TactileSensorId.FOREFINGER in grasper._latest_tactile_data
-    assert TactileSensorId.MIDDLE_FINGER not in grasper._latest_tactile_data
-    assert grasper._latest_tactile_data[TactileSensorId.THUMB].get_force_z() == pytest.approx(0.2)
-    assert grasper._latest_tactile_data[TactileSensorId.FOREFINGER].get_force_z() == pytest.approx(0.3)
-    assert grasper._last_tactile_sample_time_s == 1.0
+    assert grasper._sensor._latest_tactile_data is not None
+    assert TactileSensorId.THUMB in grasper._sensor._latest_tactile_data
+    assert TactileSensorId.FOREFINGER in grasper._sensor._latest_tactile_data
+    assert TactileSensorId.MIDDLE_FINGER not in grasper._sensor._latest_tactile_data
+    assert grasper._sensor._latest_tactile_data[TactileSensorId.THUMB].get_force_z() == pytest.approx(0.2)
+    assert grasper._sensor._latest_tactile_data[TactileSensorId.FOREFINGER].get_force_z() == pytest.approx(0.3)
+    assert grasper._sensor._last_sample_time_s == 1.0
 
-    assert grasper._latest_joint_feedback is not None
-    joint_map = {j.id: j for j in grasper._latest_joint_feedback}
+    assert grasper._sensor._latest_joint_feedback is not None
+    joint_map = {j.id: j for j in grasper._sensor._latest_joint_feedback}
     assert JointId.THUMB_PIP in joint_map
     assert joint_map[JointId.THUMB_PIP].angle == pytest.approx(0.2)
     assert JointId.LF_MCP in joint_map
@@ -578,9 +589,9 @@ def test_sensor_subscription_callback_updates_cache():
 
     tpdo.thumb_tactile = make_tactile(1.0)
     now["v"] = 2.0
-    grasper._sensor_update_callback(tpdo)
-    assert grasper._latest_tactile_data[TactileSensorId.THUMB].get_force_z() == pytest.approx(1.0)
-    assert grasper._last_tactile_sample_time_s == 2.0
+    grasper._sensor._on_data(tpdo)
+    assert grasper._sensor._latest_tactile_data[TactileSensorId.THUMB].get_force_z() == pytest.approx(1.0)
+    assert grasper._sensor._last_sample_time_s == 2.0
 
 
 def test_build_torque_joints_sets_inactive_to_zero():

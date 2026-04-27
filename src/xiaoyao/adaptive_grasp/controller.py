@@ -4,7 +4,8 @@ import threading
 import time
 from typing import Any, Mapping, Optional
 
-from xiaoyao.dexhand import CtrlMode, DexHand, ErrorCode, Joint, JointId, State, TactileInfo, TactileSensorId
+from xiaoyao.dexhand import CtrlMode, DexHand, Joint, JointId, TactileSensorId
+from .sensor import SensorClient
 
 from .config import AdaptiveGraspConfig
 from .states import GraspState
@@ -56,10 +57,12 @@ class AdaptiveGrasper:
             if _JOINT_TO_FINGER.get(j) in self.config.active_fingers
         )
 
-        # 传感器数据缓存（由 hand.subscribe 统一更新）
-        self._latest_tactile_data: Optional[dict[TactileSensorId, Any]] = None
-        self._latest_joint_feedback: Optional[list] = None
-        self._sub_id: Optional[int] = None
+        # 传感器客户端：统一封装 subscribe / 缓存 / 数据提取
+        self._sensor = SensorClient(
+            hand,
+            active_fingers=set(config.active_fingers),
+            get_monotonic_time=self._get_monotonic_time,
+        )
 
         # 子模块
         self._tactile = TactileAnalyzer(self.config)
@@ -71,7 +74,6 @@ class AdaptiveGrasper:
         self._last_tactile_analysis: Optional[Any] = None
         self._last_safety_report: Optional[Any] = None
         self._last_force_decisions: Optional[Any] = None
-        self._last_tactile_sample_time_s: Optional[float] = None
         self._last_tactile_data_age_s: Optional[float] = None
         self._last_control_step_start_s: Optional[float] = None
         self._last_control_cycle_s: Optional[float] = None
@@ -204,12 +206,11 @@ class AdaptiveGrasper:
                 _logger.error("CLOSING phase: failed to get joint feedback")
                 return False
 
-            
-            total_fz = self._sum_active_finger_normal_force(tactile_data)
+            total_fz = self._sensor.sum_active_finger_normal_force()
             # 判断是否抓空
             if total_fz >= self.config.contact_threshold_z:
                 # 进入自适应保持前进行力校准
-                self._calibrate_force(tactile_data)
+                self._calibrate_force()
                 time.sleep(self.config.control_period_s)
                 return True
             else:
@@ -218,10 +219,10 @@ class AdaptiveGrasper:
                     _logger.error("CLOSING phase: Grasp Empty")
                     self.state = GraspState.ERROR
                     return False
-            
+
         return False
 
-    def _calibrate_force(self, tactile_data: dict) -> None:
+    def _calibrate_force(self) -> None:
         """使用 1-2 步力矩调整，使总法向力匹配 F_init，误差控制在 ±2N 内。"""
         if self._force_planner is None:
             return
@@ -229,7 +230,7 @@ class AdaptiveGrasper:
         if F_init <= 0:
             return
         for _ in range(2): # 最多校准 2 步
-            total_fz = self._sum_active_finger_normal_force(tactile_data)
+            total_fz = self._sensor.sum_active_finger_normal_force()
             if abs(total_fz - F_init) <= 2.0:
                 break
             step = self.config.torque_adjust_step
@@ -244,7 +245,6 @@ class AdaptiveGrasper:
                 _logger.error("FORCE_CALIBRATION: move_joints failed")
                 break
             time.sleep(self.config.control_period_s)
-            tactile_data = self._safe_get_tactile_data() or tactile_data # 读取新数据，失败则沿用旧数据
 
     # ------------------------------------------------------------------
     # 自适应保持
@@ -318,102 +318,18 @@ class AdaptiveGrasper:
     # ------------------------------------------------------------------
     # 辅助方法
     # ------------------------------------------------------------------
-    def _sensor_update_callback(self, tpdo: Any) -> None:
-        """订阅回调：从 Tpdo 提取触觉数据和关节反馈，存入缓存。"""
-        # 触觉数据提取（与 hand.get_tactile_data 保持一致）
-        tactile_data = {
-            TactileSensorId.THUMB: TactileInfo(
-                state=bool(tpdo.tactile_state.state & (1 << 0)),
-                resultant_force=tpdo.thumb_tactile.resultant_force,
-                distributed_force=tpdo.thumb_tactile.sample_force,
-            ),
-            TactileSensorId.FOREFINGER: TactileInfo(
-                state=bool(tpdo.tactile_state.state & (1 << 1)),
-                resultant_force=tpdo.ff_tactile.resultant_force,
-                distributed_force=tpdo.ff_tactile.sample_force,
-            ),
-            TactileSensorId.MIDDLE_FINGER: TactileInfo(
-                state=bool(tpdo.tactile_state.state & (1 << 2)),
-                resultant_force=tpdo.mf_tactile.resultant_force,
-                distributed_force=tpdo.mf_tactile.sample_force,
-            ),
-            TactileSensorId.RING_FINGER: TactileInfo(
-                state=bool(tpdo.tactile_state.state & (1 << 3)),
-                resultant_force=tpdo.rf_tactile.resultant_force,
-                distributed_force=tpdo.rf_tactile.sample_force,
-            ),
-            TactileSensorId.LITTLE_FINGER: TactileInfo(
-                state=bool(tpdo.tactile_state.state & (1 << 4)),
-                resultant_force=tpdo.lf_tactile.resultant_force,
-                distributed_force=tpdo.lf_tactile.sample_force,
-            ),
-        }
-        # 过滤活动手指
-        self._latest_tactile_data = {
-            finger: info
-            for finger, info in tactile_data.items()
-            if finger in self.config.active_fingers
-        }
-        self._last_tactile_sample_time_s = self._get_monotonic_time()
-
-        # 关节反馈提取（与 hand.get_joints 保持一致）
-        joint_mappings = [
-            (JointId.THUMB_DIP, tpdo.th_dip),
-            (JointId.THUMB_PIP, tpdo.th_pip),
-            (JointId.THUMB_MCP, tpdo.th_mcp),
-            (JointId.THUMB_SWING, tpdo.th_swing),
-            (JointId.THUMB_ROTATION, tpdo.th_rot),
-            (JointId.FF_DIP, tpdo.ff_dip),
-            (JointId.FF_PIP, tpdo.ff_pip),
-            (JointId.FF_MCP, tpdo.ff_mcp),
-            (JointId.FF_SWING, tpdo.ff_swing),
-            (JointId.MF_DIP, tpdo.mf_dip),
-            (JointId.MF_PIP, tpdo.mf_pip),
-            (JointId.MF_MCP, tpdo.mf_mcp),
-            (JointId.RF_DIP, tpdo.rf_dip),
-            (JointId.RF_PIP, tpdo.rf_pip),
-            (JointId.RF_MCP, tpdo.rf_mcp),
-            (JointId.LF_DIP, tpdo.lf_dip),
-            (JointId.LF_PIP, tpdo.lf_pip),
-            (JointId.LF_MCP, tpdo.lf_mcp),
-        ]
-        joints: list[Joint] = []
-        for joint_id, joint_tpdo in joint_mappings:
-            joints.append(
-                Joint(
-                    id=joint_id,
-                    angle=joint_tpdo.angle,
-                    speed=joint_tpdo.speed,
-                    torque=joint_tpdo.torque,
-                    state=State(joint_tpdo.state),
-                    error=ErrorCode(joint_tpdo.error),
-                )
-            )
-        self._latest_joint_feedback = joints
-
     def _start_sensor_subscription(self) -> None:
-        self._latest_tactile_data = None
-        self._latest_joint_feedback = None
-        self._sub_id = self.hand.subscribe(self._sensor_update_callback)
+        self._sensor.start()
 
     def _stop_sensor_subscription(self) -> None:
-        if self._sub_id is not None:
-            try:
-                self.hand.unsubscribe(self._sub_id)
-            except Exception:
-                _logger.exception("Failed to unsubscribe sensor data")
-            self._sub_id = None
-        self._latest_tactile_data = None
-        # 保留 _latest_joint_feedback，release 阶段的 _wait_joints_settled 仍需读取关节反馈
+        self._sensor.stop(clear_joint_feedback=False)
 
     def _safe_get_tactile_data(self) -> Optional[dict[TactileSensorId, Any]]:
-        tactile_data = self._latest_tactile_data
+        tactile_data = self._sensor.tactile_data
         if tactile_data is None:
             self._last_tactile_data_age_s = None
             return None
-        sample_time_s = self._last_tactile_sample_time_s
-        if sample_time_s is not None:
-            self._last_tactile_data_age_s = self._get_monotonic_time() - sample_time_s
+        self._last_tactile_data_age_s = self._sensor.data_age_s(self._get_monotonic_time())
         for finger, info in tactile_data.items():
             if not getattr(info, "state", True):
                 if self.state in (GraspState.CLOSING_TO_CONTACT, GraspState.ADAPTIVE_HOLD):
@@ -422,19 +338,15 @@ class AdaptiveGrasper:
         return tactile_data
 
     def _safe_get_joints(self) -> Optional[list]:
-        return self._latest_joint_feedback
+        return self._sensor.joint_feedback
 
     def _get_current_angles(self, joint_feedback: Optional[list]) -> dict[JointId, float]:
         if joint_feedback:
             return {j.id: j.angle for j in joint_feedback}
         return self._init_hold_joint_angles()
 
-    def _sum_active_finger_normal_force(self, tactile_data: Mapping[TactileSensorId, Any]) -> float:
-        return sum(
-            abs(info.get_force_z())
-            for finger, info in tactile_data.items()
-            if finger in self.config.active_fingers
-        )
+    def _sum_active_finger_normal_force(self) -> float:
+        return self._sensor.sum_active_finger_normal_force()
 
     def _build_torque_joints(self, torque: int) -> list[Joint]:
         active = set(self._torque_joints)
@@ -464,13 +376,11 @@ class AdaptiveGrasper:
         self._last_tactile_analysis = None
         self._last_safety_report = None
         self._last_force_decisions = None
-        self._last_tactile_sample_time_s = None
         self._last_tactile_data_age_s = None
         self._last_control_step_start_s = None
         self._last_control_cycle_s = None
         self._last_control_cycle_jitter_s = None
-        self._latest_tactile_data = None
-        self._latest_joint_feedback = None
+        self._sensor.reset()
 
     def _build_position_joints(
         self,
