@@ -19,7 +19,7 @@ thumb_press = {
     JointId.MF_MCP: math.radians(70),
     JointId.RF_PIP: math.radians(75),
     JointId.RF_MCP: math.radians(70),
-    JointId.LF_PIP: math.radians(75),
+    JointId.LF_PIP: math.radians(74),
     JointId.LF_MCP: math.radians(70),
 }
 
@@ -35,7 +35,7 @@ ff_press = {
     JointId.MF_MCP: math.radians(70),
     JointId.RF_PIP: math.radians(75),
     JointId.RF_MCP: math.radians(70),
-    JointId.LF_PIP: math.radians(75),
+    JointId.LF_PIP: math.radians(74),
     JointId.LF_MCP: math.radians(70),
 }
 
@@ -51,7 +51,7 @@ mf_press = {
     JointId.MF_MCP: math.radians(0),
     JointId.RF_PIP: math.radians(75),
     JointId.RF_MCP: math.radians(70),
-    JointId.LF_PIP: math.radians(75),
+    JointId.LF_PIP: math.radians(74),
     JointId.LF_MCP: math.radians(70),
 }
 
@@ -67,7 +67,7 @@ rf_press = {
     JointId.MF_MCP: math.radians(70),
     JointId.RF_PIP: math.radians(0),
     JointId.RF_MCP: math.radians(0),
-    JointId.LF_PIP: math.radians(75),
+    JointId.LF_PIP: math.radians(74),
     JointId.LF_MCP: math.radians(70),
 }
 
