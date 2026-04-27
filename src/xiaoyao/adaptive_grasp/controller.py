@@ -74,6 +74,7 @@ class AdaptiveGrasper:
         if self.config.enable_visualization:
             self._visualizer = TactileVisualizer(
                 active_fingers=set(self.config.active_fingers),
+                backend=self.config.visualization_backend,
             )
 
         # 对外只读：最近一次控制周期的结果快照

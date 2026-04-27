@@ -1,3 +1,4 @@
+import logging
 import math
 import threading
 import time
@@ -5,11 +6,12 @@ from collections import deque
 from typing import Any, Optional
 
 import matplotlib
-matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 
 from xiaoyao.dexhand import TactileInfo, TactileSensorId
 from .tactility import TactileAnalysis
+
+_logger = logging.getLogger("xiaoyao.adaptive_grasp.visualization")
 
 
 class TactileVisualizer:
@@ -27,10 +29,12 @@ class TactileVisualizer:
         update_interval: float = 0.1,
         figsize_width: float = 16,
         figsize_height_per_finger: float = 2.5,
+        backend: str = "TkAgg",
     ):
         self._active_fingers = list(active_fingers)
         self._max_points = max_points
         self._update_interval = update_interval
+        self._backend = backend
 
         self._timestamps: deque[float] = deque(maxlen=max_points)
         self._data: dict[TactileSensorId, dict[str, deque[Optional[float]]]] = {
@@ -65,6 +69,11 @@ class TactileVisualizer:
         """启动后台绘图线程。"""
         if self._running:
             return
+        try:
+            matplotlib.use(self._backend)
+        except Exception as exc:
+            _logger.warning("Visualizer backend %s failed: %s, falling back to Agg", self._backend, exc)
+            matplotlib.use("Agg")
         self._running = True
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
@@ -119,7 +128,7 @@ class TactileVisualizer:
         if n == 1:
             self._axes = self._axes.reshape(1, -1)
 
-        titles = ["Fz (N)", "Ft (N)", "Variance", "Direction", "Friction"]
+        titles = ["normal force Fz (N)", "tangential force Ft (N)", "Ft Variance", "Ft direction consistency", "tangential force Friction"]
         for j, title in enumerate(titles):
             self._axes[0, j].set_title(title, fontsize=10)
 
@@ -140,21 +149,24 @@ class TactileVisualizer:
 
         while self._running:
             with self._lock:
-                if self._timestamps:
-                    t_list = list(self._timestamps)
-                    for finger in self._active_fingers:
-                        for key in ("fz", "ft", "variance", "direction", "friction"):
-                            self._lines[finger][key].set_data(
-                                t_list, list(self._data[finger][key]),
-                            )
+                if self._timestamps and self._fig is not None:
+                    try:
+                        t_list = list(self._timestamps)
+                        for finger in self._active_fingers:
+                            for key in ("fz", "ft", "variance", "direction", "friction"):
+                                self._lines[finger][key].set_data(
+                                    t_list, list(self._data[finger][key]),
+                                )
 
-                    for i in range(n):
-                        for j in range(5):
-                            self._axes[i, j].relim()
-                            self._axes[i, j].autoscale_view()
+                        for i in range(n):
+                            for j in range(5):
+                                self._axes[i, j].relim()
+                                self._axes[i, j].autoscale_view()
 
-                    self._fig.canvas.draw_idle()
-                    self._fig.canvas.flush_events()
+                        self._fig.canvas.draw_idle()
+                        self._fig.canvas.flush_events()
+                    except Exception:
+                        _logger.exception("Visualizer draw failed")
 
             time.sleep(self._update_interval)
 

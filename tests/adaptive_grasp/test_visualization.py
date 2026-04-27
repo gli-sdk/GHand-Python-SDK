@@ -29,7 +29,7 @@ def test_visualizer_init_with_active_fingers():
         active_fingers={TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
         max_points=50,
     )
-    assert viz._active_fingers == [TactileSensorId.THUMB, TactileSensorId.FOREFINGER]
+    assert set(viz._active_fingers) == {TactileSensorId.THUMB, TactileSensorId.FOREFINGER}
     assert viz._max_points == 50
 
 
