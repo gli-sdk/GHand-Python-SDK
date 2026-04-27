@@ -76,7 +76,7 @@ class SafetyMonitor:
         self._last_finger_count = current_finger_count
         return SafetyReport(SafetyStatus.OK)
 
-    def IsGraspEmpty(
+    def is_grasp_empty(
         self,
         joint_feedback: Optional[list],
         state: GraspState,

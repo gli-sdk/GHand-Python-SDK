@@ -204,7 +204,7 @@ class AdaptiveGrasper:
                 _logger.error("CLOSING phase: failed to get %s", "tactile data" if tactile_data is None else "joint feedback")
                 return False
 
-            if self._safety.IsGraspEmpty(joint_feedback, self.state).status != SafetyStatus.OK:
+            if self._safety.is_grasp_empty(joint_feedback, self.state).status != SafetyStatus.OK:
                 _logger.error("CLOSING phase: Grasp Empty")
                 self.state = GraspState.ERROR
                 return False
