@@ -140,22 +140,18 @@ class TactileVisualizer:
 
         while self._running:
             with self._lock:
-                if len(self._timestamps) == 0:
-                    pass
-                else:
+                if self._timestamps:
                     t_list = list(self._timestamps)
                     for finger in self._active_fingers:
                         for key in ("fz", "ft", "variance", "direction", "friction"):
-                            line = self._lines[finger][key]
-                            y_list = list(self._data[finger][key])
-                            line.set_data(t_list, y_list)
+                            self._lines[finger][key].set_data(
+                                t_list, list(self._data[finger][key]),
+                            )
 
-                    # 自动缩放所有子图
                     for i in range(n):
                         for j in range(5):
-                            ax = self._axes[i, j]
-                            ax.relim()
-                            ax.autoscale_view()
+                            self._axes[i, j].relim()
+                            self._axes[i, j].autoscale_view()
 
                     self._fig.canvas.draw_idle()
                     self._fig.canvas.flush_events()

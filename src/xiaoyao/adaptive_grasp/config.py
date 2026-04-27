@@ -188,6 +188,7 @@ class AdaptiveGraspConfig:
     friction_weight: float = 0.2
     default_friction_coeff: float = 0.7 # 默认摩擦系数，物体参数库未提供时回退使用
     enable_fault_release_fallback: bool = True # 异常降级使能：安全监控返回故障时是否执行释放安全张开（True）或直接进入错误（False）
+    enable_visualization: bool = False # 是否启用实时触觉数据可视化窗口（ADAPTIVE_HOLD 阶段）
 
     def __post_init__(self) -> None:
         if self.sliding_window_size < 3:
