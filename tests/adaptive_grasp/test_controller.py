@@ -619,6 +619,14 @@ def test_build_torque_joints_sets_inactive_to_zero():
     assert joints[-1].torque == 5
 
 
+def test_controller_accepts_none_config():
+    """AdaptiveGrasper(config=None) should not crash."""
+    hand = _MockHand()
+    grasper = AdaptiveGrasper(hand, config=None)
+    assert grasper.config is not None
+    assert grasper._sensor is not None
+
+
 def test_build_torque_joints_all_active_for_five_finger():
     """五指握时所有 _TORQUE_JOINTS 都应带有目标力矩。"""
     cfg = AdaptiveGraspConfig(pre_grasp_preset="five_finger_grasp")

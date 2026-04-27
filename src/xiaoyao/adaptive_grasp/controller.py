@@ -61,7 +61,7 @@ class AdaptiveGrasper:
         # 传感器客户端：统一封装 subscribe / 缓存 / 数据提取
         self._sensor = SensorClient(
             hand,
-            active_fingers=set(config.active_fingers),
+            active_fingers=set(self.config.active_fingers),
             get_monotonic_time=self._get_monotonic_time,
         )
 
@@ -73,7 +73,7 @@ class AdaptiveGrasper:
         self._visualizer: Optional[TactileVisualizer] = None
         if self.config.enable_visualization:
             self._visualizer = TactileVisualizer(
-                active_fingers=set(config.active_fingers),
+                active_fingers=set(self.config.active_fingers),
             )
 
         # 对外只读：最近一次控制周期的结果快照
