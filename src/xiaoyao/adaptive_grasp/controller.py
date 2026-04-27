@@ -404,7 +404,7 @@ class AdaptiveGrasper:
                 _logger.exception("Failed to unsubscribe sensor data")
             self._sub_id = None
         self._latest_tactile_data = None
-        self._latest_joint_feedback = None
+        # 保留 _latest_joint_feedback，release 阶段的 _wait_joints_settled 仍需读取关节反馈
 
     def _safe_get_tactile_data(self) -> Optional[dict[TactileSensorId, Any]]:
         tactile_data = self._latest_tactile_data
