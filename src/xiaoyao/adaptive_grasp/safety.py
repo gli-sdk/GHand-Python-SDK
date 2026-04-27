@@ -30,7 +30,6 @@ class SafetyMonitor:
         self._last_total_fz: float = 0.0
         self._last_finger_count: int = 0
         self._consecutive_no_data: int = 0
-        self._prev_joint_feedback: dict[Any, float] = {}
         self._closing_baseline_angles: dict[Any, float] = {}  # CLOSING 启动时的初始角度（空抓判断 baseline）
 
     def set_closing_baseline(self, joint_feedback: list) -> None:
@@ -100,5 +99,4 @@ class SafetyMonitor:
         self._last_total_fz = 0.0
         self._last_finger_count = 0
         self._consecutive_no_data = 0
-        self._prev_joint_feedback.clear()
         self._closing_baseline_angles.clear()

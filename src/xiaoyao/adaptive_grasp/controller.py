@@ -9,10 +9,10 @@ from .sensor import SensorClient
 
 from .config import AdaptiveGraspConfig
 from .states import GraspState
-from .tactility import TactileAnalyzer
+from .tactility import TactileAnalyzer, TactileAnalysis
 from .object_profile import ObjectProfile
-from .force_planner import ForcePlanner
-from .safety import SafetyMonitor, SafetyStatus
+from .force_planner import ForcePlanner, ForceDecision
+from .safety import SafetyMonitor, SafetyStatus, SafetyReport
 from .visualization import TactileVisualizer
 from .utils import clip
 
@@ -78,9 +78,9 @@ class AdaptiveGrasper:
             )
 
         # 对外只读：最近一次控制周期的结果快照
-        self._last_tactile_analysis: Optional[Any] = None
-        self._last_safety_report: Optional[Any] = None
-        self._last_force_decisions: Optional[Any] = None
+        self._last_tactile_analysis: Optional[TactileAnalysis] = None
+        self._last_safety_report: Optional[SafetyReport] = None
+        self._last_force_decisions: Optional[dict[TactileSensorId, ForceDecision]] = None
         self._last_tactile_data_age_s: Optional[float] = None
         self._last_control_step_start_s: Optional[float] = None
         self._last_control_cycle_s: Optional[float] = None

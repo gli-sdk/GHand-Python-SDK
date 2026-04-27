@@ -148,7 +148,7 @@ class TactileAnalyzer:
         if variance >= cfg.variance_threshold:
             return 1.0
         denom = (cfg.variance_threshold - cfg.variance_baseline) + cfg.epsilon
-        return  clip((variance - cfg.variance_baseline) / denom,lower=0,upper=1)
+        return clip((variance - cfg.variance_baseline) / denom, 0, 1)
 
     def _calculate_finger_direction_distance(
         self, finger: TactileSensorId, info: Any
