@@ -207,3 +207,23 @@ def test_force_planner_uses_only_contacting_active_fingers_for_force_split():
 
     assert decisions[TactileSensorId.THUMB].target_angles[JointId.THUMB_MCP] > 0.0
     assert decisions[TactileSensorId.FOREFINGER].target_angles[JointId.FF_MCP] > 0.0
+
+
+def test_force_planner_uses_monotonic_time(monkeypatch):
+    """compute() should use monotonic clock, not wall clock."""
+    cfg = AdaptiveGraspConfig(control_period_s=0.01)
+    planner = ForcePlanner(cfg, None)
+
+    # If using time.time(), a huge wall-clock jump would break PID.
+    # With monotonic, dt stays bounded.
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.force_planner.time.time", lambda: 999.0)
+
+    analysis = TactileAnalysis(
+        variance=0.0, slip_risk=0.0, direction_distance=0.0, friction_utilization=0.0,
+        slip_confirmed=False,
+        finger_fz={TactileSensorId.THUMB: 1.0},
+        total_fz=1.0,
+    )
+    angles = {JointId.THUMB_MCP: 0.0, JointId.THUMB_PIP: 0.0}
+    decisions = planner.compute(analysis, angles)
+    assert math.isfinite(decisions[TactileSensorId.THUMB].control_u)

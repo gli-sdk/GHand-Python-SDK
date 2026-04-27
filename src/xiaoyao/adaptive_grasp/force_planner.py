@@ -72,7 +72,8 @@ class ForcePlanner:
         self.is_fragile_mode = profile.is_fragile if profile else False  # 是否易碎物体
 
         self._finger_pid: dict[TactileSensorId, _FingerPidState] = {}
-        self._last_compute_time: Optional[float] = None               # 上次 compute 调用时间（用于内部计时）
+        self._last_compute_time: Optional[float] = None
+        self._get_monotonic_time = time.monotonic
 
     def _compute_F_init(self) -> float:
         """计算初始目标夹持力：重量×重力×安全系数 + 基础保持力，再钳位到安全区间。"""
@@ -116,15 +117,16 @@ class ForcePlanner:
         cfg = self.config
 
         # 确定实际时间差 dt（PID 计算使用）
+        now = self._get_monotonic_time()
         if dt is not None and dt > 0:
             actual_dt = dt
         elif self._last_compute_time is not None:
-            actual_dt = time.time() - self._last_compute_time
+            actual_dt = now - self._last_compute_time
             if actual_dt <= 0 or actual_dt > 1.0:
                 actual_dt = cfg.control_period_s
         else:
             actual_dt = cfg.control_period_s
-        self._last_compute_time = time.time()
+        self._last_compute_time = now
 
         finger_count = self._get_effective_contact_count(analysis.finger_fz)
         near_limit = self._is_near_limit(analysis.finger_fz, finger_count)
