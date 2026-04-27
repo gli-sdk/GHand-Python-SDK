@@ -8,6 +8,8 @@ import time
 from typing import Optional
 
 
+_logger = logging.getLogger(__name__)
+
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
@@ -64,6 +66,7 @@ class TactileLogger:
         try:
             data = self.hand.get_tactile_data()
         except Exception:
+            _logger.exception("Failed to get tactile data")
             data = {}
         for sid in self._SENSORS:
             name = sid.value
@@ -108,10 +111,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def build_config(args: argparse.Namespace) -> AdaptiveGraspConfig:
-    return AdaptiveGraspConfig(
-        pre_grasp_preset=args.pre_grasp_preset,
-    )
+HOLD_TIME_S = 5.0
 
 
 def _print_verbose(grasper: AdaptiveGrasper) -> None:
@@ -150,7 +150,7 @@ def main() -> None:
         logger = TactileLogger(hand, dist_dir)
         print(f"Tactile data will be saved to: {logger.csv_path}")
 
-        config = build_config(args)
+        config = AdaptiveGraspConfig(pre_grasp_preset=args.pre_grasp_preset)
         grasper = AdaptiveGrasper(hand=hand, config=config)
 
         object_profile = None
@@ -171,12 +171,12 @@ def main() -> None:
         print(f"Pre-grasp preset={config.pre_grasp_preset} (DIP passive)")
 
         if not grasper.grasp_core(object_profile=object_profile):
-            print(f"Grasp failed++. state={grasper.get_state().value}")
+            print(f"Grasp failed. state={grasper.get_state().value}")
             return
 
         print("Grasp started. Holding...")
         start = time.time()
-        while (time.time() - start) < config.demo_hold_time_s:
+        while (time.time() - start) < HOLD_TIME_S:
             elapsed = time.time() - start
             state_val = grasper.get_state().value
             status_line = (
@@ -189,8 +189,7 @@ def main() -> None:
                 _print_verbose(grasper)
             else:
                 print(f"\r{status_line}", end="", flush=True)
-            if logger is not None:
-                logger.write_row(state_val, grasper.current_torque)
+            logger.write_row(state_val, grasper.current_torque)
             time.sleep(0.1)
         if not args.verbose:
             print()
@@ -216,7 +215,7 @@ def main() -> None:
             logger.close()
         hand.tactile_close()
         hand.close()
-        time.sleep(0.2)
+        time.sleep(0.2)  # wait for hardware teardown
 
 
 if __name__ == "__main__":

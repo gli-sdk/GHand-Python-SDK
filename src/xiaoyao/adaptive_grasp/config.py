@@ -155,7 +155,6 @@ class AdaptiveGraspConfig:
     K_PIP: float = 0.5 # PIP 角增量分配系数
     #=============================================================================
     # 释放阶段参数（超时触发与安全张开）
-    demo_hold_time_s: float = 5.0 # 演示程序中主动保持的时长（秒），仅用于示例 22.adaptive_grasp_demo.py。
     release_hold_time_s: float = 20.0 # 自适应保持超时后自动进入释放的时长（秒）。
     release_open_speed: int = 30 # 释放阶段安全张开速度。
     release_open_torque: int = 30 # 释放阶段安全张开力矩。
