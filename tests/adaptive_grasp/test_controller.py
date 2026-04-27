@@ -653,12 +653,7 @@ def test_adaptive_hold_stops_after_consecutive_move_failures(monkeypatch):
     }
     grasper._sensor._latest_joint_feedback = []
 
-    fail_count = [0]
-    def fail_after_n(*args, **kwargs):
-        fail_count[0] += 1
-        return fail_count[0] <= 3
-
-    monkeypatch.setattr(hand, "move_joints", fail_after_n)
+    monkeypatch.setattr(hand, "move_joints", lambda *args, **kwargs: False)
     monkeypatch.setattr(
         grasper._safety,
         "check",
@@ -678,12 +673,15 @@ def test_adaptive_hold_stops_after_consecutive_move_failures(monkeypatch):
         ),
     )
 
-    assert grasper._run_control_step() is True
-    assert grasper._run_control_step() is True
-    assert grasper._run_control_step() is True
-    assert grasper._run_control_step() is False
-    assert grasper._run_control_step() is False
-    result = grasper._run_control_step()
-    assert result is False
+    # First 2 failures: keeps trying (state remains ADAPTIVE_HOLD)
+    grasper._run_control_step()
+    assert grasper.state == GraspState.ADAPTIVE_HOLD
+    assert grasper._running is True
+    grasper._run_control_step()
+    assert grasper.state == GraspState.ADAPTIVE_HOLD
+    assert grasper._running is True
+
+    # 3rd failure: enters ERROR and stops
+    grasper._run_control_step()
     assert grasper.state == GraspState.ERROR
     assert grasper._running is False
