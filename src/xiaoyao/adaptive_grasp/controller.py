@@ -206,19 +206,19 @@ class AdaptiveGrasper:
                 _logger.error("CLOSING phase: failed to get joint feedback")
                 return False
 
+            # 先检查关节角度累计变化：若已运动超过阈值仍无接触，判定抓空
+            empty_grasp_report = self._safety.IsGraspEmpty(joint_feedback, self.state)
+            if empty_grasp_report.status != SafetyStatus.OK:
+                _logger.error("CLOSING phase: Grasp Empty")
+                self.state = GraspState.ERROR
+                return False
+
             total_fz = self._sensor.sum_active_finger_normal_force()
-            # 判断是否抓空
             if total_fz >= self.config.contact_threshold_z:
                 # 进入自适应保持前进行力校准
                 self._calibrate_force()
                 time.sleep(self.config.control_period_s)
                 return True
-            else:
-                empty_grasp_report = self._safety.IsGraspEmpty(joint_feedback, self.state)
-                if empty_grasp_report.status != SafetyStatus.OK:
-                    _logger.error("CLOSING phase: Grasp Empty")
-                    self.state = GraspState.ERROR
-                    return False
 
         return False
 
