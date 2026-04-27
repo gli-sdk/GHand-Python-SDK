@@ -138,6 +138,7 @@ class AdaptiveGraspConfig:
     max_torque: int = 80 # 力矩命令上限（同时受硬件 [-100,100] 限制）。
     phase_timeout: float = 10.0 # 张开/预抓取/闭合等阶段超时（秒）。
     control_period_s: float = 0.02 # 离散控制周期 Ts（秒），（优先使用函数传入的dt，其次使用前后帧的时间差，最后使用这个默认值）
+    closing_period_s: float = 0.2 # 闭合接触阶段每次力矩指令后的休眠周期（秒）。
     tactile_sensor_update_period_s: float = 0.015 # 触觉传感器数据更新周期15ms。
     #=============================================================================
     # 触觉统计与阈值（v_0 / v_th）
@@ -195,6 +196,8 @@ class AdaptiveGraspConfig:
             raise ValueError("sliding_window_size must be >= 3")
         if self.control_period_s <= 0:
             raise ValueError("control_period_s must be > 0")
+        if self.closing_period_s <= 0:
+            raise ValueError("closing_period_s must be > 0")
         if self.max_torque <= 0:
             raise ValueError("max_torque must be > 0")
         if self.phase_timeout <= 0:

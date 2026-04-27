@@ -639,3 +639,51 @@ def test_build_torque_joints_all_active_for_five_finger():
         assert joint_map[joint_id].torque == 77
         assert joint_map[joint_id].angle == 0.0
         assert joint_map[joint_id].speed == 0
+
+
+def test_adaptive_hold_stops_after_consecutive_move_failures(monkeypatch):
+    hand = _MockHand()
+    cfg = AdaptiveGraspConfig(control_period_s=0.01)
+    grasper = AdaptiveGrasper(hand, cfg)
+    grasper.state = GraspState.ADAPTIVE_HOLD
+    grasper._running = True
+    grasper._force_planner = ForcePlanner(cfg, None)
+    grasper._sensor._latest_tactile_data = {
+        TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 0.2),
+    }
+    grasper._sensor._latest_joint_feedback = []
+
+    fail_count = [0]
+    def fail_after_n(*args, **kwargs):
+        fail_count[0] += 1
+        return fail_count[0] <= 3
+
+    monkeypatch.setattr(hand, "move_joints", fail_after_n)
+    monkeypatch.setattr(
+        grasper._safety,
+        "check",
+        lambda *args, **kwargs: SafetyReport(SafetyStatus.OK),
+    )
+    monkeypatch.setattr(
+        grasper._tactile,
+        "update",
+        lambda _data: TactileAnalysis(
+            variance=0.0,
+            slip_risk=0.0,
+            direction_distance=0.0,
+            friction_utilization=0.0,
+            slip_confirmed=False,
+            finger_fz={TactileSensorId.THUMB: 0.2},
+            total_fz=0.2,
+        ),
+    )
+
+    assert grasper._run_control_step() is True
+    assert grasper._run_control_step() is True
+    assert grasper._run_control_step() is True
+    assert grasper._run_control_step() is False
+    assert grasper._run_control_step() is False
+    result = grasper._run_control_step()
+    assert result is False
+    assert grasper.state == GraspState.ERROR
+    assert grasper._running is False

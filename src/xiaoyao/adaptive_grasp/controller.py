@@ -85,6 +85,9 @@ class AdaptiveGrasper:
         self._last_control_cycle_s: Optional[float] = None
         self._last_control_cycle_jitter_s: Optional[float] = None
 
+        self._consecutive_move_failures: int = 0
+        self._max_consecutive_move_failures: int = 3
+
     def grasp_core(self, object_profile: Optional[ObjectProfile] = None) -> bool:
         try:
             self._running = True
@@ -196,7 +199,7 @@ class AdaptiveGrasper:
                 return False
 
             self.hand.move_joints(self._build_torque_joints(self.current_torque), mode=CtrlMode.TORQUE)
-            time.sleep(0.2)
+            time.sleep(self.config.closing_period_s)
 
             tactile_data = self._safe_get_tactile_data()
             joint_feedback = self._safe_get_joints()
@@ -310,7 +313,19 @@ class AdaptiveGrasper:
         joints = self._build_hold_position_joints(next_torque, next_angles)
         ok = self.hand.move_joints(joints, mode=CtrlMode.POSITION)
         if not ok:
-            _logger.error("ADAPTIVE_HOLD: move_joints failed")
+            self._consecutive_move_failures += 1
+            _logger.error(
+                "ADAPTIVE_HOLD: move_joints failed (%d/%d)",
+                self._consecutive_move_failures,
+                self._max_consecutive_move_failures,
+            )
+            if self._consecutive_move_failures >= self._max_consecutive_move_failures:
+                _logger.error("ADAPTIVE_HOLD: too many consecutive move failures, entering ERROR")
+                self.state = GraspState.ERROR
+                self._running = False
+                return False
+        else:
+            self._consecutive_move_failures = 0
         return ok
 
     # ------------------------------------------------------------------
@@ -377,6 +392,9 @@ class AdaptiveGrasper:
         self._last_control_step_start_s = None
         self._last_control_cycle_s = None
         self._last_control_cycle_jitter_s = None
+        self._consecutive_move_failures = 0
+        self._object_profile = None
+        self._force_planner = None
         self._sensor.reset()
 
     def _build_position_joints(
