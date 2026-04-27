@@ -146,23 +146,19 @@ class ForcePlanner:
 
         return decisions
 
-    def _compute_finger_control_u(
+    def _compute_pid_control_u(
         self,
         finger: TactileSensorId,
-        per_finger_analysis: PerFingerAnalysis,
-        finger_count: int,
+        s_k: float,
+        fz: float,
+        fz_limit: float,
+        F_n_ref: float,
         dt: float,
     ) -> float:
-        """计算单指的 control_u（前馈 + PID）。"""
+        """Shared前馈+PID计算。"""
         cfg = self.config
-        F_n_ref = self.F_init / finger_count
-        fz_limit = self._get_max_normal_force_per_finger(finger_count)
-
-        s_total = per_finger_analysis.s_total
-        fz = per_finger_analysis.fz
-
-        e_nk = max(0.0, (fz - fz_limit) / (fz_limit + cfg.epsilon)) #加紧只应由滑移风险s_total驱动
-        u_ff = cfg.K_s * s_total - cfg.K_n * e_nk
+        e_nk = max(0.0, (fz - fz_limit) / (fz_limit + cfg.epsilon))
+        u_ff = cfg.K_s * s_k - cfg.K_n * e_nk
 
         pid_state = self._get_or_create_pid(finger)
         e_k = F_n_ref - fz
@@ -183,38 +179,36 @@ class ForcePlanner:
 
         return control_u
 
-    def _compute_unified_control_u(self, analysis: TactileAnalysis, finger_count: int, dt: float) -> float:
-        """无 per_finger 时回退：用大拇指代表整体计算统一 control_u。"""
-        cfg = self.config
+    def _compute_finger_control_u(
+        self,
+        finger: TactileSensorId,
+        per_finger_analysis: PerFingerAnalysis,
+        finger_count: int,
+        dt: float,
+    ) -> float:
         F_n_ref = self.F_init / finger_count
-        max_fz = max(analysis.finger_fz.values()) if analysis.finger_fz else 0.0
+        fz_limit = self._get_max_normal_force_per_finger(finger_count)
+        return self._compute_pid_control_u(
+            finger,
+            s_k=per_finger_analysis.s_total,
+            fz=per_finger_analysis.fz,
+            fz_limit=fz_limit,
+            F_n_ref=F_n_ref,
+            dt=dt,
+        )
+
+    def _compute_unified_control_u(self, analysis: TactileAnalysis, finger_count: int, dt: float) -> float:
+        F_n_ref = self.F_init / finger_count
         max_fz_limit = self._get_max_normal_force_per_finger(finger_count)
-        # 滑移风险 s_k 由最大指的风险代表，法向力超限 e_nk 也由最大指的超限程度代表
-        s_k = analysis.slip_risk
-        e_nk = max(0.0, (max_fz - max_fz_limit) / (max_fz_limit + cfg.epsilon))
-        # 前馈控制：滑移风险越大越加紧，法向力超限放松
-        u_ff = cfg.K_s * s_k - cfg.K_n * e_nk
-
-        finger = TactileSensorId.THUMB
-        pid_state = self._get_or_create_pid(finger)
-        e_k = F_n_ref - max_fz
-        pid_param = self._get_pid_params(finger)
-        pid_state.integral = clip(pid_state.integral + e_k * dt, pid_param.I_min, pid_param.I_max)
-        if pid_state._initialized:
-            derivative = (e_k - pid_state.prev_error) / dt
-        else:
-            derivative = 0.0
-            pid_state._initialized = True
-        pid_state.prev_error = e_k
-        # PID 控制：追踪期望法向力 F_n_ref，使总法向力维持在 F_init 附近
-        u_pid = pid_param.K_p * e_k + pid_param.K_i * pid_state.integral + pid_param.K_d * derivative
-        # 总控制量：前馈 + PID
-        control_u = u_ff + u_pid
-
-        if self.is_fragile_mode and max_fz >= max_fz_limit:
-            control_u = min(control_u, 0.0)
-
-        return control_u
+        max_fz = max(analysis.finger_fz.values()) if analysis.finger_fz else 0.0
+        return self._compute_pid_control_u(
+            TactileSensorId.THUMB,
+            s_k=analysis.slip_risk,
+            fz=max_fz,
+            fz_limit=max_fz_limit,
+            F_n_ref=F_n_ref,
+            dt=dt,
+        )
 
     def _build_finger_decision(
         self,
