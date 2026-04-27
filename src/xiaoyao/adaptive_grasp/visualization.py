@@ -128,6 +128,7 @@ class TactileVisualizer:
         if n == 1:
             self._axes = self._axes.reshape(1, -1)
 
+        _PLOT_KEYS = ("fz", "ft", "variance", "direction", "friction")
         titles = ["normal force Fz (N)", "tangential force Ft (N)", "Ft Variance", "Ft direction consistency", "tangential force Friction"]
         for j, title in enumerate(titles):
             self._axes[0, j].set_title(title, fontsize=10)
@@ -137,7 +138,7 @@ class TactileVisualizer:
                 str(finger.value), rotation=0, ha="right", va="center", fontsize=9
             )
             self._lines[finger] = {}
-            for j, key in enumerate(titles):
+            for j, key in enumerate(_PLOT_KEYS):
                 ax = self._axes[i, j]
                 (line,) = ax.plot([], [], linewidth=1.2)
                 self._lines[finger][key] = line
