@@ -7,25 +7,10 @@ from xiaoyao.dexhand import JointId, TactileSensorId
 from .config import AdaptiveGraspConfig
 from .object_profile import ObjectProfile
 from .tactility import TactileAnalysis, PerFingerAnalysis
-from .utils import clip
+from .utils import clip, JOINT_TO_FINGER
 
 
 _G = 9.8  # 重力加速度 (m/s^2)，用于将物体重量转换为重力
-
-# 关节到触觉传感器手指的映射：同一根手指的多个关节共享一个力传感器
-_JOINT_TO_FINGER: dict[JointId, TactileSensorId] = {
-    JointId.THUMB_MCP: TactileSensorId.THUMB,
-    JointId.THUMB_PIP: TactileSensorId.THUMB,
-    JointId.FF_MCP: TactileSensorId.FOREFINGER,
-    JointId.FF_PIP: TactileSensorId.FOREFINGER,
-    JointId.FF_SWING: TactileSensorId.FOREFINGER,
-    JointId.MF_MCP: TactileSensorId.MIDDLE_FINGER,
-    JointId.MF_PIP: TactileSensorId.MIDDLE_FINGER,
-    JointId.RF_MCP: TactileSensorId.RING_FINGER,
-    JointId.RF_PIP: TactileSensorId.RING_FINGER,
-    JointId.LF_MCP: TactileSensorId.LITTLE_FINGER,
-    JointId.LF_PIP: TactileSensorId.LITTLE_FINGER,
-}
 
 
 @dataclass
@@ -237,7 +222,7 @@ class ForcePlanner:
         pip_delta = total_delta * cfg.K_PIP
 
         for joint_id, angle in current_angles.items():
-            mapped_finger = _JOINT_TO_FINGER.get(joint_id)
+            mapped_finger = JOINT_TO_FINGER.get(joint_id)
             if mapped_finger != finger:
                 continue
             # THUMB_SWING,THUMB_ROTATION,FF_SWING这些关节保留角度，不更新

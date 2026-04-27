@@ -14,23 +14,9 @@ from .object_profile import ObjectProfile
 from .force_planner import ForcePlanner, ForceDecision
 from .safety import SafetyMonitor, SafetyStatus, SafetyReport
 from .visualization import TactileVisualizer
-from .utils import clip
+from .utils import clip, JOINT_TO_FINGER
 
 _logger = logging.getLogger("xiaoyao.adaptive_grasp.controller")
-
-# 关节到触觉传感器手指的映射，用于根据活跃手指过滤控制关节
-_JOINT_TO_FINGER: dict[JointId, TactileSensorId] = {
-    JointId.THUMB_PIP: TactileSensorId.THUMB,
-    JointId.THUMB_MCP: TactileSensorId.THUMB,
-    JointId.FF_PIP: TactileSensorId.FOREFINGER,
-    JointId.FF_MCP: TactileSensorId.FOREFINGER,
-    JointId.MF_PIP: TactileSensorId.MIDDLE_FINGER,
-    JointId.MF_MCP: TactileSensorId.MIDDLE_FINGER,
-    JointId.RF_PIP: TactileSensorId.RING_FINGER,
-    JointId.RF_MCP: TactileSensorId.RING_FINGER,
-    JointId.LF_PIP: TactileSensorId.LITTLE_FINGER,
-    JointId.LF_MCP: TactileSensorId.LITTLE_FINGER,
-}
 
 
 class AdaptiveGrasper:
@@ -55,7 +41,7 @@ class AdaptiveGrasper:
         # 根据活跃手指过滤参与力控/位控闭环的关节，避免不参与的手指被误驱动
         self._torque_joints = tuple(
             j for j in AdaptiveGrasper._TORQUE_JOINTS
-            if _JOINT_TO_FINGER.get(j) in self.config.active_fingers
+            if JOINT_TO_FINGER.get(j) in self.config.active_fingers
         )
 
         # 传感器客户端：统一封装 subscribe / 缓存 / 数据提取
