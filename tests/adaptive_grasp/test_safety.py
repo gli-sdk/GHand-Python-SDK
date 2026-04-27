@@ -49,6 +49,6 @@ def test_empty_grasp_respects_baseline():
 
     tactile = {"thumb": type("T", (), {"get_force_z": lambda self: 0.1})()}
     joints = [Joint(id=JointId.THUMB_MCP, angle=math.radians(20.0))]
-    report = monitor.check(tactile_data=tactile, joint_feedback=joints, state=GraspState.CLOSING_TO_CONTACT)
+    report = monitor.is_grasp_empty(joint_feedback=joints, state=GraspState.CLOSING_TO_CONTACT)
     assert report.status == SafetyStatus.OK
 
