@@ -332,9 +332,8 @@ class AdaptiveGrasper:
         self._last_tactile_data_age_s = self._sensor.data_age_s(self._get_monotonic_time())
         for finger, info in tactile_data.items():
             if not getattr(info, "state", True):
-                if self.state in (GraspState.CLOSING_TO_CONTACT, GraspState.ADAPTIVE_HOLD):
-                    _logger.error("TACTILE: active finger %s offline in %s", finger, self.state.name)
-                    return None
+                _logger.error("TACTILE: active finger %s data invalid (state=False)", finger)
+                return None
         return tactile_data
 
     def _safe_get_joints(self) -> Optional[list]:
