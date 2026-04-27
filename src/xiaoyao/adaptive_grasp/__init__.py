@@ -6,6 +6,7 @@ from .tactility import TactileAnalyzer, TactileAnalysis, PerFingerAnalysis
 from .object_profile import ObjectProfile, ObjectProfileRegistry
 from .force_planner import ForcePlanner, ForceDecision
 from .safety import SafetyMonitor, SafetyStatus, SafetyReport
+from .visualization import TactileVisualizer
 
 __all__ = [
     "GraspState",
@@ -22,4 +23,5 @@ __all__ = [
     "SafetyMonitor",
     "SafetyStatus",
     "SafetyReport",
+    "TactileVisualizer",
 ]
