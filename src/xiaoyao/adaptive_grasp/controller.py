@@ -140,15 +140,15 @@ class AdaptiveGrasper:
         return self.state
 
     @property
-    def last_tactile_analysis(self) -> Optional[Any]:
+    def last_tactile_analysis(self) -> Optional[TactileAnalysis]:
         return self._last_tactile_analysis
 
     @property
-    def last_safety_report(self) -> Optional[Any]:
+    def last_safety_report(self) -> Optional[SafetyReport]:
         return self._last_safety_report
 
     @property
-    def last_force_decisions(self) -> Optional[Any]:
+    def last_force_decisions(self) -> Optional[dict[TactileSensorId, ForceDecision]]:
         return self._last_force_decisions
 
     @property
