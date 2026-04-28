@@ -189,6 +189,8 @@ class AdaptiveGrasper:
             self._last_tactile_analysis = step.tactile_analysis
             self._last_safety_report = step.safety_report
             self._last_force_decisions = step.force_decisions
+            if step.current_torque is not None:
+                self.current_torque = step.current_torque
 
             tactile_data = self._sensor.tactile_data
             self._last_tactile_data_age_s = self._sensor.data_age_s(step_start) if tactile_data is not None else None
@@ -264,7 +266,7 @@ class AdaptiveGrasper:
         settled_cycles = 0
         start = self._get_monotonic_time()
         while (self._get_monotonic_time() - start) < timeout_s:
-            joints_feedback = self._sensor.joint_feedback
+            joints_feedback = self._get_release_joint_feedback()
             if joints_feedback is None:
                 _logger.error("Joint feedback lost during settle wait")
                 return False
@@ -282,6 +284,18 @@ class AdaptiveGrasper:
             time.sleep(self.config.control_period_s)
         _logger.error("Joint settle wait timeout")
         return False
+
+    def _get_release_joint_feedback(self) -> Optional[list]:
+        get_joints = getattr(self.hand, "get_joints", None)
+        if callable(get_joints):
+            try:
+                joints = get_joints()
+            except Exception:
+                _logger.exception("Failed to read fresh joint feedback during release")
+                return None
+            if joints:
+                return joints
+        return self._sensor.joint_feedback
 
     def _start_sensor_subscription(self) -> None:
         self._sensor.start()

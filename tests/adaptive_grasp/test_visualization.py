@@ -1,4 +1,5 @@
 import math
+import time
 
 import pytest
 
@@ -73,3 +74,24 @@ def test_visualizer_respects_max_points():
 
     assert len(viz._timestamps) == 3
     assert list(viz._timestamps) == [2.0, 3.0, 4.0]
+
+
+def test_visualizer_thread_disables_itself_when_backend_fails(monkeypatch):
+    viz = TactileVisualizer(
+        active_fingers={TactileSensorId.THUMB},
+        update_interval=0.001,
+    )
+
+    def fail_subplots(*_args, **_kwargs):
+        raise RuntimeError("backend unavailable")
+
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.visualization.plt.subplots", fail_subplots)
+
+    viz.start()
+    deadline = time.monotonic() + 1.0
+    while viz._thread is not None and viz._thread.is_alive() and time.monotonic() < deadline:
+        time.sleep(0.01)
+
+    assert viz._running is False
+    assert viz._thread is not None
+    assert not viz._thread.is_alive()

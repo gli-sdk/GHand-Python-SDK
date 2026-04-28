@@ -29,6 +29,7 @@ class HoldStepResult:
     tactile_analysis: Optional[TactileAnalysis] = None
     safety_report: Optional[SafetyReport] = None
     force_decisions: Optional[dict] = None
+    current_torque: Optional[int] = None
 
 
 class HoldController:
@@ -66,11 +67,23 @@ class HoldController:
         safety = self._safety.check(tactile_data, joint_feedback, GraspState.ADAPTIVE_HOLD)
         if safety.status == SafetyStatus.FAULT:
             if self.config.enable_fault_release_fallback:
-                return HoldStepResult(result=HoldResult.FAULT_RELEASE, safety_report=safety)
-            return HoldStepResult(result=HoldResult.ERROR, safety_report=safety)
+                return HoldStepResult(
+                    result=HoldResult.FAULT_RELEASE,
+                    safety_report=safety,
+                    current_torque=self._current_torque,
+                )
+            return HoldStepResult(
+                result=HoldResult.ERROR,
+                safety_report=safety,
+                current_torque=self._current_torque,
+            )
 
         if tactile_data is None:
-            return HoldStepResult(result=HoldResult.CONTINUE, safety_report=safety)
+            return HoldStepResult(
+                result=HoldResult.CONTINUE,
+                safety_report=safety,
+                current_torque=self._current_torque,
+            )
 
         # 2) Tactile analysis
         analysis = self._tactile.update(tactile_data)
@@ -101,15 +114,22 @@ class HoldController:
                 self._max_consecutive_move_failures,
             )
             if self._consecutive_move_failures >= self._max_consecutive_move_failures:
-                return HoldStepResult(result=HoldResult.ERROR, tactile_analysis=analysis, safety_report=safety)
+                return HoldStepResult(
+                    result=HoldResult.ERROR,
+                    tactile_analysis=analysis,
+                    safety_report=safety,
+                    current_torque=self._current_torque,
+                )
         else:
             self._consecutive_move_failures = 0
+            self._current_torque = next_torque
 
         return HoldStepResult(
             result=HoldResult.CONTINUE,
             tactile_analysis=analysis,
             safety_report=safety,
             force_decisions=decisions if self._force_planner else None,
+            current_torque=self._current_torque,
         )
 
     def _get_current_angles(self, joint_feedback: Optional[list]) -> dict[JointId, float]:

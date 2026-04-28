@@ -1,10 +1,8 @@
+import logging
 import math
 from dataclasses import dataclass
 from enum import Enum
-import time
 from typing import Any, Optional
-
-import logging
 
 from .config import AdaptiveGraspConfig
 from .states import GraspState
@@ -32,13 +30,10 @@ class SafetyMonitor:
         self._last_finger_count: int = 0
         self._consecutive_no_data: int = 0
         self._consecutive_drop_cycles: int = 0
-        self._closing_baseline_angles: dict[Any, float] = {}  # CLOSING 启动时的初始角度（空抓判断 baseline）
+        self._closing_baseline_angles: dict[Any, float] = {}
 
     def set_closing_baseline(self, joint_feedback: list) -> None:
-        """记录 CLOSING 阶段启动时的初始关节角度，作为空抓判断的基准。"""
-        self._closing_baseline_angles = {
-            j.id: j.angle for j in joint_feedback
-        }
+        self._closing_baseline_angles = {j.id: j.angle for j in joint_feedback}
 
     def check(
         self,
@@ -62,14 +57,12 @@ class SafetyMonitor:
 
         current_finger_count = len(tactile_data)
         total_fz = sum(abs(info.get_force_z()) for info in tactile_data.values())
-        
-        # 物体掉落检测：仅在手指数量未减少时触发，避免部分传感器缺失导致误报
+
         if state == GraspState.ADAPTIVE_HOLD:
-            if (
-                self._last_total_fz >= cfg.contact_threshold_z
-                and total_fz < cfg.contact_threshold_z
-                and current_finger_count >= self._last_finger_count
-            ):
+            contact_was_present = self._last_total_fz >= cfg.contact_threshold_z
+            contact_is_lost = total_fz < cfg.contact_threshold_z
+            finger_data_not_reduced = current_finger_count >= self._last_finger_count
+            if contact_was_present and contact_is_lost and finger_data_not_reduced:
                 self._consecutive_drop_cycles += 1
                 if self._consecutive_drop_cycles >= cfg.drop_detect_debounce_cycles:
                     _logger.error("Object dropped: last_fz=%.2f current_fz=%.2f", self._last_total_fz, total_fz)
@@ -86,7 +79,6 @@ class SafetyMonitor:
         joint_feedback: Optional[list],
         state: GraspState,
     ) -> SafetyReport:
-        """基于当前触觉数据和关节反馈判断是否抓空。"""
         if state != GraspState.CLOSING_TO_CONTACT:
             return SafetyReport(SafetyStatus.OK)
         if not joint_feedback or not self._closing_baseline_angles:
@@ -96,8 +88,8 @@ class SafetyMonitor:
             (abs(j.angle - self._closing_baseline_angles.get(j.id, 0.0)) for j in joint_feedback),
             default=0.0,
         )
-        if max_delta > math.radians(40.0):
-            _logger.error("Empty grasp detected: max_delta=%.1f°", math.degrees(max_delta))
+        if max_delta > math.radians(30.0):
+            _logger.error("Empty grasp detected: max_delta=%.1f deg", math.degrees(max_delta))
             return SafetyReport(SafetyStatus.FAULT, "empty_grasp", "No contact while joints moved")
         return SafetyReport(SafetyStatus.OK)
 

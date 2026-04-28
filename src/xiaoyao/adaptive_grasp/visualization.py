@@ -142,9 +142,14 @@ class TactileVisualizer:
     def _run(self) -> None:
         plt.ion()
         n = len(self._active_fingers)
-        self._fig, self._axes = plt.subplots(
-            n, 7, figsize=self._figsize, sharex="col"
-        )
+        try:
+            self._fig, self._axes = plt.subplots(
+                n, 7, figsize=self._figsize, sharex="col"
+            )
+        except Exception:
+            _logger.exception("Visualizer backend failed during startup")
+            self._running = False
+            return
         if n == 1:
             self._axes = self._axes.reshape(1, -1)
 

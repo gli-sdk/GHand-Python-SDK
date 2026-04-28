@@ -226,22 +226,22 @@ class AdaptiveGraspConfig:
     position_torque_limit: int = 15 # 自适应保持阶段位置指令力矩限幅。
     delta_theta_limit: float = math.radians(4) # 单周期总角增量限幅（弧度）。
     # MCP/PIP 角增量分配系数，满足 K_MCP + K_PIP = 1
-    K_MCP: float = 0.3 # MCP 角增量分配系数
-    K_PIP: float = 0.7 # PIP 角增量分配系数
+    K_MCP: float = 0.5 # MCP 角增量分配系数
+    K_PIP: float = 0.5 # PIP 角增量分配系数
     #=============================================================================
     # 释放阶段参数（超时触发与安全张开）
     release_hold_time_s: float = 20.0 # 自适应保持超时后自动进入释放的时长（秒）。
     release_open_speed: int = 30 # 释放阶段安全张开速度。
     release_open_torque: int = 30 # 释放阶段安全张开力矩。
-    release_timeout_s: float = 10.0 # 释放到位等待超时（秒）。
+    release_timeout_s: float = 5.0 # 释放到位等待超时（秒）。
     theta_err_th: float = math.radians(2.0) # 释放到位角误差阈值（弧度）。
     release_check_cycles: int = 3 # 释放连续到位判定周期数。
     #=============================================================================
-    # 前馈 + PID 控制律参数（u_k = u_ff + u_pid）
-    # s_ref: 目标滑移风险；K_s/K_n: 前馈增益；K_p/K_i/K_d: PID 增益
+    # PID control gains. K_s/K_n are retained for backward-compatible configs
+    # but are not used by ForcePlanner.
     s_ref: float = 0.25 # 目标滑移风险水平 s_ref。
-    K_s: float = 1.0 # 滑移前馈增益 K_s。
-    K_n: float = 1.0 # 法向超限抑制增益 K_n。
+    K_s: float = 1.0 # Deprecated feedforward gain.
+    K_n: float = 1.0 # Deprecated normal-force suppression gain.
     K_p: float = 0.01 # PID 比例增益 K_p。
     K_i: float = 0.0001 # PID 积分增益 K_i。
     K_d: float = 0.000 # PID 微分增益 K_d。
@@ -255,7 +255,7 @@ class AdaptiveGraspConfig:
     safety_factor: float = 1.5 # 安全系数 S_f，范围 [1.2, 2.0]，默认 1.5
     base_holding_force: float = 0.5 # 基础夹持力（N），默认 0.5
     slip_detect_debounce_cycles: int = 3 # 滑移防抖连续周期阈值
-    drop_detect_debounce_cycles: int = 3 # 物体掉落检测防抖连续周期阈值
+    drop_detect_debounce_cycles: int = 1 # 物体掉落检测防抖连续周期阈值
     fragile_speed_reduction: float = 0.8 # 易损模式速度降低比例
     fragile_torque_reduction: float = 0.8 # 易损模式力矩降低比例
     fragile_step_reduction: float = 0.5 # 易损模式角增量/力矩步进降低比例
@@ -338,23 +338,6 @@ class AdaptiveGraspConfig:
         if ObjectProfileRegistry.get(self.default_object) is None:
             supported = ", ".join(sorted(ObjectProfileRegistry.list_all()))
             raise ValueError(f"default_object must be one of: {supported}")
-
-        # 若未显式指定 per_finger_pid，按材质赋予默认值
-        if not self.per_finger_pid:
-            if self.default_object == "balloon":
-                self.per_finger_pid = {
-                    TactileSensorId.THUMB: PerFingerPidConfig(K_p=0.003, K_i=0.0, K_d=0.001, I_min=-0.05, I_max=0.05),
-                    TactileSensorId.FOREFINGER: PerFingerPidConfig(K_p=0.003, K_i=0.0, K_d=0.001, I_min=-0.05, I_max=0.05),
-                    TactileSensorId.MIDDLE_FINGER: PerFingerPidConfig(K_p=0.003, K_i=0.0, K_d=0.001, I_min=-0.05, I_max=0.05),
-                }
-            else:
-                self.per_finger_pid = {
-                    TactileSensorId.THUMB: PerFingerPidConfig(K_p=0.001, K_i=0.00001, K_d=0.0, I_min=-1, I_max=1),
-                    TactileSensorId.FOREFINGER: PerFingerPidConfig(K_p=0.01, K_i=0.00001, K_d=0.0, I_min=-1, I_max=1),
-                    TactileSensorId.MIDDLE_FINGER: PerFingerPidConfig(K_p=0.05, K_i=0.0001, K_d=0.0, I_min=-1, I_max=1),
-                    TactileSensorId.RING_FINGER: PerFingerPidConfig(K_p=0.01, K_i=0.0001, K_d=0.0, I_min=-1, I_max=1),
-                    TactileSensorId.LITTLE_FINGER: PerFingerPidConfig(K_p=0.01, K_i=0.0001, K_d=0.0, I_min=-1, I_max=1),
-                }
 
     def _build_pre_grasp_pose_from_preset(self) -> dict[JointId, float]:
         if self.pre_grasp_preset not in _PRE_GRASP_PRESET_DEGREE:

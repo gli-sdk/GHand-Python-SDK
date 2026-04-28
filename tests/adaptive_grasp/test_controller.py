@@ -137,6 +137,34 @@ def test_release_fails_when_timeout_before_settled(monkeypatch):
     assert g.state == GraspState.ERROR
 
 
+def test_release_waits_on_fresh_hand_feedback_after_subscription_stops(monkeypatch):
+    cfg = AdaptiveGraspConfig(
+        release_timeout_s=0.2,
+        release_check_cycles=2,
+        theta_err_th=math.radians(2.0),
+    )
+    target = JointCommandBuilder(cfg, tuple()).open_pose()
+    stale = {joint_id: angle + math.radians(15.0) for joint_id, angle in target.items()}
+    hand = _MockHand()
+    hand.get_joints = lambda: [
+        Joint(id=joint_id, angle=angle)
+        for joint_id, angle in target.items()
+    ]
+    g = AdaptiveGrasper(hand, cfg)
+    g._running = True
+    g._sensor._latest_joint_feedback = [
+        Joint(id=joint_id, angle=angle)
+        for joint_id, angle in stale.items()
+    ]
+
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
+    t = {"v": 0.0}
+    g._get_monotonic_time = lambda: (t.__setitem__("v", t["v"] + 0.01) or t["v"])
+
+    assert g.release() is True
+    assert g.state == GraspState.COMPLETED
+
+
 def test_full_grasp_state_transitions(monkeypatch):
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(

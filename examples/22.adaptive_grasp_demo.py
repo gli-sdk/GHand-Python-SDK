@@ -1,3 +1,4 @@
+import argparse
 import csv
 import logging
 from datetime import datetime
@@ -25,6 +26,31 @@ from xiaoyao.exceptions import (
     DeviceFaultError,
     JointFaultError,
 )
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run the adaptive grasp demo.")
+    parser.add_argument("--base_torque", "--base-torque", type=int, default=30)
+    parser.add_argument("--max_torque", "--max-torque", type=int, default=80)
+    parser.add_argument("--contact_threshold_z", "--contact-threshold-z", type=float, default=0.8)
+    parser.add_argument("--pre_grasp_preset", "--pre-grasp-preset", default="three_finger_pinch")
+    parser.add_argument("--hold_time", "--hold-time", type=float, default=20.0)
+    parser.add_argument("--object", dest="object", default=None)
+    parser.add_argument("--verbose", action="store_true")
+    return parser
+
+
+def build_config(args: argparse.Namespace) -> AdaptiveGraspConfig:
+    kwargs = {
+        "base_torque": args.base_torque,
+        "max_torque": args.max_torque,
+        "contact_threshold_z": args.contact_threshold_z,
+        "pre_grasp_preset": args.pre_grasp_preset,
+        "release_hold_time_s": args.hold_time,
+    }
+    if args.object is not None:
+        kwargs["default_object"] = args.object
+    return AdaptiveGraspConfig(**kwargs)
 
 
 class TactileLogger:
@@ -84,6 +110,9 @@ class TactileLogger:
 
 
 def main() -> None:
+    args = build_parser().parse_args()
+    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
+
     hand = DexHand()
 
     connected = hand.open(CommType.ETHERCAT, "auto")
@@ -101,7 +130,7 @@ def main() -> None:
         logger = TactileLogger(hand, dist_dir)
         print(f"Tactile data will be saved to: {logger.csv_path}")
 
-        config = AdaptiveGraspConfig()
+        config = build_config(args)
         grasper = AdaptiveGrasper(hand=hand, config=config)
 
         print("Starting adaptive grasp...")

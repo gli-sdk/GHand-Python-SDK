@@ -2,6 +2,7 @@ import time
 from unittest.mock import MagicMock
 import pytest
 from xiaoyao.adaptive_grasp import AdaptiveGraspConfig
+from xiaoyao.adaptive_grasp.force_planner import ForceDecision
 from xiaoyao.adaptive_grasp.hold_controller import HoldController, HoldResult, HoldStepResult
 from xiaoyao.adaptive_grasp.joint_builder import JointCommandBuilder
 from xiaoyao.adaptive_grasp.tactility import TactileAnalysis
@@ -115,3 +116,40 @@ def test_hold_step_error_after_consecutive_failures():
     assert controller.run_step(0.0).result == HoldResult.CONTINUE
     assert controller.run_step(0.0).result == HoldResult.CONTINUE
     assert controller.run_step(0.0).result == HoldResult.ERROR
+
+
+def test_hold_step_reports_updated_torque_from_force_decision():
+    hand = _MockHand()
+    cfg = AdaptiveGraspConfig()
+    sensor = MagicMock()
+    safety = MagicMock()
+    safety.check.return_value = SafetyReport(SafetyStatus.OK)
+    tactile = MagicMock()
+    tactile.update.return_value = TactileAnalysis(
+        variance=0.0,
+        slip_risk=0.0,
+        direction_distance=0.0,
+        friction_utilization=0.0,
+        slip_confirmed=False,
+        finger_fz={TactileSensorId.THUMB: 0.5},
+        total_fz=0.5,
+    )
+    force_planner = MagicMock()
+    force_planner.compute.return_value = {
+        TactileSensorId.THUMB: ForceDecision(
+            control_u=0.0,
+            next_torque=23,
+            target_angles={JointId.THUMB_PIP: 0.1},
+            is_fragile_mode=False,
+        ),
+    }
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP,))
+    controller = HoldController(
+        hand, sensor, safety, tactile, force_planner, None,
+        joint_builder, cfg, current_torque=10, get_time=time.monotonic,
+    )
+
+    result = controller.run_step(current_time=0.0)
+
+    assert result.result == HoldResult.CONTINUE
+    assert result.current_torque == 23
