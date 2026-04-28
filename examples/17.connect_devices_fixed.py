@@ -50,7 +50,7 @@ def main():
         print(
             f"第一只手 - 名称: {name1}, 硬件版本: {hw_ver1}, "
             f"固件版本: {ver1}, 类型: {type1.value}, "
-            f"序列号: {int.from_bytes(serial1, 'little')}"
+            f"序列号: {serial1}"
         )
     except Exception as e:
         print(f"获取第一只手信息失败: {e}")
@@ -65,7 +65,7 @@ def main():
         print(
             f"第二只手 - 名称: {name2}, 硬件版本: {hw_ver2}, "
             f"固件版本: {ver2}, 类型: {type2.value}, "
-            f"序列号: {int.from_bytes(serial2, 'little')}"
+            f"序列号: {serial2}"
         )
     except Exception as e:
         print(f"获取第二只手信息失败: {e}")
