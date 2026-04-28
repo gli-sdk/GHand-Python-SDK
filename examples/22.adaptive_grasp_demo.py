@@ -1,13 +1,10 @@
-import argparse
 import csv
 import logging
 from datetime import datetime
 from pathlib import Path
-from sqlite3 import adapters
 import sys
 import time
 from typing import Optional
-
 
 _logger = logging.getLogger(__name__)
 
@@ -16,11 +13,10 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from xiaoyao import Joint, configure_logging
 from xiaoyao.adaptive_grasp import (
     AdaptiveGraspConfig,
     AdaptiveGrasper,
-    ObjectProfileRegistry,
+    GraspState,
 )
 from xiaoyao.dexhand import CommType, DexHand, TactileSensorId
 from xiaoyao.exceptions import (
@@ -87,58 +83,7 @@ class TactileLogger:
         self._file.close()
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Adaptive grasp demo.")
-    parser.add_argument(
-        "--pre-grasp-preset",
-        type=str,
-        default="two_finger_pinch",
-        choices=["two_finger_pinch", "three_finger_pinch", "four_finger_grasp", "five_finger_grasp"],
-        help="Pre-grasp preset from grasp table. DIP joints are passive and excluded.",
-    )
-    parser.add_argument(
-        "--object",
-        type=str,
-        default=None,
-        choices=ObjectProfileRegistry.list_names(),
-        help="Object profile from registry for force planning.",
-    )
-    parser.add_argument(
-        "--verbose",
-        "-v",
-        action="store_true",
-        help="Print per-finger tactile analysis during adaptive hold.",
-    )
-    parser.add_argument(
-        "--visualize",
-        action="store_true",
-        help="Enable real-time tactile data visualization window.",
-    )
-    return parser
-
-
-
-
-
-def _print_verbose(grasper: AdaptiveGrasper) -> None:
-    analysis = grasper.last_tactile_analysis
-    decisions = grasper.last_force_decisions
-    if analysis is None or not analysis.per_finger:
-        return
-
-    parts = []
-    for finger in sorted(analysis.per_finger.keys(), key=lambda f: f.value):
-        p = analysis.per_finger[finger]
-        d = decisions.get(finger) if decisions else None
-        ctrl = f"{d.control_u:+.3f}" if d else "N/A"
-        parts.append(
-            f"{finger.value:10s} s={p.s_total:.2f} fz={p.fz:.2f}N u={ctrl}"
-        )
-    print(" | ".join(parts))
-
-
 def main() -> None:
-    args = build_parser().parse_args()
     hand = DexHand()
 
     connected = hand.open(CommType.ETHERCAT, "auto")
@@ -156,17 +101,8 @@ def main() -> None:
         logger = TactileLogger(hand, dist_dir)
         print(f"Tactile data will be saved to: {logger.csv_path}")
 
-        config = AdaptiveGraspConfig(pre_grasp_preset=args.pre_grasp_preset)
+        config = AdaptiveGraspConfig()
         grasper = AdaptiveGrasper(hand=hand, config=config)
-
-        object_profile = None
-        if args.object:
-            object_profile = ObjectProfileRegistry.get(args.object)
-            if object_profile:
-                print(
-                    f"Object profile: {args.object} "
-                    f"({object_profile.material}, {object_profile.weight_kg}kg)"
-                )
 
         print("Starting adaptive grasp...")
         print(
@@ -176,33 +112,22 @@ def main() -> None:
         )
         print(f"Pre-grasp preset={config.pre_grasp_preset} (DIP passive)")
 
-        if not grasper.grasp_core(object_profile=object_profile):
-            print(f"Grasp failed. state={grasper.get_state().value}")
+        grasp_ok = grasper.grasp_core()
+        if not grasp_ok:
+            print(f"Grasp failed at the state={grasper.get_state().value}")
             return
 
-        print("Grasp started. Holding...")
-        start = time.time()
-        while (time.time() - start) < config.release_hold_time_s:
-            elapsed = time.time() - start
+        print("Holding object...")
+        while grasper.get_state() == GraspState.ADAPTIVE_HOLD:
             state_val = grasper.get_state().value
-            status_line = (
-                f"state={state_val:<18} "
-                f"torque={grasper.current_torque:>3} "
-                f"elapsed={elapsed:>5.1f}s"
-            )
-            if args.verbose:
-                print(status_line)
-                _print_verbose(grasper)
-            else:
-                print(f"\r{status_line}", end="", flush=True)
+            status_line = f"state={state_val:<18}; torque={grasper.current_torque:>3}"
+            print(f"\r{status_line}", end="", flush=True)
             logger.write_row(state_val, grasper.current_torque)
             time.sleep(0.1)
-        if not args.verbose:
-            print()
+        print(f"\nFinal state: {grasper.get_state().value}")
 
-        print("Releasing...")
         grasper.release()
-        print("Done.")
+        print("Grasp Done.")
 
     except KeyboardInterrupt:
         print("\nInterrupted by user.")

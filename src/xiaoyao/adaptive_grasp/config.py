@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from xiaoyao.dexhand import JointId, TactileSensorId
+from xiaoyao.adaptive_grasp.object_profile import ObjectProfileRegistry
 
 
 _PASSIVE_DIP_JOINTS = {
@@ -35,6 +36,7 @@ _PRESET_ACTIVE_FINGERS: dict[str, set[TactileSensorId]] = {
     "three_finger_pinch": {TactileSensorId.THUMB, TactileSensorId.FOREFINGER, TactileSensorId.MIDDLE_FINGER},
     "four_finger_grasp": {TactileSensorId.THUMB, TactileSensorId.FOREFINGER, TactileSensorId.MIDDLE_FINGER, TactileSensorId.RING_FINGER},
     "five_finger_grasp": {TactileSensorId.THUMB, TactileSensorId.FOREFINGER, TactileSensorId.MIDDLE_FINGER, TactileSensorId.RING_FINGER, TactileSensorId.LITTLE_FINGER},
+    "lily_pinch":{TactileSensorId.THUMB, TactileSensorId.MIDDLE_FINGER}
 }
 
 _PRE_GRASP_PRESET_DEGREE = {
@@ -131,25 +133,22 @@ _PRE_GRASP_PRESET_DEGREE = {
         JointId.THUMB_MCP: 2.0,
         JointId.THUMB_PIP: 21.0,
     },
-}
-
-
-@dataclass
-class MaterialProperties:
-    """材质属性：定义一类材质的默认物理/安全参数。"""
-    friction_coeff: float = 0.7
-    safe_force_min: float = 0.5
-    safe_force_max: float = 10.0
-    is_fragile: bool = False
-
-
-_DEFAULT_MATERIAL_LIBRARY: dict[str, MaterialProperties] = {
-    "metal": MaterialProperties(friction_coeff=0.9, safe_force_min=2.0, safe_force_max=15.0, is_fragile=False),
-    "plastic": MaterialProperties(friction_coeff=0.9, safe_force_min=0.5, safe_force_max=5.0, is_fragile=False),
-    "glass": MaterialProperties(friction_coeff=0.5, safe_force_min=0.5, safe_force_max=8.0, is_fragile=True),
-    "tofu": MaterialProperties(friction_coeff=0.9, safe_force_min=0.5, safe_force_max=3.0, is_fragile=True),
-    "fruit": MaterialProperties(friction_coeff=0.8, safe_force_min=0.5, safe_force_max=4.0, is_fragile=True),
-    "egg": MaterialProperties(friction_coeff=0.9, safe_force_min=0.5, safe_force_max=1.0, is_fragile=True),
+    # 兰花指
+    "lily_pinch":{
+        JointId.LF_MCP: 0.0,
+        JointId.LF_PIP: 0.0,
+        JointId.RF_MCP: 0.0,
+        JointId.RF_PIP: 0.0,
+        JointId.MF_MCP: 31.0,
+        JointId.MF_PIP: 0.0,
+        JointId.FF_SWING: 0.0,
+        JointId.FF_MCP: 0.0,
+        JointId.FF_PIP: 0.0,
+        JointId.THUMB_ROTATION: 7.0,
+        JointId.THUMB_SWING: 90.0,
+        JointId.THUMB_MCP: 6.0,
+        JointId.THUMB_PIP: 0.0,
+    }
 }
 
 
@@ -163,22 +162,47 @@ class PerFingerPidConfig:
     I_max: Optional[float] = None
 
 
+def _validate(
+    name: str,
+    val,
+    *,
+    greater_than=None,
+    greater_equal=None,
+    less_than=None,
+    less_equal=None,
+) -> None:
+    """通用数值范围验证辅助函数。
+
+    greater_than: 必须严格大于此值 (>)
+    greater_equal: 必须大于等于此值 (>=)
+    less_than: 必须严格小于此值 (<)
+    less_equal: 必须小于等于此值 (<=)
+    """
+    if greater_than is not None and val <= greater_than:
+        raise ValueError(f"{name} must be > {greater_than}")
+    if greater_equal is not None and val < greater_equal:
+        raise ValueError(f"{name} must be >= {greater_equal}")
+    if less_than is not None and val >= less_than:
+        raise ValueError(f"{name} must be < {less_than}")
+    if less_equal is not None and val > less_equal:
+        raise ValueError(f"{name} must be <= {less_equal}")
+
+
 @dataclass
 class AdaptiveGraspConfig:
     # 1.预抓取姿态（OPEN -> PRE_GRASP 阶段）
     pre_grasp_pose: dict[JointId, float] = field(default_factory=dict) # 预抓取关节目标角（单位：弧度）；为空时按预设自动生成。
-    # 材质库配置
-    default_material: str = "egg" # 默认材质名称，用于 ObjectProfile 未显式指定材质属性时的回退。
-    material_library: dict[str, MaterialProperties] = field(default_factory=dict) # 材质库映射；为空时自动填充内置默认值。
+    # 材质库配置：材质数据定义在 object_profile.py，config 只保存默认材质名。
+    default_object: str = "balloon" # 材质名称获取完整属性。
     #预抓取姿态设定：
-    """"
+    """
     two_finger_pinch: 两指捏(食指-大拇指)
     three_finger_pinch: 三指捏(食指-中指-大拇指)
     four_finger_grasp: 四指握
     five_finger_grasp: 五指握
     """
     pre_grasp_preset: str = "two_finger_pinch" # 预抓取姿态预设名称。
-    active_fingers: set[TactileSensorId] = field(default_factory=set) # 参与闭环控制的手指集合；为空时按预设自动推导。
+    active_fingers: set[TactileSensorId] = field(default_factory=set) # 抓取时的手指集合；为空时按预设自动推导。
     per_finger_pid: dict[TactileSensorId, PerFingerPidConfig] = field(default_factory=dict) # 单指独立 PID 参数；未配置的手指回退到全局 K_p/K_i/K_d。
     #=============================================================================
     # 2.闭合接触阶段基础参数
@@ -202,8 +226,8 @@ class AdaptiveGraspConfig:
     position_torque_limit: int = 15 # 自适应保持阶段位置指令力矩限幅。
     delta_theta_limit: float = math.radians(4) # 单周期总角增量限幅（弧度）。
     # MCP/PIP 角增量分配系数，满足 K_MCP + K_PIP = 1
-    K_MCP: float = 0.5 # MCP 角增量分配系数
-    K_PIP: float = 0.5 # PIP 角增量分配系数
+    K_MCP: float = 0.3 # MCP 角增量分配系数
+    K_PIP: float = 0.7 # PIP 角增量分配系数
     #=============================================================================
     # 释放阶段参数（超时触发与安全张开）
     release_hold_time_s: float = 20.0 # 自适应保持超时后自动进入释放的时长（秒）。
@@ -224,6 +248,7 @@ class AdaptiveGraspConfig:
     # 积分项限幅（防积分饱和）
     I_min: float = -1.0 # PID 积分项下限（防积分饱和）。
     I_max: float = 1.0 # PID 积分项上限（防积分饱和）。
+    force_calibrate_tolerance: float = 0.5 # 夹持力校准容差（N），当实际法向力与初始目标夹持力的差值在此范围内时认为校准完成。
     # 数值稳定项（防分母为零）
     epsilon: float = 1e-6 # 数值稳定小量，避免分母为 0。
     # 新增参数
@@ -246,112 +271,90 @@ class AdaptiveGraspConfig:
     # 闭合阶段运动停滞检测（触觉阈值不足时的备用接触判定）
     closing_stall_angle_threshold: float = math.radians(0.5) # 单周期关节停滞角度阈值（弧度）
     closing_stall_cycles: int = 5 # 连续停滞周期数才判定为接触
-    
 
-    def set_material_library(self, library: dict[str, MaterialProperties]) -> None:
-        """覆盖当前材质库，常用于从外部配置文件加载自定义材质集合。"""
-        self.material_library = dict(library)
 
-    def get_material(self, material: Optional[str] = None) -> MaterialProperties:
-        """按名称查询材质属性；未找到或名称为空时返回默认材质属性。"""
-        name = material or self.default_material
-        return self.material_library.get(name, MaterialProperties())
 
     def __post_init__(self) -> None:
-        if self.sliding_window_size < 3:
-            raise ValueError("sliding_window_size must be >= 3")
-        if self.control_period_s <= 0:
-            raise ValueError("control_period_s must be > 0")
-        if self.closing_period_s <= 0:
-            raise ValueError("closing_period_s must be > 0")
-        if self.max_torque <= 0:
-            raise ValueError("max_torque must be > 0")
-        if self.phase_timeout <= 0:
-            raise ValueError("phase_timeout must be > 0")
-        if self.torque_adjust_step <= 0:
-            raise ValueError("torque_adjust_step must be > 0")
-        if self.variance_baseline < 0:
-            raise ValueError("variance_baseline must be >= 0")
-        if not 0 <= self.position_speed_limit <= 100:
-            raise ValueError("position_speed_limit must be in [0, 100]")
-        if not 0 <= self.position_torque_limit <= 100:
-            raise ValueError("position_torque_limit must be in [0, 100]")
-        if self.delta_theta_limit <= 0:
-            raise ValueError("delta_theta_limit must be > 0")
-        if not 0.0 <= self.K_MCP <= 1.0:
-            raise ValueError("K_MCP must be in [0.0, 1.0]")
-        if not 0.0 <= self.K_PIP <= 1.0:
-            raise ValueError("K_PIP must be in [0.0, 1.0]")
-        if not math.isclose(self.K_MCP + self.K_PIP, 1.0, abs_tol=1e-6):
-            raise ValueError("K_MCP + K_PIP must equal 1.0")
-        if self.release_hold_time_s <= 0:
-            raise ValueError("release_hold_time_s must be > 0")
-        if not 0 <= self.release_open_speed <= 100:
-            raise ValueError("release_open_speed must be in [0, 100]")
-        if not 0 <= self.release_open_torque <= 100:
-            raise ValueError("release_open_torque must be in [0, 100]")
-        if self.release_timeout_s <= 0:
-            raise ValueError("release_timeout_s must be > 0")
-        if self.theta_err_th <= 0:
-            raise ValueError("theta_err_th must be > 0")
-        if self.release_check_cycles <= 0:
-            raise ValueError("release_check_cycles must be > 0")
-        if not 0.0 <= self.s_ref <= 1.0:
-            raise ValueError("s_ref must be in [0.0, 1.0]")
-        if self.K_s < 0 or self.K_n < 0 or self.K_p < 0 or self.K_i < 0 or self.K_d < 0:
-            raise ValueError("K_s/K_n/K_p/K_i/K_d must be >= 0")
-        if self.I_min > self.I_max:
-            raise ValueError("I_min must be <= I_max")
-        if self.epsilon <= 0:
-            raise ValueError("epsilon must be > 0")
-        if not 1.2 <= self.safety_factor <= 2.0:
-            raise ValueError("safety_factor must be in [1.2, 2.0]")
-        if self.base_holding_force < 0:
-            raise ValueError("base_holding_force must be >= 0")
-        if self.slip_detect_debounce_cycles <= 0:
-            raise ValueError("slip_detect_debounce_cycles must be > 0")
-        if self.drop_detect_debounce_cycles <= 0:
-            raise ValueError("drop_detect_debounce_cycles must be > 0")
-        if not 0.0 < self.fragile_speed_reduction <= 1.0:
-            raise ValueError("fragile_speed_reduction must be in (0.0, 1.0]")
-        if not 0.0 < self.fragile_step_reduction <= 1.0:
-            raise ValueError("fragile_step_reduction must be in (0.0, 1.0]")
-        if not 0.0 <= self.variance_weight <= 1.0:
-            raise ValueError("variance_weight must be in [0.0, 1.0]")
-        if not 0.0 <= self.direction_weight <= 1.0:
-            raise ValueError("direction_weight must be in [0.0, 1.0]")
-        if not 0.0 <= self.friction_weight <= 1.0:
-            raise ValueError("friction_weight must be in [0.0, 1.0]")
+        # 参数校验
+        _validate("sliding_window_size", self.sliding_window_size, greater_equal=3)
+        _validate("control_period_s", self.control_period_s, greater_than=0)
+        _validate("closing_period_s", self.closing_period_s, greater_than=0)
+        _validate("max_torque", self.max_torque, greater_than=0)
+        _validate("phase_timeout", self.phase_timeout, greater_than=0)
+        _validate("torque_adjust_step", self.torque_adjust_step, greater_than=0)
+        _validate("variance_baseline", self.variance_baseline, greater_equal=0)
+        _validate("position_speed_limit", self.position_speed_limit, greater_equal=0, less_equal=100)
+        _validate("position_torque_limit", self.position_torque_limit, greater_equal=0, less_equal=100)
+        _validate("delta_theta_limit", self.delta_theta_limit, greater_than=0)
+        _validate("K_MCP", self.K_MCP, greater_equal=0.0, less_equal=1.0)
+        _validate("K_PIP", self.K_PIP, greater_equal=0.0, less_equal=1.0)
+        _validate("release_hold_time_s", self.release_hold_time_s, greater_than=0)
+        _validate("release_open_speed", self.release_open_speed, greater_equal=0, less_equal=100)
+        _validate("release_open_torque", self.release_open_torque, greater_equal=0, less_equal=100)
+        _validate("release_timeout_s", self.release_timeout_s, greater_than=0)
+        _validate("theta_err_th", self.theta_err_th, greater_than=0)
+        _validate("release_check_cycles", self.release_check_cycles, greater_than=0)
+        _validate("s_ref", self.s_ref, greater_equal=0.0, less_equal=1.0)
+        _validate("K_s", self.K_s, greater_equal=0)
+        _validate("K_n", self.K_n, greater_equal=0)
+        _validate("K_p", self.K_p, greater_equal=0)
+        _validate("K_i", self.K_i, greater_equal=0)
+        _validate("K_d", self.K_d, greater_equal=0)
+        _validate("epsilon", self.epsilon, greater_than=0)
+        _validate("safety_factor", self.safety_factor, greater_equal=1.2, less_equal=2.0)
+        _validate("base_holding_force", self.base_holding_force, greater_equal=0)
+        _validate("slip_detect_debounce_cycles", self.slip_detect_debounce_cycles, greater_than=0)
+        _validate("drop_detect_debounce_cycles", self.drop_detect_debounce_cycles, greater_than=0)
+        _validate("fragile_speed_reduction", self.fragile_speed_reduction, greater_than=0.0, less_equal=1.0)
+        _validate("fragile_step_reduction", self.fragile_step_reduction, greater_than=0.0, less_equal=1.0)
+        _validate("variance_weight", self.variance_weight, greater_equal=0.0, less_equal=1.0)
+        _validate("direction_weight", self.direction_weight, greater_equal=0.0, less_equal=1.0)
+        _validate("friction_weight", self.friction_weight, greater_equal=0.0, less_equal=1.0)
+        _validate("default_friction_coeff", self.default_friction_coeff, greater_than=0)
+        _validate("max_normal_force_per_finger", self.max_normal_force_per_finger, greater_than=0)
+        _validate("variance_threshold", self.variance_threshold, greater_equal=0)
+        _validate("closing_stall_angle_threshold", self.closing_stall_angle_threshold, greater_than=0)
+        _validate("closing_stall_cycles", self.closing_stall_cycles, greater_than=0)
         if not math.isclose(self.variance_weight + self.direction_weight + self.friction_weight, 1.0, abs_tol=1e-6):
             raise ValueError("variance_weight + direction_weight + friction_weight must equal 1.0")
-        if self.default_friction_coeff <= 0:
-            raise ValueError("default_friction_coeff must be > 0")
-        if self.max_normal_force_per_finger <= 0:
-            raise ValueError("max_normal_force_per_finger must be > 0")
-        if self.variance_threshold < 0:
-            raise ValueError("variance_threshold must be >= 0")
+        if not math.isclose(self.K_MCP + self.K_PIP, 1.0, abs_tol=1e-6):
+            raise ValueError("K_MCP + K_PIP must equal 1.0")
         if self.variance_baseline >= self.variance_threshold:
             raise ValueError("variance_baseline must be < variance_threshold")
-        if self.closing_stall_angle_threshold <= 0:
-            raise ValueError("closing_stall_angle_threshold must be > 0")
-        if self.closing_stall_cycles <= 0:
-            raise ValueError("closing_stall_cycles must be > 0")
-
-        if not self.material_library:
-            self.material_library = dict(_DEFAULT_MATERIAL_LIBRARY)
-        if self.default_material not in self.material_library:
-            supported = ", ".join(sorted(self.material_library.keys()))
-            raise ValueError(f"default_material must be one of: {supported}")
-
+        if self.I_min > self.I_max:
+            raise ValueError("I_min must be <= I_max")
+        #=============================================================================
         if self.pre_grasp_pose:
             filtered = self._filter_passive_dip_joints(self.pre_grasp_pose)
             self.pre_grasp_pose = filtered if filtered else self._build_pre_grasp_pose_from_preset()
         else:
             self.pre_grasp_pose = self._build_pre_grasp_pose_from_preset()
-
+        
         # 若未显式指定活跃手指，按预设自动推导；若预设未知则默认全开。
         if not self.active_fingers:
             self.active_fingers = set(_PRESET_ACTIVE_FINGERS.get(self.pre_grasp_preset, set(TactileSensorId)))
+
+        # 验证 default_object 材质存在
+        if ObjectProfileRegistry.get(self.default_object) is None:
+            supported = ", ".join(sorted(ObjectProfileRegistry.list_all()))
+            raise ValueError(f"default_object must be one of: {supported}")
+
+        # 若未显式指定 per_finger_pid，按材质赋予默认值
+        if not self.per_finger_pid:
+            if self.default_object == "balloon":
+                self.per_finger_pid = {
+                    TactileSensorId.THUMB: PerFingerPidConfig(K_p=0.003, K_i=0.0, K_d=0.001, I_min=-0.05, I_max=0.05),
+                    TactileSensorId.FOREFINGER: PerFingerPidConfig(K_p=0.003, K_i=0.0, K_d=0.001, I_min=-0.05, I_max=0.05),
+                    TactileSensorId.MIDDLE_FINGER: PerFingerPidConfig(K_p=0.003, K_i=0.0, K_d=0.001, I_min=-0.05, I_max=0.05),
+                }
+            else:
+                self.per_finger_pid = {
+                    TactileSensorId.THUMB: PerFingerPidConfig(K_p=0.001, K_i=0.00001, K_d=0.0, I_min=-1, I_max=1),
+                    TactileSensorId.FOREFINGER: PerFingerPidConfig(K_p=0.01, K_i=0.00001, K_d=0.0, I_min=-1, I_max=1),
+                    TactileSensorId.MIDDLE_FINGER: PerFingerPidConfig(K_p=0.05, K_i=0.0001, K_d=0.0, I_min=-1, I_max=1),
+                    TactileSensorId.RING_FINGER: PerFingerPidConfig(K_p=0.01, K_i=0.0001, K_d=0.0, I_min=-1, I_max=1),
+                    TactileSensorId.LITTLE_FINGER: PerFingerPidConfig(K_p=0.01, K_i=0.0001, K_d=0.0, I_min=-1, I_max=1),
+                }
 
     def _build_pre_grasp_pose_from_preset(self) -> dict[JointId, float]:
         if self.pre_grasp_preset not in _PRE_GRASP_PRESET_DEGREE:

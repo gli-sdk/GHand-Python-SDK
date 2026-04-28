@@ -10,7 +10,7 @@ from .sensor import SensorClient
 from .config import AdaptiveGraspConfig
 from .states import GraspState
 from .tactility import TactileAnalyzer, TactileAnalysis
-from .object_profile import ObjectProfile
+from .object_profile import ObjectProfile, ObjectProfileRegistry
 from .force_planner import ForcePlanner, ForceDecision
 from .safety import SafetyMonitor, SafetyStatus, SafetyReport
 from .visualization import TactileVisualizer
@@ -79,12 +79,12 @@ class AdaptiveGrasper:
         try:
             self._running = True
             self._reset_runtime_state()
-            self._object_profile = object_profile
+            self._object_profile = object_profile or ObjectProfileRegistry.get(self.config.default_object)
             self._force_planner = ForcePlanner(
-                self.config, object_profile,
+                self.config, self._object_profile,
             )
             self._tactile.set_friction_coeff(
-                object_profile.friction_coeff if object_profile else self.config.default_friction_coeff,
+                self._object_profile.friction_coeff if self._object_profile else self.config.default_friction_coeff,
             )
             self._start_sensor_subscription()
             # 顺序启动 张开阶段-预抓阶段-闭合阶段，任何阶段失败都直接进入错误状态
@@ -99,8 +99,11 @@ class AdaptiveGrasper:
                     return False
             self._start_adaptive_control()
             return True
+        except KeyboardInterrupt:
+            self._cleanup_grasp(state=GraspState.STOPPED)
+            raise
         except Exception:
-            _logger.exception("grasp_core 异常")
+            _logger.exception("grasp_core exception")
             self._cleanup_grasp(state=GraspState.ERROR)
             return False
 
@@ -240,15 +243,16 @@ class AdaptiveGrasper:
         return True
 
     def _calibrate_force(self) -> None:
-        """使用 1-2 步力矩调整，使总法向力匹配 F_init，误差控制在 ±2N 内。"""
+        """使用 5 步力矩调整，使总法向力匹配 F_init，误差控制在 ±1N 内。"""
         if self._force_planner is None:
             return
         F_init = self._force_planner.F_init
         if F_init <= 0:
             return
+        tolerance = getattr(self.config, 'force_calibrate_tolerance', 1.0)
         for _ in range(5): # 最多校准 5 步
             total_fz = self._sensor.sum_active_finger_normal_force()
-            if abs(total_fz - F_init) <= 2.0:
+            if abs(total_fz - F_init) <= tolerance:
                 break
             step = self.config.torque_adjust_step
             if self._force_planner.is_fragile_mode:
@@ -467,8 +471,6 @@ class AdaptiveGrasper:
         self._running = False
         self._adaptive_hold_started_at = None
         self._stop_sensor_subscription()
-        # if self._visualizer is not None:
-        #     self._visualizer.stop()
 
         control_thread = self._control_thread
         if (

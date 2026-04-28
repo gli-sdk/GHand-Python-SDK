@@ -53,8 +53,8 @@ class ForcePlanner:
     def __init__(self, config: AdaptiveGraspConfig, profile: Optional[ObjectProfile] = None):
         self.config = config
         self.profile = profile
-        # self.F_init = self._compute_F_init()              # 初始目标夹持力（N）
-        self.F_init =1.0
+        self.F_init = self._compute_F_init()              # 初始目标夹持力（N）
+        #self.F_init =1.0
         self.is_fragile_mode = profile.is_fragile if profile else False  # 是否易碎物体
 
         self._finger_pid: dict[TactileSensorId, _FingerPidState] = {}
@@ -62,13 +62,30 @@ class ForcePlanner:
         self._get_monotonic_time = time.monotonic
 
     def _compute_F_init(self) -> float:
-        """计算初始目标夹持力：重量×重力×安全系数 + 基础保持力，再钳位到安全区间。"""
+        """
+        计算初始目标夹持力，确保落在 [safe_force_min, 0.9·fz_limit] 的安全窗口。
+        """
+
         cfg = self.config
         if self.profile is None:
             return cfg.base_holding_force
-        F = self.profile.weight_kg * _G * cfg.safety_factor + cfg.base_holding_force
-        return clip(F, self.profile.safe_force_min, self.profile.safe_force_max)
 
+        finger_count = len(cfg.active_fingers) or 2 # 至少假设2根手指
+
+        #1） 基于物理： 所有手指的摩擦力=摩擦系数*法向力=重力
+        F = self.profile.weight_kg * _G / self.profile.friction_coeff / finger_count
+
+        #2）单指上限
+        fz_limit = self.profile.safe_force_max / finger_count
+
+        #3) 安全窗口
+        f_min = self.profile.safe_force_min
+        f_max= 0.9*fz_limit if self.profile.is_fragile else fz_limit  # 如果易碎*0.9
+
+        #) 把F钳制到安全窗口内
+        F_clipped = clip(F, f_min, f_max)
+
+        return F_clipped
     def _get_max_normal_force_per_finger(self, finger_count: int) -> float:
         """获取单指法向力上限：优先使用物体材质库的安全总力均摊，否则回退到配置值。"""
         if self.profile is not None:
@@ -141,11 +158,7 @@ class ForcePlanner:
         F_n_ref: float,
         dt: float,
     ) -> float:
-        """Shared前馈+PID计算。"""
-        cfg = self.config
-        e_nk = max(0.0, (fz - fz_limit) / (fz_limit + cfg.epsilon))
-        u_ff = cfg.K_s * s_k - cfg.K_n * e_nk
-
+        """前馈+PID计算。"""
         pid_state = self._get_or_create_pid(finger)
         e_k = F_n_ref - fz
         pid_param = self._get_pid_params(finger)
@@ -158,8 +171,7 @@ class ForcePlanner:
         pid_state.prev_error = e_k
         u_pid = pid_param.K_p * e_k + pid_param.K_i * pid_state.integral + pid_param.K_d * derivative
 
-        control_u = u_ff + u_pid
-
+        control_u = u_pid
         if self.is_fragile_mode and fz >= fz_limit:
             control_u = min(control_u, 0.0)
 
