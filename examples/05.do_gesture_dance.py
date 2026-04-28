@@ -168,7 +168,7 @@ index_finger_swing_neg = {
     JointId.THUMB_MCP: math.radians(20),
     JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
-    # 侧摆-15度
+    # 侧摆-10度
     JointId.FF_PIP: math.radians(0),
     JointId.FF_MCP: math.radians(0),
     JointId.FF_SWING: math.radians(-10),
@@ -177,7 +177,7 @@ index_finger_swing_neg = {
     JointId.MF_MCP: math.radians(70),
     JointId.RF_PIP: math.radians(75),
     JointId.RF_MCP: math.radians(70),
-    JointId.LF_PIP: math.radians(70),
+    JointId.LF_PIP: math.radians(74),
     JointId.LF_MCP: math.radians(70),
 }
 
@@ -186,7 +186,7 @@ index_finger_swing_pos = {
     JointId.THUMB_MCP: math.radians(20),
     JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
-    # 侧摆15度
+    # 侧摆10度
     JointId.FF_PIP: math.radians(0),
     JointId.FF_MCP: math.radians(0),
     JointId.FF_SWING: math.radians(10),
