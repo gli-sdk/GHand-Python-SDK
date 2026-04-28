@@ -52,3 +52,66 @@ def test_hold_step_sends_position_payload_with_config_limits(monkeypatch):
     for joint in hand.calls[0]["joints"]:
         assert joint.speed == cfg.position_speed_limit
         assert 0 <= joint.torque <= cfg.position_torque_limit
+
+
+def test_hold_step_fault_triggers_release():
+    hand = _MockHand()
+    cfg = AdaptiveGraspConfig(enable_fault_release_fallback=True)
+    sensor = MagicMock()
+    safety = MagicMock()
+    safety.check.return_value = SafetyReport(SafetyStatus.FAULT)
+    tactile = MagicMock()
+    force_planner = None
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP,))
+    controller = HoldController(
+        hand, sensor, safety, tactile, force_planner, None,
+        joint_builder, cfg, current_torque=10, get_time=time.monotonic,
+    )
+
+    result = controller.run_step(current_time=0.0)
+
+    assert result.result == HoldResult.FAULT_RELEASE
+
+
+def test_hold_step_fault_without_fallback_triggers_error():
+    hand = _MockHand()
+    cfg = AdaptiveGraspConfig(enable_fault_release_fallback=False)
+    sensor = MagicMock()
+    safety = MagicMock()
+    safety.check.return_value = SafetyReport(SafetyStatus.FAULT)
+    tactile = MagicMock()
+    force_planner = None
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP,))
+    controller = HoldController(
+        hand, sensor, safety, tactile, force_planner, None,
+        joint_builder, cfg, current_torque=10, get_time=time.monotonic,
+    )
+
+    result = controller.run_step(current_time=0.0)
+
+    assert result.result == HoldResult.ERROR
+
+
+def test_hold_step_error_after_consecutive_failures():
+    hand = _MockHand()
+    hand.move_joints = lambda *args, **kwargs: False
+    cfg = AdaptiveGraspConfig(control_period_s=0.01)
+    sensor = MagicMock()
+    safety = MagicMock()
+    safety.check.return_value = SafetyReport(SafetyStatus.OK)
+    tactile = MagicMock()
+    tactile.update.return_value = TactileAnalysis(
+        variance=0.0, slip_risk=0.0, direction_distance=0.0,
+        friction_utilization=0.0, slip_confirmed=False,
+        finger_fz={}, total_fz=0.0,
+    )
+    force_planner = None
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP,))
+    controller = HoldController(
+        hand, sensor, safety, tactile, force_planner, None,
+        joint_builder, cfg, current_torque=10, get_time=time.monotonic,
+    )
+
+    assert controller.run_step(0.0).result == HoldResult.CONTINUE
+    assert controller.run_step(0.0).result == HoldResult.CONTINUE
+    assert controller.run_step(0.0).result == HoldResult.ERROR
