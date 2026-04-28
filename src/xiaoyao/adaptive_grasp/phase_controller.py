@@ -134,5 +134,26 @@ class PhaseController:
                 return False
         return True
 
-    def _calibrate_force(self, force_planner: Optional[Any]) -> None:
-        pass  # Will be implemented in Task 4
+    def _calibrate_force(self, force_planner: Optional[ForcePlanner]) -> None:
+        if force_planner is None:
+            return
+        F_init = force_planner.F_init
+        if F_init <= 0:
+            return
+        tolerance = getattr(self.config, 'force_calibrate_tolerance', 1.0)
+        for _ in range(5):
+            total_fz = self._sensor.sum_active_finger_normal_force()
+            if abs(total_fz - F_init) <= tolerance:
+                break
+            step = self.config.torque_adjust_step
+            if force_planner.is_fragile_mode:
+                step = int(step * self.config.fragile_step_reduction)
+            if total_fz < F_init:
+                self.current_torque = int(clip(self.current_torque + step, -100.0, self.config.max_torque))
+            else:
+                self.current_torque = int(clip(self.current_torque - step, -100.0, self.config.max_torque))
+            joints = self._joint_builder.torque_command(self.current_torque)
+            if not self.hand.move_joints(joints, mode=CtrlMode.TORQUE):
+                _logger.error("FORCE_CALIBRATION: move_joints failed")
+                break
+            time.sleep(self.config.control_period_s)

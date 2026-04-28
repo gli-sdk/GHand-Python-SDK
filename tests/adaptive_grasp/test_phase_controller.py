@@ -4,6 +4,7 @@ import pytest
 from xiaoyao.adaptive_grasp import AdaptiveGraspConfig, GraspState
 from xiaoyao.adaptive_grasp.phase_controller import PhaseController, PhaseResult
 from xiaoyao.adaptive_grasp.joint_builder import JointCommandBuilder
+from xiaoyao.adaptive_grasp.force_planner import ForcePlanner
 from xiaoyao.dexhand import CtrlMode, JointId
 from xiaoyao.dexhand import Joint, TactileSensorId
 
@@ -67,6 +68,31 @@ def test_phase_closing_contact_by_force(monkeypatch):
 
     assert result.success is True
     assert GraspState.CLOSING_TO_CONTACT in states
+
+
+def test_calibrate_force_increases_torque_when_below_target(monkeypatch):
+    hand = _MockHand()
+    cfg = AdaptiveGraspConfig(
+        pre_grasp_preset="two_finger_pinch",
+        torque_adjust_step=5,
+        base_holding_force=6.0,
+    )
+    sensor = MagicMock()
+    safety = MagicMock()
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP, JointId.FF_PIP))
+    controller = PhaseController(
+        hand, sensor, safety, joint_builder, cfg, time.monotonic,
+        on_state_change=lambda s: None,
+    )
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.phase_controller.time.sleep", lambda *_: None)
+
+    sensor.sum_active_finger_normal_force.return_value = 1.0  # below target
+    controller.current_torque = 10
+    force_planner = ForcePlanner(cfg, None)
+
+    controller._calibrate_force(force_planner)
+
+    assert controller.current_torque > 10
 
 
 def test_phase_open_and_pre_grasp(monkeypatch):
