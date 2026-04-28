@@ -80,7 +80,7 @@ def main():
 
     joints1.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(0), speed=100, torque=100))   #角度范围为:0~75(度)
     joints1.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(50), speed=100, torque=100))   #角度范围为:0~55(度)
-    joints1.append(Joint(id=JointId.THUMB_SWING, angle=math.radians(0), speed=100, torque=100))   #角度范围为:0~90(度)
+    joints1.append(Joint(id=JointId.THUMB_SWING, angle=math.radians(20), speed=100, torque=100))   #角度范围为:0~90(度)
     joints1.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(0), speed=100, torque=100))   #角度范围为:0~90(度)
     joints1.append(Joint(id=JointId.FF_PIP, angle=math.radians(0), speed=100, torque=100))   #角度范围为:0~75(度)
     joints1.append(Joint(id=JointId.FF_MCP, angle=math.radians(0), speed=100, torque=100))   #角度范围为:0~70(度)
@@ -98,7 +98,7 @@ def main():
 
     joints1.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(0), speed=100, torque=100))   #角度范围为:0~75(度)
     joints1.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(0), speed=100, torque=100))   #角度范围为:0~55(度)
-    joints1.append(Joint(id=JointId.THUMB_SWING, angle=math.radians(0), speed=100, torque=100))   #角度范围为:0~90(度)
+    joints1.append(Joint(id=JointId.THUMB_SWING, angle=math.radians(20), speed=100, torque=100))   #角度范围为:0~90(度)
     joints1.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(0), speed=100, torque=100))   #角度范围为:0~90(度)
     joints1.append(Joint(id=JointId.FF_PIP, angle=math.radians(50), speed=100, torque=100))   #角度范围为:0~75(度)
     joints1.append(Joint(id=JointId.FF_MCP, angle=math.radians(50), speed=100, torque=100))   #角度范围为:0~70(度)
