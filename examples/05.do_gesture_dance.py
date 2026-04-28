@@ -177,7 +177,7 @@ index_finger_swing_neg = {
     JointId.MF_MCP: math.radians(70),
     JointId.RF_PIP: math.radians(75),
     JointId.RF_MCP: math.radians(70),
-    JointId.LF_PIP: math.radians(74),
+    JointId.LF_PIP: math.radians(70),
     JointId.LF_MCP: math.radians(70),
 }
 
@@ -194,7 +194,7 @@ index_finger_swing_pos = {
     JointId.MF_MCP: math.radians(70),
     JointId.RF_PIP: math.radians(75),
     JointId.RF_MCP: math.radians(70),
-    JointId.LF_PIP: math.radians(74),
+    JointId.LF_PIP: math.radians(70),
     JointId.LF_MCP: math.radians(70),
 }
 
