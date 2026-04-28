@@ -6,7 +6,7 @@ from typing import Any, Callable, Optional
 from xiaoyao.dexhand import CtrlMode, DexHand, JointId
 from .config import AdaptiveGraspConfig
 from .sensor import SensorClient
-from .safety import SafetyMonitor, SafetyStatus
+from .safety import SafetyMonitor, SafetyReport, SafetyStatus
 from .states import GraspState
 from .tactility import TactileAnalyzer, TactileAnalysis
 from .force_planner import ForcePlanner, ForceDecision
@@ -27,7 +27,7 @@ class HoldResult(Enum):
 class HoldStepResult:
     result: HoldResult
     tactile_analysis: Optional[TactileAnalysis] = None
-    safety_report: Optional[Any] = None
+    safety_report: Optional[SafetyReport] = None
     force_decisions: Optional[dict] = None
 
 

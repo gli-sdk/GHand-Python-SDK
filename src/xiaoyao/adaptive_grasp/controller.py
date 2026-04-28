@@ -2,7 +2,7 @@ import logging
 import math
 import threading
 import time
-from typing import Any, Mapping, Optional
+from typing import Any, Optional
 
 from xiaoyao.dexhand import CtrlMode, DexHand, Joint, JointId, TactileSensorId
 from .sensor import SensorClient
@@ -16,8 +16,8 @@ from .safety import SafetyMonitor, SafetyStatus, SafetyReport
 from .visualization import TactileVisualizer
 from .utils import clip, JOINT_TO_FINGER
 from .joint_builder import JointCommandBuilder
-from .phase_controller import PhaseController, PhaseResult
-from .hold_controller import HoldController, HoldResult, HoldStepResult
+from .phase_controller import PhaseController
+from .hold_controller import HoldController, HoldResult
 
 _logger = logging.getLogger("xiaoyao.adaptive_grasp.controller")
 

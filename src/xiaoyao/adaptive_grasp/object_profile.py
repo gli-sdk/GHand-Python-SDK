@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from optparse import Option
 from typing import Optional
 
 
@@ -8,13 +9,20 @@ class ObjectProfile:
 
 
     """
+    # 物品属性
     name: str
     weight_kg: float
-    material: str
     safe_force_min: float
     safe_force_max: float
     friction_coeff: float
     is_fragile: bool
+    material: str #物品材质（如金属、塑料、玻璃、陶瓷、木材等，数据类型待定）
+    color: Optional[list[float]] = None #物品的颜色（RGB 或其他格式，数据类型待定）
+    size: Optional[list[float]] = None #物品的尺寸（长、宽、高）
+    pose: Optional[list[float]] = None #物品的空间姿态：[x, y, z, roll, pitch, yaw]
+    roughness: Optional[float] = None #表面粗糙度
+    shape: Optional[str] = None #物品的形状描述，数据类型待定
+
 
 
 class ObjectProfileRegistry:

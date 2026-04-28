@@ -19,6 +19,10 @@ class JointCommandBuilder:
         self._config = config
         self._torque_joints = torque_joints
 
+    @property
+    def torque_joints(self) -> tuple[JointId, ...]:
+        return self._torque_joints
+
     def open_pose(self) -> dict[JointId, float]:
         return {
             JointId.THUMB_PIP: math.radians(0),

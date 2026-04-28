@@ -6,7 +6,7 @@ from xiaoyao.dexhand import CtrlMode, DexHand, Joint, JointId
 from .config import AdaptiveGraspConfig
 from .states import GraspState
 from .sensor import SensorClient
-from .safety import SafetyMonitor
+from .safety import SafetyMonitor, SafetyStatus
 from .force_planner import ForcePlanner
 from .joint_builder import JointCommandBuilder
 from .utils import clip
@@ -99,7 +99,6 @@ class PhaseController:
                 _logger.error("CLOSING phase: failed to get %s", "tactile data" if tactile_data is None else "joint feedback")
                 return False
 
-            from .safety import SafetyStatus
             if self._safety.is_grasp_empty(joint_feedback, GraspState.CLOSING_TO_CONTACT).status != SafetyStatus.OK:
                 _logger.error("CLOSING phase: Grasp Empty")
                 self._set_state(GraspState.ERROR)
@@ -128,7 +127,7 @@ class PhaseController:
     def _is_joints_stalled(self, prev: dict[JointId, float], current: dict[JointId, float]) -> bool:
         if not prev or not current:
             return False
-        for joint_id in self._joint_builder._torque_joints:
+        for joint_id in self._joint_builder.torque_joints:
             delta = abs(current.get(joint_id, 0.0) - prev.get(joint_id, 0.0))
             if delta > self.config.closing_stall_angle_threshold:
                 return False
