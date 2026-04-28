@@ -33,10 +33,10 @@ class JointTpdo:
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        expected_size = struct.calcsize('<BBfBB')
+        expected_size = struct.calcsize('<BBfbb')
         if len(data) < expected_size:
             return cls(0, 0, 0.0, 0, 0)
-        state, error, angle, speed, torque = struct.unpack_from('<BBfBB', data, 0)
+        state, error, angle, speed, torque = struct.unpack_from('<BBfbb', data, 0)
         return cls(state, error, angle, speed, torque)
 
     def __str__(self):
@@ -215,7 +215,7 @@ class Tpdo:
 
         # hand (4 bytes)
         hand = HandTpdo.from_bytes(data[0:4])  # 实际使用4个字节（索引0-3）BBH
-        # thumb(BBfBB) (5 joints × 8 bytes = 40 bytes)
+        # thumb(BBfbb) (5 joints × 8 bytes = 40 bytes)
         th_dip = JointTpdo.from_bytes(data[4:12])  # bytes 4-11
         th_pip = JointTpdo.from_bytes(data[12:20])  # bytes 12-19
         th_mcp = JointTpdo.from_bytes(data[20:28])  # bytes 20-27
@@ -280,7 +280,7 @@ class JointRpdo:
     torque: int = 0
 
     def to_bytes(self) -> bytes:
-        return struct.pack('<fBB', self.angle, self.speed, self.torque)
+        return struct.pack('<fbb', self.angle, self.speed, self.torque)
 
 
 @dataclass

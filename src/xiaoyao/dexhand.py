@@ -172,19 +172,21 @@ class DexHand(object):
         """
         设置关节限制参数
         """
-        self._th_pip_limit = (0, math.radians(66))
-        self._th_mcp_limit = (0, math.radians(50))
-        self._th_swing_limit = (math.radians(20), math.radians(90))
-        self._th_rot_limit = (math.radians(-10), math.radians(60))
-        self._ff_pip_limit = (0, math.radians(80))
-        self._ff_mcp_limit = (0, math.radians(85))
-        self._ff_swing_limit = (math.radians(-10), math.radians(10))
-        self._mf_pip_limit = (0, math.radians(90))
-        self._mf_mcp_limit = (0, math.radians(90))
-        self._rf_pip_limit = (0, math.radians(90))
-        self._rf_mcp_limit = (0, math.radians(90))
-        self._lf_pip_limit = (0, math.radians(74))
-        self._lf_mcp_limit = (0, math.radians(90))
+        self._joint_limits = {
+            JointId.THUMB_PIP: (0, math.radians(66)),
+            JointId.THUMB_MCP: (0, math.radians(50)),
+            JointId.THUMB_SWING: (math.radians(20), math.radians(90)),
+            JointId.THUMB_ROTATION: (math.radians(-10), math.radians(60)),
+            JointId.FF_PIP: (0, math.radians(80)),
+            JointId.FF_MCP: (0, math.radians(85)),
+            JointId.FF_SWING: (math.radians(-10), math.radians(10)),
+            JointId.MF_PIP: (0, math.radians(90)),
+            JointId.MF_MCP: (0, math.radians(90)),
+            JointId.RF_PIP: (0, math.radians(90)),
+            JointId.RF_MCP: (0, math.radians(90)),
+            JointId.LF_PIP: (0, math.radians(74)),
+            JointId.LF_MCP: (0, math.radians(90)),
+        }
 
     def _check_joint_limit(self, joint: Joint, limit):
         """
@@ -593,52 +595,36 @@ class DexHand(object):
             rpdo = Rpdo()
             rpdo.mode = mode.value
             rpdo.stop = 0
+            joint_pdo_map = {
+                JointId.THUMB_PIP: rpdo.th_pip,
+                JointId.THUMB_MCP: rpdo.th_mcp,
+                JointId.THUMB_SWING: rpdo.th_swing,
+                JointId.THUMB_ROTATION: rpdo.th_rot,
+                JointId.FF_PIP: rpdo.ff_pip,
+                JointId.FF_MCP: rpdo.ff_mcp,
+                JointId.FF_SWING: rpdo.ff_swing,
+                JointId.MF_PIP: rpdo.mf_pip,
+                JointId.MF_MCP: rpdo.mf_mcp,
+                JointId.RF_PIP: rpdo.rf_pip,
+                JointId.RF_MCP: rpdo.rf_mcp,
+                JointId.LF_PIP: rpdo.lf_pip,
+                JointId.LF_MCP: rpdo.lf_mcp,
+            }
+            passive_joints = {
+                JointId.THUMB_DIP, JointId.FF_DIP, JointId.MF_DIP,
+                JointId.RF_DIP, JointId.LF_DIP,
+            }
+
             for joint in joints:
-                # 应用速度和力矩限制检查
                 self._check_speed_limit(joint, mode)
                 self._check_torque_limit(joint, mode)
-                # 应用关节角度限制检查
-                if joint.id == JointId.THUMB_PIP:
-                    self._check_joint_limit(joint, self._th_pip_limit)
-                    self._joint_to_pdo(joint, rpdo.th_pip)
-                elif joint.id == JointId.THUMB_MCP:
-                    self._check_joint_limit(joint, self._th_mcp_limit)
-                    self._joint_to_pdo(joint, rpdo.th_mcp)
-                elif joint.id == JointId.THUMB_SWING:
-                    self._check_joint_limit(joint, self._th_swing_limit)
-                    self._joint_to_pdo(joint, rpdo.th_swing)
-                elif joint.id == JointId.THUMB_ROTATION:
-                    self._check_joint_limit(joint, self._th_rot_limit)
-                    self._joint_to_pdo(joint, rpdo.th_rot)
-                elif joint.id == JointId.FF_PIP:
-                    self._check_joint_limit(joint, self._ff_pip_limit)
-                    self._joint_to_pdo(joint, rpdo.ff_pip)
-                elif joint.id == JointId.FF_MCP:
-                    self._check_joint_limit(joint, self._ff_mcp_limit)
-                    self._joint_to_pdo(joint, rpdo.ff_mcp)
-                elif joint.id == JointId.FF_SWING:
-                    self._check_joint_limit(joint, self._ff_swing_limit)
-                    self._joint_to_pdo(joint, rpdo.ff_swing)
-                elif joint.id == JointId.MF_PIP:
-                    self._check_joint_limit(joint, self._mf_pip_limit)
-                    self._joint_to_pdo(joint, rpdo.mf_pip)
-                elif joint.id == JointId.MF_MCP:
-                    self._check_joint_limit(joint, self._mf_mcp_limit)
-                    self._joint_to_pdo(joint, rpdo.mf_mcp)
-                elif joint.id == JointId.RF_PIP:
-                    self._check_joint_limit(joint, self._rf_pip_limit)
-                    self._joint_to_pdo(joint, rpdo.rf_pip)
-                elif joint.id == JointId.RF_MCP:
-                    self._check_joint_limit(joint, self._rf_mcp_limit)
-                    self._joint_to_pdo(joint, rpdo.rf_mcp)
-                elif joint.id == JointId.LF_PIP:
-                    self._check_joint_limit(joint, self._lf_pip_limit)
-                    self._joint_to_pdo(joint, rpdo.lf_pip)
-                elif joint.id == JointId.LF_MCP:
-                    self._check_joint_limit(joint, self._lf_mcp_limit)
-                    self._joint_to_pdo(joint, rpdo.lf_mcp)
-                elif joint.id in [JointId.THUMB_DIP, JointId.FF_DIP, JointId.MF_DIP, JointId.RF_DIP, JointId.LF_DIP]:
-                    # DIP 关节是从动关节（passive joints），不需要主动控制
+
+                if mode == CtrlMode.POSITION and joint.id in self._joint_limits:
+                    self._check_joint_limit(joint, self._joint_limits[joint.id])
+
+                if joint.id in joint_pdo_map:
+                    self._joint_to_pdo(joint, joint_pdo_map[joint.id])
+                elif joint.id in passive_joints:
                     logger.debug(f"Skipping passive joint: {JointId(joint.id).name}")
                     continue
                 else:
