@@ -5,12 +5,11 @@ from xiaoyao import (
     CommType,
     GestureType,
     execute_gesture,
-    get_gesture_name,
     configure_logging
 )
 
 # Configure SDK logging (shows connection state, warnings, errors)
-configure_logging(level=logging.INFO)
+# configure_logging(level=logging.INFO)
 
 
 def main():
@@ -48,11 +47,10 @@ def main():
 
             # 按顺序演示所有手势
             for i, gesture in enumerate(gesture_demo, 1):
-                gesture_name = get_gesture_name(gesture)
-                print(f"演示{i}: [{gesture_name}]")
+                print(f"演示{i}: [{gesture.value}]")
 
                 if not execute_gesture(hand, gesture, speed=100, torque=100):
-                    print(f"{gesture_name}动作失败，终止演示")
+                    print(f"{gesture.value} 动作失败，终止演示")
                     hand.close()
                     return
                 # time.sleep(1)

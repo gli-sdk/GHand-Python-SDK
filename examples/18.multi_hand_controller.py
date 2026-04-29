@@ -157,7 +157,7 @@ class MultiDexHandController:
                     'name': hand.get_device_name(),
                     'hardware_version': hand.get_hardware_version(),
                     'firmware_version': hand.get_firmware_version(),
-                    'serial_number': int.from_bytes(hand.get_serial_number(), 'little'),
+                    'serial_number': hand.get_serial_number(),
                     'hand_type': hand.get_hand_type().value,
                     'interface': self.interface_to_hand.get(hand_name, '')
                 }
@@ -263,6 +263,7 @@ class MultiDexHandController:
 
         success_all = True
         for hand_name, joints in zip(hand_names, joints_list):
+            print(f"控制 {hand_name}...")
             if not self.move_hand(hand_name, joints):
                 success_all = False
 
@@ -402,7 +403,12 @@ def main():
     print("\n=== 关节状态 ===")
     all_joints_state = controller.get_all_joints()
     for hand_name, joints in all_joints_state.items():
-        print(f"{hand_name}: {len(joints)} 个关节")
+        print(f"\n{hand_name}: {len(joints)} 个关节")
+        for joint in joints:
+            print(
+                f"  {JointId(joint.id).name:<15}- angle: {math.degrees(joint.angle):.2f}°, "
+                f"speed: {joint.speed}, torque: {joint.torque}"
+            )
 
     print("\n=== 完成 ===")
 

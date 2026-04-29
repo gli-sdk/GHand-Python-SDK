@@ -39,7 +39,7 @@ def main():
     serial_num = hand.get_serial_number()
     hand_type = hand.get_hand_type()
     print(f"hand name:{hand_name};H/W ver:{hand_hw_ver};ver: {ver};hand_type: {hand_type.value};")
-    print(f"Serial num:{int.from_bytes(serial_num, 'little')};")
+    print(f"Serial num:{serial_num};")
 
     try:
         while True:
