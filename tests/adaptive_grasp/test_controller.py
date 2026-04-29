@@ -330,6 +330,28 @@ def test_controller_accepts_none_config():
     assert grasper._sensor is not None
 
 
+def test_grasp_core_sets_error_state_when_phase_fails(monkeypatch):
+    hand = _MockHand()
+    cfg = AdaptiveGraspConfig()
+    grasper = AdaptiveGrasper(hand, cfg)
+
+    monkeypatch.setattr(grasper, "_start_sensor_subscription", lambda: None)
+
+    from xiaoyao.adaptive_grasp.phase_controller import PhaseResult
+
+    def fail_phase_run(self, force_planner, is_running):
+        return PhaseResult(success=False, final_torque=cfg.base_torque)
+
+    monkeypatch.setattr(
+        "xiaoyao.adaptive_grasp.phase_controller.PhaseController.run",
+        fail_phase_run,
+    )
+
+    assert grasper.grasp_core() is False
+    assert grasper.state == GraspState.ERROR
+    assert grasper._running is False
+
+
 def test_full_grasp_lifecycle(monkeypatch):
     """Integration test: IDLE -> OPEN -> PRE_GRASP -> CLOSING -> ADAPTIVE_HOLD -> RELEASE -> COMPLETED。"""
     hand = _MockHand()

@@ -50,6 +50,7 @@ class PhaseController:
                 return PhaseResult(success=False, final_torque=self.current_torque)
             if not phase_method(force_planner, is_running):
                 _logger.error("%s phase failed", name)
+                self._set_state(GraspState.ERROR)
                 return PhaseResult(success=False, final_torque=self.current_torque)
         return PhaseResult(success=True, final_torque=self.current_torque)
 

@@ -92,7 +92,7 @@ class AdaptiveGrasper:
             )
             result = self._phase_controller.run(self._force_planner, lambda: self._running)
             if not result.success:
-                self._cleanup_grasp()
+                self._cleanup_grasp(state=GraspState.ERROR)
                 return False
             self.current_torque = result.final_torque
 

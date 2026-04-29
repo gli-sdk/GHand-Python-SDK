@@ -95,3 +95,14 @@ def test_visualizer_thread_disables_itself_when_backend_fails(monkeypatch):
     assert viz._running is False
     assert viz._thread is not None
     assert not viz._thread.is_alive()
+
+
+def test_visualizer_stop_does_not_write_stdout(monkeypatch, capsys):
+    viz = TactileVisualizer(active_fingers={TactileSensorId.THUMB})
+    viz._fig = object()
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.visualization.plt.close", lambda _fig: None)
+
+    viz.stop()
+
+    captured = capsys.readouterr()
+    assert captured.out == ""

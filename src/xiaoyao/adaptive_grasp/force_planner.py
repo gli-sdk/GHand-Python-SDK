@@ -159,14 +159,20 @@ class ForcePlanner:
             pid_state._initialized = True
         pid_state.prev_error = e_k
 
-        control_u = (
+        u_ff = self._compute_feedforward_control_u(s_k, fz, fz_limit)
+        u_pid = (
             pid_param.K_p * e_k
             + pid_param.K_i * pid_state.integral
             + pid_param.K_d * derivative
         )
+        control_u = u_ff + u_pid
         if self.is_fragile_mode and fz >= fz_limit:
             control_u = min(control_u, 0.0)
         return control_u
+
+    def _compute_feedforward_control_u(self, s_k: float, fz: float, fz_limit: float) -> float:
+        e_nk = max(0.0, (fz - fz_limit) / (fz_limit + self.config.epsilon))
+        return self.config.K_s * s_k - self.config.K_n * e_nk
 
     def _compute_finger_control_u(
         self,

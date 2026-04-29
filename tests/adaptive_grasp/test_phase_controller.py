@@ -21,6 +21,12 @@ class _MockHand:
         return None
 
 
+class _FailingHand(_MockHand):
+    def move_joints(self, joints, mode=None):
+        self.calls.append({"mode": mode, "joints": list(joints)})
+        return False
+
+
 class _FakeTactileInfo:
     def __init__(self, fx: float, fy: float, fz: float, state: bool = True):
         self._fx = fx
@@ -125,3 +131,22 @@ def test_phase_open_and_pre_grasp(monkeypatch):
     assert hand.calls[0]["mode"] == CtrlMode.POSITION
     assert hand.calls[1]["mode"] == CtrlMode.POSITION
     assert hand.calls[2]["mode"] == CtrlMode.TORQUE
+
+
+def test_phase_failure_sets_error_state(monkeypatch):
+    hand = _FailingHand()
+    cfg = AdaptiveGraspConfig(pre_grasp_preset="two_finger_pinch")
+    sensor = MagicMock()
+    safety = MagicMock()
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP, JointId.FF_PIP))
+    states = []
+    controller = PhaseController(
+        hand, sensor, safety, joint_builder, cfg, time.monotonic,
+        on_state_change=states.append,
+    )
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.phase_controller.time.sleep", lambda *_: None)
+
+    result = controller.run(force_planner=None, is_running=lambda: True)
+
+    assert result.success is False
+    assert states[-1] == GraspState.ERROR

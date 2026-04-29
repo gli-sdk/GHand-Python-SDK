@@ -59,31 +59,50 @@ def test_force_planner_pid_around_normal_force():
     assert decisions[TactileSensorId.THUMB].control_u > 0
 
 
-def test_force_planner_pure_pid_does_not_read_feedforward_gains(monkeypatch):
+def test_force_planner_uses_slip_risk_feedforward_from_design():
     cfg = AdaptiveGraspConfig(
-        K_p=1.0,
+        K_s=0.2,
+        K_n=0.0,
+        K_p=0.0,
         K_i=0.0,
         K_d=0.0,
         control_period_s=0.01,
     )
     planner = ForcePlanner(cfg, None)
 
-    def fail_if_feedforward_is_read(_self):
-        raise AssertionError("feedforward gain should not be read in pure PID mode")
-
-    monkeypatch.setattr(AdaptiveGraspConfig, "K_s", property(fail_if_feedforward_is_read))
-    monkeypatch.setattr(AdaptiveGraspConfig, "K_n", property(fail_if_feedforward_is_read))
-
     control_u = planner._compute_pid_control_u(
         TactileSensorId.THUMB,
-        s_k=100.0,
+        s_k=0.75,
         fz=0.5,
         fz_limit=5.0,
         F_n_ref=1.0,
         dt=0.01,
     )
 
-    assert control_u == pytest.approx(0.5)
+    assert control_u == pytest.approx(0.15)
+
+
+def test_force_planner_uses_normal_force_overlimit_feedforward():
+    cfg = AdaptiveGraspConfig(
+        K_s=0.0,
+        K_n=1.0,
+        K_p=0.0,
+        K_i=0.0,
+        K_d=0.0,
+        control_period_s=0.01,
+    )
+    planner = ForcePlanner(cfg, None)
+
+    control_u = planner._compute_pid_control_u(
+        TactileSensorId.THUMB,
+        s_k=0.0,
+        fz=3.0,
+        fz_limit=2.0,
+        F_n_ref=3.0,
+        dt=0.01,
+    )
+
+    assert control_u == pytest.approx(-0.5)
 
 
 def test_per_finger_pid_overrides_only_configured_finger():

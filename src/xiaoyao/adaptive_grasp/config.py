@@ -39,6 +39,7 @@ _PRESET_ACTIVE_FINGERS: dict[str, set[TactileSensorId]] = {
     "lily_pinch":{TactileSensorId.THUMB, TactileSensorId.MIDDLE_FINGER}
 }
 
+
 _PRE_GRASP_PRESET_DEGREE = {
     # 两指捏(食指-大拇指)
     "two_finger_pinch": {
@@ -49,6 +50,29 @@ _PRE_GRASP_PRESET_DEGREE = {
         JointId.MF_MCP: 0.0,
         JointId.MF_PIP: 0.0,
         JointId.FF_SWING: 0.0,
+        # if object == "big":
+        #     JointId.FF_MCP: 31.0,
+        #     JointId.FF_PIP: 22.0,
+        #     JointId.THUMB_ROTATION: -2.0,
+        #     JointId.THUMB_SWING: 90.0,
+        #     JointId.THUMB_MCP: 0.0,
+        #     JointId.THUMB_PIP: 0.0,
+        # elif object == "small":
+        #     JointId.FF_MCP: 55.0,
+        #     JointId.FF_PIP: 0.0,
+        #     JointId.THUMB_ROTATION: -2.0,
+        #     JointId.THUMB_SWING: 90.0,
+        #     JointId.THUMB_MCP: 3.0,
+        #     JointId.THUMB_PIP: 0.0,
+        # elif object == "cone": #圆锥
+        #     JointId.FF_MCP: 58.0,
+        #     JointId.FF_PIP: 0.0,
+        #     JointId.THUMB_ROTATION: -2.0,
+        #     JointId.THUMB_SWING: 90.0,
+        #     JointId.THUMB_MCP: 0.0,
+        #     JointId.THUMB_PIP: 0.0,
+        # elif object == "balloon":
+            
         # 大物品
         # JointId.FF_MCP: 31.0,
         # JointId.FF_PIP: 22.0,
@@ -150,7 +174,27 @@ _PRE_GRASP_PRESET_DEGREE = {
         JointId.THUMB_PIP: 0.0,
     }
 }
-
+object = "big" # small small cone ballon
+if object == "big":
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_MCP] = 0.0
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_PIP] = 0.0
+elif object == "small":
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_MCP] = 3.0
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_PIP] = 0.0
+elif object == "cone": #圆锥
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.FF_MCP] = 58.0
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.FF_PIP] = 0.0
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_ROTATION] = -2.0
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_SWING] = 90.0
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_MCP] = 0.0
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_PIP] = 0.0
+elif object == "balloon":    
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.FF_MCP] = 10.0
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.FF_PIP] = 30.0
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_ROTATION] = 0.0
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_SWING] = 90.0
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_MCP] = 3.0
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_PIP] = 0.0
 
 @dataclass
 class PerFingerPidConfig:
@@ -237,11 +281,11 @@ class AdaptiveGraspConfig:
     theta_err_th: float = math.radians(2.0) # 释放到位角误差阈值（弧度）。
     release_check_cycles: int = 3 # 释放连续到位判定周期数。
     #=============================================================================
-    # PID control gains. K_s/K_n are retained for backward-compatible configs
-    # but are not used by ForcePlanner.
+    # Feedforward + PID control gains. ForcePlanner uses K_s with fused slip
+    # risk and K_n with normal-force over-limit error.
     s_ref: float = 0.25 # 目标滑移风险水平 s_ref。
-    K_s: float = 1.0 # Deprecated feedforward gain.
-    K_n: float = 1.0 # Deprecated normal-force suppression gain.
+    K_s: float = 1.0 # Slip-risk feedforward gain K_s.
+    K_n: float = 1.0 # Normal-force over-limit suppression gain K_n.
     K_p: float = 0.01 # PID 比例增益 K_p。
     K_i: float = 0.0001 # PID 积分增益 K_i。
     K_d: float = 0.000 # PID 微分增益 K_d。

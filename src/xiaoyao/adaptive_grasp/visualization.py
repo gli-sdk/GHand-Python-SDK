@@ -88,7 +88,6 @@ class TactileVisualizer:
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=20.0)
         if self._fig is not None:
-            print("closing figure")
             plt.close(self._fig)
             self._fig = None
 
