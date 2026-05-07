@@ -183,3 +183,24 @@ def get_all_gestures() -> list[GestureType]:
     """
     return list(GestureType)
 
+
+_GESTURE_NAMES: dict[GestureType, str] = {
+    GestureType.OPEN_HAND: "张开手",
+    GestureType.FIST: "握拳",
+    GestureType.OK: "OK手势",
+    GestureType.THUMBS_UP: "竖大拇指",
+    GestureType.SIX_SIGN: "六手势（比666）",
+}
+
+
+def get_gesture_name(gesture: GestureType) -> str:
+    """获取手势的显示名称
+
+    Args:
+        gesture: 手势类型
+
+    Returns:
+        str: 手势的中文名称
+    """
+    return _GESTURE_NAMES.get(gesture, gesture.value)
+

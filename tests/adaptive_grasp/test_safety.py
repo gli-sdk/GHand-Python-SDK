@@ -3,7 +3,7 @@ import pytest
 from xiaoyao.adaptive_grasp.config import AdaptiveGraspConfig
 from xiaoyao.adaptive_grasp.safety import SafetyMonitor, SafetyStatus, SafetyReport
 from xiaoyao.adaptive_grasp.states import GraspState
-from xiaoyao.dexhand import Joint, JointId
+from xiaoyao.dexhand import Joint, JointId, TactileSensorId
 
 
 def test_sensor_fault_on_joint_feedback_missing():
@@ -25,18 +25,98 @@ def test_empty_grasp_when_closing_with_no_contact():
     assert report.fault_type == "empty_grasp"
 
 
-def test_object_dropped_when_contact_lost():
-    cfg = AdaptiveGraspConfig(contact_threshold_z=1.0)
+def _touch(fz):
+    return type("T", (), {"get_force_z": lambda self, fz=fz: fz})()
+
+
+def _tactile_data(*fz_values):
+    fingers = (
+        TactileSensorId.THUMB,
+        TactileSensorId.FOREFINGER,
+        TactileSensorId.MIDDLE_FINGER,
+        TactileSensorId.RING_FINGER,
+        TactileSensorId.LITTLE_FINGER,
+    )
+    return {finger: _touch(fz) for finger, fz in zip(fingers, fz_values)}
+
+
+def test_object_dropped_after_three_low_force_cycles(caplog):
+    cfg = AdaptiveGraspConfig(
+        active_fingers={TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
+        contact_threshold_z=1.0,
+    )
     monitor = SafetyMonitor(cfg)
 
     baseline_joints = [Joint(id=JointId.THUMB_MCP, angle=0.0)]
-    tactile_before = {"thumb": type("T", (), {"get_force_z": lambda self: 2.0})()}
+    tactile_before = _tactile_data(2.0)
     monitor.check(tactile_data=tactile_before, joint_feedback=baseline_joints, state=GraspState.ADAPTIVE_HOLD)
 
-    tactile_after = {"thumb": type("T", (), {"get_force_z": lambda self: 0.0})()}
-    report = monitor.check(tactile_data=tactile_after, joint_feedback=baseline_joints, state=GraspState.ADAPTIVE_HOLD)
+    low_force = _tactile_data(0.19)
+    report = monitor.check(tactile_data=low_force, joint_feedback=baseline_joints, state=GraspState.ADAPTIVE_HOLD)
+    assert report.status == SafetyStatus.OK
+
+    report = monitor.check(tactile_data=low_force, joint_feedback=baseline_joints, state=GraspState.ADAPTIVE_HOLD)
+    assert report.status == SafetyStatus.OK
+
+    report = monitor.check(tactile_data=low_force, joint_feedback=baseline_joints, state=GraspState.ADAPTIVE_HOLD)
     assert report.status == SafetyStatus.FAULT
     assert report.fault_type == "object_dropped"
+    assert "Object dropped" in caplog.text
+
+
+def test_object_dropped_logs_active_finger_last_and_current_fz(caplog):
+    cfg = AdaptiveGraspConfig(
+        active_fingers={TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
+        contact_threshold_z=1.0,
+    )
+    monitor = SafetyMonitor(cfg)
+    joints = [Joint(id=JointId.THUMB_MCP, angle=0.0)]
+
+    monitor.check(
+        tactile_data={
+            TactileSensorId.THUMB: _touch(0.20),
+            TactileSensorId.FOREFINGER: _touch(0.15),
+            TactileSensorId.MIDDLE_FINGER: _touch(8.00),
+        },
+        joint_feedback=joints,
+        state=GraspState.ADAPTIVE_HOLD,
+    )
+
+    low_force = {
+        TactileSensorId.THUMB: _touch(0.00),
+        TactileSensorId.FOREFINGER: _touch(0.00),
+        TactileSensorId.MIDDLE_FINGER: _touch(8.00),
+    }
+    monitor.check(tactile_data=low_force, joint_feedback=joints, state=GraspState.ADAPTIVE_HOLD)
+    monitor.check(tactile_data=low_force, joint_feedback=joints, state=GraspState.ADAPTIVE_HOLD)
+    report = monitor.check(tactile_data=low_force, joint_feedback=joints, state=GraspState.ADAPTIVE_HOLD)
+
+    assert report.status == SafetyStatus.FAULT
+    assert (
+        "Object dropped:\n"
+        "  total: last_fz=0.35 current_fz=0.00 threshold=0.20\n"
+        "  active_fingers:\n"
+        "    thumb: last_fz=0.20 current_fz=0.00\n"
+        "    forefinger: last_fz=0.15 current_fz=0.00"
+    ) in caplog.text
+    assert "middle_finger" not in caplog.text
+
+
+def test_object_drop_counter_resets_when_force_recovers():
+    cfg = AdaptiveGraspConfig(
+        active_fingers={TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
+        contact_threshold_z=1.0,
+    )
+    monitor = SafetyMonitor(cfg)
+    joints = [Joint(id=JointId.THUMB_MCP, angle=0.0)]
+
+    monitor.check(tactile_data=_tactile_data(2.0), joint_feedback=joints, state=GraspState.ADAPTIVE_HOLD)
+    monitor.check(tactile_data=_tactile_data(0.19), joint_feedback=joints, state=GraspState.ADAPTIVE_HOLD)
+    monitor.check(tactile_data=_tactile_data(0.21), joint_feedback=joints, state=GraspState.ADAPTIVE_HOLD)
+
+    monitor.check(tactile_data=_tactile_data(0.19), joint_feedback=joints, state=GraspState.ADAPTIVE_HOLD)
+    report = monitor.check(tactile_data=_tactile_data(0.19), joint_feedback=joints, state=GraspState.ADAPTIVE_HOLD)
+    assert report.status == SafetyStatus.OK
 
 
 def test_empty_grasp_respects_baseline():
@@ -51,4 +131,3 @@ def test_empty_grasp_respects_baseline():
     joints = [Joint(id=JointId.THUMB_MCP, angle=math.radians(20.0))]
     report = monitor.is_grasp_empty(joint_feedback=joints, state=GraspState.CLOSING_TO_CONTACT)
     assert report.status == SafetyStatus.OK
-

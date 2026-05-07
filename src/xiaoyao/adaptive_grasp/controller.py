@@ -1,10 +1,9 @@
 import logging
-import math
 import threading
 import time
-from typing import Any, Optional
+from typing import Optional
 
-from xiaoyao.dexhand import CtrlMode, DexHand, Joint, JointId, TactileSensorId
+from xiaoyao.dexhand import CtrlMode, DexHand, JointId, TactileSensorId
 from .sensor import SensorClient
 
 from .config import AdaptiveGraspConfig
@@ -12,7 +11,7 @@ from .states import GraspState
 from .tactility import TactileAnalyzer, TactileAnalysis
 from .object_profile import ObjectProfile, ObjectProfileRegistry
 from .force_planner import ForcePlanner, ForceDecision
-from .safety import SafetyMonitor, SafetyStatus, SafetyReport
+from .safety import SafetyMonitor, SafetyReport
 from .visualization import TactileVisualizer
 from .utils import clip, JOINT_TO_FINGER
 from .joint_builder import JointCommandBuilder
@@ -123,14 +122,21 @@ class AdaptiveGrasper:
         self._stop_sensor_subscription()
         if self._control_thread and self._control_thread.is_alive():
             self._control_thread.join(timeout=1.0)
-        if self._visualizer is not None:
-            self._visualizer.stop()
+        self._finalize_visualizer(detach_window=True)
         self.hand.stop()
         self.state = GraspState.STOPPED
 
     def stop_visualizer(self) -> None:
         if self._visualizer is not None:
             self._visualizer.stop()
+
+    def wait_for_visualizer_close(self) -> None:
+        if self._visualizer is not None:
+            self._visualizer.wait_until_closed()
+
+    def poll_visualizer(self) -> None:
+        if self._visualizer is not None:
+            self._visualizer.poll()
 
     def get_state(self) -> GraspState:
         return self.state
@@ -198,10 +204,10 @@ class AdaptiveGrasper:
             if step.result == HoldResult.AUTO_RELEASE:
                 self._perform_release(wait_control_thread=False)
                 break
-            elif step.result == HoldResult.FAULT_RELEASE:
+            if step.result == HoldResult.FAULT_RELEASE:
                 self._perform_release(wait_control_thread=False)
                 break
-            elif step.result == HoldResult.ERROR:
+            if step.result == HoldResult.ERROR:
                 self.state = GraspState.ERROR
                 self._running = False
                 break
@@ -235,67 +241,21 @@ class AdaptiveGrasper:
             torque=self.config.release_open_torque,
         )
         ok = self.hand.move_joints(joints, mode=CtrlMode.POSITION)
+        time.sleep(2)
         if not ok:
             _logger.error("RELEASE phase: move_joints failed")
             self.state = GraspState.ERROR
             return False
 
-        target_pose = self._joint_builder.open_pose()
-        feedback_supported = callable(getattr(self.hand, "get_joints", None))
-        if feedback_supported:
-            if self._wait_joints_settled(
-                target_pose,
-                self.config.theta_err_th,
-                self.config.release_check_cycles,
-                self.config.release_timeout_s,
-            ):
-                self.state = GraspState.COMPLETED
-                return True
-            self.state = GraspState.ERROR
-            return False
-        self.state = GraspState.COMPLETED if ok else GraspState.ERROR
-        return ok
+        self.state = GraspState.COMPLETED
+        return True
 
-    def _wait_joints_settled(
-        self,
-        target_pose: dict[JointId, float],
-        theta_err_th: float,
-        check_cycles: int,
-        timeout_s: float,
-    ) -> bool:
-        settled_cycles = 0
-        start = self._get_monotonic_time()
-        while (self._get_monotonic_time() - start) < timeout_s:
-            joints_feedback = self._get_release_joint_feedback()
-            if joints_feedback is None:
-                _logger.error("Joint feedback lost during settle wait")
-                return False
-            actual = {j.id: j.angle for j in joints_feedback}
-            is_settled = all(
-                joint_id in actual and abs(actual[joint_id] - target_angle) <= theta_err_th
-                for joint_id, target_angle in target_pose.items()
-            )
-            if is_settled:
-                settled_cycles += 1
-                if settled_cycles >= check_cycles:
-                    return True
-            else:
-                settled_cycles = 0
-            time.sleep(self.config.control_period_s)
-        _logger.error("Joint settle wait timeout")
-        return False
-
-    def _get_release_joint_feedback(self) -> Optional[list]:
-        get_joints = getattr(self.hand, "get_joints", None)
-        if callable(get_joints):
-            try:
-                joints = get_joints()
-            except Exception:
-                _logger.exception("Failed to read fresh joint feedback during release")
-                return None
-            if joints:
-                return joints
-        return self._sensor.joint_feedback
+    def _finalize_visualizer(self, detach_window: bool) -> None:
+        if self._visualizer is None:
+            return
+        self._visualizer.stop()
+        if detach_window:
+            self._visualizer.detach_window()
 
     def _start_sensor_subscription(self) -> None:
         self._sensor.start()

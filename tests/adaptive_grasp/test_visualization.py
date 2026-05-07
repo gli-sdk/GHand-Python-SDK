@@ -1,5 +1,6 @@
 import math
 import time
+from pathlib import Path
 
 import pytest
 
@@ -76,7 +77,7 @@ def test_visualizer_respects_max_points():
     assert list(viz._timestamps) == [2.0, 3.0, 4.0]
 
 
-def test_visualizer_thread_disables_itself_when_backend_fails(monkeypatch):
+def test_visualizer_start_disables_itself_when_backend_fails(monkeypatch):
     viz = TactileVisualizer(
         active_fingers={TactileSensorId.THUMB},
         update_interval=0.001,
@@ -88,13 +89,22 @@ def test_visualizer_thread_disables_itself_when_backend_fails(monkeypatch):
     monkeypatch.setattr("xiaoyao.adaptive_grasp.visualization.plt.subplots", fail_subplots)
 
     viz.start()
-    deadline = time.monotonic() + 1.0
-    while viz._thread is not None and viz._thread.is_alive() and time.monotonic() < deadline:
-        time.sleep(0.01)
 
     assert viz._running is False
-    assert viz._thread is not None
-    assert not viz._thread.is_alive()
+    assert viz._thread is None
+
+
+def test_visualizer_start_does_not_create_background_gui_thread(monkeypatch):
+    viz = TactileVisualizer(active_fingers={TactileSensorId.THUMB})
+
+    def fail_subplots(*_args, **_kwargs):
+        raise RuntimeError("backend unavailable")
+
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.visualization.plt.subplots", fail_subplots)
+
+    viz.start()
+
+    assert viz._thread is None
 
 
 def test_visualizer_stop_does_not_write_stdout(monkeypatch, capsys):
@@ -106,3 +116,38 @@ def test_visualizer_stop_does_not_write_stdout(monkeypatch, capsys):
 
     captured = capsys.readouterr()
     assert captured.out == ""
+
+
+def test_visualizer_stop_keeps_figure_open_by_default(monkeypatch):
+    viz = TactileVisualizer(active_fingers={TactileSensorId.THUMB})
+    fig = object()
+    viz._fig = fig
+    closed = []
+    monkeypatch.setattr(
+        "xiaoyao.adaptive_grasp.visualization.plt.close",
+        lambda _fig: closed.append(_fig),
+    )
+
+    viz.stop()
+
+    assert closed == []
+    assert viz._fig is fig
+
+
+def test_visualizer_detach_window_spawns_snapshot_viewer(monkeypatch):
+    viz = TactileVisualizer(active_fingers={TactileSensorId.THUMB})
+    viz._timestamps.extend([1.0, 2.0])
+    viz._data[TactileSensorId.THUMB]["fz"].extend([0.5, 0.8])
+    launched = []
+    snapshot_path = Path("snapshot.json")
+
+    monkeypatch.setattr(viz, "_write_snapshot_file", lambda: snapshot_path)
+    monkeypatch.setattr(
+        viz,
+        "_launch_snapshot_viewer",
+        lambda path: launched.append(path),
+    )
+
+    viz.detach_window()
+
+    assert launched == [snapshot_path]

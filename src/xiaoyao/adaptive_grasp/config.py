@@ -174,7 +174,7 @@ _PRE_GRASP_PRESET_DEGREE = {
         JointId.THUMB_PIP: 0.0,
     }
 }
-object = "big" # small small cone ballon
+object = "balloon" # small small cone ballon
 if object == "big":
     _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_MCP] = 0.0
     _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_PIP] = 0.0
@@ -189,11 +189,11 @@ elif object == "cone": #圆锥
     _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_MCP] = 0.0
     _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_PIP] = 0.0
 elif object == "balloon":    
-    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.FF_MCP] = 10.0
-    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.FF_PIP] = 30.0
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.FF_MCP] = 45.0
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.FF_PIP] = 10.0
     _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_ROTATION] = 0.0
-    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_SWING] = 90.0
-    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_MCP] = 3.0
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_SWING] = 80.0
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_MCP] = 8.0
     _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_PIP] = 0.0
 
 @dataclass

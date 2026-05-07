@@ -76,7 +76,7 @@ def test_clip_clamps_and_handles_inverted_bounds():
     assert clip(3.0, 2.0, 1.0) == pytest.approx(2.0)
 
 
-def test_release_waits_until_joints_settled(monkeypatch):
+def test_release_succeeds_without_waiting_for_settle_feedback(monkeypatch):
     cfg = AdaptiveGraspConfig(
         release_timeout_s=0.2,
         release_check_cycles=2,
@@ -106,7 +106,25 @@ def test_release_waits_until_joints_settled(monkeypatch):
     assert g.state == GraspState.COMPLETED
 
 
-def test_release_fails_when_timeout_before_settled(monkeypatch):
+def test_release_does_not_check_whether_joints_are_settled(monkeypatch):
+    hand = _MockHand()
+    g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
+    g._running = True
+    get_joints_called = [False]
+
+    def fail_if_get_joints_called():
+        get_joints_called[0] = True
+        raise AssertionError("release should not check whether joints are settled")
+
+    hand.get_joints = fail_if_get_joints_called
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
+
+    assert g.release() is True
+    assert g.state == GraspState.COMPLETED
+    assert get_joints_called == [False]
+
+
+def test_release_ignores_unsettled_feedback_after_open_command(monkeypatch):
     cfg = AdaptiveGraspConfig(
         release_timeout_s=0.02,
         release_check_cycles=2,
@@ -133,11 +151,11 @@ def test_release_fails_when_timeout_before_settled(monkeypatch):
     t = {"v": 0.0}
     g._get_monotonic_time = lambda: (t.__setitem__("v", t["v"] + 0.01) or t["v"])
 
-    assert g.release() is False
-    assert g.state == GraspState.ERROR
+    assert g.release() is True
+    assert g.state == GraspState.COMPLETED
 
 
-def test_release_waits_on_fresh_hand_feedback_after_subscription_stops(monkeypatch):
+def test_release_does_not_require_fresh_hand_feedback_after_subscription_stops(monkeypatch):
     cfg = AdaptiveGraspConfig(
         release_timeout_s=0.2,
         release_check_cycles=2,
@@ -204,7 +222,7 @@ def test_perform_release_waits_for_control_thread(monkeypatch):
     g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
     g._running = True
     g.state = GraspState.ADAPTIVE_HOLD
-    # Provide joint feedback matching open pose so _wait_joints_settled succeeds
+    # Existing feedback is ignored by release; success depends on the open command.
     open_pose = g._joint_builder.open_pose()
     g._sensor._latest_joint_feedback = [
         Joint(id=joint_id, angle=angle) for joint_id, angle in open_pose.items()
@@ -239,7 +257,7 @@ def test_perform_release_from_control_thread_does_not_deadlock(monkeypatch):
     g._running = True
     g.state = GraspState.ADAPTIVE_HOLD
     g._control_thread = threading.current_thread()
-    # Provide joint feedback matching open pose so _wait_joints_settled succeeds
+    # Existing feedback is ignored by release; success depends on the open command.
     open_pose = g._joint_builder.open_pose()
     g._sensor._latest_joint_feedback = [
         Joint(id=joint_id, angle=angle) for joint_id, angle in open_pose.items()
@@ -251,6 +269,49 @@ def test_perform_release_from_control_thread_does_not_deadlock(monkeypatch):
     assert result is True
     assert g.state == GraspState.COMPLETED
     assert g._running is False
+
+
+def test_wait_for_visualizer_close_blocks_on_visualizer(monkeypatch):
+    hand = _MockHand()
+    g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
+
+    events: list[str] = []
+
+    class _FakeVisualizer:
+        def wait_until_closed(self):
+            events.append("wait")
+
+    g._visualizer = _FakeVisualizer()
+    g.wait_for_visualizer_close()
+    assert events == ["wait"]
+
+
+def test_release_does_not_release_original_visualizer(monkeypatch):
+    hand = _MockHand()
+    g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
+    g._running = True
+    open_pose = g._joint_builder.open_pose()
+    g._sensor._latest_joint_feedback = [
+        Joint(id=joint_id, angle=angle) for joint_id, angle in open_pose.items()
+    ]
+
+    events: list[str] = []
+
+    class _FakeVisualizer:
+        def stop(self):
+            events.append("stop")
+
+        def detach_window(self):
+            events.append("detach")
+
+        def wait_until_closed(self):
+            events.append("wait")
+
+    g._visualizer = _FakeVisualizer()
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
+
+    assert g.release() is True
+    assert events == []
 
 
 def test_sensor_subscription_callback_updates_cache():

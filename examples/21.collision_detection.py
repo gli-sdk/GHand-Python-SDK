@@ -38,7 +38,7 @@ def main():
 
         # 设置安全边距
         hand.set_safety_margin(1)
-        print("[OK] 安全边距已设置为 0.3mm\n")
+        print("[OK] 安全边距已设置为 0.2mm\n")
 
         # 测试：尝试可能导致碰撞的姿态
         print("--- 测试：检测碰撞并规避 ---")

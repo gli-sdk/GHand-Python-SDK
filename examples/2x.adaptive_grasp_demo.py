@@ -32,9 +32,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the adaptive grasp demo.")
     parser.add_argument("--base_torque", "--base-torque", type=int, default=30)
     parser.add_argument("--max_torque", "--max-torque", type=int, default=80)
-    parser.add_argument("--contact_threshold_z", "--contact-threshold-z", type=float, default=0.8)
-    parser.add_argument("--pre_grasp_preset", "--pre-grasp-preset", default="three_finger_pinch")
-    parser.add_argument("--hold_time", "--hold-time", type=float, default=20.0)
+    parser.add_argument("--contact_threshold_z", "--contact-threshold-z", type=float, default=0.4)
+    parser.add_argument("--pre_grasp_preset", "--pre-grasp-preset", default="two_finger_pinch")
+    parser.add_argument("--hold_time", "--hold-time", type=float, default=50.0)
     parser.add_argument("--object", dest="object", default=None)
     parser.add_argument("--verbose", action="store_true")
     return parser
@@ -152,10 +152,12 @@ def main() -> None:
             status_line = f"state={state_val:<18}; torque={grasper.current_torque:>3}"
             print(f"\r{status_line}", end="", flush=True)
             logger.write_row(state_val, grasper.current_torque)
+            grasper.poll_visualizer()
             time.sleep(0.1)
         print(f"\nFinal state: {grasper.get_state().value}")
 
         grasper.release()
+        grasper.wait_for_visualizer_close()
         print("Grasp Done.")
 
     except KeyboardInterrupt:
