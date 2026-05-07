@@ -67,7 +67,7 @@ def main():
             joints = []
             joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(0), speed=100, torque=100))
             joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(0), speed=100, torque=100))
-            joints.append(Joint(id=JointId.THUMB_SWING, angle=math.radians(0), speed=100, torque=100))
+            joints.append(Joint(id=JointId.THUMB_SWING, angle=math.radians(20), speed=100, torque=100))
             joints.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(0), speed=100, torque=100))
             joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(0), speed=100, torque=100))
             joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(0), speed=100, torque=100))

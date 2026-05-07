@@ -24,8 +24,6 @@ def main():
             return
 
         print("\n=== Torque Control Mode Demo ===")
-        print("This demo controls finger joints using torque mode")
-        print("Torque values control the force applied by each joint\n")
 
         # Torque control cycle
         cycle_count = 0
@@ -35,64 +33,6 @@ def main():
             cycle_count += 1
             if max_cycles > 0 and cycle_count > max_cycles:
                 break
-
-            joints = []
-            joints.append(
-                Joint(
-                    id=JointId.THUMB_PIP, angle=math.radians(0), speed=50, torque=100
-                )
-            )
-            joints.append(
-                Joint(
-                    id=JointId.THUMB_MCP, angle=math.radians(0), speed=50, torque=100
-                )
-            )
-            joints.append(
-                Joint(
-                    id=JointId.THUMB_SWING,
-                    angle=math.radians(0),
-                    speed=50,
-                    torque=100,
-                )
-            )
-            joints.append(
-                Joint(
-                    id=JointId.THUMB_ROTATION,
-                    angle=math.radians(0),
-                    speed=50,
-                    torque=100,
-                )
-            )
-            joints.append(
-                Joint(id=JointId.FF_PIP, angle=math.radians(0), speed=50, torque=100)
-            )
-            joints.append(
-                Joint(id=JointId.FF_MCP, angle=math.radians(0), speed=50, torque=100)
-            )
-            joints.append(
-                Joint(id=JointId.FF_SWING, angle=math.radians(0), speed=50, torque=100)
-            )
-            joints.append(
-                Joint(id=JointId.MF_PIP, angle=math.radians(0), speed=50, torque=100)
-            )
-            joints.append(
-                Joint(id=JointId.MF_MCP, angle=math.radians(0), speed=50, torque=100)
-            )
-            joints.append(
-                Joint(id=JointId.RF_PIP, angle=math.radians(0), speed=50, torque=100)
-            )
-            joints.append(
-                Joint(id=JointId.RF_MCP, angle=math.radians(0), speed=50, torque=100)
-            )
-            joints.append(
-                Joint(id=JointId.LF_PIP, angle=math.radians(0), speed=50, torque=100)
-            )
-            joints.append(
-                Joint(id=JointId.LF_MCP, angle=math.radians(0), speed=50, torque=100)
-            )
-
-            result = hand.move_joints(joints)
-            time.sleep(5)
 
             joints = []
             joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(36), speed=50, torque=100))
@@ -139,36 +79,6 @@ def main():
             else:
                 print("Failed to send torque command")
                 break
-
-            # Step 2: Release grip (zero torque)
-            # print("\nStep 2: Opening fingers (torque=-10)")
-            # joints = []
-            # for joint_id in [JointId.THUMB_PIP, JointId.THUMB_MCP, JointId.FF_PIP,
-            #                JointId.FF_MCP, JointId.MF_PIP, JointId.MF_MCP,
-            #                JointId.RF_PIP, JointId.RF_MCP, JointId.LF_PIP, JointId.LF_MCP]:
-            #     joints.append(Joint(id=joint_id,  torque=-10))
-
-            # result = hand.move_joints(joints, mode=CtrlMode.TORQUE)
-            # if result:
-            #     time.sleep(2)
-            #     current_joints = hand.get_joints()
-            #     print("Current joint states (released):")
-            #     for joint in current_joints:
-            #         if joint.id in [JointId.THUMB_PIP, JointId.FF_PIP, JointId.MF_PIP]:
-            #             print(
-            #                 f"  {JointId(joint.id).name:<15}- state:{State(joint.state).name},\t"
-            #                 f"error:{ErrorCode(joint.error).name},\t"
-            #                 f"angle: {math.degrees(joint.angle):.2f}°,\t"
-            #                 f"speed: {joint.speed},\ttorque: {joint.torque}"
-            #             )
-            # else:
-            #     print("Failed to send torque command")
-            #     break
-
-            # print(f"\n--- Cycle {cycle_count}: Torque control completed ---")
-            # if max_cycles == 0:
-            #     print("Press Ctrl+C to stop the demo and exit\n")
-
     except KeyboardInterrupt:
         print("\nProgram interrupted by user.")
     except DeviceDisconnectedError as e:

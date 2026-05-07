@@ -16,6 +16,10 @@ from .exceptions import (
     get_fault_message
 )
 
+from collision_sdk import CollisionSDK, CollisionCheckResult
+
+from .converter import joints_to_nparray, nparray_to_joints
+
 logger = logging.getLogger("xiaoyao.dexhand")
 
 class HandType(enum.Enum):
@@ -124,7 +128,7 @@ class Joint:
     state: State = State.STOPPED  # 关节状态
     error: ErrorCode = ErrorCode.NORMAL  # 错误码
 
-    def create_joint_positions(joint_angles_dict):
+    def create_joint_positions(joint_angles_dict,speed=100, torque=100):
         """
         根据关节角度字典创建关节列表
 
@@ -135,16 +139,9 @@ class Joint:
             list: Joint对象列表
         """
         joints = []
-        default_speed = 100
-        default_torque = 100
 
         for joint_id, angle in joint_angles_dict.items():
-            joints.append(Joint(
-                id=joint_id,
-                angle=angle,
-                speed=default_speed,
-                torque=default_torque
-            ))
+            joints.append(Joint(id=joint_id, angle=angle, speed=speed, torque=torque))
 
         return joints
 
@@ -161,6 +158,9 @@ class DexHand(object):
         self._sub_manager = SubscriptionManager(self._client)
         self._opened = False
         self._set_joint_limit()
+        # 碰撞检测相关属性
+        self._safety_margin = 0.0  # 默认安全边距
+        self._collision_checker = None  # 延迟加载
 
     def __del__(self):
         """
@@ -172,19 +172,21 @@ class DexHand(object):
         """
         设置关节限制参数
         """
-        self._th_pip_limit = (0, math.radians(66))
-        self._th_mcp_limit = (0, math.radians(50))
-        self._th_swing_limit = (0, math.radians(90))
-        self._th_rot_limit = (math.radians(-10), math.radians(60))
-        self._ff_pip_limit = (0, math.radians(80))
-        self._ff_mcp_limit = (0, math.radians(85))
-        self._ff_swing_limit = (math.radians(-10), math.radians(10))
-        self._mf_pip_limit = (0, math.radians(90))
-        self._mf_mcp_limit = (0, math.radians(90))
-        self._rf_pip_limit = (0, math.radians(90))
-        self._rf_mcp_limit = (0, math.radians(90))
-        self._lf_pip_limit = (0, math.radians(74))
-        self._lf_mcp_limit = (0, math.radians(90))
+        self._joint_limits = {
+            JointId.THUMB_PIP: (0, math.radians(66)),
+            JointId.THUMB_MCP: (0, math.radians(50)),
+            JointId.THUMB_SWING: (math.radians(20), math.radians(90)),
+            JointId.THUMB_ROTATION: (math.radians(-10), math.radians(60)),
+            JointId.FF_PIP: (0, math.radians(80)),
+            JointId.FF_MCP: (0, math.radians(85)),
+            JointId.FF_SWING: (math.radians(-10), math.radians(10)),
+            JointId.MF_PIP: (0, math.radians(90)),
+            JointId.MF_MCP: (0, math.radians(90)),
+            JointId.RF_PIP: (0, math.radians(90)),
+            JointId.RF_MCP: (0, math.radians(90)),
+            JointId.LF_PIP: (0, math.radians(74)),
+            JointId.LF_MCP: (0, math.radians(90)),
+        }
 
     def _check_joint_limit(self, joint: Joint, limit):
         """
@@ -304,9 +306,8 @@ class DexHand(object):
                 for id in id_list:
                     connected = self._client.connect(id)
                     if connected:
-                        run_success = self._client.run()
-                        if run_success:
-                            self._opened = True
+                        self._opened = self._client.run()
+                        if self._opened:
                             logger.info(f"Device opened successfully (ID: {id})")
                             break
                         else:
@@ -316,8 +317,12 @@ class DexHand(object):
             else:
                 connected = self._client.connect(id)
                 if connected:
-                    run_success = self._client.run()
-                    self._opened = run_success
+                    self._opened = self._client.run()
+                    if self._opened:
+                        logger.info(f"Device opened successfully (ID: {id})")
+                    else:
+                        logger.error(f"Failed to open device (ID: {id})")
+                        self._client.disconnect()
         elif type == CommType.CANFD:
             pass
         elif type == CommType.RS485:
@@ -431,6 +436,27 @@ class DexHand(object):
             return 0
         return serial_number
 
+    def get_motor_driver_version(self):
+        """
+        获取电机驱动版本号
+
+        Returns:
+            tuple: (主版本号, 子版本号1, 子版本号2)，获取失败返回 (0, 0, 0)
+        """
+        try:
+            main_ver = int.from_bytes(
+                self._client.sdo_read(0x2007, 0x01), byteorder="little"
+            )
+            sub1_ver = int.from_bytes(
+                self._client.sdo_read(0x2007, 0x02), byteorder="little"
+            )
+            sub2_ver = int.from_bytes(
+                self._client.sdo_read(0x2007, 0x03), byteorder="little"
+            )
+        except Exception:
+            return (0, 0, 0)
+        return (main_ver, sub1_ver, sub2_ver)
+
     def fault_clearance(self) -> bool:
         """
         故障清除
@@ -477,7 +503,8 @@ class DexHand(object):
                 return True
             else:
                 return False
-        except Exception:
+        except Exception as e:
+            logger.error(f"tactile_open error: {e}", exc_info=True)
             return False
 
     def tactile_close(self) -> bool:
@@ -512,10 +539,14 @@ class DexHand(object):
             result_data = self._client.sdo_read(0x2004, 0x03)
             # 检查结果区数据，如果为0则成功，为1则失败
             if result_data == b'\x00':
+                logger.debug("Tactile zero calibration successful")
                 return True
             else:
+                logger.error(f"tactile_zero failed with result data: {result_data}")
                 return False
-        except Exception:
+
+        except Exception as e:
+            logger.error(f"tactile_zero error: {e}", exc_info=True)
             return False
 
     def get_hand_type(self) -> HandType:
@@ -564,50 +595,38 @@ class DexHand(object):
             rpdo = Rpdo()
             rpdo.mode = mode.value
             rpdo.stop = 0
+            joint_pdo_map = {
+                JointId.THUMB_PIP: rpdo.th_pip,
+                JointId.THUMB_MCP: rpdo.th_mcp,
+                JointId.THUMB_SWING: rpdo.th_swing,
+                JointId.THUMB_ROTATION: rpdo.th_rot,
+                JointId.FF_PIP: rpdo.ff_pip,
+                JointId.FF_MCP: rpdo.ff_mcp,
+                JointId.FF_SWING: rpdo.ff_swing,
+                JointId.MF_PIP: rpdo.mf_pip,
+                JointId.MF_MCP: rpdo.mf_mcp,
+                JointId.RF_PIP: rpdo.rf_pip,
+                JointId.RF_MCP: rpdo.rf_mcp,
+                JointId.LF_PIP: rpdo.lf_pip,
+                JointId.LF_MCP: rpdo.lf_mcp,
+            }
+            passive_joints = {
+                JointId.THUMB_DIP, JointId.FF_DIP, JointId.MF_DIP,
+                JointId.RF_DIP, JointId.LF_DIP,
+            }
+
             for joint in joints:
-                # 应用速度和力矩限制检查
                 self._check_speed_limit(joint, mode)
                 self._check_torque_limit(joint, mode)
-                # 应用关节角度限制检查
-                if joint.id == JointId.THUMB_PIP:
-                    self._check_joint_limit(joint, self._th_pip_limit)
-                    self._joint_to_pdo(joint, rpdo.th_pip)
-                elif joint.id == JointId.THUMB_MCP:
-                    self._check_joint_limit(joint, self._th_mcp_limit)
-                    self._joint_to_pdo(joint, rpdo.th_mcp)
-                elif joint.id == JointId.THUMB_SWING:
-                    self._check_joint_limit(joint, self._th_swing_limit)
-                    self._joint_to_pdo(joint, rpdo.th_swing)
-                elif joint.id == JointId.THUMB_ROTATION:
-                    self._check_joint_limit(joint, self._th_rot_limit)
-                    self._joint_to_pdo(joint, rpdo.th_rot)
-                elif joint.id == JointId.FF_PIP:
-                    self._check_joint_limit(joint, self._ff_pip_limit)
-                    self._joint_to_pdo(joint, rpdo.ff_pip)
-                elif joint.id == JointId.FF_MCP:
-                    self._check_joint_limit(joint, self._ff_mcp_limit)
-                    self._joint_to_pdo(joint, rpdo.ff_mcp)
-                elif joint.id == JointId.FF_SWING:
-                    self._check_joint_limit(joint, self._ff_swing_limit)
-                    self._joint_to_pdo(joint, rpdo.ff_swing)
-                elif joint.id == JointId.MF_PIP:
-                    self._check_joint_limit(joint, self._mf_pip_limit)
-                    self._joint_to_pdo(joint, rpdo.mf_pip)
-                elif joint.id == JointId.MF_MCP:
-                    self._check_joint_limit(joint, self._mf_mcp_limit)
-                    self._joint_to_pdo(joint, rpdo.mf_mcp)
-                elif joint.id == JointId.RF_PIP:
-                    self._check_joint_limit(joint, self._rf_pip_limit)
-                    self._joint_to_pdo(joint, rpdo.rf_pip)
-                elif joint.id == JointId.RF_MCP:
-                    self._check_joint_limit(joint, self._rf_mcp_limit)
-                    self._joint_to_pdo(joint, rpdo.rf_mcp)
-                elif joint.id == JointId.LF_PIP:
-                    self._check_joint_limit(joint, self._lf_pip_limit)
-                    self._joint_to_pdo(joint, rpdo.lf_pip)
-                elif joint.id == JointId.LF_MCP:
-                    self._check_joint_limit(joint, self._lf_mcp_limit)
-                    self._joint_to_pdo(joint, rpdo.lf_mcp)
+
+                if mode == CtrlMode.POSITION and joint.id in self._joint_limits:
+                    self._check_joint_limit(joint, self._joint_limits[joint.id])
+
+                if joint.id in joint_pdo_map:
+                    self._joint_to_pdo(joint, joint_pdo_map[joint.id])
+                elif joint.id in passive_joints:
+                    logger.debug(f"Skipping passive joint: {JointId(joint.id).name}")
+                    continue
                 else:
                     logger.warning(f"[Joint] Invalid joint ID: {joint.id}")
                     return False
@@ -705,6 +724,12 @@ class DexHand(object):
                         state=State(joint_tpdo.state),
                         error_code=ErrorCode(joint_tpdo.error)
                     ))
+
+                # 规范化角度：避免 -0.0
+                angle = joint_tpdo.angle
+                if abs(angle) < 1e-10:
+                    angle = 0.0
+
                 joints.append(
                     Joint(
                         id=joint_id,
@@ -891,3 +916,115 @@ class DexHand(object):
                 f"Failed to communicate with device: {e}",
                 reason=str(e)
             ) from e
+
+    # ==================== 碰撞检测相关方法 ====================
+
+    def set_safety_margin(self, margin: float) -> None:
+        """
+        设置碰撞检测的安全边距
+
+        Args:
+            margin: 安全边距，范围 [0.0, 1.0]
+                    0.0 = 无边距（精确接触）
+                    1.0 = 最大边距（2mm）
+
+        Raises:
+            ValueError: 如果 margin 超出 [0.0, 1.0] 范围
+
+        Example:
+            >>> hand = DexHand()
+            >>> hand.open(CommType.ETHERCAT, "auto")
+            >>> hand.set_safety_margin(0.5)  # 设置1mm安全边距
+        """
+        # 限制在有效范围内
+        if margin < 0.0 or margin > 1.0:
+            logger.warning(
+                f"Safety margin {margin} out of range [0.0, 1.0], clamping to valid range"
+            )
+            margin = max(0.0, min(1.0, margin))
+
+        self._safety_margin = margin
+        logger.info(f"Collision safety margin set to {margin} ({margin * 2:.1f} mm)")
+
+    def _ensure_collision_checker(self):
+        """确保碰撞检测器已初始化（延迟加载）"""
+        if self._collision_checker is None:
+            self._collision_checker = CollisionSDK()
+        return self._collision_checker
+
+    def check_collision(self, joints: list[Joint]) -> CollisionCheckResult:
+        """
+        检查目标关节姿态是否会发生碰撞。
+
+        此方法仅进行碰撞检测并返回结果，不会执行任何关节运动。
+        如果检测到碰撞，返回的结果中会包含安全角度。
+
+        Args:
+            joints: 关节列表。未指定的关节将使用当前关节角度（设备已连接）
+                    或 0°（设备未连接）填充。
+
+        Returns:
+            CollisionCheckResult: 碰撞检测结果，包含 has_collision、safe_angles 和
+                                   collision_pairs。
+
+        Example:
+            >>> hand = DexHand()
+            >>> result = hand.check_collision(joints)
+            >>> if result.has_collision:
+            ...     print("检测到碰撞，使用安全角度")
+            ...     joints = hand._angles_to_joints(result.safe_angles)
+        """
+        collision_checker = self._ensure_collision_checker()
+
+        # 获取当前关节状态（用于填充未指定的关节）
+        current_joints = None
+        if self._opened:
+            try:
+                current_joints = self.get_joints()
+            except Exception:
+                logger.debug("无法获取当前关节状态，使用默认值（0度）")
+
+        # 转换 Joint 列表为 numpy 数组
+        target_angles = joints_to_nparray(joints, current_joints)
+
+        # 调用 CollisionSDK 进行碰撞检测
+        result = collision_checker.collision_check(
+            target_angles=target_angles,
+            safety_margin=self._safety_margin
+        )
+
+        # 若未碰撞，将 safe_angles 设为 target_angles 便于调用方统一处理
+        if not result.has_collision:
+            result = CollisionCheckResult(
+                has_collision=False,
+                safe_angles=target_angles.copy(),
+                collision_pairs=None,
+            )
+        return result
+
+    def _joints_to_angles(self, joints: list[Joint], current_joints: list[Joint] | None = None):
+        """
+        将Joint列表转换为numpy数组（私有方法）
+
+        Args:
+            joints: 关节列表
+            current_joints: 当前关节状态（用于填充未指定的关节）
+
+        Returns:
+            np.ndarray: 18个关节角度的数组
+        """
+        return joints_to_nparray(joints, current_joints)
+
+    def _angles_to_joints(self, angles, speed: int = 100, torque: int = 100) -> list[Joint]:
+        """
+        将numpy数组转换为Joint列表（私有方法）
+
+        Args:
+            angles: 18个关节角度的numpy数组
+            speed: 所有关节的速度参数
+            torque: 所有关节的力矩参数
+
+        Returns:
+            list[Joint]: 18个Joint对象的列表
+        """
+        return nparray_to_joints(angles, speed, torque)

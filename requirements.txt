@@ -2,3 +2,4 @@ pysoem
 netifaces
 setuptools
 sphinx
+collision_sdk

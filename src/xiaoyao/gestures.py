@@ -32,7 +32,7 @@ GESTURE_DEFINITIONS: Dict[GestureType, Dict[JointId, float]] = {
     GestureType.OPEN_HAND: {
         JointId.THUMB_PIP: 0,
         JointId.THUMB_MCP: 0,
-        JointId.THUMB_SWING: 0,
+        JointId.THUMB_SWING: 20,
         JointId.THUMB_ROTATION: 0,
         JointId.FF_PIP: 0,
         JointId.FF_MCP: 0,
@@ -50,7 +50,7 @@ GESTURE_DEFINITIONS: Dict[GestureType, Dict[JointId, float]] = {
         JointId.THUMB_SWING: 20,
         JointId.THUMB_ROTATION: 0,
         JointId.FF_PIP: 75,
-        JointId.FF_MCP: 85,
+        JointId.FF_MCP: 80,
         JointId.FF_SWING: 0,
         JointId.MF_PIP: 85,
         JointId.MF_MCP: 85,
@@ -78,9 +78,9 @@ GESTURE_DEFINITIONS: Dict[GestureType, Dict[JointId, float]] = {
         JointId.THUMB_PIP: 0,
         JointId.THUMB_MCP: 0,
         JointId.THUMB_SWING: 20,
-        JointId.THUMB_ROTATION: 0,
+        JointId.THUMB_ROTATION: -10,
         JointId.FF_PIP: 75,
-        JointId.FF_MCP: 85,
+        JointId.FF_MCP: 80,
         JointId.FF_SWING: 0,
         JointId.MF_PIP: 85,
         JointId.MF_MCP: 85,
@@ -93,9 +93,9 @@ GESTURE_DEFINITIONS: Dict[GestureType, Dict[JointId, float]] = {
         JointId.THUMB_PIP: 0,
         JointId.THUMB_MCP: 0,
         JointId.THUMB_SWING: 20,
-        JointId.THUMB_ROTATION: 0,
+        JointId.THUMB_ROTATION: -10,
         JointId.FF_PIP: 75,
-        JointId.FF_MCP: 85,
+        JointId.FF_MCP: 80,
         JointId.FF_SWING: 0,
         JointId.MF_PIP: 85,
         JointId.MF_MCP: 85,
@@ -153,16 +153,20 @@ def _wait_for_completion(hand: DexHand) -> bool:
     Returns:
         bool: 成功返回 True，失败返回 False
     """
-    while True:
-        hand_info = hand.get_hand_info()
-        if hand_info.state == State.RUNNING:
-            break
-        time.sleep(0.01)  # 避免 CPU 占用过高
+    start_time = time.time()
+    has_been_running = False
 
     while True:
         hand_info = hand.get_hand_info()
-        if hand_info.state != State.RUNNING:
+        if hand_info.state == State.RUNNING:
+            has_been_running = True
+        elif has_been_running:
+            # 场景 A：从 RUNNING 变为 STOPPED，立刻判定完成
             break
+        elif time.time() - start_time >= 0.02:
+            # 场景 B：一直是 STOPPED，20ms 观察期后判定完成
+            break
+        time.sleep(0.005)
 
     if hand_info.state in [State.ABNORMAL_RUNNING, State.PROTECTIVE_STOPED] or \
        hand_info.error != ErrorCode.NORMAL:
@@ -179,21 +183,3 @@ def get_all_gestures() -> list[GestureType]:
     """
     return list(GestureType)
 
-
-def get_gesture_name(gesture: GestureType) -> str:
-    """获取手势的中文名称
-
-    Args:
-        gesture: 手势类型
-
-    Returns:
-        str: 手势中文名称
-    """
-    names = {
-        GestureType.OPEN_HAND: "张开手",
-        GestureType.FIST: "握拳",
-        GestureType.OK: "OK手势",
-        GestureType.THUMBS_UP: "竖大拇指",
-        GestureType.SIX_SIGN: "六手势",
-    }
-    return names.get(gesture, "未知手势")

@@ -11,7 +11,7 @@ configure_logging(level=logging.INFO)
 pull_tightly = {
     JointId.THUMB_PIP: math.radians(0),
     JointId.THUMB_MCP: math.radians(0),
-    JointId.THUMB_SWING: math.radians(0),
+    JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
     JointId.FF_PIP: math.radians(25),
     JointId.FF_MCP: math.radians(35),
@@ -28,7 +28,7 @@ open_hand = {
     # 全部手指都在零位
     JointId.THUMB_PIP: math.radians(0),
     JointId.THUMB_MCP: math.radians(0),
-    JointId.THUMB_SWING: math.radians(0),
+    JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
     JointId.FF_PIP: math.radians(0),
     JointId.FF_MCP: math.radians(0),

@@ -11,9 +11,9 @@ logger = logging.getLogger("xiaoyao")
 
 
 konck_tightly = {
-    JointId.THUMB_PIP: math.radians(75),
+    JointId.THUMB_PIP: math.radians(60),
     JointId.THUMB_MCP: math.radians(0),
-    JointId.THUMB_SWING: math.radians(0),
+    JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
     JointId.FF_PIP: math.radians(75),
     JointId.FF_MCP: math.radians(0),
@@ -22,7 +22,7 @@ konck_tightly = {
     JointId.MF_MCP: math.radians(0),
     JointId.RF_PIP: math.radians(75),
     JointId.RF_MCP: math.radians(70),
-    JointId.LF_PIP: math.radians(75),
+    JointId.LF_PIP: math.radians(74),
     JointId.LF_MCP: math.radians(70),
 }
 
@@ -30,7 +30,7 @@ open_hand = {
     # 全部手指都在零位
     JointId.THUMB_PIP: math.radians(0),
     JointId.THUMB_MCP: math.radians(0),
-    JointId.THUMB_SWING: math.radians(0),
+    JointId.THUMB_SWING: math.radians(20),
     JointId.THUMB_ROTATION: math.radians(0),
     JointId.FF_PIP: math.radians(0),
     JointId.FF_MCP: math.radians(0),
