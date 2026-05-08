@@ -6,15 +6,16 @@ from .config import AdaptiveGraspConfig
 from .utils import clip
 
 
-class JointCommandBuilder:
-    _TORQUE_JOINTS = (
-        JointId.THUMB_PIP, JointId.THUMB_MCP,
-        JointId.FF_PIP, JointId.FF_MCP,
-        JointId.MF_PIP, JointId.MF_MCP,
-        JointId.RF_PIP, JointId.RF_MCP,
-        JointId.LF_PIP, JointId.LF_MCP,
-    )
+TORQUE_CONTROL_JOINTS = (
+    JointId.THUMB_PIP, JointId.THUMB_MCP,
+    JointId.FF_PIP, JointId.FF_MCP,
+    JointId.MF_PIP, JointId.MF_MCP,
+    JointId.RF_PIP, JointId.RF_MCP,
+    JointId.LF_PIP, JointId.LF_MCP,
+)
 
+
+class JointCommandBuilder:
     def __init__(self, config: AdaptiveGraspConfig, torque_joints: tuple[JointId, ...]):
         self._config = config
         self._torque_joints = torque_joints
@@ -59,7 +60,7 @@ class JointCommandBuilder:
             
             if joint_id in active
             else Joint(id=joint_id, angle=0.0, speed=0, torque=0)
-            for joint_id in JointCommandBuilder._TORQUE_JOINTS
+            for joint_id in TORQUE_CONTROL_JOINTS
         ]
         joints += [
             Joint(id=JointId.THUMB_ROTATION, angle=0.0, speed=0, torque=5),

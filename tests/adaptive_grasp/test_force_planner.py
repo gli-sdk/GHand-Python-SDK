@@ -174,6 +174,41 @@ def test_fragile_mode_limits_torque_and_step():
     assert decision.next_torque <= int(20 * 0.7)
 
 
+def test_force_planner_uses_profile_base_hold_torque():
+    cfg = AdaptiveGraspConfig(
+        position_torque_limit=20,
+        K_p=0.0,
+        K_i=0.0,
+        K_d=0.0,
+    )
+    profile = ObjectProfile(
+        name="soft_object",
+        weight_kg=0.05,
+        material="soft",
+        safe_force_min=0.5,
+        safe_force_max=3.0,
+        friction_coeff=0.8,
+        is_fragile=False,
+        hold_strategy="adaptive",
+        base_hold_torque=12,
+    )
+    planner = ForcePlanner(cfg, profile)
+
+    analysis = TactileAnalysis(
+        variance=0.0,
+        slip_risk=0.0,
+        direction_distance=0.0,
+        friction_utilization=0.0,
+        slip_confirmed=False,
+        finger_fz={TactileSensorId.THUMB: 0.5},
+        total_fz=0.5,
+    )
+    angles = {JointId.THUMB_MCP: 0.0, JointId.THUMB_PIP: 0.0}
+    decision = planner.compute(analysis, angles)[TactileSensorId.THUMB]
+
+    assert decision.next_torque == 12
+
+
 def test_hold_strategy_none_defaults_to_fixed():
     profile = ObjectProfile(
         name="unknown",

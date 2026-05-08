@@ -1,4 +1,5 @@
 import logging
+import math
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Any, Optional
@@ -15,6 +16,7 @@ from .visualization import TactileVisualizer
 
 _logger = logging.getLogger("xiaoyao.adaptive_grasp.adaptive_hold_loop")
 _MAX_CONSECUTIVE_MOVE_FAILURES = 3
+_CONTACT_ANGLE_LIMIT_RAD = math.radians(5.0)
 
 ForceDecisions = dict[TactileSensorId, ForceDecision]
 JointAngles = dict[JointId, float]
@@ -144,7 +146,7 @@ class HoldController:
         current_angles: JointAngles,
     ) -> _HoldCommand:
         if self._force_planner is None:
-            return _HoldCommand(angles=current_angles, torque=self._current_torque)
+            return _HoldCommand(angles=current_angles, torque=self._default_hold_torque())
 
         decisions = self._force_planner.compute(analysis, current_angles)
         next_angles = self._merge_target_angles(current_angles, decisions)
@@ -169,6 +171,11 @@ class HoldController:
         if not decisions:
             return self._current_torque
         return next(iter(decisions.values())).next_torque
+
+    def _default_hold_torque(self) -> int:
+        if self.config.adaptive_hold_command_mode == "torque":
+            return self.config.adaptive_hold_torque
+        return self._current_torque
 
     def _execute_hold_command(
         self,
@@ -201,11 +208,25 @@ class HoldController:
 
     def _build_hold_payload(self, command: _HoldCommand) -> tuple[list[Joint], CtrlMode, int]:
         if self.config.adaptive_hold_command_mode == "torque":
-            torque = self.config.adaptive_hold_torque
+            torque = command.torque
             return self._joint_builder.hold_torque_command(torque), CtrlMode.TORQUE, torque
 
-        joints = self._joint_builder.hold_position_command(command.torque, command.angles)
+        angles = self._clamp_to_contact_window(command.angles)
+        joints = self._joint_builder.hold_position_command(command.torque, angles)
         return joints, CtrlMode.POSITION, command.torque
+
+    def _clamp_to_contact_window(self, angles: JointAngles) -> JointAngles:
+        if not self._contact_joint_angles:
+            return angles
+
+        clamped_angles = dict(angles)
+        for joint_id, base_angle in self._contact_joint_angles.items():
+            if joint_id not in clamped_angles:
+                continue
+            lower = base_angle - _CONTACT_ANGLE_LIMIT_RAD
+            upper = base_angle + _CONTACT_ANGLE_LIMIT_RAD
+            clamped_angles[joint_id] = max(lower, min(clamped_angles[joint_id], upper))
+        return clamped_angles
 
     def _get_current_angles(self, joint_feedback: Optional[list[Joint]]) -> JointAngles:
         if joint_feedback:

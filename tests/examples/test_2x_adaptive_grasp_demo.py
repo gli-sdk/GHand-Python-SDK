@@ -122,6 +122,13 @@ def test_build_config_accepts_adaptive_hold_command_options():
     assert captured_kwargs["default_object"] == "balloon"
 
 
+def test_print_hold_status_uses_newline(capsys):
+    demo.print_hold_status("adaptive_hold", 4)
+
+    captured = capsys.readouterr()
+    assert captured.out == "state=adaptive_hold     ; torque=  4\n"
+
+
 def test_main_zeroes_tactile_after_open(monkeypatch):
     monkeypatch.setattr(demo, "DexHand", _MockHand)
     monkeypatch.setattr(demo, "AdaptiveGrasper", _InterruptingGrasper)

@@ -1,11 +1,13 @@
 import math
 import threading
 import time
+from typing import Callable
 
 import pytest
 
 import xiaoyao
 from xiaoyao.adaptive_grasp import AdaptiveGraspConfig, AdaptiveGrasper, GraspState
+from xiaoyao.adaptive_grasp.adaptive_hold_loop import HoldResult, HoldStepResult
 from xiaoyao.adaptive_grasp.object_profile import ObjectProfile
 from xiaoyao.adaptive_grasp.force_planner import ForcePlanner
 from xiaoyao.adaptive_grasp.safety import SafetyReport, SafetyStatus
@@ -263,6 +265,59 @@ def test_perform_release_from_control_thread_does_not_deadlock(monkeypatch):
     assert result is True
     assert g.state == GraspState.COMPLETED
     assert g._running is False
+
+
+def test_cleanup_grasp_sets_stopped_state():
+    hand = _MockHand()
+    g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
+    g.state = GraspState.CLOSING_TO_CONTACT
+    g._running = True
+
+    g._cleanup_grasp(state=GraspState.STOPPED)
+
+    assert g.state == GraspState.STOPPED
+    assert g._running is False
+
+
+def test_adaptive_control_loop_cleans_up_when_hold_step_errors(monkeypatch):
+    hand = _MockHand()
+    g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
+    g._running = True
+    g.state = GraspState.ADAPTIVE_HOLD
+    g._adaptive_hold_loop = type(
+        "_ErrorHoldLoop",
+        (),
+        {"run_step": lambda self, current_time: HoldStepResult(result=HoldResult.ERROR)},
+    )()
+    stop_calls = []
+    monkeypatch.setattr(g._sensor, "stop", lambda clear_joint_feedback=False: stop_calls.append(clear_joint_feedback))
+
+    g._adaptive_control_loop()
+
+    assert g.state == GraspState.ERROR
+    assert g._running is False
+    assert stop_calls == [False]
+
+
+def test_adaptive_control_loop_catches_unexpected_hold_exceptions(monkeypatch):
+    hand = _MockHand()
+    g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
+    g._running = True
+    g.state = GraspState.ADAPTIVE_HOLD
+
+    class _RaisingHoldLoop:
+        def run_step(self, current_time):
+            raise RuntimeError("hold boom")
+
+    g._adaptive_hold_loop = _RaisingHoldLoop()
+    stop_calls = []
+    monkeypatch.setattr(g._sensor, "stop", lambda clear_joint_feedback=False: stop_calls.append(clear_joint_feedback))
+
+    g._adaptive_control_loop()
+
+    assert g.state == GraspState.ERROR
+    assert g._running is False
+    assert stop_calls == [False]
 
 
 def test_wait_for_visualizer_close_blocks_on_visualizer(monkeypatch):

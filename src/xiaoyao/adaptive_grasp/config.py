@@ -63,15 +63,15 @@ _PRE_GRASP_PRESET_DEGREE = {
         JointId.LF_PIP: 0.0,
         JointId.RF_MCP: 0.0,
         JointId.RF_PIP: 0.0,
-        JointId.MF_MCP: 72.0,
-        JointId.MF_PIP: 0.0,
+        JointId.MF_MCP: 49.0,
+        JointId.MF_PIP: 10.0,
         JointId.FF_SWING: 0.0,
-        JointId.FF_MCP: 63.0,
-        JointId.FF_PIP: 0.0,
+        JointId.FF_MCP: 41.0,
+        JointId.FF_PIP: 14.0,
         JointId.THUMB_ROTATION: 0.0,
-        JointId.THUMB_SWING: 90.0,
-        JointId.THUMB_MCP: 0.0,
-        JointId.THUMB_PIP: 11.0,
+        JointId.THUMB_SWING: 85.0,
+        JointId.THUMB_MCP: 4.0,
+        JointId.THUMB_PIP: 4.0,
     },
     # 四指握
     "four_finger_grasp": {
@@ -143,6 +143,15 @@ elif object == "balloon":
     _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_SWING] = 80.0
     _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_MCP] = 3.0
     _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_PIP] = 5.0
+elif object == "paper_cup":
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.FF_MCP] = 25.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.FF_PIP] = 22.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.MF_MCP] = 31.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.MF_PIP] = 29.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.THUMB_ROTATION] = 0.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.THUMB_SWING] = 80.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.THUMB_MCP] = 2.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.THUMB_PIP] = 3.0
 
 @dataclass
 class PerFingerPidConfig:
@@ -233,8 +242,8 @@ class AdaptiveGraspConfig:
     # risk and K_n with normal-force over-limit error.
     K_s: float = 1.0 # Slip-risk feedforward gain K_s.
     K_n: float = 1.0 # Normal-force over-limit suppression gain K_n.
-    K_p: float = 0.0 # PID 比例增益 K_p。
-    K_i: float = 0.0 # PID 积分增益 K_i。
+    K_p: float = 0.2 # PID 比例增益 K_p。
+    K_i: float = 0.2 # PID 积分增益 K_i。
     K_d: float = 0.000 # PID 微分增益 K_d。
     # 积分项限幅（防积分饱和）
     I_min: float = -1.0 # PID 积分项下限（防积分饱和）。

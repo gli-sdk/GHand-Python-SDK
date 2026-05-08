@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from email.mime import base
 from typing import Literal, Optional
 
 
@@ -24,6 +25,7 @@ class ObjectProfile:
     roughness: Optional[float] = None
     shape: Optional[str] = None
     hold_strategy: Optional[HoldStrategy] = None
+    base_hold_torque: Optional[int] = None
 
 
 class ObjectProfileRegistry:
@@ -58,6 +60,7 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         is_fragile=False,
         material="metal",
         hold_strategy="slip_triggered",
+        base_hold_torque=20,
     ),
     ObjectProfile(
         name="plastic",
@@ -68,6 +71,7 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         is_fragile=False,
         material="plastic",
         hold_strategy="slip_triggered",
+        base_hold_torque=20,
     ),
     ObjectProfile(
         name="glass",
@@ -78,6 +82,7 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         is_fragile=True,
         material="glass",
         hold_strategy="adaptive",
+        base_hold_torque=20,
     ),
     ObjectProfile(
         name="tofu",
@@ -88,6 +93,7 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         is_fragile=True,
         material="tofu",
         hold_strategy="fixed",
+        base_hold_torque=10,
     ),
     ObjectProfile(
         name="fruit",
@@ -118,7 +124,19 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         is_fragile=True,
         material="latex",
         hold_strategy="adaptive",
+        base_hold_torque=10,
     ),
+    ObjectProfile(
+        name="paper_cup",
+        weight_kg=0.01,
+        safe_force_min=0.5,
+        safe_force_max=1.0,
+        friction_coeff=0.9,
+        is_fragile=True,
+        material="paper",
+        hold_strategy="adaptive",
+        base_hold_torque=5,
+    )
 )
 
 

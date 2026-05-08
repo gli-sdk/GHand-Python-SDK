@@ -33,13 +33,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--base_torque", "--base-torque", type=int, default=20)
     parser.add_argument("--max_torque", "--max-torque", type=int, default=80)
     parser.add_argument("--contact_threshold_z", "--contact-threshold-z", type=float, default=0.4)
-    parser.add_argument("--pre_grasp_preset", "--pre-grasp-preset", default="two_finger_pinch")
+    parser.add_argument("--pre_grasp_preset", "--pre-grasp-preset", default="three_finger_pinch")
     parser.add_argument("--hold_time", "--hold-time", type=float, default=50.0)
-    parser.add_argument("--default_object", dest="object", default="balloon")
+    parser.add_argument("--default_object", dest="object", default="paper_cup")
     parser.add_argument(
         "--hold-command-mode",
         choices=("position", "torque"),
-        default="position",
+        default="torque",
         help="Command mode used in adaptive hold.",
     )
     parser.add_argument("--adaptive-hold-torque", type=int, default=20)
@@ -65,6 +65,11 @@ def build_config(args: argparse.Namespace) -> AdaptiveGraspConfig:
     if args.object is not None:
         kwargs["default_object"] = args.object
     return AdaptiveGraspConfig(**kwargs)
+
+
+def print_hold_status(state: str, torque: int) -> None:
+    status_line = f"state={state:<18}; torque={torque:>3}"
+    print(status_line, flush=True)
 
 
 class TactileLogger:
@@ -141,10 +146,8 @@ def main() -> None:
             print("Failed to open tactile sensors.")
             return
 
-        # if not hand.tactile_zero():
-        #     print("Failed to zero tactile sensors.")
-        #     return
-        # print("Tactile sensors zeroed.")
+        hand.tactile_zero()
+        time.sleep(0.5)
 
         dist_dir = ROOT / "dist"
         logger = TactileLogger(hand, dist_dir)
@@ -171,12 +174,11 @@ def main() -> None:
         print("Holding object...")
         while grasper.get_state() == GraspState.ADAPTIVE_HOLD:
             state_val = grasper.get_state().value
-            status_line = f"state={state_val:<18}; torque={grasper.current_torque:>3}"
-            print(f"\r{status_line}", end="", flush=True)
+            print_hold_status(state_val, grasper.current_torque)
             logger.write_row(state_val, grasper.current_torque)
             grasper.poll_visualizer()
             time.sleep(0.1)
-        print(f"\nFinal state: {grasper.get_state().value}")
+        print(f"Final state: {grasper.get_state().value}")
 
         grasper.release()
         grasper.wait_for_visualizer_close()

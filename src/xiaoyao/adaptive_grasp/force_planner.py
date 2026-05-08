@@ -6,6 +6,7 @@ from xiaoyao.dexhand import JointId, TactileSensorId
 
 from .config import AdaptiveGraspConfig
 from .object_profile import ObjectProfile
+from .pid_controller import PidController, PidParams
 from .tactility import PerFingerAnalysis, TactileAnalysis
 from .utils import JOINT_TO_FINGER, clip
 
@@ -32,22 +33,6 @@ class ForceDecision:
 ForceDecisions = dict[TactileSensorId, ForceDecision]
 
 
-@dataclass
-class _PidParams:
-    K_p: float
-    K_i: float
-    K_d: float
-    I_min: float
-    I_max: float
-
-
-class _FingerPidState:
-    def __init__(self):
-        self.integral: float = 0.0
-        self.prev_error: float = 0.0
-        self._initialized: bool = False
-
-
 class ForcePlanner:
     """Compute adaptive grasp force targets and per-finger joint corrections."""
 
@@ -57,7 +42,7 @@ class ForcePlanner:
         self.F_init = self._compute_F_init()
         self.is_fragile_mode = profile.is_fragile if profile else False
 
-        self._finger_pid: dict[TactileSensorId, _FingerPidState] = {}
+        self._finger_pid: dict[TactileSensorId, PidController] = {}
         self._last_compute_time: Optional[float] = None
         self._get_monotonic_time = time.monotonic
 
@@ -253,28 +238,11 @@ class ForcePlanner:
         F_n_ref: float,
         dt: float,
     ) -> float:
-        pid_state = self._get_or_create_pid(finger)
         error = F_n_ref - fz
-        params = self._get_pid_params(finger)
-
-        pid_state.integral = clip(
-            pid_state.integral + error * dt,
-            params.I_min,
-            params.I_max,
-        )
-        if pid_state._initialized:
-            derivative = (error - pid_state.prev_error) / dt
-        else:
-            derivative = 0.0
-            pid_state._initialized = True
-        pid_state.prev_error = error
+        pid_controller = self._get_or_create_pid(finger)
 
         feedforward_u = self._compute_feedforward_control_u(s_k, fz, fz_limit)
-        pid_u = (
-            params.K_p * error
-            + params.K_i * pid_state.integral
-            + params.K_d * derivative
-        )
+        pid_u = pid_controller.compute(error=error, dt=dt)
         control_u = feedforward_u + pid_u
         if self.is_fragile_mode and fz >= fz_limit:
             control_u = min(control_u, 0.0)
@@ -341,14 +309,18 @@ class ForcePlanner:
         return self.config.max_normal_force_per_finger
 
     def _compute_next_torque(self) -> int:
-        next_torque = self.config.position_torque_limit
+        next_torque = (
+            self.profile.base_hold_torque
+            if self.profile is not None and self.profile.base_hold_torque is not None
+            else self.config.position_torque_limit
+        )
         if self.is_fragile_mode:
             next_torque = int(next_torque * self.config.fragile_torque_reduction)
         return next_torque
 
-    def _get_or_create_pid(self, finger: TactileSensorId) -> _FingerPidState:
+    def _get_or_create_pid(self, finger: TactileSensorId) -> PidController:
         if finger not in self._finger_pid:
-            self._finger_pid[finger] = _FingerPidState()
+            self._finger_pid[finger] = PidController(self._get_pid_params(finger))
         return self._finger_pid[finger]
 
     def _get_pid_param(self, finger: TactileSensorId, param_name: str) -> float:
@@ -359,8 +331,8 @@ class ForcePlanner:
                 return value
         return getattr(self.config, param_name)
 
-    def _get_pid_params(self, finger: TactileSensorId) -> _PidParams:
-        return _PidParams(
+    def _get_pid_params(self, finger: TactileSensorId) -> PidParams:
+        return PidParams(
             K_p=self._get_pid_param(finger, "K_p"),
             K_i=self._get_pid_param(finger, "K_i"),
             K_d=self._get_pid_param(finger, "K_d"),

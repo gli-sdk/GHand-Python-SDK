@@ -14,7 +14,7 @@ from .force_planner import ForcePlanner, ForceDecision
 from .safety import SafetyMonitor, SafetyReport
 from .visualization import TactileVisualizer
 from .utils import clip, JOINT_TO_FINGER
-from .joint_builder import JointCommandBuilder
+from .joint_builder import JointCommandBuilder, TORQUE_CONTROL_JOINTS
 from .grasp_sequence import ContactSnapshot, PhaseController
 from .adaptive_hold_loop import HoldController, HoldResult
 
@@ -22,14 +22,6 @@ _logger = logging.getLogger("xiaoyao.adaptive_grasp.adaptive_grasp_manager")
 
 
 class AdaptiveGrasper:
-    _TORQUE_JOINTS = (
-        JointId.THUMB_PIP, JointId.THUMB_MCP,
-        JointId.FF_PIP, JointId.FF_MCP,
-        JointId.MF_PIP, JointId.MF_MCP,
-        JointId.RF_PIP, JointId.RF_MCP,
-        JointId.LF_PIP, JointId.LF_MCP,
-    )
-
     def __init__(self, hand: DexHand, config: Optional[AdaptiveGraspConfig] = None):
         self.hand = hand
         self.config = config or AdaptiveGraspConfig()
@@ -41,7 +33,7 @@ class AdaptiveGrasper:
         self._get_monotonic_time = time.monotonic
 
         self._torque_joints = tuple(
-            j for j in AdaptiveGrasper._TORQUE_JOINTS
+            j for j in TORQUE_CONTROL_JOINTS
             if JOINT_TO_FINGER.get(j) in self.config.active_fingers
         )
 
@@ -77,20 +69,8 @@ class AdaptiveGrasper:
 
     def grasp_core(self, object_profile: Optional[ObjectProfile] = None) -> bool:
         try:
-            self._running = True
-            self._reset_runtime_state()
-            self._object_profile = object_profile or ObjectProfileRegistry.get(self.config.default_object)
-            self._force_planner = ForcePlanner(self.config, self._object_profile)
-            self._tactile.set_friction_coeff(
-                self._object_profile.friction_coeff if self._object_profile else self.config.default_friction_coeff,
-            )
-            self._start_sensor_subscription()
-
-            self._grasp_sequence = PhaseController(
-                self.hand, self._sensor, self._safety, self._joint_builder,
-                self.config, self._get_monotonic_time, on_state_change=self._set_state,
-            )
-            result = self._grasp_sequence.run(self._force_planner, lambda: self._running)
+            self._prepare_grasp_runtime(object_profile)
+            result = self._run_grasp_sequence()
             if not result.success:
                 if result.should_release:
                     self._perform_release(wait_control_thread=False)
@@ -116,8 +96,7 @@ class AdaptiveGrasper:
     def _cleanup_grasp(self, state: GraspState = GraspState.STOPPED) -> None:
         self._running = False
         self._stop_sensor_subscription()
-        if state != GraspState.STOPPED:
-            self.state = state
+        self.state = state
 
     def release(self) -> bool:
         return self._perform_release(wait_control_thread=True)
@@ -181,52 +160,88 @@ class AdaptiveGrasper:
             self.hand, self._sensor, self._safety, self._tactile,
             self._force_planner, self._visualizer, self._joint_builder,
             self.config, self.current_torque,
-            contact_joint_angles=(
-                self._last_contact_snapshot.joint_angles
-                if self._last_contact_snapshot is not None
-                else None
-            ),
+            contact_joint_angles=self._contact_joint_angles(),
         )
         self._control_thread = threading.Thread(target=self._adaptive_control_loop, daemon=True)
         self._control_thread.start()
         if self._visualizer is not None:
             self._visualizer.start()
 
+    def _prepare_grasp_runtime(self, object_profile: Optional[ObjectProfile]) -> None:
+        self._running = True
+        self._reset_runtime_state()
+        self._object_profile = object_profile or ObjectProfileRegistry.get(self.config.default_object)
+        self._force_planner = ForcePlanner(self.config, self._object_profile)
+        self._tactile.set_friction_coeff(self._runtime_friction_coeff())
+        self._start_sensor_subscription()
+
+    def _runtime_friction_coeff(self) -> float:
+        if self._object_profile is not None:
+            return self._object_profile.friction_coeff
+        return self.config.default_friction_coeff
+
+    def _run_grasp_sequence(self):
+        self._grasp_sequence = PhaseController(
+            self.hand, self._sensor, self._safety, self._joint_builder,
+            self.config, self._get_monotonic_time, on_state_change=self._set_state,
+        )
+        return self._grasp_sequence.run(self._force_planner, lambda: self._running)
+
+    def _contact_joint_angles(self) -> Optional[dict[JointId, float]]:
+        if self._last_contact_snapshot is None:
+            return None
+        return self._last_contact_snapshot.joint_angles
+
     def _adaptive_control_loop(self) -> None:
-        while self._running:
-            step_start = self._get_monotonic_time()
-            if self._last_control_step_start_s is not None:
-                control_cycle_s = step_start - self._last_control_step_start_s
-                self._last_control_cycle_s = control_cycle_s
-                self._last_control_cycle_jitter_s = control_cycle_s - self.config.control_period_s
-            self._last_control_step_start_s = step_start
+        try:
+            while self._running:
+                step_start = self._get_monotonic_time()
+                self._update_control_cycle_timing(step_start)
 
-            if self._should_auto_release():
-                self._perform_release(wait_control_thread=False)
-                break
+                if self._should_auto_release():
+                    self._perform_release(wait_control_thread=False)
+                    break
 
-            step = self._adaptive_hold_loop.run_step(step_start)
-            self._last_tactile_analysis = step.tactile_analysis
-            self._last_safety_report = step.safety_report
-            self._last_force_decisions = step.force_decisions
-            if step.current_torque is not None:
-                self.current_torque = step.current_torque
+                step = self._adaptive_hold_loop.run_step(step_start)
+                self._record_hold_step(step, step_start)
 
-            tactile_data = self._sensor.tactile_data
-            self._last_tactile_data_age_s = self._sensor.data_age_s(step_start) if tactile_data is not None else None
+                if self._handle_hold_result(step.result):
+                    break
 
-            if step.result == HoldResult.AUTO_RELEASE:
-                self._perform_release(wait_control_thread=False)
-                break
-            if step.result == HoldResult.FAULT_RELEASE:
-                self._perform_release(wait_control_thread=False)
-                break
-            if step.result == HoldResult.ERROR:
-                self.state = GraspState.ERROR
-                self._running = False
-                break
+                time.sleep(self.config.control_period_s)
+        except Exception:
+            _logger.exception("adaptive control loop exception")
+            self._cleanup_grasp(state=GraspState.ERROR)
 
-            time.sleep(self.config.control_period_s)
+    def _update_control_cycle_timing(self, step_start: float) -> None:
+        if self._last_control_step_start_s is not None:
+            control_cycle_s = step_start - self._last_control_step_start_s
+            self._last_control_cycle_s = control_cycle_s
+            self._last_control_cycle_jitter_s = control_cycle_s - self.config.control_period_s
+        self._last_control_step_start_s = step_start
+
+    def _record_hold_step(self, step, step_start: float) -> None:
+        self._last_tactile_analysis = step.tactile_analysis
+        self._last_safety_report = step.safety_report
+        self._last_force_decisions = step.force_decisions
+        if step.current_torque is not None:
+            self.current_torque = step.current_torque
+
+        tactile_data = self._sensor.tactile_data
+        self._last_tactile_data_age_s = (
+            self._sensor.data_age_s(step_start)
+            if tactile_data is not None
+            else None
+        )
+
+    def _handle_hold_result(self, result: HoldResult) -> bool:
+        if result in (HoldResult.AUTO_RELEASE, HoldResult.FAULT_RELEASE):
+            self._perform_release(wait_control_thread=False)
+            return True
+        if result == HoldResult.ERROR:
+            self._cleanup_grasp(state=GraspState.ERROR)
+            return True
+        return False
 
     def _should_auto_release(self) -> bool:
         if self._adaptive_hold_started_at is None:
