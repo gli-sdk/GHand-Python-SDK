@@ -385,6 +385,19 @@ def test_adaptive_grasp_manager_accepts_none_config():
     assert grasper._sensor is not None
 
 
+def test_adaptive_grasper_constructor_does_not_zero_tactile():
+    class HandThatRejectsTactileZero(_MockHand):
+        def tactile_zero(self):
+            raise AssertionError("demo should decide when to zero tactile sensors")
+
+    grasper = AdaptiveGrasper(
+        HandThatRejectsTactileZero(),
+        AdaptiveGraspConfig(K_MCP=0.5, K_PIP=0.5),
+    )
+
+    assert grasper.state == GraspState.IDLE
+
+
 def test_grasp_core_sets_error_state_when_phase_fails(monkeypatch):
     hand = _MockHand()
     cfg = AdaptiveGraspConfig()
@@ -432,6 +445,41 @@ def test_grasp_core_releases_when_phase_requests_release(monkeypatch):
 
     assert grasper.grasp_core() is False
     assert release_calls == [False]
+
+
+def test_grasp_core_stores_contact_snapshot_for_adaptive_hold(monkeypatch):
+    hand = _MockHand()
+    cfg = AdaptiveGraspConfig(K_MCP=0.5, K_PIP=0.5)
+    grasper = AdaptiveGrasper(hand, cfg)
+
+    monkeypatch.setattr(grasper, "_start_sensor_subscription", lambda: None)
+    monkeypatch.setattr(grasper, "_adaptive_control_loop", lambda: None)
+
+    from xiaoyao.adaptive_grasp.grasp_sequence import ContactSnapshot, PhaseResult
+
+    snapshot = ContactSnapshot(
+        joint_angles={JointId.THUMB_PIP: 0.12},
+        total_fz=1.2,
+        torque=cfg.base_torque,
+        reason="force_threshold",
+        timestamp_s=3.4,
+    )
+
+    def successful_phase_run(self, force_planner, is_running):
+        return PhaseResult(
+            success=True,
+            final_torque=cfg.base_torque,
+            contact_snapshot=snapshot,
+        )
+
+    monkeypatch.setattr(
+        "xiaoyao.adaptive_grasp.grasp_sequence.PhaseController.run",
+        successful_phase_run,
+    )
+
+    assert grasper.grasp_core() is True
+    assert grasper.last_contact_snapshot is snapshot
+    assert grasper._adaptive_hold_loop._contact_joint_angles == snapshot.joint_angles
 
 
 def test_full_grasp_lifecycle(monkeypatch):

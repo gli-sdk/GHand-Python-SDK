@@ -41,6 +41,7 @@ def test_force_planner_pid_around_normal_force():
         safe_force_max=10.0,
         friction_coeff=0.4,
         is_fragile=False,
+        hold_strategy="adaptive",
     )
     planner = ForcePlanner(cfg, profile)
 
@@ -173,6 +174,22 @@ def test_fragile_mode_limits_torque_and_step():
     assert decision.next_torque <= int(20 * 0.7)
 
 
+def test_hold_strategy_none_defaults_to_fixed():
+    profile = ObjectProfile(
+        name="unknown",
+        weight_kg=0.1,
+        material="unknown",
+        safe_force_min=0.5,
+        safe_force_max=5.0,
+        friction_coeff=0.8,
+        is_fragile=False,
+        hold_strategy=None,
+    )
+    planner = ForcePlanner(AdaptiveGraspConfig(), profile)
+
+    assert planner._apply_hold_strategy(control_u=0.1, slip_confirmed=True) == pytest.approx(0.0)
+
+
 def test_per_finger_independent_control():
     cfg = AdaptiveGraspConfig(
         K_p=1.0,
@@ -189,6 +206,7 @@ def test_per_finger_independent_control():
         safe_force_max=10.0,
         friction_coeff=0.4,
         is_fragile=False,
+        hold_strategy="adaptive",
     )
     planner = ForcePlanner(cfg, profile)
 
@@ -248,6 +266,7 @@ def test_force_planner_uses_only_contacting_active_fingers_for_force_split():
         safe_force_max=10.0,
         friction_coeff=0.4,
         is_fragile=False,
+        hold_strategy="adaptive",
     )
     planner = ForcePlanner(cfg, profile)
 

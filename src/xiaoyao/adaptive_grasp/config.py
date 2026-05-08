@@ -50,58 +50,6 @@ _PRE_GRASP_PRESET_DEGREE = {
         JointId.MF_MCP: 0.0,
         JointId.MF_PIP: 0.0,
         JointId.FF_SWING: 0.0,
-        # if object == "big":
-        #     JointId.FF_MCP: 31.0,
-        #     JointId.FF_PIP: 22.0,
-        #     JointId.THUMB_ROTATION: -2.0,
-        #     JointId.THUMB_SWING: 90.0,
-        #     JointId.THUMB_MCP: 0.0,
-        #     JointId.THUMB_PIP: 0.0,
-        # elif object == "small":
-        #     JointId.FF_MCP: 55.0,
-        #     JointId.FF_PIP: 0.0,
-        #     JointId.THUMB_ROTATION: -2.0,
-        #     JointId.THUMB_SWING: 90.0,
-        #     JointId.THUMB_MCP: 3.0,
-        #     JointId.THUMB_PIP: 0.0,
-        # elif object == "cone": #圆锥
-        #     JointId.FF_MCP: 58.0,
-        #     JointId.FF_PIP: 0.0,
-        #     JointId.THUMB_ROTATION: -2.0,
-        #     JointId.THUMB_SWING: 90.0,
-        #     JointId.THUMB_MCP: 0.0,
-        #     JointId.THUMB_PIP: 0.0,
-        # elif object == "balloon":
-            
-        # 大物品
-        # JointId.FF_MCP: 31.0,
-        # JointId.FF_PIP: 22.0,
-        # JointId.THUMB_ROTATION: -2.0,
-        # JointId.THUMB_SWING: 90.0,
-        # JointId.THUMB_MCP: 0.0,
-        # JointId.THUMB_PIP: 0.0,
-        # 小物品
-        # JointId.FF_MCP: 55.0,
-        # JointId.FF_PIP: 0.0,
-        # JointId.THUMB_ROTATION: -2.0,
-        # JointId.THUMB_SWING: 90.0,
-        # JointId.THUMB_MCP: 3.0,
-        # JointId.THUMB_PIP: 0.0,
-        # # 圆锥
-        # JointId.FF_MCP: 58.0,
-        # JointId.FF_PIP: 0.0,
-        # JointId.THUMB_ROTATION: -2.0,
-        # JointId.THUMB_SWING: 90.0,
-        # JointId.THUMB_MCP: 0.0,
-        # JointId.THUMB_PIP: 0.0,
-        # 大球
-        # JointId.FF_MCP: 23.0,
-        # JointId.FF_PIP: 39.0,
-        # JointId.THUMB_ROTATION: -3.0,
-        # JointId.THUMB_SWING: 90.0,
-        # JointId.THUMB_MCP: 0.0,
-        # JointId.THUMB_PIP: 0.0,
-        #气球
         JointId.FF_MCP: 10.0,
         JointId.FF_PIP: 30.0,
         JointId.THUMB_ROTATION: 0.0,
@@ -189,12 +137,12 @@ elif object == "cone": #圆锥
     _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_MCP] = 0.0
     _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_PIP] = 0.0
 elif object == "balloon":    
-    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.FF_MCP] = 45.0
-    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.FF_PIP] = 10.0
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.FF_MCP] = 25.0
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.FF_PIP] = 25.0
     _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_ROTATION] = 0.0
     _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_SWING] = 80.0
-    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_MCP] = 8.0
-    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_PIP] = 0.0
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_MCP] = 3.0
+    _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_PIP] = 5.0
 
 @dataclass
 class PerFingerPidConfig:
@@ -278,12 +226,15 @@ class AdaptiveGraspConfig:
     release_open_torque: int = 50 # 释放阶段安全张开力矩。
     release_timeout_s: float = 5.0 # 释放到位等待超时（秒）。
     #=============================================================================
+    adaptive_hold_command_mode: str = "position" # "position" or "torque".
+    adaptive_hold_torque: int = 5 # Torque sent to active MCP/PIP joints in torque hold mode.
+
     # Feedforward + PID control gains. ForcePlanner uses K_s with fused slip
     # risk and K_n with normal-force over-limit error.
     K_s: float = 1.0 # Slip-risk feedforward gain K_s.
     K_n: float = 1.0 # Normal-force over-limit suppression gain K_n.
-    K_p: float = 0.001 # PID 比例增益 K_p。
-    K_i: float = 0.0000 # PID 积分增益 K_i。
+    K_p: float = 0.0 # PID 比例增益 K_p。
+    K_i: float = 0.0 # PID 积分增益 K_i。
     K_d: float = 0.000 # PID 微分增益 K_d。
     # 积分项限幅（防积分饱和）
     I_min: float = -1.0 # PID 积分项下限（防积分饱和）。
@@ -321,6 +272,7 @@ class AdaptiveGraspConfig:
         _validate("phase_timeout", self.phase_timeout, greater_than=0)
         _validate("torque_adjust_step", self.torque_adjust_step, greater_than=0)
         _validate("variance_baseline", self.variance_baseline, greater_equal=0)
+        _validate("adaptive_hold_torque", self.adaptive_hold_torque, greater_equal=-100, less_equal=100)
         _validate("position_speed_limit", self.position_speed_limit, greater_equal=0, less_equal=100)
         _validate("position_torque_limit", self.position_torque_limit, greater_equal=0, less_equal=100)
         _validate("delta_theta_limit", self.delta_theta_limit, greater_than=0)
@@ -350,8 +302,10 @@ class AdaptiveGraspConfig:
         _validate("closing_stall_cycles", self.closing_stall_cycles, greater_than=0)
         if not math.isclose(self.variance_weight + self.direction_weight + self.friction_weight, 1.0, abs_tol=1e-6):
             raise ValueError("variance_weight + direction_weight + friction_weight must equal 1.0")
-        if not math.isclose(self.K_MCP + self.K_PIP, 1.0, abs_tol=1e-6):
-            raise ValueError("K_MCP + K_PIP must equal 1.0")
+        # if not math.isclose(self.K_MCP + self.K_PIP, 1.0, abs_tol=1e-6):
+        #     raise ValueError("K_MCP + K_PIP must equal 1.0")
+        if self.adaptive_hold_command_mode not in {"position", "torque"}:
+            raise ValueError('adaptive_hold_command_mode must be "position" or "torque"')
         if self.variance_baseline >= self.variance_threshold:
             raise ValueError("variance_baseline must be < variance_threshold")
         if self.I_min > self.I_max:

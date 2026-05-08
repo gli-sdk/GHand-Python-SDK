@@ -95,10 +95,12 @@ class TactileAnalyzer:
                 + cfg.direction_weight * d_k
                 + cfg.friction_weight * r_k
             ))
-
-            # 逐指防抖
+            # s_total= min(1.0, max(0.0,
+            #     s_k*0.7+r_k*0.3
+            # ))
+            # 滑移次数统计
             count = self._slip_count.get(finger, 0)
-            if s_total >= 0.5:
+            if s_total >= 0.7:
                 count += 1
             else:
                 count = max(0, count - 1)

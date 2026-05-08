@@ -1,5 +1,6 @@
 import logging
 import time
+from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
 from xiaoyao.dexhand import CtrlMode, DexHand, Joint, JointId
@@ -14,11 +15,27 @@ from .utils import clip
 _logger = logging.getLogger("xiaoyao.adaptive_grasp.grasp_sequence")
 
 
+@dataclass(frozen=True)
+class ContactSnapshot:
+    joint_angles: dict[JointId, float]
+    total_fz: float
+    torque: int
+    reason: str
+    timestamp_s: float
+
+
 class PhaseResult:
-    def __init__(self, success: bool, final_torque: int, should_release: bool = False):
+    def __init__(
+        self,
+        success: bool,
+        final_torque: int,
+        should_release: bool = False,
+        contact_snapshot: Optional[ContactSnapshot] = None,
+    ):
         self.success = success
         self.final_torque = final_torque
         self.should_release = should_release
+        self.contact_snapshot = contact_snapshot
 
 
 class PhaseController:
@@ -41,21 +58,37 @@ class PhaseController:
         self._on_state_change = on_state_change
         self.current_torque = int(clip(config.base_torque, -100.0, config.max_torque))
         self._phase_should_release = False
+        self._contact_snapshot: Optional[ContactSnapshot] = None
 
     def run(self, force_planner: Optional[ForcePlanner], is_running: Callable[[], bool]) -> PhaseResult:
         self._phase_should_release = False
+        self._contact_snapshot = None
         for phase_method, name in (
             (self._phase_open, "OPEN"),
             (self._phase_pre_grasp, "PRE_GRASP"),
             (self._phase_closing, "CLOSING"),
         ):
             if not is_running():
-                return PhaseResult(success=False, final_torque=self.current_torque, should_release=self._phase_should_release)
+                return PhaseResult(
+                    success=False,
+                    final_torque=self.current_torque,
+                    should_release=self._phase_should_release,
+                    contact_snapshot=self._contact_snapshot,
+                )
             if not phase_method(force_planner, is_running):
                 _logger.error("%s phase failed", name)
                 self._set_state(GraspState.ERROR)
-                return PhaseResult(success=False, final_torque=self.current_torque, should_release=self._phase_should_release)
-        return PhaseResult(success=True, final_torque=self.current_torque)
+                return PhaseResult(
+                    success=False,
+                    final_torque=self.current_torque,
+                    should_release=self._phase_should_release,
+                    contact_snapshot=self._contact_snapshot,
+                )
+        return PhaseResult(
+            success=True,
+            final_torque=self.current_torque,
+            contact_snapshot=self._contact_snapshot,
+        )
 
     def _set_state(self, state: GraspState) -> None:
         self._on_state_change(state)
@@ -109,10 +142,15 @@ class PhaseController:
                 self._set_state(GraspState.ERROR)
                 return False
 
-            if self._sensor.sum_active_finger_normal_force() >= self.config.contact_threshold_z:
-                self._calibrate_force(force_planner)
-                time.sleep(self.config.control_period_s)
-                return True
+            total_fz = self._sensor.sum_active_finger_normal_force()
+            if total_fz >= self.config.contact_threshold_z:
+                self._record_contact_snapshot(joint_feedback, total_fz, "force_threshold")
+                if force_planner and force_planner.is_fragile_mode:
+                    return True
+                else:
+                    self._calibrate_force(force_planner)
+                    time.sleep(self.config.control_period_s)
+                    return True
 
             current_angles = {j.id: j.angle for j in joint_feedback}
             if self._is_joints_stalled(prev_angles, current_angles):
@@ -120,6 +158,11 @@ class PhaseController:
                 _logger.debug("CLOSING: joint stall detected (%d/%d)", stall_counter, self.config.closing_stall_cycles)
                 if stall_counter >= self.config.closing_stall_cycles:
                     _logger.info("CLOSING: torque-stall contact confirmed")
+                    self._record_contact_snapshot(
+                        joint_feedback,
+                        self._sensor.sum_active_finger_normal_force(),
+                        "torque_stall",
+                    )
                     self._calibrate_force(force_planner)
                     time.sleep(self.config.control_period_s)
                     return True
@@ -128,6 +171,31 @@ class PhaseController:
             prev_angles = current_angles
 
         return False
+
+    def _record_contact_snapshot(
+        self,
+        joint_feedback: list[Joint],
+        total_fz: float,
+        reason: str,
+    ) -> None:
+        joint_angles = {
+            j.id: j.angle
+            for j in joint_feedback
+            if j.id in self._joint_builder.torque_joints
+        }
+        self._contact_snapshot = ContactSnapshot(
+            joint_angles=joint_angles,
+            total_fz=total_fz,
+            torque=self.current_torque,
+            reason=reason,
+            timestamp_s=self._get_monotonic_time(),
+        )
+        _logger.info(
+            "CLOSING: contact snapshot recorded reason=%s total_fz=%.2f joints=%d",
+            reason,
+            total_fz,
+            len(joint_angles),
+        )
 
     def _is_joints_stalled(self, prev: dict[JointId, float], current: dict[JointId, float]) -> bool:
         if not prev or not current:

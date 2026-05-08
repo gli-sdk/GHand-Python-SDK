@@ -9,7 +9,6 @@ from typing import Optional
 from xiaoyao import configure_logging
 _logger = logging.getLogger(__name__)
 configure_logging(level=logging.INFO)
-logger = logging.getLogger("xiaoyao")
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
@@ -36,7 +35,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--contact_threshold_z", "--contact-threshold-z", type=float, default=0.4)
     parser.add_argument("--pre_grasp_preset", "--pre-grasp-preset", default="two_finger_pinch")
     parser.add_argument("--hold_time", "--hold-time", type=float, default=50.0)
-    parser.add_argument("--default_object", dest="object", default="plastic")
+    parser.add_argument("--default_object", dest="object", default="balloon")
+    parser.add_argument(
+        "--hold-command-mode",
+        choices=("position", "torque"),
+        default="position",
+        help="Command mode used in adaptive hold.",
+    )
+    parser.add_argument("--adaptive-hold-torque", type=int, default=20)
+    parser.add_argument(
+        "--no-release-on-interrupt",
+        action="store_true",
+        help="Do not call release() when interrupted with Ctrl+C.",
+    )
     parser.add_argument("--verbose", action="store_true")
     return parser
 
@@ -48,6 +59,8 @@ def build_config(args: argparse.Namespace) -> AdaptiveGraspConfig:
         "contact_threshold_z": args.contact_threshold_z,
         "pre_grasp_preset": args.pre_grasp_preset,
         "release_hold_time_s": args.hold_time,
+        "adaptive_hold_command_mode": args.hold_command_mode,
+        "adaptive_hold_torque": args.adaptive_hold_torque,
     }
     if args.object is not None:
         kwargs["default_object"] = args.object
@@ -115,6 +128,7 @@ def main() -> None:
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
 
     hand = DexHand()
+    grasper: Optional[AdaptiveGrasper] = None
 
     connected = hand.open(CommType.ETHERCAT, "auto")
     logger: Optional[TactileLogger] = None
@@ -127,6 +141,11 @@ def main() -> None:
             print("Failed to open tactile sensors.")
             return
 
+        # if not hand.tactile_zero():
+        #     print("Failed to zero tactile sensors.")
+        #     return
+        # print("Tactile sensors zeroed.")
+
         dist_dir = ROOT / "dist"
         logger = TactileLogger(hand, dist_dir)
         print(f"Tactile data will be saved to: {logger.csv_path}")
@@ -138,7 +157,9 @@ def main() -> None:
         print(
             f"release_hold_time_s={config.release_hold_time_s}, "
             f"release_open_speed={config.release_open_speed}, "
-            f"release_open_torque={config.release_open_torque}"
+            f"release_open_torque={config.release_open_torque}, "
+            f"adaptive_hold_command_mode={config.adaptive_hold_command_mode}, "
+            f"adaptive_hold_torque={config.adaptive_hold_torque}"
         )
         print(f"Pre-grasp preset={config.pre_grasp_preset} (DIP passive)")
 
@@ -163,6 +184,9 @@ def main() -> None:
 
     except KeyboardInterrupt:
         print("\nInterrupted by user.")
+        if grasper is not None and not args.no_release_on_interrupt:
+            print("Releasing hand...")
+            grasper.release()
     except DeviceDisconnectedError as exc:
         print(f"\n[Device Disconnected] {exc.message}")
     except JointFaultError as exc:

@@ -56,6 +56,7 @@ class JointCommandBuilder:
         active = set(self._torque_joints)
         joints = [
             Joint(id=joint_id, torque=torque)
+            
             if joint_id in active
             else Joint(id=joint_id, angle=0.0, speed=0, torque=0)
             for joint_id in JointCommandBuilder._TORQUE_JOINTS
@@ -65,6 +66,9 @@ class JointCommandBuilder:
             Joint(id=JointId.THUMB_SWING, angle=0.0, speed=0, torque=5),
         ]
         return joints
+
+    def hold_torque_command(self, torque: int) -> list[Joint]:
+        return self.torque_command(torque)
 
     def hold_position_command(self, torque: int, angles: Optional[Mapping[JointId, float]] = None) -> list[Joint]:
         limited_torque = int(clip(abs(torque), 0.0, float(self._config.position_torque_limit)))

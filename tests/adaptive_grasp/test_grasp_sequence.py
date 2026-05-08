@@ -76,6 +76,50 @@ def test_phase_closing_contact_by_force(monkeypatch):
     assert GraspState.CLOSING_TO_CONTACT in states
 
 
+def test_phase_closing_records_contact_joint_snapshot_by_force(monkeypatch):
+    hand = _MockHand()
+    cfg = AdaptiveGraspConfig(
+        pre_grasp_preset="two_finger_pinch",
+        contact_threshold_z=0.5,
+        phase_timeout=10.0,
+        control_period_s=0.001,
+        base_torque=12,
+    )
+    sensor = MagicMock()
+    safety = MagicMock()
+    from xiaoyao.adaptive_grasp.safety import SafetyStatus
+    safety.is_grasp_empty.return_value = MagicMock(status=SafetyStatus.OK)
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP, JointId.FF_PIP))
+    controller = PhaseController(
+        hand, sensor, safety, joint_builder, cfg, lambda: 10.0,
+        on_state_change=lambda _state: None,
+    )
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.grasp_sequence.time.sleep", lambda *_: None)
+
+    sensor.tactile_data = {
+        TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 2.0),
+        TactileSensorId.FOREFINGER: _FakeTactileInfo(0.0, 0.0, 2.0),
+    }
+    sensor.joint_feedback = [
+        Joint(id=JointId.THUMB_PIP, angle=0.11),
+        Joint(id=JointId.THUMB_MCP, angle=0.22),
+        Joint(id=JointId.FF_PIP, angle=0.33),
+    ]
+    sensor.sum_active_finger_normal_force.return_value = 4.0
+
+    result = controller.run(force_planner=None, is_running=lambda: True)
+
+    assert result.contact_snapshot is not None
+    assert result.contact_snapshot.reason == "force_threshold"
+    assert result.contact_snapshot.total_fz == pytest.approx(4.0)
+    assert result.contact_snapshot.torque == 12
+    assert result.contact_snapshot.timestamp_s == pytest.approx(10.0)
+    assert result.contact_snapshot.joint_angles == {
+        JointId.THUMB_PIP: pytest.approx(0.11),
+        JointId.FF_PIP: pytest.approx(0.33),
+    }
+
+
 def test_calibrate_force_increases_torque_when_below_target(monkeypatch):
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(

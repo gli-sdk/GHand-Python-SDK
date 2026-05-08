@@ -15,7 +15,7 @@ from .safety import SafetyMonitor, SafetyReport
 from .visualization import TactileVisualizer
 from .utils import clip, JOINT_TO_FINGER
 from .joint_builder import JointCommandBuilder
-from .grasp_sequence import PhaseController
+from .grasp_sequence import ContactSnapshot, PhaseController
 from .adaptive_hold_loop import HoldController, HoldResult
 
 _logger = logging.getLogger("xiaoyao.adaptive_grasp.adaptive_grasp_manager")
@@ -73,6 +73,7 @@ class AdaptiveGrasper:
         self._last_control_step_start_s: Optional[float] = None
         self._last_control_cycle_s: Optional[float] = None
         self._last_control_cycle_jitter_s: Optional[float] = None
+        self._last_contact_snapshot: Optional[ContactSnapshot] = None
 
     def grasp_core(self, object_profile: Optional[ObjectProfile] = None) -> bool:
         try:
@@ -97,6 +98,7 @@ class AdaptiveGrasper:
                 self._cleanup_grasp(state=GraspState.ERROR)
                 return False
             self.current_torque = result.final_torque
+            self._last_contact_snapshot = result.contact_snapshot
 
             self._start_adaptive_control()
             return True
@@ -168,13 +170,22 @@ class AdaptiveGrasper:
     def last_control_cycle_jitter_s(self) -> Optional[float]:
         return self._last_control_cycle_jitter_s
 
+    @property
+    def last_contact_snapshot(self) -> Optional[ContactSnapshot]:
+        return self._last_contact_snapshot
+
     def _start_adaptive_control(self) -> None:
         self.state = GraspState.ADAPTIVE_HOLD
         self._adaptive_hold_started_at = self._get_monotonic_time()
         self._adaptive_hold_loop = HoldController(
             self.hand, self._sensor, self._safety, self._tactile,
             self._force_planner, self._visualizer, self._joint_builder,
-            self.config, self.current_torque, self._get_monotonic_time,
+            self.config, self.current_torque,
+            contact_joint_angles=(
+                self._last_contact_snapshot.joint_angles
+                if self._last_contact_snapshot is not None
+                else None
+            ),
         )
         self._control_thread = threading.Thread(target=self._adaptive_control_loop, daemon=True)
         self._control_thread.start()
@@ -280,6 +291,7 @@ class AdaptiveGrasper:
         self._last_control_step_start_s = None
         self._last_control_cycle_s = None
         self._last_control_cycle_jitter_s = None
+        self._last_contact_snapshot = None
         self._object_profile = None
         self._force_planner = None
         self._grasp_sequence = None
