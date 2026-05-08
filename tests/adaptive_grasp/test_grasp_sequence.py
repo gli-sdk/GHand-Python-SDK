@@ -2,7 +2,7 @@ import time
 from unittest.mock import MagicMock
 import pytest
 from xiaoyao.adaptive_grasp import AdaptiveGraspConfig, GraspState
-from xiaoyao.adaptive_grasp.phase_controller import PhaseController, PhaseResult
+from xiaoyao.adaptive_grasp.grasp_sequence import PhaseController, PhaseResult
 from xiaoyao.adaptive_grasp.joint_builder import JointCommandBuilder
 from xiaoyao.adaptive_grasp.force_planner import ForcePlanner
 from xiaoyao.dexhand import CtrlMode, JointId
@@ -61,7 +61,7 @@ def test_phase_closing_contact_by_force(monkeypatch):
         hand, sensor, safety, joint_builder, cfg, time.monotonic,
         on_state_change=states.append,
     )
-    monkeypatch.setattr("xiaoyao.adaptive_grasp.phase_controller.time.sleep", lambda *_: None)
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.grasp_sequence.time.sleep", lambda *_: None)
 
     sensor.tactile_data = {
         TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 2.0),
@@ -90,7 +90,7 @@ def test_calibrate_force_increases_torque_when_below_target(monkeypatch):
         hand, sensor, safety, joint_builder, cfg, time.monotonic,
         on_state_change=lambda s: None,
     )
-    monkeypatch.setattr("xiaoyao.adaptive_grasp.phase_controller.time.sleep", lambda *_: None)
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.grasp_sequence.time.sleep", lambda *_: None)
 
     sensor.sum_active_finger_normal_force.return_value = 1.0  # below target
     controller.current_torque = 10
@@ -114,7 +114,7 @@ def test_phase_open_and_pre_grasp(monkeypatch):
         hand, sensor, safety, joint_builder, cfg, time.monotonic,
         on_state_change=states.append,
     )
-    monkeypatch.setattr("xiaoyao.adaptive_grasp.phase_controller.time.sleep", lambda *_: None)
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.grasp_sequence.time.sleep", lambda *_: None)
 
     sensor.tactile_data = {
         TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 2.0),
@@ -144,9 +144,41 @@ def test_phase_failure_sets_error_state(monkeypatch):
         hand, sensor, safety, joint_builder, cfg, time.monotonic,
         on_state_change=states.append,
     )
-    monkeypatch.setattr("xiaoyao.adaptive_grasp.phase_controller.time.sleep", lambda *_: None)
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.grasp_sequence.time.sleep", lambda *_: None)
 
     result = controller.run(force_planner=None, is_running=lambda: True)
 
     assert result.success is False
     assert states[-1] == GraspState.ERROR
+
+
+def test_phase_closing_empty_grasp_requests_release(monkeypatch):
+    hand = _MockHand()
+    cfg = AdaptiveGraspConfig(
+        pre_grasp_preset="two_finger_pinch",
+        phase_timeout=10.0,
+        control_period_s=0.001,
+    )
+    sensor = MagicMock()
+    safety = MagicMock()
+    from xiaoyao.adaptive_grasp.safety import SafetyStatus
+    safety.is_grasp_empty.return_value = MagicMock(status=SafetyStatus.FAULT)
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP, JointId.FF_PIP))
+    states = []
+    controller = PhaseController(
+        hand, sensor, safety, joint_builder, cfg, time.monotonic,
+        on_state_change=states.append,
+    )
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.grasp_sequence.time.sleep", lambda *_: None)
+
+    sensor.tactile_data = {
+        TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 0.0),
+        TactileSensorId.FOREFINGER: _FakeTactileInfo(0.0, 0.0, 0.0),
+    }
+    sensor.joint_feedback = [Joint(id=JointId.THUMB_MCP, angle=0.0)]
+    sensor.sum_active_finger_normal_force.return_value = 0.0
+
+    result = controller.run(force_planner=None, is_running=lambda: True)
+
+    assert result.success is False
+    assert result.should_release is True

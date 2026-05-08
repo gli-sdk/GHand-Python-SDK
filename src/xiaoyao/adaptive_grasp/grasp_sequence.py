@@ -11,13 +11,14 @@ from .force_planner import ForcePlanner
 from .joint_builder import JointCommandBuilder
 from .utils import clip
 
-_logger = logging.getLogger("xiaoyao.adaptive_grasp.phase_controller")
+_logger = logging.getLogger("xiaoyao.adaptive_grasp.grasp_sequence")
 
 
 class PhaseResult:
-    def __init__(self, success: bool, final_torque: int):
+    def __init__(self, success: bool, final_torque: int, should_release: bool = False):
         self.success = success
         self.final_torque = final_torque
+        self.should_release = should_release
 
 
 class PhaseController:
@@ -39,19 +40,21 @@ class PhaseController:
         self._get_monotonic_time = get_time
         self._on_state_change = on_state_change
         self.current_torque = int(clip(config.base_torque, -100.0, config.max_torque))
+        self._phase_should_release = False
 
     def run(self, force_planner: Optional[ForcePlanner], is_running: Callable[[], bool]) -> PhaseResult:
+        self._phase_should_release = False
         for phase_method, name in (
             (self._phase_open, "OPEN"),
             (self._phase_pre_grasp, "PRE_GRASP"),
             (self._phase_closing, "CLOSING"),
         ):
             if not is_running():
-                return PhaseResult(success=False, final_torque=self.current_torque)
+                return PhaseResult(success=False, final_torque=self.current_torque, should_release=self._phase_should_release)
             if not phase_method(force_planner, is_running):
                 _logger.error("%s phase failed", name)
                 self._set_state(GraspState.ERROR)
-                return PhaseResult(success=False, final_torque=self.current_torque)
+                return PhaseResult(success=False, final_torque=self.current_torque, should_release=self._phase_should_release)
         return PhaseResult(success=True, final_torque=self.current_torque)
 
     def _set_state(self, state: GraspState) -> None:
@@ -102,6 +105,7 @@ class PhaseController:
 
             if self._safety.is_grasp_empty(joint_feedback, GraspState.CLOSING_TO_CONTACT).status != SafetyStatus.OK:
                 _logger.error("CLOSING phase: Grasp Empty")
+                self._phase_should_release = True
                 self._set_state(GraspState.ERROR)
                 return False
 

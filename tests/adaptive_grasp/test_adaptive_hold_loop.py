@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 from xiaoyao.adaptive_grasp import AdaptiveGraspConfig
 from xiaoyao.adaptive_grasp.force_planner import ForceDecision
-from xiaoyao.adaptive_grasp.hold_controller import HoldController, HoldResult, HoldStepResult
+from xiaoyao.adaptive_grasp.adaptive_hold_loop import HoldController, HoldResult, HoldStepResult
 from xiaoyao.adaptive_grasp.joint_builder import JointCommandBuilder
 from xiaoyao.adaptive_grasp.tactility import TactileAnalysis
 from xiaoyao.adaptive_grasp.safety import SafetyReport, SafetyStatus

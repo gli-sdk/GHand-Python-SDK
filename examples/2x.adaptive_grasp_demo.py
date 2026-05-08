@@ -6,9 +6,10 @@ from pathlib import Path
 import sys
 import time
 from typing import Optional
-
+from xiaoyao import configure_logging
 _logger = logging.getLogger(__name__)
-
+configure_logging(level=logging.INFO)
+logger = logging.getLogger("xiaoyao")
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
@@ -30,12 +31,12 @@ from xiaoyao.exceptions import (
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the adaptive grasp demo.")
-    parser.add_argument("--base_torque", "--base-torque", type=int, default=30)
+    parser.add_argument("--base_torque", "--base-torque", type=int, default=20)
     parser.add_argument("--max_torque", "--max-torque", type=int, default=80)
     parser.add_argument("--contact_threshold_z", "--contact-threshold-z", type=float, default=0.4)
     parser.add_argument("--pre_grasp_preset", "--pre-grasp-preset", default="two_finger_pinch")
     parser.add_argument("--hold_time", "--hold-time", type=float, default=50.0)
-    parser.add_argument("--object", dest="object", default=None)
+    parser.add_argument("--default_object", dest="object", default="plastic")
     parser.add_argument("--verbose", action="store_true")
     return parser
 

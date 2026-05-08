@@ -79,8 +79,6 @@ def test_clip_clamps_and_handles_inverted_bounds():
 def test_release_succeeds_without_waiting_for_settle_feedback(monkeypatch):
     cfg = AdaptiveGraspConfig(
         release_timeout_s=0.2,
-        release_check_cycles=2,
-        theta_err_th=math.radians(2.0),
     )
     target = JointCommandBuilder(cfg, tuple()).open_pose()
     hand = _MockHand()
@@ -98,7 +96,7 @@ def test_release_succeeds_without_waiting_for_settle_feedback(monkeypatch):
         return next(feedback_sequence, self._latest_joint_feedback)
 
     monkeypatch.setattr(SensorClient, "joint_feedback", property(mock_joint_feedback))
-    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.adaptive_grasp_manager.time.sleep", lambda *_: None)
     t = {"v": 0.0}
     g._get_monotonic_time = lambda: (t.__setitem__("v", t["v"] + 0.01) or t["v"])
 
@@ -117,7 +115,7 @@ def test_release_does_not_check_whether_joints_are_settled(monkeypatch):
         raise AssertionError("release should not check whether joints are settled")
 
     hand.get_joints = fail_if_get_joints_called
-    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.adaptive_grasp_manager.time.sleep", lambda *_: None)
 
     assert g.release() is True
     assert g.state == GraspState.COMPLETED
@@ -127,8 +125,6 @@ def test_release_does_not_check_whether_joints_are_settled(monkeypatch):
 def test_release_ignores_unsettled_feedback_after_open_command(monkeypatch):
     cfg = AdaptiveGraspConfig(
         release_timeout_s=0.02,
-        release_check_cycles=2,
-        theta_err_th=math.radians(1.0),
     )
     target = JointCommandBuilder(cfg, tuple()).open_pose()
     far = {joint_id: angle + math.radians(10.0) for joint_id, angle in target.items()}
@@ -147,7 +143,7 @@ def test_release_ignores_unsettled_feedback_after_open_command(monkeypatch):
         return next(feedback_sequence, self._latest_joint_feedback)
 
     monkeypatch.setattr(SensorClient, "joint_feedback", property(mock_joint_feedback))
-    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.adaptive_grasp_manager.time.sleep", lambda *_: None)
     t = {"v": 0.0}
     g._get_monotonic_time = lambda: (t.__setitem__("v", t["v"] + 0.01) or t["v"])
 
@@ -158,8 +154,6 @@ def test_release_ignores_unsettled_feedback_after_open_command(monkeypatch):
 def test_release_does_not_require_fresh_hand_feedback_after_subscription_stops(monkeypatch):
     cfg = AdaptiveGraspConfig(
         release_timeout_s=0.2,
-        release_check_cycles=2,
-        theta_err_th=math.radians(2.0),
     )
     target = JointCommandBuilder(cfg, tuple()).open_pose()
     stale = {joint_id: angle + math.radians(15.0) for joint_id, angle in target.items()}
@@ -175,7 +169,7 @@ def test_release_does_not_require_fresh_hand_feedback_after_subscription_stops(m
         for joint_id, angle in stale.items()
     ]
 
-    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.adaptive_grasp_manager.time.sleep", lambda *_: None)
     t = {"v": 0.0}
     g._get_monotonic_time = lambda: (t.__setitem__("v", t["v"] + 0.01) or t["v"])
 
@@ -191,8 +185,8 @@ def test_full_grasp_state_transitions(monkeypatch):
     )
     grasper = AdaptiveGrasper(hand, cfg)
 
-    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
-    monkeypatch.setattr("xiaoyao.adaptive_grasp.phase_controller.time.sleep", lambda *_: None)
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.adaptive_grasp_manager.time.sleep", lambda *_: None)
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.grasp_sequence.time.sleep", lambda *_: None)
     monkeypatch.setattr(grasper, "_start_sensor_subscription", lambda: None)
     monkeypatch.setattr(grasper._sensor, "reset", lambda: None)
     monkeypatch.setattr(grasper._sensor, "sum_active_finger_normal_force", lambda: 4.0)
@@ -242,7 +236,7 @@ def test_perform_release_waits_for_control_thread(monkeypatch):
         joined[0] = True
         original_join(timeout=timeout)
     monkeypatch.setattr(t, "join", tracking_join)
-    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.adaptive_grasp_manager.time.sleep", lambda *_: None)
 
     g._perform_release(wait_control_thread=True)
     assert joined[0] is True
@@ -263,7 +257,7 @@ def test_perform_release_from_control_thread_does_not_deadlock(monkeypatch):
         Joint(id=joint_id, angle=angle) for joint_id, angle in open_pose.items()
     ]
 
-    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.adaptive_grasp_manager.time.sleep", lambda *_: None)
 
     result = g._perform_release(wait_control_thread=False)
     assert result is True
@@ -308,7 +302,7 @@ def test_release_does_not_release_original_visualizer(monkeypatch):
             events.append("wait")
 
     g._visualizer = _FakeVisualizer()
-    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.adaptive_grasp_manager.time.sleep", lambda *_: None)
 
     assert g.release() is True
     assert events == []
@@ -383,7 +377,7 @@ def test_sensor_subscription_callback_updates_cache():
     assert grasper._sensor._last_sample_time_s == 2.0
 
 
-def test_controller_accepts_none_config():
+def test_adaptive_grasp_manager_accepts_none_config():
     """AdaptiveGrasper(config=None) should not crash。"""
     hand = _MockHand()
     grasper = AdaptiveGrasper(hand, config=None)
@@ -398,19 +392,46 @@ def test_grasp_core_sets_error_state_when_phase_fails(monkeypatch):
 
     monkeypatch.setattr(grasper, "_start_sensor_subscription", lambda: None)
 
-    from xiaoyao.adaptive_grasp.phase_controller import PhaseResult
+    from xiaoyao.adaptive_grasp.grasp_sequence import PhaseResult
 
     def fail_phase_run(self, force_planner, is_running):
         return PhaseResult(success=False, final_torque=cfg.base_torque)
 
     monkeypatch.setattr(
-        "xiaoyao.adaptive_grasp.phase_controller.PhaseController.run",
+        "xiaoyao.adaptive_grasp.grasp_sequence.PhaseController.run",
         fail_phase_run,
     )
 
     assert grasper.grasp_core() is False
     assert grasper.state == GraspState.ERROR
     assert grasper._running is False
+
+
+def test_grasp_core_releases_when_phase_requests_release(monkeypatch):
+    hand = _MockHand()
+    cfg = AdaptiveGraspConfig()
+    grasper = AdaptiveGrasper(hand, cfg)
+
+    monkeypatch.setattr(grasper, "_start_sensor_subscription", lambda: None)
+    release_calls = []
+    monkeypatch.setattr(
+        grasper,
+        "_perform_release",
+        lambda wait_control_thread: release_calls.append(wait_control_thread) or True,
+    )
+
+    from xiaoyao.adaptive_grasp.grasp_sequence import PhaseResult
+
+    def fail_phase_run(self, force_planner, is_running):
+        return PhaseResult(success=False, final_torque=cfg.base_torque, should_release=True)
+
+    monkeypatch.setattr(
+        "xiaoyao.adaptive_grasp.grasp_sequence.PhaseController.run",
+        fail_phase_run,
+    )
+
+    assert grasper.grasp_core() is False
+    assert release_calls == [False]
 
 
 def test_full_grasp_lifecycle(monkeypatch):
@@ -421,13 +442,11 @@ def test_full_grasp_lifecycle(monkeypatch):
         release_hold_time_s=0.05,
         control_period_s=0.01,
         release_timeout_s=0.2,
-        release_check_cycles=2,
-        theta_err_th=math.radians(2.0),
     )
     grasper = AdaptiveGrasper(hand, cfg)
 
-    monkeypatch.setattr("xiaoyao.adaptive_grasp.controller.time.sleep", lambda *_: None)
-    monkeypatch.setattr("xiaoyao.adaptive_grasp.phase_controller.time.sleep", lambda *_: None)
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.adaptive_grasp_manager.time.sleep", lambda *_: None)
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.grasp_sequence.time.sleep", lambda *_: None)
     monkeypatch.setattr(grasper, "_start_sensor_subscription", lambda: None)
     monkeypatch.setattr(grasper._sensor, "reset", lambda: None)
     monkeypatch.setattr(grasper._sensor, "sum_active_finger_normal_force", lambda: 4.0)

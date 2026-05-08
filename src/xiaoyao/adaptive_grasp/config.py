@@ -250,7 +250,7 @@ class AdaptiveGraspConfig:
     per_finger_pid: dict[TactileSensorId, PerFingerPidConfig] = field(default_factory=dict) # 单指独立 PID 参数；未配置的手指回退到全局 K_p/K_i/K_d。
     #=============================================================================
     # 2.闭合接触阶段基础参数
-    base_torque: int = 10 # 闭合接触阶段初始力矩（力矩模式）。
+    base_torque: int = 30 # 闭合接触阶段初始力矩（力矩模式）。
     contact_threshold_z: float = 0.2 # 接触判定阈值（所有传感器法向力绝对值之和）。
     sliding_window_size: int = 10 # 触觉滑动窗口长度（用于方差估计）。
     torque_adjust_step: int = 5 # 力矩步进增量。
@@ -258,7 +258,6 @@ class AdaptiveGraspConfig:
     phase_timeout: float = 10.0 # 张开/预抓取/闭合等阶段超时（秒）。
     control_period_s: float = 0.02 # 离散控制周期 Ts（秒），（优先使用函数传入的dt，其次使用前后帧的时间差，最后使用这个默认值）
     closing_period_s: float = 0.2 # 闭合接触阶段每次力矩指令后的休眠周期（秒）。
-    tactile_sensor_update_period_s: float = 0.015 # 触觉传感器数据更新周期15ms。
     #=============================================================================
     # 触觉统计与阈值（v_0 / v_th）
     max_normal_force_per_finger: float = 25.0 # 单指法向力上限 Fn,max N，触觉传感器最大量程；
@@ -268,26 +267,23 @@ class AdaptiveGraspConfig:
     # 自适应保持阶段的位置闭环约束
     position_speed_limit: int = 15 # 自适应保持阶段位置指令速度限幅。
     position_torque_limit: int = 15 # 自适应保持阶段位置指令力矩限幅。
-    delta_theta_limit: float = math.radians(4) # 单周期总角增量限幅（弧度）。
+    delta_theta_limit: float = math.radians(2) # 单周期总角增量限幅（弧度）。
     # MCP/PIP 角增量分配系数，满足 K_MCP + K_PIP = 1
     K_MCP: float = 0.5 # MCP 角增量分配系数
     K_PIP: float = 0.5 # PIP 角增量分配系数
     #=============================================================================
     # 释放阶段参数（超时触发与安全张开）
     release_hold_time_s: float = 20.0 # 自适应保持超时后自动进入释放的时长（秒）。
-    release_open_speed: int = 30 # 释放阶段安全张开速度。
-    release_open_torque: int = 30 # 释放阶段安全张开力矩。
+    release_open_speed: int = 50 # 释放阶段安全张开速度。
+    release_open_torque: int = 50 # 释放阶段安全张开力矩。
     release_timeout_s: float = 5.0 # 释放到位等待超时（秒）。
-    theta_err_th: float = math.radians(2.0) # 释放到位角误差阈值（弧度）。
-    release_check_cycles: int = 3 # 释放连续到位判定周期数。
     #=============================================================================
     # Feedforward + PID control gains. ForcePlanner uses K_s with fused slip
     # risk and K_n with normal-force over-limit error.
-    s_ref: float = 0.25 # 目标滑移风险水平 s_ref。
     K_s: float = 1.0 # Slip-risk feedforward gain K_s.
     K_n: float = 1.0 # Normal-force over-limit suppression gain K_n.
-    K_p: float = 0.01 # PID 比例增益 K_p。
-    K_i: float = 0.0001 # PID 积分增益 K_i。
+    K_p: float = 0.001 # PID 比例增益 K_p。
+    K_i: float = 0.0000 # PID 积分增益 K_i。
     K_d: float = 0.000 # PID 微分增益 K_d。
     # 积分项限幅（防积分饱和）
     I_min: float = -1.0 # PID 积分项下限（防积分饱和）。
@@ -299,8 +295,6 @@ class AdaptiveGraspConfig:
     safety_factor: float = 1.5 # 安全系数 S_f，范围 [1.2, 2.0]，默认 1.5
     base_holding_force: float = 0.5 # 基础夹持力（N），默认 0.5
     slip_detect_debounce_cycles: int = 3 # 滑移防抖连续周期阈值
-    drop_detect_debounce_cycles: int = 1 # 物体掉落检测防抖连续周期阈值
-    fragile_speed_reduction: float = 0.8 # 易损模式速度降低比例
     fragile_torque_reduction: float = 0.8 # 易损模式力矩降低比例
     fragile_step_reduction: float = 0.5 # 易损模式角增量/力矩步进降低比例
     # 三指标融合权重，满足 α + β + γ = 1
@@ -336,9 +330,6 @@ class AdaptiveGraspConfig:
         _validate("release_open_speed", self.release_open_speed, greater_equal=0, less_equal=100)
         _validate("release_open_torque", self.release_open_torque, greater_equal=0, less_equal=100)
         _validate("release_timeout_s", self.release_timeout_s, greater_than=0)
-        _validate("theta_err_th", self.theta_err_th, greater_than=0)
-        _validate("release_check_cycles", self.release_check_cycles, greater_than=0)
-        _validate("s_ref", self.s_ref, greater_equal=0.0, less_equal=1.0)
         _validate("K_s", self.K_s, greater_equal=0)
         _validate("K_n", self.K_n, greater_equal=0)
         _validate("K_p", self.K_p, greater_equal=0)
@@ -348,8 +339,6 @@ class AdaptiveGraspConfig:
         _validate("safety_factor", self.safety_factor, greater_equal=1.2, less_equal=2.0)
         _validate("base_holding_force", self.base_holding_force, greater_equal=0)
         _validate("slip_detect_debounce_cycles", self.slip_detect_debounce_cycles, greater_than=0)
-        _validate("drop_detect_debounce_cycles", self.drop_detect_debounce_cycles, greater_than=0)
-        _validate("fragile_speed_reduction", self.fragile_speed_reduction, greater_than=0.0, less_equal=1.0)
         _validate("fragile_step_reduction", self.fragile_step_reduction, greater_than=0.0, less_equal=1.0)
         _validate("variance_weight", self.variance_weight, greater_equal=0.0, less_equal=1.0)
         _validate("direction_weight", self.direction_weight, greater_equal=0.0, less_equal=1.0)

@@ -10,7 +10,7 @@ def test_position_hold_defaults():
 
     assert cfg.position_speed_limit == 15
     assert cfg.position_torque_limit == 15
-    assert cfg.delta_theta_limit == pytest.approx(math.radians(4.0))
+    assert cfg.delta_theta_limit == pytest.approx(math.radians(2.0))
     assert cfg.K_MCP == pytest.approx(0.5)
     assert cfg.K_PIP == pytest.approx(0.5)
 
@@ -45,11 +45,9 @@ def test_release_and_pid_defaults():
     cfg = AdaptiveGraspConfig()
 
     assert cfg.release_hold_time_s == 20.0
-    assert cfg.release_open_speed == 30
-    assert cfg.release_open_torque == 30
+    assert cfg.release_open_speed == 50
+    assert cfg.release_open_torque == 50
     assert cfg.release_timeout_s == 5.0
-    assert cfg.release_check_cycles == 3
-    assert cfg.s_ref == pytest.approx(0.25)
 
 
 def test_release_and_pid_constraints():
@@ -61,10 +59,6 @@ def test_release_and_pid_constraints():
         AdaptiveGraspConfig(release_open_torque=-1)
     with pytest.raises(ValueError):
         AdaptiveGraspConfig(release_timeout_s=0.0)
-    with pytest.raises(ValueError):
-        AdaptiveGraspConfig(release_check_cycles=0)
-    with pytest.raises(ValueError):
-        AdaptiveGraspConfig(s_ref=1.1)
     with pytest.raises(ValueError):
         AdaptiveGraspConfig(I_min=1.0, I_max=0.0)
 
@@ -80,12 +74,24 @@ def test_extended_torque_strategy_params_removed():
         AdaptiveGraspConfig(ext_safety_margin_ratio=0.8)
 
 
+def test_unused_params_removed():
+    for param_name, value in {
+        "tactile_sensor_update_period_s": 0.015,
+        "theta_err_th": math.radians(2.0),
+        "release_check_cycles": 3,
+        "s_ref": 0.25,
+        "drop_detect_debounce_cycles": 1,
+        "fragile_speed_reduction": 0.8,
+    }.items():
+        with pytest.raises(TypeError):
+            AdaptiveGraspConfig(**{param_name: value})
+
+
 def test_v2_params_defaults():
     cfg = AdaptiveGraspConfig()
     assert cfg.safety_factor == pytest.approx(1.5)
     assert cfg.base_holding_force == pytest.approx(0.5)
     assert cfg.slip_detect_debounce_cycles == 3
-    assert cfg.fragile_speed_reduction == pytest.approx(0.8)
     assert cfg.fragile_step_reduction == pytest.approx(0.5)
 
 

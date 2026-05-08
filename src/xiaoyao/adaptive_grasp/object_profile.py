@@ -27,8 +27,6 @@ class ObjectProfile:
 
 class ObjectProfileRegistry:
     _profiles: dict[str, ObjectProfile] = {}
-
-
     @classmethod
     def register(cls, profile: ObjectProfile) -> None:
         cls._profiles[profile.name] = profile
@@ -73,7 +71,7 @@ ObjectProfileRegistry.register(
         name="balloon",
         weight_kg=0.005,        # 典型乳胶气球约 5g
         material="latex",
-        safe_force_min=0.1,     # 克服滑移所需最小力（见下方计算）
+        safe_force_min=0.2,     # 克服滑移所需最小力
         safe_force_max=0.3,     # 乳胶气球爆裂临界力约 0.2~0.4N，保守取 0.3N
         friction_coeff=0.8,     # 乳胶对硅胶/橡胶手指，干燥时摩擦系数
         is_fragile=True,

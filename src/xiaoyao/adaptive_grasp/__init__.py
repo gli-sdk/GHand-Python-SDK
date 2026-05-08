@@ -1,6 +1,6 @@
 from .states import GraspState
 from .config import AdaptiveGraspConfig
-from .controller import AdaptiveGrasper
+from .adaptive_grasp_manager import AdaptiveGrasper
 from .sensor import SensorClient
 from .tactility import TactileAnalyzer, TactileAnalysis, PerFingerAnalysis
 from .object_profile import ObjectProfile, ObjectProfileRegistry

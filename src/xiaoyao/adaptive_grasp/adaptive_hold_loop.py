@@ -13,7 +13,7 @@ from .force_planner import ForcePlanner, ForceDecision
 from .visualization import TactileVisualizer
 from .joint_builder import JointCommandBuilder
 
-_logger = logging.getLogger("xiaoyao.adaptive_grasp.hold_controller")
+_logger = logging.getLogger("xiaoyao.adaptive_grasp.adaptive_hold_loop")
 
 
 class HoldResult(Enum):
