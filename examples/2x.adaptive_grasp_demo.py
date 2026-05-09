@@ -19,6 +19,7 @@ from xiaoyao.adaptive_grasp import (
     AdaptiveGrasper,
     GraspState,
 )
+from xiaoyao.adaptive_grasp.torque_hold_planner import TorqueHoldDecision
 from xiaoyao.dexhand import CommType, DexHand, TactileSensorId
 from xiaoyao.exceptions import (
     DataReceiveError,
@@ -67,8 +68,65 @@ def build_config(args: argparse.Namespace) -> AdaptiveGraspConfig:
     return AdaptiveGraspConfig(**kwargs)
 
 
-def print_hold_status(state: str, torque: int) -> None:
-    status_line = f"state={state:<18}; torque={torque:>3}"
+def _format_optional_float(name: str, value: Optional[float]) -> str:
+    if value is None:
+        return f"{name}=NA"
+    return f"{name}={value:.2f}"
+
+
+def format_hold_status(
+    state: str,
+    torque: int,
+    mode: str,
+    total_fz: Optional[float],
+    slip_risk: Optional[float],
+    slip_confirmed: Optional[bool],
+    torque_decision: Optional[TorqueHoldDecision],
+) -> str:
+    parts = [
+        f"state={state:<18}",
+        f"mode={mode}",
+        f"torque={torque:>3}",
+        _format_optional_float("total_fz", total_fz),
+        _format_optional_float("slip_risk", slip_risk),
+    ]
+    if slip_confirmed is not None:
+        parts.append(f"slip_confirmed={slip_confirmed}")
+    if torque_decision is not None:
+        parts.append(f"F_ref_total={torque_decision.F_ref_total:.2f}")
+        finger_torques = ", ".join(
+            f"{finger.name}={value:.2f}"
+            for finger, value in sorted(
+                torque_decision.finger_torques.items(),
+                key=lambda item: item[0].name,
+            )
+        )
+        if finger_torques:
+            parts.append(f"finger_torques=[{finger_torques}]")
+    return "; ".join(parts)
+
+
+def print_hold_status(
+    state: str,
+    torque: int,
+    mode: str = "",
+    total_fz: Optional[float] = None,
+    slip_risk: Optional[float] = None,
+    slip_confirmed: Optional[bool] = None,
+    torque_decision: Optional[TorqueHoldDecision] = None,
+) -> None:
+    if not mode and total_fz is None and slip_risk is None and torque_decision is None:
+        status_line = f"state={state:<18}; torque={torque:>3}"
+    else:
+        status_line = format_hold_status(
+            state=state,
+            torque=torque,
+            mode=mode,
+            total_fz=total_fz,
+            slip_risk=slip_risk,
+            slip_confirmed=slip_confirmed,
+            torque_decision=torque_decision,
+        )
     print(status_line, flush=True)
 
 
@@ -174,7 +232,16 @@ def main() -> None:
         print("Holding object...")
         while grasper.get_state() == GraspState.ADAPTIVE_HOLD:
             state_val = grasper.get_state().value
-            print_hold_status(state_val, grasper.current_torque)
+            analysis = grasper.last_tactile_analysis
+            print_hold_status(
+                state_val,
+                grasper.current_torque,
+                mode=config.adaptive_hold_command_mode,
+                total_fz=analysis.total_fz if analysis is not None else None,
+                slip_risk=analysis.slip_risk if analysis is not None else None,
+                slip_confirmed=analysis.slip_confirmed if analysis is not None else None,
+                torque_decision=grasper.last_torque_hold_decision,
+            )
             logger.write_row(state_val, grasper.current_torque)
             grasper.poll_visualizer()
             time.sleep(0.1)
