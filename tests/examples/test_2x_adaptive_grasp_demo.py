@@ -4,6 +4,9 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
+from xiaoyao.adaptive_grasp.torque_hold_planner import TorqueHoldDecision
+from xiaoyao.dexhand import TactileSensorId
+
 _DEMO_PATH = Path(__file__).resolve().parents[2] / "examples" / "2x.adaptive_grasp_demo.py"
 spec = importlib.util.spec_from_file_location("adaptive_grasp_demo_2x", _DEMO_PATH)
 assert spec is not None and spec.loader is not None
@@ -127,6 +130,36 @@ def test_print_hold_status_uses_newline(capsys):
 
     captured = capsys.readouterr()
     assert captured.out == "state=adaptive_hold     ; torque=  4\n"
+
+
+def test_format_hold_status_includes_torque_decision():
+    decision = TorqueHoldDecision(
+        finger_torques={
+            TactileSensorId.THUMB: 5.4,
+            TactileSensorId.FOREFINGER: 6.2,
+        },
+        force_refs={},
+        contact_ratios={},
+        F_ref_total=0.8,
+    )
+
+    line = demo.format_hold_status(
+        state="adaptive_hold",
+        torque=6,
+        mode="torque",
+        total_fz=0.7,
+        slip_risk=0.4,
+        slip_confirmed=False,
+        torque_decision=decision,
+    )
+
+    assert "state=adaptive_hold" in line
+    assert "mode=torque" in line
+    assert "total_fz=0.70" in line
+    assert "slip_risk=0.40" in line
+    assert "F_ref_total=0.80" in line
+    assert "THUMB=5.40" in line
+    assert "FOREFINGER=6.20" in line
 
 
 def test_main_zeroes_tactile_after_open(monkeypatch):

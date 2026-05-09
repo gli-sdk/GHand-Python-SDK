@@ -6,6 +6,7 @@ from xiaoyao.adaptive_grasp.force_planner import ForceDecision
 from xiaoyao.adaptive_grasp.adaptive_hold_loop import HoldController, HoldResult, HoldStepResult
 from xiaoyao.adaptive_grasp.joint_builder import JointCommandBuilder
 from xiaoyao.adaptive_grasp.tactility import TactileAnalysis
+from xiaoyao.adaptive_grasp.torque_hold_planner import TorqueHoldDecision
 from xiaoyao.adaptive_grasp.safety import SafetyReport, SafetyStatus
 from xiaoyao.dexhand import CtrlMode, Joint, JointId, TactileSensorId
 
@@ -244,6 +245,65 @@ def test_torque_hold_uses_torque_from_force_decision():
     assert hand.calls[0]["mode"] == CtrlMode.TORQUE
     for joint_id in (JointId.THUMB_PIP, JointId.THUMB_MCP, JointId.FF_PIP, JointId.FF_MCP):
         assert joint_map[joint_id].torque == 12
+
+
+def test_torque_hold_loop_uses_torque_hold_planner_per_finger_torques():
+    hand = _MockHand()
+    cfg = AdaptiveGraspConfig(
+        adaptive_hold_command_mode="torque",
+        active_fingers={TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
+        control_period_s=0.02,
+    )
+    sensor = MagicMock()
+    sensor.tactile_data = {}
+    sensor.joint_feedback = []
+    sensor.sample_time_s = 10.0
+    safety = MagicMock()
+    safety.check.return_value = SafetyReport(SafetyStatus.OK)
+    analysis = TactileAnalysis(
+        variance=0.0,
+        slip_risk=0.0,
+        direction_distance=0.0,
+        friction_utilization=0.0,
+        slip_confirmed=False,
+        finger_fz={},
+        total_fz=0.0,
+    )
+    tactile = MagicMock()
+    tactile.update.return_value = analysis
+    torque_hold_planner = MagicMock()
+    decision = TorqueHoldDecision(
+        finger_torques={
+            TactileSensorId.THUMB: 6.2,
+            TactileSensorId.FOREFINGER: 8.1,
+        },
+        force_refs={},
+        contact_ratios={},
+        F_ref_total=1.0,
+    )
+    torque_hold_planner.compute.return_value = decision
+    joint_builder = JointCommandBuilder(
+        cfg,
+        (JointId.THUMB_PIP, JointId.THUMB_MCP, JointId.FF_PIP, JointId.FF_MCP),
+    )
+    controller = HoldController(
+        hand, sensor, safety, tactile, None, None,
+        joint_builder, cfg, current_torque=10,
+        torque_hold_planner=torque_hold_planner,
+    )
+
+    result = controller.run_step(current_time=0.0)
+
+    joint_map = {joint.id: joint for joint in hand.calls[0]["joints"]}
+    torque_hold_planner.compute.assert_called_once_with(analysis, dt=cfg.control_period_s)
+    assert result.result == HoldResult.CONTINUE
+    assert result.torque_hold_decision is decision
+    assert result.current_torque == 8
+    assert hand.calls[0]["mode"] == CtrlMode.TORQUE
+    assert joint_map[JointId.THUMB_PIP].torque == 6
+    assert joint_map[JointId.THUMB_MCP].torque == 6
+    assert joint_map[JointId.FF_PIP].torque == 8
+    assert joint_map[JointId.FF_MCP].torque == 8
 
 
 def test_hold_step_uses_contact_snapshot_when_joint_feedback_missing():

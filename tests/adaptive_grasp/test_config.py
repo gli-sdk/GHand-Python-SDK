@@ -3,6 +3,7 @@ import math
 import pytest
 
 from xiaoyao.adaptive_grasp import AdaptiveGraspConfig
+from xiaoyao.dexhand import TactileSensorId
 
 
 def test_position_hold_defaults():
@@ -132,3 +133,34 @@ def test_default_friction_coeff():
     assert cfg.default_friction_coeff == pytest.approx(0.7)
     with pytest.raises(ValueError):
         AdaptiveGraspConfig(default_friction_coeff=0.0)
+
+
+def test_torque_hold_closed_loop_defaults():
+    cfg = AdaptiveGraspConfig()
+
+    assert cfg.torque_hold_force_margin_n == pytest.approx(0.10)
+    assert cfg.torque_hold_slip_warning_threshold == pytest.approx(0.40)
+    assert cfg.torque_hold_stable_threshold == pytest.approx(0.20)
+    assert cfg.torque_hold_slip_gain_n_per_s == pytest.approx(0.20)
+    assert cfg.torque_hold_max_rise_step_n == pytest.approx(0.02)
+    assert cfg.torque_hold_confirmed_boost_n == pytest.approx(0.05)
+    assert cfg.torque_hold_decay_rate_n_per_s == pytest.approx(0.02)
+    assert cfg.torque_hold_stable_decay_delay_s == pytest.approx(1.0)
+    assert cfg.torque_hold_min_contact_ratio == pytest.approx(0.15)
+    assert cfg.torque_hold_K_p == pytest.approx(5.0)
+    assert cfg.torque_hold_K_i == pytest.approx(0.0)
+    assert cfg.torque_hold_K_d == pytest.approx(0.0)
+    assert cfg.torque_hold_I_min == pytest.approx(-1.0)
+    assert cfg.torque_hold_I_max == pytest.approx(1.0)
+
+
+def test_torque_hold_min_contact_ratio_must_fit_active_fingers():
+    with pytest.raises(ValueError, match="torque_hold_min_contact_ratio"):
+        AdaptiveGraspConfig(
+            active_fingers={
+                TactileSensorId.THUMB,
+                TactileSensorId.FOREFINGER,
+                TactileSensorId.MIDDLE_FINGER,
+            },
+            torque_hold_min_contact_ratio=0.40,
+        )

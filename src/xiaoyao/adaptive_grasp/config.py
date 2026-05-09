@@ -237,6 +237,20 @@ class AdaptiveGraspConfig:
     #=============================================================================
     adaptive_hold_command_mode: str = "position" # "position" or "torque".
     adaptive_hold_torque: int = 5 # Torque sent to active MCP/PIP joints in torque hold mode.
+    torque_hold_force_margin_n: float = 0.10
+    torque_hold_slip_warning_threshold: float = 0.40
+    torque_hold_stable_threshold: float = 0.20
+    torque_hold_slip_gain_n_per_s: float = 0.20
+    torque_hold_max_rise_step_n: float = 0.02
+    torque_hold_confirmed_boost_n: float = 0.05
+    torque_hold_decay_rate_n_per_s: float = 0.02
+    torque_hold_stable_decay_delay_s: float = 1.0
+    torque_hold_min_contact_ratio: float = 0.15
+    torque_hold_K_p: float = 5.0
+    torque_hold_K_i: float = 0.0
+    torque_hold_K_d: float = 0.0
+    torque_hold_I_min: float = -1.0
+    torque_hold_I_max: float = 1.0
 
     # Feedforward + PID control gains. ForcePlanner uses K_s with fused slip
     # risk and K_n with normal-force over-limit error.
@@ -282,6 +296,22 @@ class AdaptiveGraspConfig:
         _validate("torque_adjust_step", self.torque_adjust_step, greater_than=0)
         _validate("variance_baseline", self.variance_baseline, greater_equal=0)
         _validate("adaptive_hold_torque", self.adaptive_hold_torque, greater_equal=-100, less_equal=100)
+        _validate("torque_hold_force_margin_n", self.torque_hold_force_margin_n, greater_equal=0.0)
+        _validate("torque_hold_slip_warning_threshold", self.torque_hold_slip_warning_threshold, greater_equal=0.0, less_equal=1.0)
+        _validate("torque_hold_stable_threshold", self.torque_hold_stable_threshold, greater_equal=0.0, less_equal=1.0)
+        _validate("torque_hold_slip_gain_n_per_s", self.torque_hold_slip_gain_n_per_s, greater_equal=0.0)
+        _validate("torque_hold_max_rise_step_n", self.torque_hold_max_rise_step_n, greater_equal=0.0)
+        _validate("torque_hold_confirmed_boost_n", self.torque_hold_confirmed_boost_n, greater_equal=0.0)
+        _validate("torque_hold_decay_rate_n_per_s", self.torque_hold_decay_rate_n_per_s, greater_equal=0.0)
+        _validate("torque_hold_stable_decay_delay_s", self.torque_hold_stable_decay_delay_s, greater_equal=0.0)
+        _validate("torque_hold_min_contact_ratio", self.torque_hold_min_contact_ratio, greater_equal=0.0, less_equal=1.0)
+        if self.torque_hold_min_contact_ratio * len(self.active_fingers) > 1.0:
+            raise ValueError("torque_hold_min_contact_ratio * active_finger_count must be <= 1.0")
+        _validate("torque_hold_K_p", self.torque_hold_K_p, greater_equal=0.0)
+        _validate("torque_hold_K_i", self.torque_hold_K_i, greater_equal=0.0)
+        _validate("torque_hold_K_d", self.torque_hold_K_d, greater_equal=0.0)
+        if self.torque_hold_I_min > self.torque_hold_I_max:
+            raise ValueError("torque_hold_I_min must be <= torque_hold_I_max")
         _validate("position_speed_limit", self.position_speed_limit, greater_equal=0, less_equal=100)
         _validate("position_torque_limit", self.position_torque_limit, greater_equal=0, less_equal=100)
         _validate("delta_theta_limit", self.delta_theta_limit, greater_than=0)
@@ -311,8 +341,8 @@ class AdaptiveGraspConfig:
         _validate("closing_stall_cycles", self.closing_stall_cycles, greater_than=0)
         if not math.isclose(self.variance_weight + self.direction_weight + self.friction_weight, 1.0, abs_tol=1e-6):
             raise ValueError("variance_weight + direction_weight + friction_weight must equal 1.0")
-        # if not math.isclose(self.K_MCP + self.K_PIP, 1.0, abs_tol=1e-6):
-        #     raise ValueError("K_MCP + K_PIP must equal 1.0")
+        if not math.isclose(self.K_MCP + self.K_PIP, 1.0, abs_tol=1e-6):
+            raise ValueError("K_MCP + K_PIP must equal 1.0")
         if self.adaptive_hold_command_mode not in {"position", "torque"}:
             raise ValueError('adaptive_hold_command_mode must be "position" or "torque"')
         if self.variance_baseline >= self.variance_threshold:

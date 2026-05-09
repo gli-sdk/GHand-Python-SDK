@@ -3,7 +3,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
-from xiaoyao.dexhand import CtrlMode, DexHand, Joint, JointId
+from xiaoyao.dexhand import CtrlMode, DexHand, Joint, JointId, TactileSensorId
 from .config import AdaptiveGraspConfig
 from .states import GraspState
 from .sensor import SensorClient
@@ -18,6 +18,7 @@ _logger = logging.getLogger("xiaoyao.adaptive_grasp.grasp_sequence")
 @dataclass(frozen=True)
 class ContactSnapshot:
     joint_angles: dict[JointId, float]
+    finger_fz: dict[TactileSensorId, float]
     total_fz: float
     torque: int
     reason: str
@@ -144,7 +145,12 @@ class PhaseController:
 
             total_fz = self._sensor.sum_active_finger_normal_force()
             if total_fz >= self.config.contact_threshold_z:
-                self._record_contact_snapshot(joint_feedback, total_fz, "force_threshold")
+                self._record_contact_snapshot(
+                    joint_feedback,
+                    tactile_data,
+                    total_fz,
+                    "force_threshold",
+                )
                 if force_planner and force_planner.is_fragile_mode:
                     return True
                 else:
@@ -160,6 +166,7 @@ class PhaseController:
                     _logger.info("CLOSING: torque-stall contact confirmed")
                     self._record_contact_snapshot(
                         joint_feedback,
+                        tactile_data,
                         self._sensor.sum_active_finger_normal_force(),
                         "torque_stall",
                     )
@@ -175,6 +182,7 @@ class PhaseController:
     def _record_contact_snapshot(
         self,
         joint_feedback: list[Joint],
+        tactile_data: dict[TactileSensorId, Any],
         total_fz: float,
         reason: str,
     ) -> None:
@@ -183,8 +191,14 @@ class PhaseController:
             for j in joint_feedback
             if j.id in self._joint_builder.torque_joints
         }
+        finger_fz = {
+            finger: abs(info.get_force_z())
+            for finger, info in tactile_data.items()
+            if finger in self.config.active_fingers
+        }
         self._contact_snapshot = ContactSnapshot(
             joint_angles=joint_angles,
+            finger_fz=finger_fz,
             total_fz=total_fz,
             torque=self.current_torque,
             reason=reason,

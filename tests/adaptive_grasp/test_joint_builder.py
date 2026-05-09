@@ -2,7 +2,7 @@ import math
 import pytest
 from xiaoyao.adaptive_grasp import AdaptiveGraspConfig
 from xiaoyao.adaptive_grasp.joint_builder import JointCommandBuilder
-from xiaoyao.dexhand import JointId
+from xiaoyao.dexhand import JointId, TactileSensorId
 
 
 class TestJointCommandBuilder:
@@ -74,3 +74,39 @@ class TestJointCommandBuilder:
         joints = builder.hold_position_command(torque=50)
         assert joints[0].torque == 30
         assert joints[0].speed == 20
+
+    def test_hold_per_finger_torque_command_maps_finger_to_mcp_pip(self):
+        cfg = AdaptiveGraspConfig(
+            active_fingers={
+                TactileSensorId.THUMB,
+                TactileSensorId.FOREFINGER,
+                TactileSensorId.MIDDLE_FINGER,
+            },
+        )
+        builder = JointCommandBuilder(
+            cfg,
+            (
+                JointId.THUMB_PIP,
+                JointId.THUMB_MCP,
+                JointId.FF_PIP,
+                JointId.FF_MCP,
+                JointId.MF_PIP,
+                JointId.MF_MCP,
+            ),
+        )
+
+        joints = builder.hold_per_finger_torque_command({
+            TactileSensorId.THUMB: 5.4,
+            TactileSensorId.FOREFINGER: 7.2,
+            TactileSensorId.MIDDLE_FINGER: 9.0,
+        })
+
+        joint_map = {joint.id: joint for joint in joints}
+        assert joint_map[JointId.THUMB_PIP].torque == 5
+        assert joint_map[JointId.THUMB_MCP].torque == 5
+        assert joint_map[JointId.FF_PIP].torque == 7
+        assert joint_map[JointId.FF_MCP].torque == 7
+        assert joint_map[JointId.MF_PIP].torque == 9
+        assert joint_map[JointId.MF_MCP].torque == 9
+        assert joint_map[JointId.RF_PIP].torque == 0
+        assert joint_map[JointId.LF_PIP].torque == 0

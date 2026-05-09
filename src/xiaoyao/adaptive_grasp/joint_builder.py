@@ -1,7 +1,7 @@
 import math
 from typing import Mapping, Optional
 
-from xiaoyao.dexhand import Joint, JointId
+from xiaoyao.dexhand import Joint, JointId, TactileSensorId
 from .config import AdaptiveGraspConfig
 from .utils import clip
 
@@ -14,8 +14,18 @@ TORQUE_CONTROL_JOINTS = (
     JointId.LF_PIP, JointId.LF_MCP,
 )
 
+FINGER_TORQUE_JOINTS = {
+    TactileSensorId.THUMB: (JointId.THUMB_MCP, JointId.THUMB_PIP),
+    TactileSensorId.FOREFINGER: (JointId.FF_MCP, JointId.FF_PIP),
+    TactileSensorId.MIDDLE_FINGER: (JointId.MF_MCP, JointId.MF_PIP),
+    TactileSensorId.RING_FINGER: (JointId.RF_MCP, JointId.RF_PIP),
+    TactileSensorId.LITTLE_FINGER: (JointId.LF_MCP, JointId.LF_PIP),
+}
+
 
 class JointCommandBuilder:
+    _TORQUE_JOINTS = TORQUE_CONTROL_JOINTS
+
     def __init__(self, config: AdaptiveGraspConfig, torque_joints: tuple[JointId, ...]):
         self._config = config
         self._torque_joints = torque_joints
@@ -70,6 +80,32 @@ class JointCommandBuilder:
 
     def hold_torque_command(self, torque: int) -> list[Joint]:
         return self.torque_command(torque)
+
+    def hold_per_finger_torque_command(
+        self,
+        finger_torques: Mapping[TactileSensorId, float],
+    ) -> list[Joint]:
+        active_joints = set(self._torque_joints)
+        joint_torques: dict[JointId, int] = {}
+
+        for finger, torque in finger_torques.items():
+            for joint_id in FINGER_TORQUE_JOINTS.get(finger, ()):
+                if joint_id in active_joints:
+                    joint_torques[joint_id] = round(
+                        clip(torque, -100.0, self._config.max_torque)
+                    )
+
+        joints = [
+            Joint(id=joint_id, torque=joint_torques[joint_id])
+            if joint_id in joint_torques
+            else Joint(id=joint_id, angle=0.0, speed=0, torque=0)
+            for joint_id in TORQUE_CONTROL_JOINTS
+        ]
+        joints += [
+            Joint(id=JointId.THUMB_ROTATION, angle=0.0, speed=0, torque=5),
+            Joint(id=JointId.THUMB_SWING, angle=0.0, speed=0, torque=5),
+        ]
+        return joints
 
     def hold_position_command(self, torque: int, angles: Optional[Mapping[JointId, float]] = None) -> list[Joint]:
         limited_torque = int(clip(abs(torque), 0.0, float(self._config.position_torque_limit)))

@@ -12,6 +12,7 @@ from .tactility import TactileAnalyzer, TactileAnalysis
 from .object_profile import ObjectProfile, ObjectProfileRegistry
 from .force_planner import ForcePlanner, ForceDecision
 from .safety import SafetyMonitor, SafetyReport
+from .torque_hold_planner import TorqueHoldDecision, TorqueHoldPlanner
 from .visualization import TactileVisualizer
 from .utils import clip, JOINT_TO_FINGER
 from .joint_builder import JointCommandBuilder, TORQUE_CONTROL_JOINTS
@@ -61,6 +62,7 @@ class AdaptiveGrasper:
         self._last_tactile_analysis: Optional[TactileAnalysis] = None
         self._last_safety_report: Optional[SafetyReport] = None
         self._last_force_decisions: Optional[dict[TactileSensorId, ForceDecision]] = None
+        self._last_torque_hold_decision: Optional[TorqueHoldDecision] = None
         self._last_tactile_data_age_s: Optional[float] = None
         self._last_control_step_start_s: Optional[float] = None
         self._last_control_cycle_s: Optional[float] = None
@@ -138,6 +140,10 @@ class AdaptiveGrasper:
         return self._last_force_decisions
 
     @property
+    def last_torque_hold_decision(self) -> Optional[TorqueHoldDecision]:
+        return self._last_torque_hold_decision
+
+    @property
     def last_tactile_data_age_s(self) -> Optional[float]:
         return self._last_tactile_data_age_s
 
@@ -156,11 +162,13 @@ class AdaptiveGrasper:
     def _start_adaptive_control(self) -> None:
         self.state = GraspState.ADAPTIVE_HOLD
         self._adaptive_hold_started_at = self._get_monotonic_time()
+        torque_hold_planner = self._create_torque_hold_planner()
         self._adaptive_hold_loop = HoldController(
             self.hand, self._sensor, self._safety, self._tactile,
             self._force_planner, self._visualizer, self._joint_builder,
             self.config, self.current_torque,
             contact_joint_angles=self._contact_joint_angles(),
+            torque_hold_planner=torque_hold_planner,
         )
         self._control_thread = threading.Thread(target=self._adaptive_control_loop, daemon=True)
         self._control_thread.start()
@@ -191,6 +199,18 @@ class AdaptiveGrasper:
         if self._last_contact_snapshot is None:
             return None
         return self._last_contact_snapshot.joint_angles
+
+    def _create_torque_hold_planner(self) -> Optional[TorqueHoldPlanner]:
+        if (
+            self.config.adaptive_hold_command_mode == "torque"
+            and self._last_contact_snapshot is not None
+        ):
+            return TorqueHoldPlanner(
+                self.config,
+                self._object_profile,
+                self._last_contact_snapshot,
+            )
+        return None
 
     def _adaptive_control_loop(self) -> None:
         try:
@@ -224,6 +244,7 @@ class AdaptiveGrasper:
         self._last_tactile_analysis = step.tactile_analysis
         self._last_safety_report = step.safety_report
         self._last_force_decisions = step.force_decisions
+        self._last_torque_hold_decision = step.torque_hold_decision
         if step.current_torque is not None:
             self.current_torque = step.current_torque
 
@@ -302,6 +323,7 @@ class AdaptiveGrasper:
         self._last_tactile_analysis = None
         self._last_safety_report = None
         self._last_force_decisions = None
+        self._last_torque_hold_decision = None
         self._last_tactile_data_age_s = None
         self._last_control_step_start_s = None
         self._last_control_cycle_s = None
