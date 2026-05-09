@@ -8,7 +8,6 @@ from .config import AdaptiveGraspConfig
 from .states import GraspState
 from .sensor import SensorClient
 from .safety import SafetyMonitor, SafetyStatus
-from .force_planner import ForcePlanner
 from .joint_builder import JointCommandBuilder
 from .utils import clip
 
@@ -61,7 +60,7 @@ class PhaseController:
         self._phase_should_release = False
         self._contact_snapshot: Optional[ContactSnapshot] = None
 
-    def run(self, force_planner: Optional[ForcePlanner], is_running: Callable[[], bool]) -> PhaseResult:
+    def run(self, is_running: Callable[[], bool]) -> PhaseResult:
         self._phase_should_release = False
         self._contact_snapshot = None
         for phase_method, name in (
@@ -76,7 +75,7 @@ class PhaseController:
                     should_release=self._phase_should_release,
                     contact_snapshot=self._contact_snapshot,
                 )
-            if not phase_method(force_planner, is_running):
+            if not phase_method(is_running):
                 _logger.error("%s phase failed", name)
                 self._set_state(GraspState.ERROR)
                 return PhaseResult(
@@ -102,17 +101,17 @@ class PhaseController:
             time.sleep(sleep_s)
         return ok
 
-    def _phase_open(self, force_planner: Optional[ForcePlanner] = None, is_running: Callable[[], bool] = lambda: True) -> bool:
+    def _phase_open(self, is_running: Callable[[], bool] = lambda: True) -> bool:
         return self._execute_position_phase(
             GraspState.OPEN, self._joint_builder.open_pose(), sleep_s=3,
         )
 
-    def _phase_pre_grasp(self, force_planner: Optional[ForcePlanner] = None, is_running: Callable[[], bool] = lambda: True) -> bool:
+    def _phase_pre_grasp(self, is_running: Callable[[], bool] = lambda: True) -> bool:
         return self._execute_position_phase(
             GraspState.PRE_GRASP, self.config.pre_grasp_pose, sleep_s=5,
         )
 
-    def _phase_closing(self, force_planner: Optional[ForcePlanner], is_running: Callable[[], bool]) -> bool:
+    def _phase_closing(self, is_running: Callable[[], bool]) -> bool:
         self._set_state(GraspState.CLOSING_TO_CONTACT)
         start = self._get_monotonic_time()
         self.current_torque = int(clip(self.config.phase_closing_torque, -100.0, self.config.max_torque))
@@ -153,12 +152,8 @@ class PhaseController:
                     total_fz,
                     "force_threshold",
                 )
-                if force_planner and force_planner.is_fragile_mode:
-                    return True
-                else:
-                    self._calibrate_force(force_planner)
-                    time.sleep(self.config.control_period_s)
-                    return True
+                time.sleep(self.config.control_period_s)
+                return True
 
             current_angles = {j.id: j.angle for j in joint_feedback}
             if self._is_joints_stalled(prev_angles, current_angles):
@@ -172,7 +167,6 @@ class PhaseController:
                         self._sensor.sum_active_finger_normal_force(),
                         "torque_stall",
                     )
-                    self._calibrate_force(force_planner)
                     time.sleep(self.config.control_period_s)
                     return True
             else:
@@ -221,27 +215,3 @@ class PhaseController:
             if delta > self.config.closing_stall_angle_threshold:
                 return False
         return True
-
-    def _calibrate_force(self, force_planner: Optional[ForcePlanner]) -> None:
-        if force_planner is None:
-            return
-        F_init = force_planner.F_init
-        if F_init <= 0:
-            return
-        tolerance = getattr(self.config, 'force_calibrate_tolerance', 1.0)
-        for _ in range(5):
-            total_fz = self._sensor.sum_active_finger_normal_force()
-            if abs(total_fz - F_init) <= tolerance:
-                break
-            step = self.config.torque_adjust_step
-            if force_planner.is_fragile_mode:
-                step = int(step * self.config.fragile_step_reduction)
-            if total_fz < F_init:
-                self.current_torque = int(clip(self.current_torque + step, -100.0, self.config.max_torque))
-            else:
-                self.current_torque = int(clip(self.current_torque - step, -100.0, self.config.max_torque))
-            joints = self._joint_builder.torque_command(self.current_torque)
-            if not self.hand.move_joints(joints, mode=CtrlMode.TORQUE):
-                _logger.error("FORCE_CALIBRATION: move_joints failed")
-                break
-            time.sleep(self.config.control_period_s)

@@ -204,7 +204,7 @@ class AdaptiveGraspConfig:
     """
     pre_grasp_preset: str = "two_finger_pinch" # 预抓取姿态预设名称。
     active_fingers: set[TactileSensorId] = field(default_factory=set) # 抓取时的手指集合；为空时按预设自动推导。
-    per_finger_pid: dict[TactileSensorId, PerFingerPidConfig] = field(default_factory=dict) # 单指独立 PID 参数；未配置的手指回退到全局 K_p/K_i/K_d。
+    per_finger_pid: dict[TactileSensorId, PerFingerPidConfig] = field(default_factory=dict) # 单指独立 PID 参数；未配置的手指回退到 position_hold_* 参数。
     #=============================================================================
     # 2.闭合接触阶段基础参数
     base_torque: int = 30 # 默认基础力矩，保留给兼容逻辑使用。
@@ -221,6 +221,16 @@ class AdaptiveGraspConfig:
     max_normal_force_per_finger: float = 25.0 # 单指法向力上限 Fn,max N，触觉传感器最大量程；
     variance_threshold: float = 0.003    # 滑移方差阈值 v_th（需标定）；
     variance_baseline: float = 0.00001 # 滑移方差基线 v_0（需标定）。
+    # 自适应保持阶段位置闭环控制/力矩闭环控制公用参数
+    adaptive_hold_command_mode: str = "position" # "position" or "torque".
+    force_ref_slip_warning_threshold: float = 0.40
+    force_ref_stable_threshold: float = 0.20
+    force_ref_slip_gain_n_per_s: float = 0.20
+    force_ref_max_rise_step_n: float = 0.02
+    force_ref_confirmed_boost_n: float = 0.05
+    force_ref_decay_rate_n_per_s: float = 0.02
+    force_ref_stable_decay_delay_s: float = 1.0
+    force_ref_min_contact_ratio: float = 0.15
 
     # 自适应保持阶段的位置闭环控制
     position_speed_limit: int = 15 # 自适应保持阶段位置指令速度限幅。
@@ -229,24 +239,21 @@ class AdaptiveGraspConfig:
     # MCP/PIP 角增量分配系数，满足 K_MCP + K_PIP = 1
     K_MCP: float = 0.5 # MCP 角增量分配系数
     K_PIP: float = 0.5 # PIP 角增量分配系数
+    position_hold_K_p: float = 2.0
+    position_hold_K_i: float = 0.2
+    position_hold_K_d: float = 0.0
+    position_hold_I_min: float = -2.0
+    position_hold_I_max: float = 2.0
+    K_n: float = 1.0 # Normal-force over-limit suppression gain K_n.
     
     #自适应保持阶段的力矩闭环控制
-    adaptive_hold_command_mode: str = "position" # "position" or "torque".
     adaptive_hold_torque: int = 5 # Torque sent to active MCP/PIP joints in torque hold mode.
-    torque_hold_force_margin_n: float = 0.10
-    torque_hold_slip_warning_threshold: float = 0.40
-    torque_hold_stable_threshold: float = 0.20
-    torque_hold_slip_gain_n_per_s: float = 0.20
-    torque_hold_max_rise_step_n: float = 0.02
-    torque_hold_confirmed_boost_n: float = 0.05
-    torque_hold_decay_rate_n_per_s: float = 0.02
-    torque_hold_stable_decay_delay_s: float = 1.0
-    torque_hold_min_contact_ratio: float = 0.15
+    force_ref_margin_n: float = 0.10
     torque_hold_K_p: float = 5.0
-    torque_hold_K_i: float = 0.1
+    torque_hold_K_i: float = 0.0
     torque_hold_K_d: float = 0.0
-    torque_hold_I_min: float = -2.0
-    torque_hold_I_max: float = 2.0
+    torque_hold_I_min: float = -1.0
+    torque_hold_I_max: float = 1.0
     #=============================================================================
     # 释放阶段参数（超时触发与安全张开）
     release_hold_time_s: float = 20.0 # 自适应保持超时后自动进入释放的时长（秒）。
@@ -254,31 +261,19 @@ class AdaptiveGraspConfig:
     release_open_torque: int = 50 # 释放阶段安全张开力矩。
     release_timeout_s: float = 5.0 # 释放到位等待超时（秒）。
     #=============================================================================
-    
-
-    # Feedforward + PID control gains. ForcePlanner uses K_s with fused slip
-    # risk and K_n with normal-force over-limit error.
-    K_s: float = 1.0 # Slip-risk feedforward gain K_s.
-    K_n: float = 1.0 # Normal-force over-limit suppression gain K_n.
-    K_p: float = 0.2 # PID 比例增益 K_p。
-    K_i: float = 0.2 # PID 积分增益 K_i。
-    K_d: float = 0.000 # PID 微分增益 K_d。
-    # 积分项限幅（防积分饱和）
-    I_min: float = -1.0 # PID 积分项下限（防积分饱和）。
-    I_max: float = 1.0 # PID 积分项上限（防积分饱和）。
-    force_calibrate_tolerance: float = 0.5 # 夹持力校准容差（N），当实际法向力与初始目标夹持力的差值在此范围内时认为校准完成。
-    # 数值稳定项（防分母为零）
-    epsilon: float = 1e-6 # 数值稳定小量，避免分母为 0。
-    # 新增参数
-    safety_factor: float = 1.5 # 安全系数 S_f，范围 [1.2, 2.0]，默认 1.5
-    base_holding_force: float = 0.5 # 基础夹持力（N），默认 0.5
-    slip_detect_debounce_cycles: int = 3 # 滑移防抖连续周期阈值
-    fragile_torque_reduction: float = 0.8 # 易损模式力矩降低比例
-    fragile_step_reduction: float = 0.5 # 易损模式角增量/力矩步进降低比例
+    # 切向力相关参数
     # 三指标融合权重，满足 α + β + γ = 1
     variance_weight: float = 0.5
     direction_weight: float = 0.3
     friction_weight: float = 0.2
+    #==============================================================================
+    # 数值稳定项（防分母为零）
+    epsilon: float = 1e-6 # 数值稳定小量，避免分母为 0。
+    # 新增参数
+    slip_detect_debounce_cycles: int = 3 # 滑移防抖连续周期阈值
+    fragile_torque_reduction: float = 0.8 # 易损模式力矩降低比例
+    fragile_step_reduction: float = 0.5 # 易损模式角增量/力矩步进降低比例
+
     default_friction_coeff: float = 0.7 # 默认摩擦系数，物体参数库未提供时回退使用
     enable_fault_release_fallback: bool = True # 异常降级使能：安全监控返回故障时是否执行释放安全张开（True）或直接进入错误（False）
     enable_visualization: bool = True # 是否启用实时触觉数据可视化窗口（ADAPTIVE_HOLD 阶段）
@@ -301,17 +296,17 @@ class AdaptiveGraspConfig:
         _validate("torque_adjust_step", self.torque_adjust_step, greater_than=0)
         _validate("variance_baseline", self.variance_baseline, greater_equal=0)
         _validate("adaptive_hold_torque", self.adaptive_hold_torque, greater_equal=-100, less_equal=100)
-        _validate("torque_hold_force_margin_n", self.torque_hold_force_margin_n, greater_equal=0.0)
-        _validate("torque_hold_slip_warning_threshold", self.torque_hold_slip_warning_threshold, greater_equal=0.0, less_equal=1.0)
-        _validate("torque_hold_stable_threshold", self.torque_hold_stable_threshold, greater_equal=0.0, less_equal=1.0)
-        _validate("torque_hold_slip_gain_n_per_s", self.torque_hold_slip_gain_n_per_s, greater_equal=0.0)
-        _validate("torque_hold_max_rise_step_n", self.torque_hold_max_rise_step_n, greater_equal=0.0)
-        _validate("torque_hold_confirmed_boost_n", self.torque_hold_confirmed_boost_n, greater_equal=0.0)
-        _validate("torque_hold_decay_rate_n_per_s", self.torque_hold_decay_rate_n_per_s, greater_equal=0.0)
-        _validate("torque_hold_stable_decay_delay_s", self.torque_hold_stable_decay_delay_s, greater_equal=0.0)
-        _validate("torque_hold_min_contact_ratio", self.torque_hold_min_contact_ratio, greater_equal=0.0, less_equal=1.0)
-        if self.torque_hold_min_contact_ratio * len(self.active_fingers) > 1.0:
-            raise ValueError("torque_hold_min_contact_ratio * active_finger_count must be <= 1.0")
+        _validate("force_ref_margin_n", self.force_ref_margin_n, greater_equal=0.0)
+        _validate("force_ref_slip_warning_threshold", self.force_ref_slip_warning_threshold, greater_equal=0.0, less_equal=1.0)
+        _validate("force_ref_stable_threshold", self.force_ref_stable_threshold, greater_equal=0.0, less_equal=1.0)
+        _validate("force_ref_slip_gain_n_per_s", self.force_ref_slip_gain_n_per_s, greater_equal=0.0)
+        _validate("force_ref_max_rise_step_n", self.force_ref_max_rise_step_n, greater_equal=0.0)
+        _validate("force_ref_confirmed_boost_n", self.force_ref_confirmed_boost_n, greater_equal=0.0)
+        _validate("force_ref_decay_rate_n_per_s", self.force_ref_decay_rate_n_per_s, greater_equal=0.0)
+        _validate("force_ref_stable_decay_delay_s", self.force_ref_stable_decay_delay_s, greater_equal=0.0)
+        _validate("force_ref_min_contact_ratio", self.force_ref_min_contact_ratio, greater_equal=0.0, less_equal=1.0)
+        if self.force_ref_min_contact_ratio * len(self.active_fingers) > 1.0:
+            raise ValueError("force_ref_min_contact_ratio * active_finger_count must be <= 1.0")
         _validate("torque_hold_K_p", self.torque_hold_K_p, greater_equal=0.0)
         _validate("torque_hold_K_i", self.torque_hold_K_i, greater_equal=0.0)
         _validate("torque_hold_K_d", self.torque_hold_K_d, greater_equal=0.0)
@@ -326,14 +321,11 @@ class AdaptiveGraspConfig:
         _validate("release_open_speed", self.release_open_speed, greater_equal=0, less_equal=100)
         _validate("release_open_torque", self.release_open_torque, greater_equal=0, less_equal=100)
         _validate("release_timeout_s", self.release_timeout_s, greater_than=0)
-        _validate("K_s", self.K_s, greater_equal=0)
         _validate("K_n", self.K_n, greater_equal=0)
-        _validate("K_p", self.K_p, greater_equal=0)
-        _validate("K_i", self.K_i, greater_equal=0)
-        _validate("K_d", self.K_d, greater_equal=0)
+        _validate("position_hold_K_p", self.position_hold_K_p, greater_equal=0)
+        _validate("position_hold_K_i", self.position_hold_K_i, greater_equal=0)
+        _validate("position_hold_K_d", self.position_hold_K_d, greater_equal=0)
         _validate("epsilon", self.epsilon, greater_than=0)
-        _validate("safety_factor", self.safety_factor, greater_equal=1.2, less_equal=2.0)
-        _validate("base_holding_force", self.base_holding_force, greater_equal=0)
         _validate("slip_detect_debounce_cycles", self.slip_detect_debounce_cycles, greater_than=0)
         _validate("fragile_step_reduction", self.fragile_step_reduction, greater_than=0.0, less_equal=1.0)
         _validate("variance_weight", self.variance_weight, greater_equal=0.0, less_equal=1.0)
@@ -352,8 +344,8 @@ class AdaptiveGraspConfig:
             raise ValueError('adaptive_hold_command_mode must be "position" or "torque"')
         if self.variance_baseline >= self.variance_threshold:
             raise ValueError("variance_baseline must be < variance_threshold")
-        if self.I_min > self.I_max:
-            raise ValueError("I_min must be <= I_max")
+        if self.position_hold_I_min > self.position_hold_I_max:
+            raise ValueError("position_hold_I_min must be <= position_hold_I_max")
         #=============================================================================
         if self.pre_grasp_pose:
             filtered = self._filter_passive_dip_joints(self.pre_grasp_pose)

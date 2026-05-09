@@ -35,7 +35,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--phase-closing-torque", type=int, default=10)
     parser.add_argument("--max_torque", "--max-torque", type=int, default=80)
     parser.add_argument("--contact_threshold_z", "--contact-threshold-z", type=float, default=0.2)
-    parser.add_argument("--pre_grasp_preset", "--pre-grasp-preset", default="two_finger_pinch")
+    parser.add_argument("--pre_grasp_preset", "--pre-grasp-preset", default="three_finger_pinch")
     parser.add_argument("--hold_time", "--hold-time", type=float, default=50.0)
     parser.add_argument("--default_object", dest="object", default="glass")
     parser.add_argument(

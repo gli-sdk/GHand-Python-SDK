@@ -6,8 +6,9 @@ from typing import Any, Optional
 
 from xiaoyao.dexhand import CtrlMode, DexHand, Joint, JointId, TactileSensorId
 from .config import AdaptiveGraspConfig
-from .force_planner import ForceDecision, ForcePlanner
+from .force_reference_planner import ForceReferencePlanner
 from .joint_builder import JointCommandBuilder
+from .position_hold_planner import ForceDecision, PositionHoldPlanner
 from .safety import SafetyMonitor, SafetyReport, SafetyStatus
 from .sensor import SensorClient
 from .states import GraspState
@@ -60,25 +61,27 @@ class HoldController:
         sensor: SensorClient,
         safety: SafetyMonitor,
         tactile: TactileAnalyzer,
-        force_planner: Optional[ForcePlanner],
         visualizer: Optional[TactileVisualizer],
         joint_builder: JointCommandBuilder,
         config: AdaptiveGraspConfig,
         current_torque: int,
         contact_joint_angles: Optional[JointAngles] = None,
         torque_hold_planner: Optional[TorqueHoldPlanner] = None,
+        force_reference_planner: Optional[ForceReferencePlanner] = None,
+        position_hold_planner: Optional[PositionHoldPlanner] = None,
     ):
         self.hand = hand
         self._sensor = sensor
         self._safety = safety
         self._tactile = tactile
-        self._force_planner = force_planner
         self._visualizer = visualizer
         self._joint_builder = joint_builder
         self.config = config
         self._current_torque = current_torque
         self._contact_joint_angles = dict(contact_joint_angles or {})
         self._torque_hold_planner = torque_hold_planner
+        self._force_reference_planner = force_reference_planner
+        self._position_hold_planner = position_hold_planner
         self._last_sample_time_s: Optional[float] = None
         self._consecutive_move_failures = 0
         self._max_consecutive_move_failures = _MAX_CONSECUTIVE_MOVE_FAILURES
@@ -173,8 +176,14 @@ class HoldController:
         if (
             self.config.adaptive_hold_command_mode == "torque"
             and self._torque_hold_planner is not None
+            and self._force_reference_planner is not None
         ):
-            decision = self._torque_hold_planner.compute(analysis, dt=dt)
+            force_reference = self._force_reference_planner.compute(analysis, dt=dt)
+            decision = self._torque_hold_planner.compute(
+                analysis,
+                force_reference,
+                dt=dt,
+            )
             return _HoldCommand(
                 angles=current_angles,
                 torque=round(
@@ -191,17 +200,27 @@ class HoldController:
                 torque_hold_decision=decision,
             )
 
-        if self._force_planner is None:
-            return _HoldCommand(angles=current_angles, torque=self._default_hold_torque())
+        if (
+            self.config.adaptive_hold_command_mode == "position"
+            and self._position_hold_planner is not None
+            and self._force_reference_planner is not None
+        ):
+            force_reference = self._force_reference_planner.compute(analysis, dt=dt)
+            decisions = self._position_hold_planner.compute(
+                analysis,
+                current_angles,
+                force_reference,
+                dt=dt,
+            )
+            next_angles = self._merge_target_angles(current_angles, decisions)
+            next_torque = self._next_torque(decisions)
+            return _HoldCommand(
+                angles=next_angles,
+                torque=next_torque,
+                decisions=decisions,
+            )
 
-        decisions = self._force_planner.compute(analysis, current_angles)
-        next_angles = self._merge_target_angles(current_angles, decisions)
-        next_torque = self._next_torque(decisions)
-        return _HoldCommand(
-            angles=next_angles,
-            torque=next_torque,
-            decisions=decisions,
-        )
+        return _HoldCommand(angles=current_angles, torque=self._default_hold_torque())
 
     def _merge_target_angles(
         self,

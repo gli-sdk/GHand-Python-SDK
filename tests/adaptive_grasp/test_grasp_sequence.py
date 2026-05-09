@@ -4,7 +4,6 @@ import pytest
 from xiaoyao.adaptive_grasp import AdaptiveGraspConfig, GraspState
 from xiaoyao.adaptive_grasp.grasp_sequence import PhaseController, PhaseResult
 from xiaoyao.adaptive_grasp.joint_builder import JointCommandBuilder
-from xiaoyao.adaptive_grasp.force_planner import ForcePlanner
 from xiaoyao.dexhand import CtrlMode, JointId
 from xiaoyao.dexhand import Joint, TactileSensorId
 
@@ -70,7 +69,7 @@ def test_phase_closing_contact_by_force(monkeypatch):
     sensor.joint_feedback = []
     sensor.sum_active_finger_normal_force.return_value = 4.0
 
-    result = controller.run(force_planner=None, is_running=lambda: True)
+    result = controller.run(is_running=lambda: True)
 
     assert result.success is True
     assert GraspState.CLOSING_TO_CONTACT in states
@@ -104,7 +103,7 @@ def test_phase_closing_uses_phase_closing_torque(monkeypatch):
     sensor.joint_feedback = []
     sensor.sum_active_finger_normal_force.return_value = 4.0
 
-    result = controller.run(force_planner=None, is_running=lambda: True)
+    result = controller.run(is_running=lambda: True)
 
     assert result.success is True
     closing_call = next(call for call in hand.calls if call["mode"] == CtrlMode.TORQUE)
@@ -145,7 +144,7 @@ def test_phase_closing_records_contact_joint_snapshot_by_force(monkeypatch):
     ]
     sensor.sum_active_finger_normal_force.return_value = 4.0
 
-    result = controller.run(force_planner=None, is_running=lambda: True)
+    result = controller.run(is_running=lambda: True)
 
     assert result.contact_snapshot is not None
     assert result.contact_snapshot.reason == "force_threshold"
@@ -185,38 +184,13 @@ def test_phase_closing_records_contact_finger_force_snapshot_by_force(monkeypatc
     sensor.joint_feedback = [Joint(id=JointId.THUMB_PIP, angle=0.11)]
     sensor.sum_active_finger_normal_force.return_value = 2.0
 
-    result = controller.run(force_planner=None, is_running=lambda: True)
+    result = controller.run(is_running=lambda: True)
 
     assert result.contact_snapshot is not None
     assert result.contact_snapshot.finger_fz == {
         TactileSensorId.THUMB: pytest.approx(1.2),
         TactileSensorId.FOREFINGER: pytest.approx(0.8),
     }
-
-
-def test_calibrate_force_increases_torque_when_below_target(monkeypatch):
-    hand = _MockHand()
-    cfg = AdaptiveGraspConfig(
-        pre_grasp_preset="two_finger_pinch",
-        torque_adjust_step=5,
-        base_holding_force=6.0,
-    )
-    sensor = MagicMock()
-    safety = MagicMock()
-    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP, JointId.FF_PIP))
-    controller = PhaseController(
-        hand, sensor, safety, joint_builder, cfg, time.monotonic,
-        on_state_change=lambda s: None,
-    )
-    monkeypatch.setattr("xiaoyao.adaptive_grasp.grasp_sequence.time.sleep", lambda *_: None)
-
-    sensor.sum_active_finger_normal_force.return_value = 1.0  # below target
-    controller.current_torque = 10
-    force_planner = ForcePlanner(cfg, None)
-
-    controller._calibrate_force(force_planner)
-
-    assert controller.current_torque > 10
 
 
 def test_phase_open_and_pre_grasp(monkeypatch):
@@ -241,7 +215,7 @@ def test_phase_open_and_pre_grasp(monkeypatch):
     sensor.joint_feedback = []
     sensor.sum_active_finger_normal_force.return_value = 4.0
 
-    result = controller.run(force_planner=None, is_running=lambda: True)
+    result = controller.run(is_running=lambda: True)
 
     assert isinstance(result, PhaseResult)
     assert result.success is True
@@ -264,7 +238,7 @@ def test_phase_failure_sets_error_state(monkeypatch):
     )
     monkeypatch.setattr("xiaoyao.adaptive_grasp.grasp_sequence.time.sleep", lambda *_: None)
 
-    result = controller.run(force_planner=None, is_running=lambda: True)
+    result = controller.run(is_running=lambda: True)
 
     assert result.success is False
     assert states[-1] == GraspState.ERROR
@@ -296,7 +270,7 @@ def test_phase_closing_empty_grasp_requests_release(monkeypatch):
     sensor.joint_feedback = [Joint(id=JointId.THUMB_MCP, angle=0.0)]
     sensor.sum_active_finger_normal_force.return_value = 0.0
 
-    result = controller.run(force_planner=None, is_running=lambda: True)
+    result = controller.run(is_running=lambda: True)
 
     assert result.success is False
     assert result.should_release is True

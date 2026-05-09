@@ -8,10 +8,11 @@ import pytest
 import xiaoyao
 from xiaoyao.adaptive_grasp import AdaptiveGraspConfig, AdaptiveGrasper, GraspState
 from xiaoyao.adaptive_grasp.adaptive_hold_loop import HoldResult, HoldStepResult
+from xiaoyao.adaptive_grasp.force_reference_planner import ForceReferencePlanner
+from xiaoyao.adaptive_grasp.position_hold_planner import PositionHoldPlanner
 from xiaoyao.adaptive_grasp.torque_hold_planner import TorqueHoldDecision, TorqueHoldPlanner
 from xiaoyao.adaptive_grasp.object_profile import ObjectProfile
 from xiaoyao.adaptive_grasp.grasp_sequence import ContactSnapshot
-from xiaoyao.adaptive_grasp.force_planner import ForcePlanner
 from xiaoyao.adaptive_grasp.safety import SafetyReport, SafetyStatus
 from xiaoyao.adaptive_grasp.tactility import TactileAnalysis
 from xiaoyao.adaptive_grasp.joint_builder import JointCommandBuilder
@@ -464,7 +465,7 @@ def test_grasp_core_sets_error_state_when_phase_fails(monkeypatch):
 
     from xiaoyao.adaptive_grasp.grasp_sequence import PhaseResult
 
-    def fail_phase_run(self, force_planner, is_running):
+    def fail_phase_run(self, is_running):
         return PhaseResult(success=False, final_torque=cfg.base_torque)
 
     monkeypatch.setattr(
@@ -492,7 +493,7 @@ def test_grasp_core_releases_when_phase_requests_release(monkeypatch):
 
     from xiaoyao.adaptive_grasp.grasp_sequence import PhaseResult
 
-    def fail_phase_run(self, force_planner, is_running):
+    def fail_phase_run(self, is_running):
         return PhaseResult(success=False, final_torque=cfg.base_torque, should_release=True)
 
     monkeypatch.setattr(
@@ -523,7 +524,7 @@ def test_grasp_core_stores_contact_snapshot_for_adaptive_hold(monkeypatch):
         timestamp_s=3.4,
     )
 
-    def successful_phase_run(self, force_planner, is_running):
+    def successful_phase_run(self, is_running):
         return PhaseResult(
             success=True,
             final_torque=cfg.base_torque,
@@ -540,7 +541,45 @@ def test_grasp_core_stores_contact_snapshot_for_adaptive_hold(monkeypatch):
     assert grasper._adaptive_hold_loop._contact_joint_angles == snapshot.joint_angles
 
 
-def test_torque_mode_creates_torque_hold_planner_from_contact_snapshot(monkeypatch):
+def test_grasp_sequence_run_receives_only_is_running_callback(monkeypatch):
+    hand = _MockHand()
+    cfg = AdaptiveGraspConfig(enable_visualization=False)
+    grasper = AdaptiveGrasper(hand, cfg)
+
+    monkeypatch.setattr(grasper, "_start_sensor_subscription", lambda: None)
+    monkeypatch.setattr(grasper, "_adaptive_control_loop", lambda: None)
+
+    from xiaoyao.adaptive_grasp.grasp_sequence import ContactSnapshot, PhaseResult
+
+    snapshot = ContactSnapshot(
+        joint_angles={JointId.THUMB_PIP: 0.12},
+        finger_fz={TactileSensorId.THUMB: 1.2},
+        total_fz=1.2,
+        torque=cfg.phase_closing_torque,
+        reason="force_threshold",
+        timestamp_s=3.4,
+    )
+    captured_is_running = []
+
+    def successful_phase_run(self, is_running):
+        captured_is_running.append(is_running)
+        return PhaseResult(
+            success=True,
+            final_torque=cfg.phase_closing_torque,
+            contact_snapshot=snapshot,
+        )
+
+    monkeypatch.setattr(
+        "xiaoyao.adaptive_grasp.grasp_sequence.PhaseController.run",
+        successful_phase_run,
+    )
+
+    assert grasper.grasp_core() is True
+    assert len(captured_is_running) == 1
+    assert captured_is_running[0]() is True
+
+
+def test_torque_mode_creates_hold_planners_from_contact_snapshot(monkeypatch):
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(
         adaptive_hold_command_mode="torque",
@@ -570,6 +609,40 @@ def test_torque_mode_creates_torque_hold_planner_from_contact_snapshot(monkeypat
     grasper._start_adaptive_control()
 
     assert isinstance(grasper._adaptive_hold_loop._torque_hold_planner, TorqueHoldPlanner)
+    assert isinstance(grasper._adaptive_hold_loop._force_reference_planner, ForceReferencePlanner)
+
+
+def test_position_mode_creates_position_hold_planner_from_contact_snapshot(monkeypatch):
+    hand = _MockHand()
+    cfg = AdaptiveGraspConfig(
+        adaptive_hold_command_mode="position",
+        active_fingers={TactileSensorId.THUMB},
+        enable_visualization=False,
+    )
+    grasper = AdaptiveGrasper(hand, cfg)
+    grasper._object_profile = ObjectProfile(
+        name="paper_cup_test",
+        weight_kg=0.01,
+        safe_force_min=0.5,
+        safe_force_max=3.5,
+        friction_coeff=0.8,
+        is_fragile=True,
+        material="paper",
+    )
+    grasper._last_contact_snapshot = ContactSnapshot(
+        joint_angles={JointId.THUMB_PIP: 0.12},
+        finger_fz={TactileSensorId.THUMB: 0.5},
+        total_fz=0.5,
+        torque=cfg.base_torque,
+        reason="force_threshold",
+        timestamp_s=3.4,
+    )
+    monkeypatch.setattr(threading.Thread, "start", lambda self: None)
+
+    grasper._start_adaptive_control()
+
+    assert isinstance(grasper._adaptive_hold_loop._position_hold_planner, PositionHoldPlanner)
+    assert isinstance(grasper._adaptive_hold_loop._force_reference_planner, ForceReferencePlanner)
 
 
 def test_record_hold_step_stores_last_torque_hold_decision():

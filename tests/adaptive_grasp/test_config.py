@@ -61,7 +61,7 @@ def test_release_and_pid_constraints():
     with pytest.raises(ValueError):
         AdaptiveGraspConfig(release_timeout_s=0.0)
     with pytest.raises(ValueError):
-        AdaptiveGraspConfig(I_min=1.0, I_max=0.0)
+        AdaptiveGraspConfig(position_hold_I_min=1.0, position_hold_I_max=0.0)
 
 
 def test_extended_torque_strategy_params_removed():
@@ -83,6 +83,15 @@ def test_unused_params_removed():
         "s_ref": 0.25,
         "drop_detect_debounce_cycles": 1,
         "fragile_speed_reduction": 0.8,
+        "K_s": 1.0,
+        "force_calibrate_tolerance": 0.5,
+        "safety_factor": 1.5,
+        "base_holding_force": 0.5,
+        "K_p": 0.2,
+        "K_i": 0.2,
+        "K_d": 0.0,
+        "I_min": -1.0,
+        "I_max": 1.0,
     }.items():
         with pytest.raises(TypeError):
             AdaptiveGraspConfig(**{param_name: value})
@@ -90,8 +99,6 @@ def test_unused_params_removed():
 
 def test_v2_params_defaults():
     cfg = AdaptiveGraspConfig()
-    assert cfg.safety_factor == pytest.approx(1.5)
-    assert cfg.base_holding_force == pytest.approx(0.5)
     assert cfg.slip_detect_debounce_cycles == 3
     assert cfg.fragile_step_reduction == pytest.approx(0.5)
     assert cfg.phase_closing_torque == 30
@@ -102,13 +109,6 @@ def test_phase_closing_torque_bounds():
         AdaptiveGraspConfig(phase_closing_torque=-101)
     with pytest.raises(ValueError):
         AdaptiveGraspConfig(phase_closing_torque=101)
-
-
-def test_safety_factor_bounds():
-    with pytest.raises(ValueError):
-        AdaptiveGraspConfig(safety_factor=1.1)
-    with pytest.raises(ValueError):
-        AdaptiveGraspConfig(safety_factor=2.1)
 
 
 def test_slip_detect_debounce_positive():
@@ -143,18 +143,23 @@ def test_default_friction_coeff():
         AdaptiveGraspConfig(default_friction_coeff=0.0)
 
 
+def test_force_reference_defaults():
+    cfg = AdaptiveGraspConfig()
+
+    assert cfg.force_ref_margin_n == pytest.approx(0.10)
+    assert cfg.force_ref_slip_warning_threshold == pytest.approx(0.40)
+    assert cfg.force_ref_stable_threshold == pytest.approx(0.20)
+    assert cfg.force_ref_slip_gain_n_per_s == pytest.approx(0.20)
+    assert cfg.force_ref_max_rise_step_n == pytest.approx(0.02)
+    assert cfg.force_ref_confirmed_boost_n == pytest.approx(0.05)
+    assert cfg.force_ref_decay_rate_n_per_s == pytest.approx(0.02)
+    assert cfg.force_ref_stable_decay_delay_s == pytest.approx(1.0)
+    assert cfg.force_ref_min_contact_ratio == pytest.approx(0.15)
+
+
 def test_torque_hold_closed_loop_defaults():
     cfg = AdaptiveGraspConfig()
 
-    assert cfg.torque_hold_force_margin_n == pytest.approx(0.10)
-    assert cfg.torque_hold_slip_warning_threshold == pytest.approx(0.40)
-    assert cfg.torque_hold_stable_threshold == pytest.approx(0.20)
-    assert cfg.torque_hold_slip_gain_n_per_s == pytest.approx(0.20)
-    assert cfg.torque_hold_max_rise_step_n == pytest.approx(0.02)
-    assert cfg.torque_hold_confirmed_boost_n == pytest.approx(0.05)
-    assert cfg.torque_hold_decay_rate_n_per_s == pytest.approx(0.02)
-    assert cfg.torque_hold_stable_decay_delay_s == pytest.approx(1.0)
-    assert cfg.torque_hold_min_contact_ratio == pytest.approx(0.15)
     assert cfg.torque_hold_K_p == pytest.approx(5.0)
     assert cfg.torque_hold_K_i == pytest.approx(0.0)
     assert cfg.torque_hold_K_d == pytest.approx(0.0)
@@ -162,13 +167,13 @@ def test_torque_hold_closed_loop_defaults():
     assert cfg.torque_hold_I_max == pytest.approx(1.0)
 
 
-def test_torque_hold_min_contact_ratio_must_fit_active_fingers():
-    with pytest.raises(ValueError, match="torque_hold_min_contact_ratio"):
+def test_force_ref_min_contact_ratio_must_fit_active_fingers():
+    with pytest.raises(ValueError, match="force_ref_min_contact_ratio"):
         AdaptiveGraspConfig(
             active_fingers={
                 TactileSensorId.THUMB,
                 TactileSensorId.FOREFINGER,
                 TactileSensorId.MIDDLE_FINGER,
             },
-            torque_hold_min_contact_ratio=0.40,
+            force_ref_min_contact_ratio=0.40,
         )
