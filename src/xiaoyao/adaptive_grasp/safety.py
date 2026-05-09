@@ -74,7 +74,7 @@ class SafetyMonitor:
         drop_threshold = self._drop_threshold()
         if self._is_below_drop_threshold(total_fz):
             self._consecutive_drop_cycles += 1
-            if self._consecutive_drop_cycles >= 3:
+            if self._consecutive_drop_cycles >= 6:
                 _logger.error(
                     "Object dropped:\n"
                     "  total: last_fz=%.2f current_fz=%.2f threshold=%.2f\n"
@@ -94,8 +94,8 @@ class SafetyMonitor:
         return active_finger_count * 0.1
 
     def _is_below_drop_threshold(self, total_fz: float) -> bool:
-        return total_fz < self._drop_threshold()
-
+        # return total_fz < self._drop_threshold()
+        return total_fz ==0
     def _get_active_finger_fz(self, tactile_data: dict) -> dict[Any, float]:
         return {
             finger: abs(tactile_data[finger].get_force_z())

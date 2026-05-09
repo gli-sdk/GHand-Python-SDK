@@ -144,14 +144,14 @@ elif object == "balloon":
     _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_MCP] = 3.0
     _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_PIP] = 5.0
 elif object == "paper_cup":
-    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.FF_MCP] = 25.0
-    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.FF_PIP] = 22.0
-    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.MF_MCP] = 31.0
-    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.MF_PIP] = 29.0
-    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.THUMB_ROTATION] = 0.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.FF_MCP] = 35.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.FF_PIP] = 14.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.MF_MCP] = 45.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.MF_PIP] = 10.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.THUMB_ROTATION] = -10.0
     _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.THUMB_SWING] = 80.0
-    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.THUMB_MCP] = 2.0
-    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.THUMB_PIP] = 3.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.THUMB_MCP] = 4.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.THUMB_PIP] = 4.0
 
 @dataclass
 class PerFingerPidConfig:
@@ -207,7 +207,8 @@ class AdaptiveGraspConfig:
     per_finger_pid: dict[TactileSensorId, PerFingerPidConfig] = field(default_factory=dict) # 单指独立 PID 参数；未配置的手指回退到全局 K_p/K_i/K_d。
     #=============================================================================
     # 2.闭合接触阶段基础参数
-    base_torque: int = 30 # 闭合接触阶段初始力矩（力矩模式）。
+    base_torque: int = 30 # 默认基础力矩，保留给兼容逻辑使用。
+    phase_closing_torque: int = 30 # 闭合找接触阶段下发的力矩（力矩模式）。
     contact_threshold_z: float = 0.2 # 接触判定阈值（所有传感器法向力绝对值之和）。
     sliding_window_size: int = 10 # 触觉滑动窗口长度（用于方差估计）。
     torque_adjust_step: int = 5 # 力矩步进增量。
@@ -221,20 +222,15 @@ class AdaptiveGraspConfig:
     variance_threshold: float = 0.003    # 滑移方差阈值 v_th（需标定）；
     variance_baseline: float = 0.00001 # 滑移方差基线 v_0（需标定）。
 
-    # 自适应保持阶段的位置闭环约束
+    # 自适应保持阶段的位置闭环控制
     position_speed_limit: int = 15 # 自适应保持阶段位置指令速度限幅。
     position_torque_limit: int = 15 # 自适应保持阶段位置指令力矩限幅。
     delta_theta_limit: float = math.radians(2) # 单周期总角增量限幅（弧度）。
     # MCP/PIP 角增量分配系数，满足 K_MCP + K_PIP = 1
     K_MCP: float = 0.5 # MCP 角增量分配系数
     K_PIP: float = 0.5 # PIP 角增量分配系数
-    #=============================================================================
-    # 释放阶段参数（超时触发与安全张开）
-    release_hold_time_s: float = 20.0 # 自适应保持超时后自动进入释放的时长（秒）。
-    release_open_speed: int = 50 # 释放阶段安全张开速度。
-    release_open_torque: int = 50 # 释放阶段安全张开力矩。
-    release_timeout_s: float = 5.0 # 释放到位等待超时（秒）。
-    #=============================================================================
+    
+    #自适应保持阶段的力矩闭环控制
     adaptive_hold_command_mode: str = "position" # "position" or "torque".
     adaptive_hold_torque: int = 5 # Torque sent to active MCP/PIP joints in torque hold mode.
     torque_hold_force_margin_n: float = 0.10
@@ -247,10 +243,18 @@ class AdaptiveGraspConfig:
     torque_hold_stable_decay_delay_s: float = 1.0
     torque_hold_min_contact_ratio: float = 0.15
     torque_hold_K_p: float = 5.0
-    torque_hold_K_i: float = 0.0
+    torque_hold_K_i: float = 0.1
     torque_hold_K_d: float = 0.0
-    torque_hold_I_min: float = -1.0
-    torque_hold_I_max: float = 1.0
+    torque_hold_I_min: float = -2.0
+    torque_hold_I_max: float = 2.0
+    #=============================================================================
+    # 释放阶段参数（超时触发与安全张开）
+    release_hold_time_s: float = 20.0 # 自适应保持超时后自动进入释放的时长（秒）。
+    release_open_speed: int = 50 # 释放阶段安全张开速度。
+    release_open_torque: int = 50 # 释放阶段安全张开力矩。
+    release_timeout_s: float = 5.0 # 释放到位等待超时（秒）。
+    #=============================================================================
+    
 
     # Feedforward + PID control gains. ForcePlanner uses K_s with fused slip
     # risk and K_n with normal-force over-limit error.
@@ -291,6 +295,7 @@ class AdaptiveGraspConfig:
         _validate("sliding_window_size", self.sliding_window_size, greater_equal=3)
         _validate("control_period_s", self.control_period_s, greater_than=0)
         _validate("closing_period_s", self.closing_period_s, greater_than=0)
+        _validate("phase_closing_torque", self.phase_closing_torque, greater_equal=-100, less_equal=100)
         _validate("max_torque", self.max_torque, greater_than=0)
         _validate("phase_timeout", self.phase_timeout, greater_than=0)
         _validate("torque_adjust_step", self.torque_adjust_step, greater_than=0)

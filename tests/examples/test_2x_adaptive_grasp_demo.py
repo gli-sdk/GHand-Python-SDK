@@ -109,6 +109,7 @@ def test_build_config_accepts_adaptive_hold_command_options():
     args = parser.parse_args([
         "--hold-command-mode", "torque",
         "--adaptive-hold-torque", "20",
+        "--phase-closing-torque", "4",
         "--default_object", "balloon",
     ])
 
@@ -122,6 +123,7 @@ def test_build_config_accepts_adaptive_hold_command_options():
     assert isinstance(cfg, _ConfigSpy)
     assert captured_kwargs["adaptive_hold_command_mode"] == "torque"
     assert captured_kwargs["adaptive_hold_torque"] == 20
+    assert captured_kwargs["phase_closing_torque"] == 4
     assert captured_kwargs["default_object"] == "balloon"
 
 

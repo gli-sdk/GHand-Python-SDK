@@ -63,18 +63,17 @@ class JointCommandBuilder:
             for joint_id, angle in angles.items()
         ]
 
-    def torque_command(self, torque: int) -> list[Joint]:
+    def torque_command(self, torque: int, thumb_torque: int=5) -> list[Joint]:
         active = set(self._torque_joints)
         joints = [
             Joint(id=joint_id, torque=torque)
-            
             if joint_id in active
             else Joint(id=joint_id, angle=0.0, speed=0, torque=0)
             for joint_id in TORQUE_CONTROL_JOINTS
         ]
         joints += [
-            Joint(id=JointId.THUMB_ROTATION, angle=0.0, speed=0, torque=5),
-            Joint(id=JointId.THUMB_SWING, angle=0.0, speed=0, torque=5),
+            Joint(id=JointId.THUMB_ROTATION, angle=0.0, speed=0, torque=thumb_torque),
+            Joint(id=JointId.THUMB_SWING, angle=0.0, speed=0, torque=thumb_torque),
         ]
         return joints
 

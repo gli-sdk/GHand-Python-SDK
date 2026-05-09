@@ -76,6 +76,44 @@ def test_phase_closing_contact_by_force(monkeypatch):
     assert GraspState.CLOSING_TO_CONTACT in states
 
 
+def test_phase_closing_uses_phase_closing_torque(monkeypatch):
+    hand = _MockHand()
+    cfg = AdaptiveGraspConfig(
+        pre_grasp_preset="two_finger_pinch",
+        base_torque=30,
+        phase_closing_torque=4,
+        contact_threshold_z=0.5,
+        phase_timeout=10.0,
+        control_period_s=0.001,
+    )
+    sensor = MagicMock()
+    safety = MagicMock()
+    from xiaoyao.adaptive_grasp.safety import SafetyStatus
+    safety.is_grasp_empty.return_value = MagicMock(status=SafetyStatus.OK)
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP, JointId.FF_PIP))
+    controller = PhaseController(
+        hand, sensor, safety, joint_builder, cfg, time.monotonic,
+        on_state_change=lambda _state: None,
+    )
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.grasp_sequence.time.sleep", lambda *_: None)
+
+    sensor.tactile_data = {
+        TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 2.0),
+        TactileSensorId.FOREFINGER: _FakeTactileInfo(0.0, 0.0, 2.0),
+    }
+    sensor.joint_feedback = []
+    sensor.sum_active_finger_normal_force.return_value = 4.0
+
+    result = controller.run(force_planner=None, is_running=lambda: True)
+
+    assert result.success is True
+    closing_call = next(call for call in hand.calls if call["mode"] == CtrlMode.TORQUE)
+    torque_by_joint = {joint.id: joint.torque for joint in closing_call["joints"]}
+    assert torque_by_joint[JointId.THUMB_PIP] == 4
+    assert torque_by_joint[JointId.FF_PIP] == 4
+    assert result.final_torque == 4
+
+
 def test_phase_closing_records_contact_joint_snapshot_by_force(monkeypatch):
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(
@@ -83,7 +121,7 @@ def test_phase_closing_records_contact_joint_snapshot_by_force(monkeypatch):
         contact_threshold_z=0.5,
         phase_timeout=10.0,
         control_period_s=0.001,
-        base_torque=12,
+        phase_closing_torque=12,
     )
     sensor = MagicMock()
     safety = MagicMock()

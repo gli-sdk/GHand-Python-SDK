@@ -57,7 +57,7 @@ class PhaseController:
         self.config = config
         self._get_monotonic_time = get_time
         self._on_state_change = on_state_change
-        self.current_torque = int(clip(config.base_torque, -100.0, config.max_torque))
+        self.current_torque = int(clip(config.phase_closing_torque, -100.0, config.max_torque))
         self._phase_should_release = False
         self._contact_snapshot: Optional[ContactSnapshot] = None
 
@@ -115,7 +115,7 @@ class PhaseController:
     def _phase_closing(self, force_planner: Optional[ForcePlanner], is_running: Callable[[], bool]) -> bool:
         self._set_state(GraspState.CLOSING_TO_CONTACT)
         start = self._get_monotonic_time()
-        self.current_torque = int(clip(self.config.base_torque, -100.0, self.config.max_torque))
+        self.current_torque = int(clip(self.config.phase_closing_torque, -100.0, self.config.max_torque))
 
         if joints_feedback := self._sensor.joint_feedback:
             self._safety.set_closing_baseline(joints_feedback)
@@ -144,7 +144,9 @@ class PhaseController:
                 return False
 
             total_fz = self._sensor.sum_active_finger_normal_force()
-            if total_fz >= self.config.contact_threshold_z:
+            touch_flag_dict = self._sensor.active_finger_touch_flag()
+
+            if total_fz >= self.config.contact_threshold_z and all(touch_flag_dict.values()):
                 self._record_contact_snapshot(
                     joint_feedback,
                     tactile_data,

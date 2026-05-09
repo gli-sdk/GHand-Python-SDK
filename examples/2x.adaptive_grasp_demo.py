@@ -31,19 +31,20 @@ from xiaoyao.exceptions import (
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the adaptive grasp demo.")
-    parser.add_argument("--base_torque", "--base-torque", type=int, default=20)
+    parser.add_argument("--base_torque", "--base-torque", type=int, default=5)
+    parser.add_argument("--phase-closing-torque", type=int, default=10)
     parser.add_argument("--max_torque", "--max-torque", type=int, default=80)
-    parser.add_argument("--contact_threshold_z", "--contact-threshold-z", type=float, default=0.4)
-    parser.add_argument("--pre_grasp_preset", "--pre-grasp-preset", default="three_finger_pinch")
+    parser.add_argument("--contact_threshold_z", "--contact-threshold-z", type=float, default=0.2)
+    parser.add_argument("--pre_grasp_preset", "--pre-grasp-preset", default="two_finger_pinch")
     parser.add_argument("--hold_time", "--hold-time", type=float, default=50.0)
-    parser.add_argument("--default_object", dest="object", default="paper_cup")
+    parser.add_argument("--default_object", dest="object", default="glass")
     parser.add_argument(
         "--hold-command-mode",
         choices=("position", "torque"),
-        default="torque",
+        default="position",
         help="Command mode used in adaptive hold.",
     )
-    parser.add_argument("--adaptive-hold-torque", type=int, default=20)
+    parser.add_argument("--adaptive-hold-torque", type=int, default=6)
     parser.add_argument(
         "--no-release-on-interrupt",
         action="store_true",
@@ -56,6 +57,7 @@ def build_parser() -> argparse.ArgumentParser:
 def build_config(args: argparse.Namespace) -> AdaptiveGraspConfig:
     kwargs = {
         "base_torque": args.base_torque,
+        "phase_closing_torque": args.phase_closing_torque,
         "max_torque": args.max_torque,
         "contact_threshold_z": args.contact_threshold_z,
         "pre_grasp_preset": args.pre_grasp_preset,
@@ -203,9 +205,9 @@ def main() -> None:
         if not hand.tactile_open():
             print("Failed to open tactile sensors.")
             return
-
-        hand.tactile_zero()
-        time.sleep(0.5)
+        # time.sleep(1)
+        # hand.tactile_zero()
+        # time.sleep(0.5)
 
         dist_dir = ROOT / "dist"
         logger = TactileLogger(hand, dist_dir)
@@ -242,7 +244,7 @@ def main() -> None:
                 slip_confirmed=analysis.slip_confirmed if analysis is not None else None,
                 torque_decision=grasper.last_torque_hold_decision,
             )
-            logger.write_row(state_val, grasper.current_torque)
+            # logger.write_row(state_val, grasper.current_torque)
             grasper.poll_visualizer()
             time.sleep(0.1)
         print(f"Final state: {grasper.get_state().value}")

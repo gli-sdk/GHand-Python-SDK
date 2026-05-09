@@ -1,3 +1,4 @@
+from ctypes.wintypes import BOOL
 import logging
 import time
 from typing import Any, Optional
@@ -90,6 +91,20 @@ class SensorClient:
             for finger, info in self._latest_tactile_data.items()
             if finger in self._active_fingers
         )
+    def active_finger_touch_flag(self) -> dict[TactileSensorId, bool]:
+        # 判断活动手指是否都接触
+        if self._latest_tactile_data is None:
+            return {finger: False for finger in self._active_fingers}
+
+        touch_flag: dict[TactileSensorId, bool] = {}
+        for finger in self._active_fingers:
+            info = self._latest_tactile_data.get(finger)
+            touch_flag[finger] = (
+                info is not None
+                and info.state
+                and abs(info.get_force_z()) >= 0.1
+            )
+        return touch_flag
 
     # ------------------------------------------------------------------
     # 内部回调

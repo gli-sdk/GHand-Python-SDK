@@ -94,6 +94,14 @@ def test_v2_params_defaults():
     assert cfg.base_holding_force == pytest.approx(0.5)
     assert cfg.slip_detect_debounce_cycles == 3
     assert cfg.fragile_step_reduction == pytest.approx(0.5)
+    assert cfg.phase_closing_torque == 30
+
+
+def test_phase_closing_torque_bounds():
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(phase_closing_torque=-101)
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(phase_closing_torque=101)
 
 
 def test_safety_factor_bounds():
