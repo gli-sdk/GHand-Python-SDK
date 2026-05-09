@@ -20,13 +20,13 @@ from .utils import FINGER_TO_MCP_PIP
 
 _logger = logging.getLogger("xiaoyao.adaptive_grasp.visualization")
 
-_PLOT_KEYS = ("fz", "ft", "variance", "direction", "friction", "mcp_deg", "pip_deg")
+_PLOT_KEYS = ("fz", "ft", "s_k", "d_k", "r_k", "mcp_deg", "pip_deg")
 _PLOT_TITLES = [
     "normal force Fz (N)",
     "tangential force Ft (N)",
-    "Ft Variance",
-    "Ft direction consistency",
-    "tangential force Friction",
+    "s_k variance risk",
+    "d_k direction risk",
+    "r_k friction utilization",
     "MCP angle (deg)",
     "PIP angle (deg)",
 ]
@@ -53,10 +53,11 @@ class TactileVisualizer:
         self._data: dict[TactileSensorId, dict[str, deque[Optional[float]]]] = {
             finger: {
                 "fz": deque(maxlen=max_points),
+                "fz_ref": deque(maxlen=max_points),
                 "ft": deque(maxlen=max_points),
-                "variance": deque(maxlen=max_points),
-                "direction": deque(maxlen=max_points),
-                "friction": deque(maxlen=max_points),
+                "s_k": deque(maxlen=max_points),
+                "d_k": deque(maxlen=max_points),
+                "r_k": deque(maxlen=max_points),
                 "mcp_deg": deque(maxlen=max_points),
                 "pip_deg": deque(maxlen=max_points),
             }
@@ -138,7 +139,7 @@ class TactileVisualizer:
                 "data": {
                     finger.value: {
                         key: list(self._data[finger][key])
-                        for key in _PLOT_KEYS
+                        for key in (*_PLOT_KEYS, "fz_ref")
                     }
                     for finger in self._active_fingers
                 },
@@ -172,6 +173,7 @@ class TactileVisualizer:
         tactile_data: dict[TactileSensorId, Any],
         analysis: TactileAnalysis,
         joint_angles: Optional[dict[JointId, float]] = None,
+        force_refs: Optional[dict[TactileSensorId, float]] = None,
         timestamp: Optional[float] = None,
     ) -> None:
         t = timestamp or time.monotonic()
@@ -185,12 +187,15 @@ class TactileVisualizer:
                     fy = info.get_force_y()
                     ft = math.hypot(fx, fy)
                     self._data[finger]["fz"].append(per.fz)
+                    self._data[finger]["fz_ref"].append(
+                        force_refs.get(finger) if force_refs is not None else None
+                    )
                     self._data[finger]["ft"].append(ft)
-                    self._data[finger]["variance"].append(per.variance)
-                    self._data[finger]["direction"].append(per.d_k)
-                    self._data[finger]["friction"].append(per.r_k)
+                    self._data[finger]["s_k"].append(per.s_k)
+                    self._data[finger]["d_k"].append(per.d_k)
+                    self._data[finger]["r_k"].append(per.r_k)
                 else:
-                    for key in ("fz", "ft", "variance", "direction", "friction"):
+                    for key in ("fz", "fz_ref", "ft", "s_k", "d_k", "r_k"):
                         self._data[finger][key].append(None)
 
                 mcp_id, pip_id = FINGER_TO_MCP_PIP[finger]
@@ -233,6 +238,9 @@ class TactileVisualizer:
                 ax = self._axes[i, j]
                 (line,) = ax.plot([], [], linewidth=1.2)
                 self._lines[finger][key] = line
+                if key == "fz":
+                    (ref_line,) = ax.plot([], [], "r-.", linewidth=1.0)
+                    self._lines[finger]["fz_ref"] = ref_line
                 ax.grid(True, alpha=0.3)
 
         for i in range(n):
@@ -250,6 +258,10 @@ class TactileVisualizer:
                         self._lines[finger][key].set_data(
                             t_list, list(self._data[finger][key])
                         )
+                    self._lines[finger]["fz_ref"].set_data(
+                        t_list,
+                        list(self._data[finger]["fz_ref"]),
+                    )
 
                 for i in range(n):
                     for j in range(7):
@@ -283,7 +295,7 @@ timestamps = payload["timestamps"]
 data = payload["data"]
 titles = payload["titles"]
 figsize = payload["figsize"]
-plot_keys = ("fz", "ft", "variance", "direction", "friction", "mcp_deg", "pip_deg")
+plot_keys = ("fz", "ft", "s_k", "d_k", "r_k", "mcp_deg", "pip_deg")
 
 n = max(len(active_fingers), 1)
 fig, axes = plt.subplots(n, 7, figsize=figsize, sharex="col")
@@ -299,6 +311,8 @@ for i, finger in enumerate(active_fingers):
     for j, key in enumerate(plot_keys):
         ax = axes[i, j]
         ax.plot(timestamps, finger_data[key], linewidth=1.2)
+        if key == "fz":
+            ax.plot(timestamps, finger_data.get("fz_ref", []), "r-.", linewidth=1.0)
         ax.grid(True, alpha=0.3)
 
 for i in range(n):

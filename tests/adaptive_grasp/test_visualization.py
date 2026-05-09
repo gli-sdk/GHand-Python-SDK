@@ -48,13 +48,43 @@ def test_visualizer_update_populates_data():
     }
     analysis = analyzer.update(tactile_data)
 
-    viz.update(tactile_data, analysis, timestamp=0.0)
+    viz.update(
+        tactile_data,
+        analysis,
+        force_refs={TactileSensorId.THUMB: 0.8},
+        timestamp=0.0,
+    )
 
     assert len(viz._timestamps) == 1
     assert len(viz._data[TactileSensorId.THUMB]["fz"]) == 1
+    assert len(viz._data[TactileSensorId.THUMB]["fz_ref"]) == 1
+    assert viz._data[TactileSensorId.THUMB]["fz_ref"][0] == pytest.approx(0.8)
     assert len(viz._data[TactileSensorId.THUMB]["ft"]) == 1
     # ft = hypot(0.3, 0.4) = 0.5
     assert viz._data[TactileSensorId.THUMB]["ft"][0] == pytest.approx(0.5)
+
+
+def test_visualizer_plots_slip_indicator_components():
+    viz = TactileVisualizer(
+        active_fingers={TactileSensorId.THUMB},
+        max_points=10,
+    )
+    cfg = AdaptiveGraspConfig()
+    analyzer = TactileAnalyzer(cfg)
+
+    for _ in range(3):
+        analyzer.update({TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 1.0)})
+    tactile_data = {
+        TactileSensorId.THUMB: _FakeTactileInfo(0.3, 0.4, 1.0),
+    }
+    analysis = analyzer.update(tactile_data)
+    per = analysis.per_finger[TactileSensorId.THUMB]
+
+    viz.update(tactile_data, analysis, timestamp=0.0)
+
+    assert viz._data[TactileSensorId.THUMB]["s_k"][0] == pytest.approx(per.s_k)
+    assert viz._data[TactileSensorId.THUMB]["d_k"][0] == pytest.approx(per.d_k)
+    assert viz._data[TactileSensorId.THUMB]["r_k"][0] == pytest.approx(per.r_k)
 
 
 def test_visualizer_respects_max_points():

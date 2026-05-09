@@ -167,7 +167,7 @@ class PositionHoldPlanner:
 
     def _compute_next_torque(self) -> int:
         next_torque = (
-            self.profile.base_hold_torque
+            self.profile.position_hold_torque
             if self.profile is not None and self.profile.base_hold_torque is not None
             else self.config.position_torque_limit
         )

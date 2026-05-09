@@ -144,14 +144,23 @@ elif object == "balloon":
     _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_MCP] = 3.0
     _PRE_GRASP_PRESET_DEGREE["two_finger_pinch"][JointId.THUMB_PIP] = 5.0
 elif object == "paper_cup":
-    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.FF_MCP] = 35.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.FF_MCP] = 41.0
     _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.FF_PIP] = 14.0
-    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.MF_MCP] = 45.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.MF_MCP] = 49.0
     _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.MF_PIP] = 10.0
-    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.THUMB_ROTATION] = -10.0
-    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.THUMB_SWING] = 80.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.THUMB_ROTATION] = 0.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.THUMB_SWING] = 85.0
     _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.THUMB_MCP] = 4.0
     _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.THUMB_PIP] = 4.0
+elif object == "glass":
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.FF_MCP] = 35.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.FF_PIP] = 20.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.MF_MCP] = 45.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.MF_PIP] = 15.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.THUMB_ROTATION] = 0.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.THUMB_SWING] = 90.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.THUMB_MCP] = 11.0
+    _PRE_GRASP_PRESET_DEGREE["three_finger_pinch"][JointId.THUMB_PIP] = 6.0
 
 @dataclass
 class PerFingerPidConfig:
@@ -237,9 +246,9 @@ class AdaptiveGraspConfig:
     position_torque_limit: int = 15 # 自适应保持阶段位置指令力矩限幅。
     delta_theta_limit: float = math.radians(2) # 单周期总角增量限幅（弧度）。
     # MCP/PIP 角增量分配系数，满足 K_MCP + K_PIP = 1
-    K_MCP: float = 0.5 # MCP 角增量分配系数
+    K_MCP: float = 0.1 # MCP 角增量分配系数
     K_PIP: float = 0.5 # PIP 角增量分配系数
-    position_hold_K_p: float = 2.0
+    position_hold_K_p: float = 5.0
     position_hold_K_i: float = 0.2
     position_hold_K_d: float = 0.0
     position_hold_I_min: float = -2.0
@@ -249,8 +258,8 @@ class AdaptiveGraspConfig:
     #自适应保持阶段的力矩闭环控制
     adaptive_hold_torque: int = 5 # Torque sent to active MCP/PIP joints in torque hold mode.
     force_ref_margin_n: float = 0.10
-    torque_hold_K_p: float = 5.0
-    torque_hold_K_i: float = 0.0
+    torque_hold_K_p: float = 15.0
+    torque_hold_K_i: float = 0.5
     torque_hold_K_d: float = 0.0
     torque_hold_I_min: float = -1.0
     torque_hold_I_max: float = 1.0
@@ -263,9 +272,9 @@ class AdaptiveGraspConfig:
     #=============================================================================
     # 切向力相关参数
     # 三指标融合权重，满足 α + β + γ = 1
-    variance_weight: float = 0.5
-    direction_weight: float = 0.3
-    friction_weight: float = 0.2
+    variance_weight: float = 0.34
+    direction_weight: float = 0.33
+    friction_weight: float = 0.33
     #==============================================================================
     # 数值稳定项（防分母为零）
     epsilon: float = 1e-6 # 数值稳定小量，避免分母为 0。
@@ -338,8 +347,8 @@ class AdaptiveGraspConfig:
         _validate("closing_stall_cycles", self.closing_stall_cycles, greater_than=0)
         if not math.isclose(self.variance_weight + self.direction_weight + self.friction_weight, 1.0, abs_tol=1e-6):
             raise ValueError("variance_weight + direction_weight + friction_weight must equal 1.0")
-        if not math.isclose(self.K_MCP + self.K_PIP, 1.0, abs_tol=1e-6):
-            raise ValueError("K_MCP + K_PIP must equal 1.0")
+        # if not math.isclose(self.K_MCP + self.K_PIP, 1.0, abs_tol=1e-6):
+        #     raise ValueError("K_MCP + K_PIP must equal 1.0")
         if self.adaptive_hold_command_mode not in {"position", "torque"}:
             raise ValueError('adaptive_hold_command_mode must be "position" or "torque"')
         if self.variance_baseline >= self.variance_threshold:

@@ -31,13 +31,13 @@ from xiaoyao.exceptions import (
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the adaptive grasp demo.")
-    parser.add_argument("--base_torque", "--base-torque", type=int, default=5)
+    parser.add_argument("--base_torque", "--base-torque", type=int, default=10)
     parser.add_argument("--phase-closing-torque", type=int, default=10)
     parser.add_argument("--max_torque", "--max-torque", type=int, default=80)
     parser.add_argument("--contact_threshold_z", "--contact-threshold-z", type=float, default=0.2)
-    parser.add_argument("--pre_grasp_preset", "--pre-grasp-preset", default="three_finger_pinch")
-    parser.add_argument("--hold_time", "--hold-time", type=float, default=50.0)
-    parser.add_argument("--default_object", dest="object", default="glass")
+    parser.add_argument("--pre_grasp_preset", "--pre-grasp-preset", default="two_finger_pinch")
+    parser.add_argument("--hold_time", "--hold-time", type=float, default=100.0)
+    parser.add_argument("--default_object", dest="object", default="balloon")
     parser.add_argument(
         "--hold-command-mode",
         choices=("position", "torque"),
@@ -202,11 +202,14 @@ def main() -> None:
             print("Connection failed.")
             return
 
+        
         if not hand.tactile_open():
             print("Failed to open tactile sensors.")
             return
-        # time.sleep(1)
-        # hand.tactile_zero()
+        time.sleep(0.5)
+        # if not hand.tactile_zero():
+        #     print("Failed to zero tactile sensors.")
+        #     return
         # time.sleep(0.5)
 
         dist_dir = ROOT / "dist"

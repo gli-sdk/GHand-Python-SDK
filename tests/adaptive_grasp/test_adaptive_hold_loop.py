@@ -305,6 +305,66 @@ def test_position_hold_loop_uses_position_hold_planner_with_force_reference():
     assert joint_map[JointId.THUMB_PIP].angle == pytest.approx(0.12)
 
 
+def test_hold_loop_passes_force_reference_to_visualizer():
+    hand = _MockHand()
+    cfg = AdaptiveGraspConfig(
+        adaptive_hold_command_mode="position",
+        active_fingers={TactileSensorId.THUMB},
+        control_period_s=0.02,
+    )
+    sensor = MagicMock()
+    sensor.tactile_data = {}
+    sensor.joint_feedback = [Joint(id=JointId.THUMB_PIP, angle=0.10)]
+    sensor.sample_time_s = 10.0
+    safety = MagicMock()
+    safety.check.return_value = SafetyReport(SafetyStatus.OK)
+    analysis = TactileAnalysis(
+        variance=0.0,
+        slip_risk=0.0,
+        direction_distance=0.0,
+        friction_utilization=0.0,
+        slip_confirmed=False,
+        finger_fz={TactileSensorId.THUMB: 0.5},
+        total_fz=0.5,
+    )
+    tactile = MagicMock()
+    tactile.update.return_value = analysis
+    visualizer = MagicMock()
+    force_reference_planner = MagicMock()
+    force_reference = ForceReferenceDecision(
+        force_refs={TactileSensorId.THUMB: 0.7},
+        contact_ratios={TactileSensorId.THUMB: 1.0},
+        F_ref_total=0.7,
+    )
+    force_reference_planner.compute.return_value = force_reference
+    position_hold_planner = MagicMock()
+    position_hold_planner.compute.return_value = {
+        TactileSensorId.THUMB: ForceDecision(
+            control_u=0.0,
+            next_torque=23,
+            target_angles={JointId.THUMB_PIP: 0.10},
+            is_fragile_mode=False,
+        )
+    }
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP,))
+    controller = HoldController(
+        hand, sensor, safety, tactile, visualizer,
+        joint_builder, cfg, current_torque=10,
+        force_reference_planner=force_reference_planner,
+        position_hold_planner=position_hold_planner,
+    )
+
+    controller.run_step(current_time=0.0)
+
+    visualizer.update.assert_called_once_with(
+        sensor.tactile_data,
+        analysis,
+        joint_angles={JointId.THUMB_PIP: 0.10},
+        force_refs={TactileSensorId.THUMB: 0.7},
+        timestamp=0.0,
+    )
+
+
 def test_hold_step_uses_contact_snapshot_when_joint_feedback_missing():
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(

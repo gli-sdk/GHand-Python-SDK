@@ -4,7 +4,7 @@ from xiaoyao.adaptive_grasp.config import AdaptiveGraspConfig
 from xiaoyao.adaptive_grasp.force_reference_planner import ForceReferencePlanner
 from xiaoyao.adaptive_grasp.grasp_sequence import ContactSnapshot
 from xiaoyao.adaptive_grasp.object_profile import ObjectProfile
-from xiaoyao.adaptive_grasp.tactility import TactileAnalysis
+from xiaoyao.adaptive_grasp.tactility import PerFingerAnalysis, TactileAnalysis
 from xiaoyao.dexhand import TactileSensorId
 
 
@@ -50,6 +50,7 @@ def _analysis(
     slip_risk: float = 0.0,
     slip_confirmed: bool = False,
     finger_fz: dict[TactileSensorId, float] | None = None,
+    per_finger_slip_risk: dict[TactileSensorId, float] | None = None,
 ) -> TactileAnalysis:
     forces = finger_fz or {
         TactileSensorId.THUMB: 0.30,
@@ -64,6 +65,18 @@ def _analysis(
         slip_confirmed=slip_confirmed,
         finger_fz=forces,
         total_fz=sum(forces.values()),
+        per_finger={
+            finger: PerFingerAnalysis(
+                variance=0.0,
+                s_k=0.0,
+                d_k=0.0,
+                r_k=0.0,
+                s_total=risk,
+                slip_confirmed=False,
+                fz=forces.get(finger, 0.0),
+            )
+            for finger, risk in (per_finger_slip_risk or {}).items()
+        },
     )
 
 
@@ -145,6 +158,41 @@ def test_force_reference_increases_force_when_slip_risk_is_high():
     planner.compute(_analysis(slip_risk=0.90), dt=1.0)
 
     assert planner.F_ref_total == pytest.approx(initial + 0.02)
+
+
+def test_force_reference_increases_only_high_risk_finger_ref():
+    cfg = _three_finger_config(
+        force_ref_slip_warning_threshold=0.40,
+        force_ref_slip_gain_n_per_s=0.20,
+        force_ref_max_rise_step_n=0.02,
+        force_ref_stable_threshold=0.20,
+        force_ref_stable_decay_delay_s=999.0,
+    )
+    planner = ForceReferencePlanner(cfg, _profile(), _snapshot(total_fz=0.55))
+    initial = planner.compute(_analysis(), dt=0.02).force_refs
+
+    decision = planner.compute(
+        _analysis(
+            slip_risk=0.90,
+            per_finger_slip_risk={
+                TactileSensorId.THUMB: 0.90,
+                TactileSensorId.FOREFINGER: 0.0,
+                TactileSensorId.MIDDLE_FINGER: 0.0,
+            },
+        ),
+        dt=1.0,
+    )
+
+    assert decision.force_refs[TactileSensorId.THUMB] == pytest.approx(
+        initial[TactileSensorId.THUMB] + 0.02
+    )
+    assert decision.force_refs[TactileSensorId.FOREFINGER] == pytest.approx(
+        initial[TactileSensorId.FOREFINGER]
+    )
+    assert decision.force_refs[TactileSensorId.MIDDLE_FINGER] == pytest.approx(
+        initial[TactileSensorId.MIDDLE_FINGER]
+    )
+    assert decision.F_ref_total == pytest.approx(sum(decision.force_refs.values()))
 
 
 def test_force_reference_does_not_repeat_confirmed_boost():

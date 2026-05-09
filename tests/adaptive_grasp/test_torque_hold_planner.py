@@ -92,6 +92,25 @@ def test_torque_hold_planner_increases_torque_for_low_force_finger():
     assert decision.finger_torques[TactileSensorId.FOREFINGER] == pytest.approx(5.0)
 
 
+def test_torque_hold_planner_can_command_negative_torque_for_high_force_finger():
+    cfg = AdaptiveGraspConfig(
+        active_fingers={TactileSensorId.THUMB},
+        adaptive_hold_torque=5,
+        torque_hold_K_p=5.0,
+        torque_hold_K_i=0.0,
+        torque_hold_K_d=0.0,
+    )
+    planner = TorqueHoldPlanner(cfg)
+
+    decision = planner.compute(
+        _analysis(finger_fz={TactileSensorId.THUMB: 4.0}),
+        _reference(force_refs={TactileSensorId.THUMB: 0.5}),
+        dt=0.02,
+    )
+
+    assert decision.finger_torques[TactileSensorId.THUMB] < 0.0
+
+
 def test_torque_hold_planner_clips_torque_to_config_max():
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB},

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from email.mime import base
+from turtle import position
 from typing import Literal, Optional
 
 
@@ -26,6 +27,8 @@ class ObjectProfile:
     shape: Optional[str] = None
     hold_strategy: Optional[HoldStrategy] = None
     base_hold_torque: Optional[int] = None
+    position_hold_torque: Optional[int] = None
+    position_hold_speed: Optional[int] = None
 
 
 class ObjectProfileRegistry:
@@ -72,6 +75,8 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         material="plastic",
         hold_strategy="slip_triggered",
         base_hold_torque=20,
+        position_hold_torque=30,
+        position_hold_speed =30,
     ),
     ObjectProfile(
         name="glass",
@@ -81,8 +86,10 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         friction_coeff=0.5,
         is_fragile=True,
         material="glass",
-        hold_strategy="adaptive",
+        hold_strategy="fixed",
         base_hold_torque=20,
+        position_hold_torque=30,
+        position_hold_speed =30,
     ),
     ObjectProfile(
         name="tofu",
@@ -125,17 +132,21 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         material="latex",
         hold_strategy="adaptive",
         base_hold_torque=10,
+        position_hold_torque=10,
+        position_hold_speed =30,
     ),
     ObjectProfile(
         name="paper_cup",
         weight_kg=0.01,
         safe_force_min=0.5,
-        safe_force_max=3.4,
+        safe_force_max=4.4,
         friction_coeff=0.8,
         is_fragile=True,
         material="paper",
         hold_strategy="adaptive",
         base_hold_torque=5,
+        position_hold_torque=5,
+        position_hold_speed =5,
     )
 )
 

@@ -19,7 +19,7 @@ from .visualization import TactileVisualizer
 
 _logger = logging.getLogger("xiaoyao.adaptive_grasp.adaptive_hold_loop")
 _MAX_CONSECUTIVE_MOVE_FAILURES = 3
-_CONTACT_ANGLE_LIMIT_RAD = math.radians(5.0)
+_CONTACT_ANGLE_LIMIT_RAD = math.radians(10.0)
 
 ForceDecisions = dict[TactileSensorId, ForceDecision]
 JointAngles = dict[JointId, float]
@@ -50,6 +50,7 @@ class _HoldCommand:
     decisions: Optional[ForceDecisions] = None
     finger_torques: Optional[dict[TactileSensorId, float]] = None
     torque_hold_decision: Optional[TorqueHoldDecision] = None
+    force_refs: Optional[dict[TactileSensorId, float]] = None
 
 
 class HoldController:
@@ -109,10 +110,16 @@ class HoldController:
 
         analysis = self._tactile.update(tactile_data)
         current_angles = self._get_current_angles(joint_feedback)
-        self._update_visualizer(tactile_data, analysis, current_angles, current_time)
 
         dt = self._compute_dt(sample_time_s)
         command = self._plan_hold_command(analysis, current_angles, dt)
+        self._update_visualizer(
+            tactile_data,
+            analysis,
+            current_angles,
+            current_time,
+            command.force_refs,
+        )
         execute_result = self._execute_hold_command(command, analysis, safety)
         if execute_result is not None:
             return execute_result
@@ -157,6 +164,7 @@ class HoldController:
         analysis: TactileAnalysis,
         current_angles: JointAngles,
         current_time: float,
+        force_refs: Optional[dict[TactileSensorId, float]] = None,
     ) -> None:
         if self._visualizer is None:
             return
@@ -164,6 +172,7 @@ class HoldController:
             tactile_data,
             analysis,
             joint_angles=current_angles,
+            force_refs=force_refs,
             timestamp=current_time,
         )
 
@@ -198,6 +207,7 @@ class HoldController:
                 ),
                 finger_torques=decision.finger_torques,
                 torque_hold_decision=decision,
+                force_refs=force_reference.force_refs,
             )
 
         if (
@@ -218,6 +228,7 @@ class HoldController:
                 angles=next_angles,
                 torque=next_torque,
                 decisions=decisions,
+                force_refs=force_reference.force_refs,
             )
 
         return _HoldCommand(angles=current_angles, torque=self._default_hold_torque())

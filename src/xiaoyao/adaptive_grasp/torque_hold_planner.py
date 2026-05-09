@@ -74,4 +74,4 @@ class TorqueHoldPlanner:
         error = force_ref - force_actual
         pid_u = self._pid_by_finger[finger].compute(error=error, dt=dt)
         torque = self._initial_hold_torque() + pid_u
-        return clip(torque, 0.0, self.config.max_torque)
+        return clip(torque, -100.0, self.config.max_torque)
