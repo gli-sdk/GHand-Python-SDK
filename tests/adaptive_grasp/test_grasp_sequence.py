@@ -195,7 +195,16 @@ def test_phase_closing_records_contact_finger_force_snapshot_by_force(monkeypatc
 
 def test_phase_open_and_pre_grasp(monkeypatch):
     hand = _MockHand()
-    cfg = AdaptiveGraspConfig(pre_grasp_preset="two_finger_pinch")
+    sleep_calls = []
+    cfg = AdaptiveGraspConfig(
+        pre_grasp_preset="two_finger_pinch",
+        open_speed=11,
+        open_torque=12,
+        open_wait_s=1.5,
+        pre_grasp_speed=21,
+        pre_grasp_torque=22,
+        pre_grasp_wait_s=2.5,
+    )
     sensor = MagicMock()
     safety = MagicMock()
     from xiaoyao.adaptive_grasp.safety import SafetyStatus
@@ -206,7 +215,10 @@ def test_phase_open_and_pre_grasp(monkeypatch):
         hand, sensor, safety, joint_builder, cfg, time.monotonic,
         on_state_change=states.append,
     )
-    monkeypatch.setattr("xiaoyao.adaptive_grasp.grasp_sequence.time.sleep", lambda *_: None)
+    monkeypatch.setattr(
+        "xiaoyao.adaptive_grasp.grasp_sequence.time.sleep",
+        lambda duration: sleep_calls.append(duration),
+    )
 
     sensor.tactile_data = {
         TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 2.0),
@@ -223,6 +235,11 @@ def test_phase_open_and_pre_grasp(monkeypatch):
     assert hand.calls[0]["mode"] == CtrlMode.POSITION
     assert hand.calls[1]["mode"] == CtrlMode.POSITION
     assert hand.calls[2]["mode"] == CtrlMode.TORQUE
+    assert {joint.speed for joint in hand.calls[0]["joints"]} == {11}
+    assert {joint.torque for joint in hand.calls[0]["joints"]} == {12}
+    assert {joint.speed for joint in hand.calls[1]["joints"]} == {21}
+    assert {joint.torque for joint in hand.calls[1]["joints"]} == {22}
+    assert sleep_calls[:2] == [1.5, 2.5]
 
 
 def test_phase_failure_sets_error_state(monkeypatch):

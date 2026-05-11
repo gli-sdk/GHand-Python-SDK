@@ -31,20 +31,19 @@ from xiaoyao.exceptions import (
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the adaptive grasp demo.")
-    parser.add_argument("--base_torque", "--base-torque", type=int, default=10)
-    parser.add_argument("--phase-closing-torque", type=int, default=10)
+    parser.add_argument("--base_torque", "--base-torque", type=int, default=8)
+    parser.add_argument("--phase-closing-torque", type=int, default=15)
     parser.add_argument("--max_torque", "--max-torque", type=int, default=80)
-    parser.add_argument("--contact_threshold_z", "--contact-threshold-z", type=float, default=0.2)
-    parser.add_argument("--pre_grasp_preset", "--pre-grasp-preset", default="two_finger_pinch")
-    parser.add_argument("--hold_time", "--hold-time", type=float, default=100.0)
-    parser.add_argument("--default_object", dest="object", default="balloon")
+    parser.add_argument("--pre_grasp_preset", "--pre-grasp-preset", default="plastic_three_pinch")
+    parser.add_argument("--hold_time", "--hold-time", type=float, default=100)
+    parser.add_argument("--default_object", dest="object", default="plastic")
     parser.add_argument(
         "--hold-command-mode",
         choices=("position", "torque"),
-        default="position",
+        default="torque",
         help="Command mode used in adaptive hold.",
     )
-    parser.add_argument("--adaptive-hold-torque", type=int, default=6)
+    parser.add_argument("--adaptive-hold-torque", type=int, default=5)
     parser.add_argument(
         "--no-release-on-interrupt",
         action="store_true",
@@ -55,18 +54,21 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def build_config(args: argparse.Namespace) -> AdaptiveGraspConfig:
-    kwargs = {
-        "base_torque": args.base_torque,
-        "phase_closing_torque": args.phase_closing_torque,
-        "max_torque": args.max_torque,
-        "contact_threshold_z": args.contact_threshold_z,
-        "pre_grasp_preset": args.pre_grasp_preset,
-        "release_hold_time_s": args.hold_time,
-        "adaptive_hold_command_mode": args.hold_command_mode,
-        "adaptive_hold_torque": args.adaptive_hold_torque,
+    arg_to_config = {
+        "base_torque": "base_torque",
+        "phase_closing_torque": "phase_closing_torque",
+        "max_torque": "max_torque",
+        "pre_grasp_preset": "pre_grasp_preset",
+        "hold_time": "release_hold_time_s",
+        "hold_command_mode": "adaptive_hold_command_mode",
+        "adaptive_hold_torque": "adaptive_hold_torque",
+        "object": "default_object",
     }
-    if args.object is not None:
-        kwargs["default_object"] = args.object
+    kwargs = {
+        config_name: getattr(args, arg_name)
+        for arg_name, config_name in arg_to_config.items()
+        if getattr(args, arg_name) is not None
+    }
     return AdaptiveGraspConfig(**kwargs)
 
 
@@ -247,9 +249,9 @@ def main() -> None:
                 slip_confirmed=analysis.slip_confirmed if analysis is not None else None,
                 torque_decision=grasper.last_torque_hold_decision,
             )
-            # logger.write_row(state_val, grasper.current_torque)
+            logger.write_row(state_val, grasper.current_torque)
             grasper.poll_visualizer()
-            time.sleep(0.1)
+            # time.sleep(0.1)
         print(f"Final state: {grasper.get_state().value}")
 
         grasper.release()

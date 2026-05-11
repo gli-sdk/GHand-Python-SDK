@@ -40,6 +40,16 @@ class TestJointCommandBuilder:
         assert joints[-2].torque == 5
         assert joints[-1].torque == 5
 
+    def test_torque_command_uses_configured_thumb_aux_torque(self):
+        cfg = AdaptiveGraspConfig(thumb_aux_torque=7)
+        builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP,))
+
+        joints = builder.torque_command(42)
+
+        joint_map = {joint.id: joint for joint in joints}
+        assert joint_map[JointId.THUMB_ROTATION].torque == 7
+        assert joint_map[JointId.THUMB_SWING].torque == 7
+
     def test_torque_command_all_active_for_five_finger(self):
         cfg = AdaptiveGraspConfig(pre_grasp_preset="five_finger_grasp")
         torque_joints = tuple(JointCommandBuilder._TORQUE_JOINTS)

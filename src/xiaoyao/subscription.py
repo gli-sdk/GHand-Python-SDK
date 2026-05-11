@@ -7,7 +7,7 @@ from typing import Callable, Optional
 logger = logging.getLogger("xiaoyao")
 
 class SubscriptionManager:
-    def __init__(self, client=None):
+    def __init__(self, client=None, recv_period_s=0.02, dispatch_period_s=0.02):
         self._lock = threading.Lock()
         self._running = False
         self._thread = None
@@ -17,7 +17,29 @@ class SubscriptionManager:
         self._data = None
         self._sub_id_counter = 0
         self._subscribers = {}
+        self._recv_period_s = self._validate_period("recv_period_s", recv_period_s)
+        self._dispatch_period_s = self._validate_period("dispatch_period_s", dispatch_period_s)
         self._is_client_owner = client is None  # 标记是否拥有客户端实例
+
+    @staticmethod
+    def _validate_period(name, value):
+        if value <= 0:
+            raise ValueError(f"{name} must be > 0")
+        return float(value)
+
+    @property
+    def recv_period_s(self):
+        return self._recv_period_s
+
+    @property
+    def dispatch_period_s(self):
+        return self._dispatch_period_s
+
+    def configure_periods(self, *, recv_period_s=None, dispatch_period_s=None):
+        if recv_period_s is not None:
+            self._recv_period_s = self._validate_period("recv_period_s", recv_period_s)
+        if dispatch_period_s is not None:
+            self._dispatch_period_s = self._validate_period("dispatch_period_s", dispatch_period_s)
 
     def start(self):
         if not self._running:
@@ -56,7 +78,7 @@ class SubscriptionManager:
                     self._data = None
                 time.sleep(min(0.1 * (2 ** min(consecutive_errors, 5)), 5.0))
                 continue
-            time.sleep(0.1)
+            time.sleep(self._recv_period_s)
 
     def _data_dispatcher(self):
         while self._running:
@@ -69,7 +91,7 @@ class SubscriptionManager:
                             callback(self._data, *args, **kwargs)
                         except Exception as e:
                             logger.error(f"Error in callback {sub_id}: {e}")
-            time.sleep(0.05)
+            time.sleep(self._dispatch_period_s)
 
     def subscribe(self, callback: Optional[Callable] = None, *args, **kwargs):
         with self._lock:

@@ -10,10 +10,10 @@ from .config import AdaptiveGraspConfig
 from .states import GraspState
 from .tactility import TactileAnalyzer, TactileAnalysis
 from .object_profile import ObjectProfile, ObjectProfileRegistry
-from .force_reference_planner import ForceReferencePlanner
-from .position_hold_planner import ForceDecision, PositionHoldPlanner
+from .hold_planner_factory import HoldPlannerFactory
+from .position_hold_planner import ForceDecision
 from .safety import SafetyMonitor, SafetyReport
-from .torque_hold_planner import TorqueHoldDecision, TorqueHoldPlanner
+from .torque_hold_planner import TorqueHoldDecision
 from .visualization import TactileVisualizer
 from .utils import clip, JOINT_TO_FINGER
 from .joint_builder import JointCommandBuilder, TORQUE_CONTROL_JOINTS
@@ -39,9 +39,12 @@ class AdaptiveGrasper:
             if JOINT_TO_FINGER.get(j) in self.config.active_fingers
         )
 
+        self._configure_subscription_periods()
+
         self._sensor = SensorClient(
             hand,
             active_fingers=set(self.config.active_fingers),
+            touch_detect_force_threshold_n=self.config.touch_detect_force_threshold_n,
             get_monotonic_time=self._get_monotonic_time,
         )
 
@@ -56,6 +59,7 @@ class AdaptiveGrasper:
             )
 
         self._joint_builder = JointCommandBuilder(self.config, self._torque_joints)
+        self._hold_planner_factory = HoldPlannerFactory(self.config)
         self._grasp_sequence: Optional[PhaseController] = None
         self._adaptive_hold_loop: Optional[HoldController] = None
 
@@ -162,17 +166,18 @@ class AdaptiveGrasper:
     def _start_adaptive_control(self) -> None:
         self.state = GraspState.ADAPTIVE_HOLD
         self._adaptive_hold_started_at = self._get_monotonic_time()
-        force_reference_planner = self._create_force_reference_planner()
-        position_hold_planner = self._create_position_hold_planner()
-        torque_hold_planner = self._create_torque_hold_planner()
+        planners = self._hold_planner_factory.create(
+            self._object_profile,
+            self._last_contact_snapshot,
+        )
         self._adaptive_hold_loop = HoldController(
             self.hand, self._sensor, self._safety, self._tactile,
             self._visualizer, self._joint_builder,
             self.config, self.current_torque,
             contact_joint_angles=self._contact_joint_angles(),
-            torque_hold_planner=torque_hold_planner,
-            force_reference_planner=force_reference_planner,
-            position_hold_planner=position_hold_planner,
+            torque_hold_planner=planners.torque_hold_planner,
+            force_reference_planner=planners.force_reference_planner,
+            position_hold_planner=planners.position_hold_planner,
         )
         self._control_thread = threading.Thread(target=self._adaptive_control_loop, daemon=True)
         self._control_thread.start()
@@ -202,31 +207,6 @@ class AdaptiveGrasper:
         if self._last_contact_snapshot is None:
             return None
         return self._last_contact_snapshot.joint_angles
-
-    def _create_torque_hold_planner(self) -> Optional[TorqueHoldPlanner]:
-        if (
-            self.config.adaptive_hold_command_mode == "torque"
-            and self._last_contact_snapshot is not None
-        ):
-            return TorqueHoldPlanner(self.config)
-        return None
-
-    def _create_force_reference_planner(self) -> Optional[ForceReferencePlanner]:
-        if self._last_contact_snapshot is not None:
-            return ForceReferencePlanner(
-                self.config,
-                self._object_profile,
-                self._last_contact_snapshot,
-            )
-        return None
-
-    def _create_position_hold_planner(self) -> Optional[PositionHoldPlanner]:
-        if (
-            self.config.adaptive_hold_command_mode == "position"
-            and self._last_contact_snapshot is not None
-        ):
-            return PositionHoldPlanner(self.config, self._object_profile)
-        return None
 
     def _adaptive_control_loop(self) -> None:
         try:
@@ -347,3 +327,13 @@ class AdaptiveGrasper:
         self._grasp_sequence = None
         self._adaptive_hold_loop = None
         self._sensor.reset()
+
+    def _configure_subscription_periods(self) -> None:
+        sub_manager = getattr(self.hand, "_sub_manager", None)
+        configure_periods = getattr(sub_manager, "configure_periods", None)
+        if configure_periods is None:
+            return
+        configure_periods(
+            recv_period_s=self.config.tactile_sensor_update_period_s,
+            dispatch_period_s=self.config.tactile_dispatch_period_s,
+        )

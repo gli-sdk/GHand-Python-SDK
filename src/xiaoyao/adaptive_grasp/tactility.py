@@ -10,14 +10,13 @@ from .config import AdaptiveGraspConfig
 
 @dataclass
 class PerFingerAnalysis:
-    variance: float #切向力合力方差
-    s_k: float #基于方差的滑动风险
-    d_k: float #方向余弦风险
-    r_k: float #摩擦利用率
-    s_total: float #融合风险
-    slip_confirmed: bool #滑动确认
-    fz: float #法向力
-
+    variance: float
+    s_k: float
+    d_k: float
+    r_k: float
+    s_total: float
+    slip_confirmed: bool
+    fz: float
 
     @property
     def slip_risk(self) -> float:
@@ -26,7 +25,7 @@ class PerFingerAnalysis:
 
 @dataclass
 class TactileAnalysis:
-    variance: float 
+    variance: float
     slip_risk: float
     direction_distance: float
     friction_utilization: float
@@ -34,6 +33,16 @@ class TactileAnalysis:
     finger_fz: dict[TactileSensorId, float]
     total_fz: float
     per_finger: dict[TactileSensorId, PerFingerAnalysis] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class FingerTactileSample:
+    finger: TactileSensorId
+    info: Any
+    fx: float
+    fy: float
+    fz: float
+    ft: float
 
 
 class OnlineWindowNormalizer:
@@ -56,7 +65,6 @@ class TactileAnalyzer:
     def __init__(self, config: AdaptiveGraspConfig):
         self.config = config
         self._friction_coeff = config.default_friction_coeff
-        # 只实例化活跃手指的滑动窗口，避免非参与手指产生噪声干扰
         self._windows: dict[TactileSensorId, deque[float]] = {
             finger: deque(maxlen=config.sliding_window_size)
             for finger in config.active_fingers
@@ -78,98 +86,78 @@ class TactileAnalyzer:
         self._friction_coeff = value
 
     def update(self, tactile_data: dict[TactileSensorId, Any]) -> TactileAnalysis:
-        cfg = self.config
-        finger_fz: dict[TactileSensorId, float] = {}
-        total_fz = 0.0
-        per_finger: dict[TactileSensorId, PerFingerAnalysis] = {}
-
-        for finger, info in tactile_data.items():
-            if finger not in cfg.active_fingers:
-                continue  # 跳过非活跃手指，避免不参与的手指产生误触发
-            fx = info.get_force_x()
-            fy = info.get_force_y()
-            fz = abs(info.get_force_z())
-            ft = math.sqrt(fx ** 2 + fy ** 2)
-            self._windows[finger].append(ft)
-            finger_fz[finger] = fz
-            total_fz += fz
-
-        for finger, info in tactile_data.items():
-            if finger not in cfg.active_fingers:
-                continue
-            fz = finger_fz[finger]
-            fx = info.get_force_x()
-            fy = info.get_force_y()
-            ft = math.sqrt(fx ** 2 + fy ** 2)
-
-            # 逐指方差（基于该手指的滑动窗口）
-            window = self._windows[finger]
-            if len(window) >= 3:
-                mean = sum(window) / len(window)
-                var = sum((x - mean) ** 2 for x in window) / len(window)
-            else:
-                var = 0.0
-            s_k = self._normalize_variance_with_window(finger, var)
-
-            # 逐指方向一致性
-            d_k = self._calculate_finger_direction_distance(finger, info)
-
-            # 逐指摩擦利用率
-            r_k = self._calculate_finger_friction_utilization(ft, fz)
-
-            # 逐指融合
-            s_total = min(1.0, max(0.0,
-                cfg.variance_weight * s_k
-                + cfg.direction_weight * d_k
-                + cfg.friction_weight * r_k
-            ))
-
-            # 滑移次数统计
-            count = self._slip_count.get(finger, 0)
-            if s_total + cfg.epsilon >= 0.7:
-                count += 1
-            else:
-                count = max(0, count - 1)
-            self._slip_count[finger] = count
-            finger_confirmed = count >= cfg.slip_detect_debounce_cycles
-
-            per_finger[finger] = PerFingerAnalysis(
-                variance=var,
-                s_k=s_k,
-                d_k=d_k,
-                r_k=r_k,
-                s_total=s_total,
-                slip_confirmed=finger_confirmed,
-                fz=fz,
-            )
-
-        # 全局汇总（取各指最大值/任一确认）
-        variance = max((f.variance for f in per_finger.values()), default=0.0)
-        slip_risk = max((f.s_total for f in per_finger.values()), default=0.0)
-        direction_distance = max((f.d_k for f in per_finger.values()), default=0.0)
-        friction_utilization = max((f.r_k for f in per_finger.values()), default=0.0)
-        slip_confirmed = any(f.slip_confirmed for f in per_finger.values())
-
-        return TactileAnalysis(
-            variance=variance,
-            slip_risk=slip_risk,
-            direction_distance=direction_distance,
-            friction_utilization=friction_utilization,
-            slip_confirmed=slip_confirmed,
-            finger_fz=finger_fz,
-            total_fz=total_fz,
-            per_finger=per_finger,
-        )
+        samples = self._collect_active_samples(tactile_data)
+        per_finger = {
+            sample.finger: self._analyze_finger(sample)
+            for sample in samples
+        }
+        return self._build_analysis(samples, per_finger)
 
     def reset(self) -> None:
         for window in self._windows.values():
             window.clear()
         for normalizer in self._variance_normalizers.values():
             normalizer.reset()
-        # 只清理活跃手指的历史状态，避免残留数据影响下一轮控制
         self._slip_count = {f: 0 for f in self.config.active_fingers}
         self._prev_fx.clear()
         self._prev_fy.clear()
+
+    def _collect_active_samples(
+        self,
+        tactile_data: dict[TactileSensorId, Any],
+    ) -> list[FingerTactileSample]:
+        samples: list[FingerTactileSample] = []
+        for finger, info in tactile_data.items():
+            if finger not in self.config.active_fingers:
+                continue
+            fx = info.get_force_x()
+            fy = info.get_force_y()
+            fz = abs(info.get_force_z())
+            ft = math.sqrt(fx ** 2 + fy ** 2)
+            self._windows[finger].append(ft)
+            samples.append(FingerTactileSample(finger, info, fx, fy, fz, ft))
+        return samples
+
+    def _analyze_finger(self, sample: FingerTactileSample) -> PerFingerAnalysis:
+        variance = self._calculate_tangential_variance(sample.finger)
+        s_k = self._normalize_variance_with_window(sample.finger, variance)
+        d_k = self._calculate_finger_direction_distance(sample.finger, sample.info)
+        r_k = self._calculate_finger_friction_utilization(sample.ft, sample.fz)
+        s_total = self._fuse_slip_risk(s_k, d_k, r_k)
+        slip_confirmed = self._update_slip_debounce(sample.finger, s_total)
+        return PerFingerAnalysis(
+            variance=variance,
+            s_k=s_k,
+            d_k=d_k,
+            r_k=r_k,
+            s_total=s_total,
+            slip_confirmed=slip_confirmed,
+            fz=sample.fz,
+        )
+
+    def _build_analysis(
+        self,
+        samples: list[FingerTactileSample],
+        per_finger: dict[TactileSensorId, PerFingerAnalysis],
+    ) -> TactileAnalysis:
+        finger_fz = {sample.finger: sample.fz for sample in samples}
+        return TactileAnalysis(
+            variance=max((f.variance for f in per_finger.values()), default=0.0),
+            slip_risk=max((f.s_total for f in per_finger.values()), default=0.0),
+            direction_distance=max((f.d_k for f in per_finger.values()), default=0.0),
+            friction_utilization=max((f.r_k for f in per_finger.values()), default=0.0),
+            slip_confirmed=any(f.slip_confirmed for f in per_finger.values()),
+            finger_fz=finger_fz,
+            total_fz=sum(finger_fz.values()),
+            per_finger=per_finger,
+        )
+
+    def _calculate_tangential_variance(self, finger: TactileSensorId) -> float:
+        window = self._windows[finger]
+        if len(window) < 3:
+            return 0.0
+        mean = sum(window) / len(window)
+        return sum((x - mean) ** 2 for x in window) / len(window)
 
     def _normalize_variance_with_window(
         self,
@@ -187,6 +175,25 @@ class TactileAnalyzer:
             return 1.0
         denom = (cfg.variance_threshold - cfg.variance_baseline) + cfg.epsilon
         return clip((variance - cfg.variance_baseline) / denom, 0, 1)
+
+    def _fuse_slip_risk(self, s_k: float, d_k: float, r_k: float) -> float:
+        cfg = self.config
+        return clip(
+            cfg.variance_weight * s_k
+            + cfg.direction_weight * d_k
+            + cfg.friction_weight * r_k,
+            0.0,
+            1.0,
+        )
+
+    def _update_slip_debounce(self, finger: TactileSensorId, slip_risk: float) -> bool:
+        count = self._slip_count.get(finger, 0)
+        if slip_risk + self.config.epsilon >= 0.7:
+            count += 1
+        else:
+            count = max(0, count - 1)
+        self._slip_count[finger] = count
+        return count >= self.config.slip_detect_debounce_cycles
 
     def _calculate_finger_direction_distance(
         self, finger: TactileSensorId, info: Any

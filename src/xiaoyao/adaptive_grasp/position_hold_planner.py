@@ -11,9 +11,6 @@ from .tactility import TactileAnalysis
 from .utils import JOINT_TO_FINGER, clip
 
 
-_NEAR_FORCE_LIMIT_RATIO = 0.9
-_NEAR_LIMIT_STEP_SCALE = 0.8
-
 JointAngles = dict[JointId, float]
 FingerForces = dict[TactileSensorId, float]
 
@@ -25,6 +22,7 @@ class ForceDecision:
     target_angles: JointAngles
     is_fragile_mode: bool
     near_limit: bool = False
+    next_speed: Optional[int] = None
 
 
 ForceDecisions = dict[TactileSensorId, ForceDecision]
@@ -48,21 +46,22 @@ class PositionHoldPlanner:
     ) -> ForceDecisions:
         finger_count = self._get_effective_contact_count(analysis.finger_fz)
         near_limit = self._is_near_limit(analysis.finger_fz, finger_count)
-        return {
-            finger: self._build_decision(
+        decisions: ForceDecisions = {}
+        for finger in self.config.active_fingers:
+            control_u = self._compute_finger_control_u(
                 finger,
-                self._compute_finger_control_u(
-                    finger,
-                    analysis,
-                    force_reference,
-                    finger_count,
-                    dt,
-                ),
+                analysis,
+                force_reference,
+                finger_count,
+                dt,
+            )
+            decisions[finger] = self._build_decision(
+                finger,
+                control_u,
                 current_angles,
                 near_limit,
             )
-            for finger in self.config.active_fingers
-        }
+        return decisions
 
     def reset(self) -> None:
         self._finger_pid.clear()
@@ -114,8 +113,7 @@ class PositionHoldPlanner:
         near_limit: bool,
     ) -> ForceDecision:
         total_delta = self._limited_total_delta(control_u, near_limit)
-        mcp_delta = total_delta * self.config.K_MCP
-        pip_delta = total_delta * self.config.K_PIP
+        mcp_delta, pip_delta = self._joint_deltas(finger, total_delta)
 
         target_angles: JointAngles = {}
         for joint_id, angle in current_angles.items():
@@ -134,6 +132,22 @@ class PositionHoldPlanner:
             target_angles=target_angles,
             is_fragile_mode=self.is_fragile_mode,
             near_limit=near_limit,
+            next_speed=self._compute_next_speed(),
+        )
+
+    def _joint_deltas(
+        self,
+        finger: TactileSensorId,
+        total_delta: float,
+    ) -> tuple[float, float]:
+        if finger == TactileSensorId.THUMB:
+            return (
+                total_delta * self.config.thumb_K_MCP,
+                total_delta * self.config.thumb_K_PIP,
+            )
+        return (
+            total_delta * self.config.finger_K_MCP,
+            total_delta * self.config.finger_K_PIP,
         )
 
     def _limited_total_delta(self, control_u: float, near_limit: bool) -> float:
@@ -141,7 +155,7 @@ class PositionHoldPlanner:
         if self.is_fragile_mode:
             delta_limit *= self.config.fragile_step_reduction
         if near_limit:
-            delta_limit *= _NEAR_LIMIT_STEP_SCALE
+            delta_limit *= self.config.near_limit_step_scale
         return clip(control_u, -delta_limit, delta_limit)
 
     def _get_effective_contact_count(self, finger_fz: FingerForces) -> int:
@@ -154,7 +168,7 @@ class PositionHoldPlanner:
         return contacting_fingers or active_finger_count
 
     def _is_near_limit(self, finger_fz: FingerForces, finger_count: int) -> bool:
-        threshold = _NEAR_FORCE_LIMIT_RATIO * self._get_max_normal_force_per_finger(finger_count)
+        threshold = self.config.near_force_limit_ratio * self._get_max_normal_force_per_finger(finger_count)
         return any(
             finger_fz.get(finger, 0.0) >= threshold
             for finger in self.config.active_fingers
@@ -168,12 +182,20 @@ class PositionHoldPlanner:
     def _compute_next_torque(self) -> int:
         next_torque = (
             self.profile.position_hold_torque
-            if self.profile is not None and self.profile.base_hold_torque is not None
+            if self.profile is not None and self.profile.position_hold_torque is not None
             else self.config.position_torque_limit
         )
         if self.is_fragile_mode:
             next_torque = int(next_torque * self.config.fragile_torque_reduction)
         return next_torque
+
+    def _compute_next_speed(self) -> int:
+        next_speed = (
+            self.profile.position_hold_speed
+            if self.profile is not None and self.profile.position_hold_speed is not None
+            else self.config.position_speed_limit
+        )
+        return int(clip(next_speed, 0, 100))
 
     def _get_or_create_pid(self, finger: TactileSensorId) -> PidController:
         if finger not in self._finger_pid:

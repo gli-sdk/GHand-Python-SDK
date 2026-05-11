@@ -63,7 +63,8 @@ class JointCommandBuilder:
             for joint_id, angle in angles.items()
         ]
 
-    def torque_command(self, torque: int, thumb_torque: int=5) -> list[Joint]:
+    def torque_command(self, torque: int, thumb_torque: Optional[int] = None) -> list[Joint]:
+        thumb_aux_torque = self._config.thumb_aux_torque if thumb_torque is None else thumb_torque
         active = set(self._torque_joints)
         joints = [
             Joint(id=joint_id, torque=torque)
@@ -72,8 +73,8 @@ class JointCommandBuilder:
             for joint_id in TORQUE_CONTROL_JOINTS
         ]
         joints += [
-            Joint(id=JointId.THUMB_ROTATION, angle=0.0, speed=0, torque=thumb_torque),
-            Joint(id=JointId.THUMB_SWING, angle=0.0, speed=0, torque=thumb_torque),
+            Joint(id=JointId.THUMB_ROTATION, angle=0.0, speed=0, torque=thumb_aux_torque),
+            Joint(id=JointId.THUMB_SWING, angle=0.0, speed=0, torque=thumb_aux_torque),
         ]
         return joints
 
@@ -101,19 +102,29 @@ class JointCommandBuilder:
             for joint_id in TORQUE_CONTROL_JOINTS
         ]
         joints += [
-            Joint(id=JointId.THUMB_ROTATION, angle=0.0, speed=0, torque=5),
-            Joint(id=JointId.THUMB_SWING, angle=0.0, speed=0, torque=5),
+            Joint(id=JointId.THUMB_ROTATION, angle=0.0, speed=0, torque=self._config.thumb_aux_torque),
+            Joint(id=JointId.THUMB_SWING, angle=0.0, speed=0, torque=self._config.thumb_aux_torque),
         ]
         return joints
 
-    def hold_position_command(self, torque: int, angles: Optional[Mapping[JointId, float]] = None) -> list[Joint]:
+    def hold_position_command(
+        self,
+        torque: int,
+        angles: Optional[Mapping[JointId, float]] = None,
+        speed: Optional[int] = None,
+    ) -> list[Joint]:
         limited_torque = int(clip(abs(torque), 0.0, float(self._config.position_torque_limit)))
+        limited_speed = int(clip(
+            self._config.position_speed_limit if speed is None else speed,
+            0.0,
+            100.0,
+        ))
         hold_angles = angles or self.init_hold_angles()
         return [
             Joint(
                 id=joint_id,
                 angle=hold_angles.get(joint_id, 0.0),
-                speed=int(self._config.position_speed_limit),
+                speed=limited_speed,
                 torque=limited_torque,
             )
             for joint_id in self._torque_joints

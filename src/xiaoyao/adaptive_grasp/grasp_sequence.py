@@ -24,6 +24,14 @@ class ContactSnapshot:
     timestamp_s: float
 
 
+@dataclass(frozen=True)
+class ClosingSensorFrame:
+    tactile_data: dict[TactileSensorId, Any]
+    joint_feedback: list[Joint]
+    total_fz: float
+    touch_flags: dict[TactileSensorId, bool]
+
+
 class PhaseResult:
     def __init__(
         self,
@@ -93,22 +101,37 @@ class PhaseController:
     def _set_state(self, state: GraspState) -> None:
         self._on_state_change(state)
 
-    def _execute_position_phase(self, state: GraspState, pose: dict[JointId, float], sleep_s: float) -> bool:
+    def _execute_position_phase(
+        self,
+        state: GraspState,
+        pose: dict[JointId, float],
+        speed: int,
+        torque: int,
+        wait_s: float,
+    ) -> bool:
         self._set_state(state)
-        joints = self._joint_builder.position_command(pose, speed=50, torque=50)
+        joints = self._joint_builder.position_command(pose, speed=speed, torque=torque)
         ok = self.hand.move_joints(joints, mode=CtrlMode.POSITION)
         if ok:
-            time.sleep(sleep_s)
+            time.sleep(wait_s)
         return ok
 
     def _phase_open(self, is_running: Callable[[], bool] = lambda: True) -> bool:
         return self._execute_position_phase(
-            GraspState.OPEN, self._joint_builder.open_pose(), sleep_s=3,
+            GraspState.OPEN,
+            self._joint_builder.open_pose(),
+            speed=self.config.open_speed,
+            torque=self.config.open_torque,
+            wait_s=self.config.open_wait_s,
         )
 
     def _phase_pre_grasp(self, is_running: Callable[[], bool] = lambda: True) -> bool:
         return self._execute_position_phase(
-            GraspState.PRE_GRASP, self.config.pre_grasp_pose, sleep_s=5,
+            GraspState.PRE_GRASP,
+            self.config.pre_grasp_pose,
+            speed=self.config.pre_grasp_speed,
+            torque=self.config.pre_grasp_torque,
+            wait_s=self.config.pre_grasp_wait_s,
         )
 
     def _phase_closing(self, is_running: Callable[[], bool]) -> bool:
@@ -130,50 +153,93 @@ class PhaseController:
             self.hand.move_joints(self._joint_builder.torque_command(self.current_torque), mode=CtrlMode.TORQUE)
             time.sleep(self.config.closing_period_s)
 
-            tactile_data = self._sensor.tactile_data
-            joint_feedback = self._sensor.joint_feedback
-            if tactile_data is None or joint_feedback is None:
-                _logger.error("CLOSING phase: failed to get %s", "tactile data" if tactile_data is None else "joint feedback")
+            frame = self._read_closing_sensor_frame()
+            if frame is None:
                 return False
 
-            if self._safety.is_grasp_empty(joint_feedback, GraspState.CLOSING_TO_CONTACT).status != SafetyStatus.OK:
-                _logger.error("CLOSING phase: Grasp Empty")
-                self._phase_should_release = True
-                self._set_state(GraspState.ERROR)
+            if self._is_empty_grasp(frame.joint_feedback):
                 return False
 
-            total_fz = self._sensor.sum_active_finger_normal_force()
-            touch_flag_dict = self._sensor.active_finger_touch_flag()
-
-            if total_fz >= self.config.contact_threshold_z and all(touch_flag_dict.values()):
-                self._record_contact_snapshot(
-                    joint_feedback,
-                    tactile_data,
-                    total_fz,
-                    "force_threshold",
-                )
-                time.sleep(self.config.control_period_s)
+            if self._try_confirm_force_contact(frame):
                 return True
 
-            current_angles = {j.id: j.angle for j in joint_feedback}
+            current_angles = {j.id: j.angle for j in frame.joint_feedback}
             if self._is_joints_stalled(prev_angles, current_angles):
                 stall_counter += 1
-                _logger.debug("CLOSING: joint stall detected (%d/%d)", stall_counter, self.config.closing_stall_cycles)
-                if stall_counter >= self.config.closing_stall_cycles:
-                    _logger.info("CLOSING: torque-stall contact confirmed")
-                    self._record_contact_snapshot(
-                        joint_feedback,
-                        tactile_data,
-                        self._sensor.sum_active_finger_normal_force(),
-                        "torque_stall",
-                    )
-                    time.sleep(self.config.control_period_s)
+                if self._try_confirm_stall_contact(stall_counter, frame):
                     return True
             else:
                 stall_counter = 0
             prev_angles = current_angles
 
         return False
+
+    def _read_closing_sensor_frame(self) -> Optional[ClosingSensorFrame]:
+        tactile_data = self._sensor.tactile_data
+        joint_feedback = self._sensor.joint_feedback
+        if tactile_data is None or joint_feedback is None:
+            _logger.error(
+                "CLOSING phase: failed to get %s",
+                "tactile data" if tactile_data is None else "joint feedback",
+            )
+            return None
+        return ClosingSensorFrame(
+            tactile_data=tactile_data,
+            joint_feedback=joint_feedback,
+            total_fz=self._sensor.sum_active_finger_normal_force(),
+            touch_flags=self._sensor.active_finger_touch_flag(),
+        )
+
+    def _is_empty_grasp(self, joint_feedback: list[Joint]) -> bool:
+        report = self._safety.is_grasp_empty(
+            joint_feedback,
+            GraspState.CLOSING_TO_CONTACT,
+        )
+        if report.status == SafetyStatus.OK:
+            return False
+
+        _logger.error("CLOSING phase: Grasp Empty")
+        self._phase_should_release = True
+        self._set_state(GraspState.ERROR)
+        return True
+
+    def _try_confirm_force_contact(self, frame: ClosingSensorFrame) -> bool:
+        if frame.total_fz < self.config.contact_threshold_z:
+            return False
+        if not all(frame.touch_flags.values()):
+            return False
+
+        self._record_contact_snapshot(
+            frame.joint_feedback,
+            frame.tactile_data,
+            frame.total_fz,
+            "force_threshold",
+        )
+        time.sleep(self.config.control_period_s)
+        return True
+
+    def _try_confirm_stall_contact(
+        self,
+        stall_counter: int,
+        frame: ClosingSensorFrame,
+    ) -> bool:
+        _logger.debug(
+            "CLOSING: joint stall detected (%d/%d)",
+            stall_counter,
+            self.config.closing_stall_cycles,
+        )
+        if stall_counter < self.config.closing_stall_cycles:
+            return False
+
+        _logger.info("CLOSING: torque-stall contact confirmed")
+        self._record_contact_snapshot(
+            frame.joint_feedback,
+            frame.tactile_data,
+            frame.total_fz,
+            "torque_stall",
+        )
+        time.sleep(self.config.control_period_s)
+        return True
 
     def _record_contact_snapshot(
         self,

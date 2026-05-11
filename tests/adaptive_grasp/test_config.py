@@ -2,8 +2,9 @@ import math
 
 import pytest
 
+import xiaoyao.adaptive_grasp.config as config_module
 from xiaoyao.adaptive_grasp import AdaptiveGraspConfig
-from xiaoyao.dexhand import TactileSensorId
+from xiaoyao.dexhand import JointId, TactileSensorId
 
 
 def test_position_hold_defaults():
@@ -12,8 +13,10 @@ def test_position_hold_defaults():
     assert cfg.position_speed_limit == 15
     assert cfg.position_torque_limit == 15
     assert cfg.delta_theta_limit == pytest.approx(math.radians(2.0))
-    assert cfg.K_MCP == pytest.approx(0.5)
-    assert cfg.K_PIP == pytest.approx(0.5)
+    assert cfg.thumb_K_MCP == pytest.approx(0.7)
+    assert cfg.thumb_K_PIP == pytest.approx(0.3)
+    assert cfg.finger_K_MCP == pytest.approx(0.2)
+    assert cfg.finger_K_PIP == pytest.approx(0.8)
 
 
 def test_delta_theta_limit_must_be_positive():
@@ -35,11 +38,46 @@ def test_position_torque_limit_bounds():
         AdaptiveGraspConfig(position_torque_limit=101)
 
 
-def test_k_allocation_must_be_normalized():
-    with pytest.raises(ValueError):
-        AdaptiveGraspConfig(K_MCP=-0.1, K_PIP=1.1)
-    with pytest.raises(ValueError):
-        AdaptiveGraspConfig(K_MCP=0.4, K_PIP=0.4)
+def test_global_joint_allocation_params_removed():
+    cfg = AdaptiveGraspConfig()
+
+    assert not hasattr(cfg, "K_MCP")
+    assert not hasattr(cfg, "K_PIP")
+    with pytest.raises(TypeError):
+        AdaptiveGraspConfig(K_MCP=0.3)
+    with pytest.raises(TypeError):
+        AdaptiveGraspConfig(K_PIP=0.7)
+
+
+def test_thumb_and_finger_joint_allocation_must_be_non_negative():
+    for param_name in ("thumb_K_MCP", "thumb_K_PIP", "finger_K_MCP", "finger_K_PIP"):
+        with pytest.raises(ValueError):
+            AdaptiveGraspConfig(**{param_name: -0.1})
+
+    cfg = AdaptiveGraspConfig(
+        thumb_K_MCP=0.0,
+        thumb_K_PIP=0.0,
+        finger_K_MCP=0.0,
+        finger_K_PIP=0.0,
+    )
+    assert cfg.thumb_K_MCP == pytest.approx(0.0)
+    assert cfg.thumb_K_PIP == pytest.approx(0.0)
+    assert cfg.finger_K_MCP == pytest.approx(0.0)
+    assert cfg.finger_K_PIP == pytest.approx(0.0)
+
+
+def test_thumb_and_finger_joint_allocation_can_be_configured_independently():
+    cfg = AdaptiveGraspConfig(
+        thumb_K_MCP=0.2,
+        thumb_K_PIP=0.8,
+        finger_K_MCP=0.7,
+        finger_K_PIP=0.3,
+    )
+
+    assert cfg.thumb_K_MCP == pytest.approx(0.2)
+    assert cfg.thumb_K_PIP == pytest.approx(0.8)
+    assert cfg.finger_K_MCP == pytest.approx(0.7)
+    assert cfg.finger_K_PIP == pytest.approx(0.3)
 
 
 def test_release_and_pid_defaults():
@@ -77,11 +115,9 @@ def test_extended_torque_strategy_params_removed():
 
 def test_unused_params_removed():
     for param_name, value in {
-        "tactile_sensor_update_period_s": 0.015,
         "theta_err_th": math.radians(2.0),
         "release_check_cycles": 3,
         "s_ref": 0.25,
-        "drop_detect_debounce_cycles": 1,
         "fragile_speed_reduction": 0.8,
         "K_s": 1.0,
         "force_calibrate_tolerance": 0.5,
@@ -114,6 +150,150 @@ def test_phase_closing_torque_bounds():
 def test_slip_detect_debounce_positive():
     with pytest.raises(ValueError):
         AdaptiveGraspConfig(slip_detect_debounce_cycles=0)
+
+
+def test_drop_detect_defaults():
+    cfg = AdaptiveGraspConfig()
+
+    assert cfg.drop_detect_force_per_finger_n == pytest.approx(0.1)
+    assert cfg.drop_detect_debounce_cycles == 6
+
+
+def test_adaptive_hold_guard_defaults_are_configurable():
+    cfg = AdaptiveGraspConfig()
+
+    assert cfg.adaptive_hold_move_failure_limit == 3
+    assert cfg.contact_snapshot_angle_limit == pytest.approx(math.radians(10.0))
+    assert cfg.near_force_limit_ratio == pytest.approx(0.9)
+    assert cfg.near_limit_step_scale == pytest.approx(0.8)
+    assert cfg.touch_detect_force_threshold_n == pytest.approx(0.1)
+    assert cfg.thumb_aux_torque == 5
+    assert cfg.tactile_sensor_update_period_s == pytest.approx(0.02)
+    assert cfg.tactile_dispatch_period_s == pytest.approx(0.02)
+
+
+def test_adaptive_hold_guard_constraints():
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(adaptive_hold_move_failure_limit=0)
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(contact_snapshot_angle_limit=0.0)
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(near_force_limit_ratio=0.0)
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(near_force_limit_ratio=1.1)
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(near_limit_step_scale=0.0)
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(near_limit_step_scale=1.1)
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(touch_detect_force_threshold_n=-0.1)
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(tactile_sensor_update_period_s=0.0)
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(tactile_dispatch_period_s=0.0)
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(thumb_aux_torque=-101)
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(thumb_aux_torque=101)
+
+
+def test_drop_detect_constraints():
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(drop_detect_force_per_finger_n=-0.1)
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(drop_detect_debounce_cycles=0)
+
+
+def test_default_pre_grasp_preset_is_explicit_balloon_pinch():
+    cfg = AdaptiveGraspConfig()
+
+    assert cfg.pre_grasp_preset == "balloon_pinch"
+    assert cfg.pre_grasp_pose[JointId.FF_MCP] == pytest.approx(math.radians(25.0))
+    assert cfg.pre_grasp_pose[JointId.FF_PIP] == pytest.approx(math.radians(25.0))
+    assert cfg.pre_grasp_pose[JointId.THUMB_SWING] == pytest.approx(math.radians(80.0))
+    assert cfg.pre_grasp_pose[JointId.THUMB_PIP] == pytest.approx(math.radians(5.0))
+
+
+def test_config_has_no_import_time_object_pose_selector():
+    assert not hasattr(config_module, "_legacy_object_pose_selector")
+
+
+def test_object_specific_pre_grasp_preset_is_config_driven():
+    cfg = AdaptiveGraspConfig(pre_grasp_preset="paper_cup_pinch")
+
+    assert cfg.active_fingers == {
+        TactileSensorId.THUMB,
+        TactileSensorId.FOREFINGER,
+        TactileSensorId.MIDDLE_FINGER,
+    }
+    assert cfg.pre_grasp_pose[JointId.FF_MCP] == pytest.approx(math.radians(41.0))
+    assert cfg.pre_grasp_pose[JointId.MF_MCP] == pytest.approx(math.radians(49.0))
+    assert cfg.pre_grasp_pose[JointId.THUMB_SWING] == pytest.approx(math.radians(85.0))
+
+
+def test_default_object_can_drive_default_pre_grasp_preset():
+    cfg = AdaptiveGraspConfig(default_object="paper_cup")
+
+    assert cfg.pre_grasp_preset == "paper_cup_pinch"
+    assert cfg.active_fingers == {
+        TactileSensorId.THUMB,
+        TactileSensorId.FOREFINGER,
+        TactileSensorId.MIDDLE_FINGER,
+    }
+    assert cfg.pre_grasp_pose[JointId.FF_MCP] == pytest.approx(math.radians(41.0))
+
+
+def test_explicit_pre_grasp_preset_overrides_default_object_preset():
+    cfg = AdaptiveGraspConfig(
+        default_object="paper_cup",
+        pre_grasp_preset="balloon_pinch",
+    )
+
+    assert cfg.pre_grasp_preset == "balloon_pinch"
+    assert cfg.active_fingers == {
+        TactileSensorId.THUMB,
+        TactileSensorId.FOREFINGER,
+    }
+
+
+def test_phase_motion_defaults_are_configurable():
+    cfg = AdaptiveGraspConfig()
+
+    assert cfg.open_speed == 50
+    assert cfg.open_torque == 50
+    assert cfg.open_wait_s == pytest.approx(3.0)
+    assert cfg.pre_grasp_speed == 50
+    assert cfg.pre_grasp_torque == 50
+    assert cfg.pre_grasp_wait_s == pytest.approx(5.0)
+
+
+def test_phase_motion_constraints():
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(open_speed=-1)
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(open_torque=101)
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(open_wait_s=0.0)
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(pre_grasp_speed=101)
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(pre_grasp_torque=-1)
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(pre_grasp_wait_s=0.0)
+
+
+def test_safety_threshold_defaults_are_configurable():
+    cfg = AdaptiveGraspConfig()
+
+    assert cfg.sensor_missing_fault_cycles == 3
+    assert cfg.empty_grasp_angle_threshold == pytest.approx(math.radians(30.0))
+
+
+def test_safety_threshold_constraints():
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(sensor_missing_fault_cycles=0)
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(empty_grasp_angle_threshold=0.0)
 
 
 def test_variance_direction_friction_weights_sum_to_one():

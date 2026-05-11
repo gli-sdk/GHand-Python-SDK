@@ -19,6 +19,13 @@ class ForceReferenceDecision:
     F_ref_total: float
 
 
+@dataclass(frozen=True)
+class _ForceRefStep:
+    force_ref: float
+    stable_time_s: float
+    slip_confirmed: bool
+
+
 class ForceReferencePlanner:
     """Plans per-finger normal-force references for adaptive hold."""
 
@@ -86,31 +93,21 @@ class ForceReferencePlanner:
 
     def _update_global_force_ref(self, analysis: TactileAnalysis, dt: float) -> None:
         total_ref = sum(self._force_refs.values())
-        confirmed_rising_edge = (
-            analysis.slip_confirmed and not self._last_global_slip_confirmed
+        step = self._step_force_ref_by_slip(
+            force_ref=total_ref,
+            slip_risk=analysis.slip_risk,
+            slip_confirmed=analysis.slip_confirmed,
+            was_slip_confirmed=self._last_global_slip_confirmed,
+            stable_time_s=self._global_stable_time_s,
+            dt=dt,
         )
-        if confirmed_rising_edge:
-            total_ref += self.config.force_ref_confirmed_boost_n
-            self._global_stable_time_s = 0.0
-
-        if analysis.slip_risk >= self.config.force_ref_slip_warning_threshold:
-            slip_excess = analysis.slip_risk - self.config.force_ref_slip_warning_threshold
-            rise_step = self.config.force_ref_slip_gain_n_per_s * slip_excess * dt
-            total_ref += min(rise_step, self.config.force_ref_max_rise_step_n)
-            self._global_stable_time_s = 0.0
-        elif analysis.slip_risk <= self.config.force_ref_stable_threshold:
-            self._global_stable_time_s += dt
-            if self._global_stable_time_s >= self.config.force_ref_stable_decay_delay_s:
-                total_ref -= self.config.force_ref_decay_rate_n_per_s * dt
-        else:
-            self._global_stable_time_s = 0.0
-
-        total_ref = self._clamp_force_ref(total_ref)
+        total_ref = self._clamp_force_ref(step.force_ref)
         self._force_refs = {
             finger: total_ref * self.contact_ratios.get(finger, 0.0)
             for finger in self.config.active_fingers
         }
-        self._last_global_slip_confirmed = analysis.slip_confirmed
+        self._global_stable_time_s = step.stable_time_s
+        self._last_global_slip_confirmed = step.slip_confirmed
 
     def _update_finger_force_ref(
         self,
@@ -120,28 +117,48 @@ class ForceReferencePlanner:
         slip_confirmed: bool,
         dt: float,
     ) -> float:
-        confirmed_rising_edge = slip_confirmed and not self._last_slip_confirmed.get(
-            finger,
-            False,
+        step = self._step_force_ref_by_slip(
+            force_ref=force_ref,
+            slip_risk=slip_risk,
+            slip_confirmed=slip_confirmed,
+            was_slip_confirmed=self._last_slip_confirmed.get(finger, False),
+            stable_time_s=self._stable_time_s[finger],
+            dt=dt,
         )
-        if confirmed_rising_edge:
+        self._stable_time_s[finger] = step.stable_time_s
+        self._last_slip_confirmed[finger] = step.slip_confirmed
+        return max(0.0, step.force_ref)
+
+    def _step_force_ref_by_slip(
+        self,
+        force_ref: float,
+        slip_risk: float,
+        slip_confirmed: bool,
+        was_slip_confirmed: bool,
+        stable_time_s: float,
+        dt: float,
+    ) -> _ForceRefStep:
+        if slip_confirmed and not was_slip_confirmed:
             force_ref += self.config.force_ref_confirmed_boost_n
-            self._stable_time_s[finger] = 0.0
+            stable_time_s = 0.0
 
         if slip_risk >= self.config.force_ref_slip_warning_threshold:
             slip_excess = slip_risk - self.config.force_ref_slip_warning_threshold
             rise_step = self.config.force_ref_slip_gain_n_per_s * slip_excess * dt
             force_ref += min(rise_step, self.config.force_ref_max_rise_step_n)
-            self._stable_time_s[finger] = 0.0
+            stable_time_s = 0.0
         elif slip_risk <= self.config.force_ref_stable_threshold:
-            self._stable_time_s[finger] += dt
-            if self._stable_time_s[finger] >= self.config.force_ref_stable_decay_delay_s:
+            stable_time_s += dt
+            if stable_time_s >= self.config.force_ref_stable_decay_delay_s:
                 force_ref -= self.config.force_ref_decay_rate_n_per_s * dt
         else:
-            self._stable_time_s[finger] = 0.0
+            stable_time_s = 0.0
 
-        self._last_slip_confirmed[finger] = slip_confirmed
-        return max(0.0, force_ref)
+        return _ForceRefStep(
+            force_ref=force_ref,
+            stable_time_s=stable_time_s,
+            slip_confirmed=slip_confirmed,
+        )
 
     def _compute_contact_ratios(
         self,

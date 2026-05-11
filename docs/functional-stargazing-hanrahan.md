@@ -483,8 +483,12 @@ class ForcePlanner:
             delta_limit *= cfg.fragile_step_reduction
         total_delta = self._clip(total_delta, -delta_limit, delta_limit)
 
-        mcp_delta = total_delta * cfg.K_MCP
-        pip_delta = total_delta * cfg.K_PIP
+        if finger == TactileSensorId.THUMB:
+            mcp_delta = total_delta * cfg.thumb_K_MCP
+            pip_delta = total_delta * cfg.thumb_K_PIP
+        else:
+            mcp_delta = total_delta * cfg.finger_K_MCP
+            pip_delta = total_delta * cfg.finger_K_PIP
 
         target_angles = dict(current_angles)
         for joint_id in current_angles:

@@ -25,6 +25,31 @@ def test_empty_grasp_when_closing_with_no_contact():
     assert report.fault_type == "empty_grasp"
 
 
+def test_tactile_missing_fault_cycles_are_configurable():
+    cfg = AdaptiveGraspConfig(sensor_missing_fault_cycles=2)
+    monitor = SafetyMonitor(cfg)
+    joints = [Joint(id=JointId.THUMB_MCP, angle=0.0)]
+
+    report = monitor.check(tactile_data=None, joint_feedback=joints, state=GraspState.ADAPTIVE_HOLD)
+    assert report.status == SafetyStatus.WARN
+
+    report = monitor.check(tactile_data=None, joint_feedback=joints, state=GraspState.ADAPTIVE_HOLD)
+    assert report.status == SafetyStatus.FAULT
+    assert report.fault_type == "sensor_fault"
+
+
+def test_empty_grasp_angle_threshold_is_configurable():
+    cfg = AdaptiveGraspConfig(empty_grasp_angle_threshold=math.radians(10.0))
+    monitor = SafetyMonitor(cfg)
+    monitor.set_closing_baseline([Joint(id=JointId.THUMB_MCP, angle=0.0)])
+
+    joints = [Joint(id=JointId.THUMB_MCP, angle=math.radians(11.0))]
+    report = monitor.is_grasp_empty(joint_feedback=joints, state=GraspState.CLOSING_TO_CONTACT)
+
+    assert report.status == SafetyStatus.FAULT
+    assert report.fault_type == "empty_grasp"
+
+
 def _touch(fz):
     return type("T", (), {"get_force_z": lambda self, fz=fz: fz})()
 
@@ -44,6 +69,7 @@ def test_object_dropped_after_three_low_force_cycles(caplog):
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
         contact_threshold_z=1.0,
+        drop_detect_debounce_cycles=3,
     )
     monitor = SafetyMonitor(cfg)
 
@@ -68,6 +94,7 @@ def test_object_dropped_logs_active_finger_last_and_current_fz(caplog):
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
         contact_threshold_z=1.0,
+        drop_detect_debounce_cycles=3,
     )
     monitor = SafetyMonitor(cfg)
     joints = [Joint(id=JointId.THUMB_MCP, angle=0.0)]
@@ -106,6 +133,7 @@ def test_object_drop_counter_resets_when_force_recovers():
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
         contact_threshold_z=1.0,
+        drop_detect_debounce_cycles=3,
     )
     monitor = SafetyMonitor(cfg)
     joints = [Joint(id=JointId.THUMB_MCP, angle=0.0)]
@@ -117,6 +145,22 @@ def test_object_drop_counter_resets_when_force_recovers():
     monitor.check(tactile_data=_tactile_data(0.19), joint_feedback=joints, state=GraspState.ADAPTIVE_HOLD)
     report = monitor.check(tactile_data=_tactile_data(0.19), joint_feedback=joints, state=GraspState.ADAPTIVE_HOLD)
     assert report.status == SafetyStatus.OK
+
+
+def test_object_drop_threshold_is_configurable():
+    cfg = AdaptiveGraspConfig(
+        active_fingers={TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
+        drop_detect_force_per_finger_n=0.2,
+        drop_detect_debounce_cycles=1,
+    )
+    monitor = SafetyMonitor(cfg)
+    joints = [Joint(id=JointId.THUMB_MCP, angle=0.0)]
+
+    monitor.check(tactile_data=_tactile_data(1.0), joint_feedback=joints, state=GraspState.ADAPTIVE_HOLD)
+    report = monitor.check(tactile_data=_tactile_data(0.39), joint_feedback=joints, state=GraspState.ADAPTIVE_HOLD)
+
+    assert report.status == SafetyStatus.FAULT
+    assert report.fault_type == "object_dropped"
 
 
 def test_empty_grasp_respects_baseline():

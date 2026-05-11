@@ -127,6 +127,27 @@ def test_build_config_accepts_adaptive_hold_command_options():
     assert captured_kwargs["default_object"] == "balloon"
 
 
+def test_build_config_does_not_override_config_defaults_when_args_omitted():
+    captured_kwargs = {}
+
+    class _ConfigSpy:
+        def __init__(self, **kwargs):
+            captured_kwargs.update(kwargs)
+
+    parser = demo.build_parser()
+    args = parser.parse_args([])
+
+    original_config = demo.AdaptiveGraspConfig
+    demo.AdaptiveGraspConfig = _ConfigSpy
+    try:
+        cfg = demo.build_config(args)
+    finally:
+        demo.AdaptiveGraspConfig = original_config
+
+    assert isinstance(cfg, _ConfigSpy)
+    assert captured_kwargs == {}
+
+
 def test_print_hold_status_uses_newline(capsys):
     demo.print_hold_status("adaptive_hold", 4)
 

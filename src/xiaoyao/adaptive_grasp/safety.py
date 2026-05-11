@@ -49,9 +49,13 @@ class SafetyMonitor:
 
         if tactile_data is None:
             self._consecutive_no_data += 1
-            if self._consecutive_no_data >= 3:
+            if self._consecutive_no_data >= self.config.sensor_missing_fault_cycles:
                 _logger.error("Tactile data missing for %d cycles", self._consecutive_no_data)
-                return SafetyReport(SafetyStatus.FAULT, "sensor_fault", "Tactile data missing for 3 cycles")
+                return SafetyReport(
+                    SafetyStatus.FAULT,
+                    "sensor_fault",
+                    f"Tactile data missing for {self.config.sensor_missing_fault_cycles} cycles",
+                )
             return SafetyReport(SafetyStatus.WARN, message="Tactile data missing")
 
         self._consecutive_no_data = 0
@@ -74,7 +78,7 @@ class SafetyMonitor:
         drop_threshold = self._drop_threshold()
         if self._is_below_drop_threshold(total_fz):
             self._consecutive_drop_cycles += 1
-            if self._consecutive_drop_cycles >= 6:
+            if self._consecutive_drop_cycles >= self.config.drop_detect_debounce_cycles:
                 _logger.error(
                     "Object dropped:\n"
                     "  total: last_fz=%.2f current_fz=%.2f threshold=%.2f\n"
@@ -91,11 +95,10 @@ class SafetyMonitor:
 
     def _drop_threshold(self) -> float:
         active_finger_count = max(len(self.config.active_fingers), 1)
-        return active_finger_count * 0.1
+        return active_finger_count * self.config.drop_detect_force_per_finger_n
 
     def _is_below_drop_threshold(self, total_fz: float) -> bool:
-        # return total_fz < self._drop_threshold()
-        return total_fz ==0
+        return total_fz < self._drop_threshold()
     def _get_active_finger_fz(self, tactile_data: dict) -> dict[Any, float]:
         return {
             finger: abs(tactile_data[finger].get_force_z())
@@ -137,7 +140,7 @@ class SafetyMonitor:
             (abs(j.angle - self._closing_baseline_angles.get(j.id, 0.0)) for j in joint_feedback),
             default=0.0,
         )
-        if max_delta > math.radians(30.0):
+        if max_delta > self.config.empty_grasp_angle_threshold:
             _logger.error("Empty grasp detected: max_delta=%.1f deg", math.degrees(max_delta))
             return SafetyReport(SafetyStatus.FAULT, "empty_grasp", "No contact while joints moved")
         return SafetyReport(SafetyStatus.OK)

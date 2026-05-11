@@ -60,8 +60,10 @@ def test_position_hold_planner_uses_external_force_refs_per_finger():
         position_hold_K_p=1.0,
         position_hold_K_i=0.0,
         position_hold_K_d=0.0,
-        K_MCP=0.5,
-        K_PIP=0.5,
+        thumb_K_MCP=0.5,
+        thumb_K_PIP=0.5,
+        finger_K_MCP=0.5,
+        finger_K_PIP=0.5,
         delta_theta_limit=math.radians(2.0),
     )
     planner = PositionHoldPlanner(cfg, _profile(is_fragile=False))
@@ -101,8 +103,8 @@ def test_position_hold_planner_limits_angle_step():
         position_hold_K_p=100.0,
         position_hold_K_i=0.0,
         position_hold_K_d=0.0,
-        K_MCP=0.5,
-        K_PIP=0.5,
+        thumb_K_MCP=0.5,
+        thumb_K_PIP=0.5,
         delta_theta_limit=math.radians(2.0),
     )
     planner = PositionHoldPlanner(cfg, _profile(is_fragile=False))
@@ -118,6 +120,76 @@ def test_position_hold_planner_limits_angle_step():
     assert decision.target_angles[JointId.THUMB_PIP] == pytest.approx(math.radians(1.0))
 
 
+def test_position_hold_planner_uses_thumb_and_finger_joint_allocation():
+    cfg = AdaptiveGraspConfig(
+        active_fingers={TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
+        position_hold_K_p=1.0,
+        position_hold_K_i=0.0,
+        position_hold_K_d=0.0,
+        thumb_K_MCP=0.2,
+        thumb_K_PIP=0.8,
+        finger_K_MCP=0.7,
+        finger_K_PIP=0.3,
+        delta_theta_limit=10.0,
+    )
+    planner = PositionHoldPlanner(cfg, _profile(is_fragile=False))
+
+    decisions = planner.compute(
+        _analysis(
+            finger_fz={
+                TactileSensorId.THUMB: 0.0,
+                TactileSensorId.FOREFINGER: 0.0,
+            },
+        ),
+        {
+            JointId.THUMB_MCP: 0.0,
+            JointId.THUMB_PIP: 0.0,
+            JointId.FF_MCP: 0.0,
+            JointId.FF_PIP: 0.0,
+        },
+        _reference(
+            force_refs={
+                TactileSensorId.THUMB: 1.0,
+                TactileSensorId.FOREFINGER: 1.0,
+            },
+        ),
+        dt=0.02,
+    )
+
+    thumb = decisions[TactileSensorId.THUMB].target_angles
+    forefinger = decisions[TactileSensorId.FOREFINGER].target_angles
+    assert thumb[JointId.THUMB_MCP] == pytest.approx(0.2)
+    assert thumb[JointId.THUMB_PIP] == pytest.approx(0.8)
+    assert forefinger[JointId.FF_MCP] == pytest.approx(0.7)
+    assert forefinger[JointId.FF_PIP] == pytest.approx(0.3)
+
+
+def test_position_hold_planner_uses_configured_near_limit_step_scale():
+    cfg = AdaptiveGraspConfig(
+        active_fingers={TactileSensorId.THUMB},
+        position_hold_K_p=100.0,
+        position_hold_K_i=0.0,
+        position_hold_K_d=0.0,
+        thumb_K_MCP=0.5,
+        thumb_K_PIP=0.5,
+        delta_theta_limit=math.radians(2.0),
+        near_force_limit_ratio=0.5,
+        near_limit_step_scale=0.25,
+    )
+    planner = PositionHoldPlanner(cfg, _profile(is_fragile=False))
+
+    decision = planner.compute(
+        _analysis(finger_fz={TactileSensorId.THUMB: 2.0}),
+        {JointId.THUMB_MCP: 0.0, JointId.THUMB_PIP: 0.0},
+        _reference(force_refs={TactileSensorId.THUMB: 3.0}),
+        dt=0.02,
+    )[TactileSensorId.THUMB]
+
+    assert decision.near_limit is True
+    assert decision.target_angles[JointId.THUMB_MCP] == pytest.approx(math.radians(0.25))
+    assert decision.target_angles[JointId.THUMB_PIP] == pytest.approx(math.radians(0.25))
+
+
 def test_position_hold_planner_does_not_apply_slip_feedforward():
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB},
@@ -125,8 +197,8 @@ def test_position_hold_planner_does_not_apply_slip_feedforward():
         position_hold_K_p=1.0,
         position_hold_K_i=0.0,
         position_hold_K_d=0.0,
-        K_MCP=0.5,
-        K_PIP=0.5,
+        thumb_K_MCP=0.5,
+        thumb_K_PIP=0.5,
     )
     planner = PositionHoldPlanner(cfg, _profile(is_fragile=False))
 
@@ -150,8 +222,8 @@ def test_position_hold_planner_uses_position_hold_pid_params():
         position_hold_K_d=0.0,
         position_hold_I_min=-1.0,
         position_hold_I_max=1.0,
-        K_MCP=0.5,
-        K_PIP=0.5,
+        thumb_K_MCP=0.5,
+        thumb_K_PIP=0.5,
         delta_theta_limit=10.0,
     )
     planner = PositionHoldPlanner(cfg, _profile(is_fragile=False))
@@ -164,3 +236,61 @@ def test_position_hold_planner_uses_position_hold_pid_params():
     )[TactileSensorId.THUMB]
 
     assert decision.control_u == pytest.approx(1.0)
+
+
+def test_position_hold_planner_uses_position_hold_torque_when_configured():
+    cfg = AdaptiveGraspConfig(
+        active_fingers={TactileSensorId.THUMB},
+        position_torque_limit=15,
+    )
+    profile = _profile(is_fragile=False)
+    profile.position_hold_torque = 12
+    planner = PositionHoldPlanner(cfg, profile)
+
+    decision = planner.compute(
+        _analysis(finger_fz={TactileSensorId.THUMB: 0.5}),
+        {JointId.THUMB_MCP: 0.0, JointId.THUMB_PIP: 0.0},
+        _reference(force_refs={TactileSensorId.THUMB: 0.5}),
+        dt=0.02,
+    )[TactileSensorId.THUMB]
+
+    assert decision.next_torque == 12
+
+
+def test_position_hold_planner_uses_position_hold_speed_when_configured():
+    cfg = AdaptiveGraspConfig(
+        active_fingers={TactileSensorId.THUMB},
+        position_speed_limit=15,
+    )
+    profile = _profile(is_fragile=False)
+    profile.position_hold_speed = 7
+    planner = PositionHoldPlanner(cfg, profile)
+
+    decision = planner.compute(
+        _analysis(finger_fz={TactileSensorId.THUMB: 0.5}),
+        {JointId.THUMB_MCP: 0.0, JointId.THUMB_PIP: 0.0},
+        _reference(force_refs={TactileSensorId.THUMB: 0.5}),
+        dt=0.02,
+    )[TactileSensorId.THUMB]
+
+    assert decision.next_speed == 7
+
+
+def test_position_hold_planner_falls_back_when_only_base_hold_torque_is_configured():
+    cfg = AdaptiveGraspConfig(
+        active_fingers={TactileSensorId.THUMB},
+        position_torque_limit=15,
+    )
+    profile = _profile(is_fragile=False)
+    profile.base_hold_torque = 8
+    profile.position_hold_torque = None
+    planner = PositionHoldPlanner(cfg, profile)
+
+    decision = planner.compute(
+        _analysis(finger_fz={TactileSensorId.THUMB: 0.5}),
+        {JointId.THUMB_MCP: 0.0, JointId.THUMB_PIP: 0.0},
+        _reference(force_refs={TactileSensorId.THUMB: 0.5}),
+        dt=0.02,
+    )[TactileSensorId.THUMB]
+
+    assert decision.next_torque == cfg.position_torque_limit

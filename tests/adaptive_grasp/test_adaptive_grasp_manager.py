@@ -68,6 +68,25 @@ class _MockHand:
         return []
 
 
+class _FakeSubscriptionManager:
+    def __init__(self):
+        self.calls: list[dict[str, float]] = []
+
+    def configure_periods(self, *, recv_period_s: float, dispatch_period_s: float) -> None:
+        self.calls.append(
+            {
+                "recv_period_s": recv_period_s,
+                "dispatch_period_s": dispatch_period_s,
+            }
+        )
+
+
+class _MockHandWithSubscriptionManager(_MockHand):
+    def __init__(self):
+        super().__init__()
+        self._sub_manager = _FakeSubscriptionManager()
+
+
 def _joint_map(call):
     return {joint.id: joint for joint in call["joints"]}
 
@@ -366,6 +385,35 @@ def test_release_does_not_release_original_visualizer(monkeypatch):
     assert events == []
 
 
+def test_adaptive_grasper_configures_subscription_periods_without_dexhand_api():
+    hand = _MockHandWithSubscriptionManager()
+    cfg = AdaptiveGraspConfig(
+        tactile_sensor_update_period_s=0.01,
+        tactile_dispatch_period_s=0.015,
+    )
+
+    AdaptiveGrasper(hand, cfg)
+
+    assert hand._sub_manager.calls == [
+        {
+            "recv_period_s": pytest.approx(0.01),
+            "dispatch_period_s": pytest.approx(0.015),
+        }
+    ]
+
+
+def test_adaptive_grasper_skips_subscription_period_config_when_unavailable():
+    hand = _MockHand()
+    cfg = AdaptiveGraspConfig(
+        tactile_sensor_update_period_s=0.01,
+        tactile_dispatch_period_s=0.015,
+    )
+
+    AdaptiveGrasper(hand, cfg)
+
+    assert not hasattr(hand, "_sub_manager")
+
+
 def test_sensor_subscription_callback_updates_cache():
     """订阅回调应正确解析 Tpdo 并更新触觉/关节缓存。"""
     from types import SimpleNamespace
@@ -443,6 +491,13 @@ def test_adaptive_grasp_manager_accepts_none_config():
     assert grasper._sensor is not None
 
 
+def test_adaptive_grasper_passes_touch_threshold_to_sensor():
+    cfg = AdaptiveGraspConfig(touch_detect_force_threshold_n=0.25)
+    grasper = AdaptiveGrasper(_MockHand(), cfg)
+
+    assert grasper._sensor._touch_detect_force_threshold_n == pytest.approx(0.25)
+
+
 def test_adaptive_grasper_constructor_does_not_zero_tactile():
     class HandThatRejectsTactileZero(_MockHand):
         def tactile_zero(self):
@@ -450,7 +505,7 @@ def test_adaptive_grasper_constructor_does_not_zero_tactile():
 
     grasper = AdaptiveGrasper(
         HandThatRejectsTactileZero(),
-        AdaptiveGraspConfig(K_MCP=0.5, K_PIP=0.5),
+        AdaptiveGraspConfig(),
     )
 
     assert grasper.state == GraspState.IDLE
@@ -507,7 +562,7 @@ def test_grasp_core_releases_when_phase_requests_release(monkeypatch):
 
 def test_grasp_core_stores_contact_snapshot_for_adaptive_hold(monkeypatch):
     hand = _MockHand()
-    cfg = AdaptiveGraspConfig(K_MCP=0.5, K_PIP=0.5)
+    cfg = AdaptiveGraspConfig()
     grasper = AdaptiveGrasper(hand, cfg)
 
     monkeypatch.setattr(grasper, "_start_sensor_subscription", lambda: None)

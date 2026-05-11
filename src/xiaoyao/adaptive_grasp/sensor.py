@@ -1,4 +1,3 @@
-from ctypes.wintypes import BOOL
 import logging
 import time
 from typing import Any, Optional
@@ -7,6 +6,7 @@ from xiaoyao.dexhand import DexHand, Joint, JointId, State, ErrorCode, TactileIn
 from xiaoyao.data import Tpdo
 
 _logger = logging.getLogger("xiaoyao.sensor")
+_DEFAULT_TOUCH_DETECT_FORCE_THRESHOLD_N = 0.1
 
 
 class SensorClient:
@@ -20,9 +20,11 @@ class SensorClient:
         self,
         hand: DexHand,
         active_fingers: Optional[set[TactileSensorId]] = None,
+        touch_detect_force_threshold_n: float = _DEFAULT_TOUCH_DETECT_FORCE_THRESHOLD_N,
         get_monotonic_time: Optional[Any] = None,
     ):
         self._hand = hand
+        self._touch_detect_force_threshold_n = touch_detect_force_threshold_n
         self._active_fingers = active_fingers or {
             TactileSensorId.THUMB,
             TactileSensorId.FOREFINGER,
@@ -102,7 +104,7 @@ class SensorClient:
             touch_flag[finger] = (
                 info is not None
                 and info.state
-                and abs(info.get_force_z()) >= 0.1
+                and abs(info.get_force_z()) >= self._touch_detect_force_threshold_n
             )
         return touch_flag
 
