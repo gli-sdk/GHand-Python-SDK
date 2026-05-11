@@ -5,6 +5,7 @@ from xiaoyao.adaptive_grasp.tactility import (
     OnlineWindowNormalizer,
     TactileAnalyzer,
     TactileAnalysis,
+    get_tactile_layout_points,
 )
 from xiaoyao.dexhand import TactileSensorId
 
@@ -19,6 +20,27 @@ class FakeTactileInfo:
     def get_force_y(self): return self._fy
     def get_force_z(self): return self._fz
     def get_distributed_force(self): return self._distributed
+
+
+def test_tactile_layout_points_match_sensor_geometry():
+    thumb_points = get_tactile_layout_points(TactileSensorId.THUMB)
+    forefinger_points = get_tactile_layout_points(TactileSensorId.FOREFINGER)
+
+    assert len(thumb_points) == 52
+    assert thumb_points[0].index == 0
+    assert thumb_points[0].x == pytest.approx(10.0)
+    assert thumb_points[0].y == pytest.approx(385.0)
+    assert thumb_points[-1].index == 51
+    assert thumb_points[-1].x == pytest.approx(268.0)
+    assert thumb_points[-1].y == pytest.approx(386.0)
+
+    assert len(forefinger_points) == 31
+    assert forefinger_points[0].index == 0
+    assert forefinger_points[0].x == pytest.approx(22.0)
+    assert forefinger_points[0].y == pytest.approx(365.0)
+    assert forefinger_points[-1].index == 30
+    assert forefinger_points[-1].x == pytest.approx(236.0)
+    assert forefinger_points[-1].y == pytest.approx(235.0)
 
 
 def test_tactile_analysis_variance_and_slip_risk():

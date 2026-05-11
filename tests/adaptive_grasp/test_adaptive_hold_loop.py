@@ -21,11 +21,9 @@ class _MockHand:
         return True
 
 
-def test_hold_step_sends_position_payload_with_config_limits(monkeypatch):
+def test_hold_step_sends_position_payload_from_hold_decision(monkeypatch):
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(
-        position_speed_limit=17,
-        position_torque_limit=29,
         variance_threshold=0.1,
         max_normal_force_per_finger=1.0,
     )
@@ -43,9 +41,27 @@ def test_hold_step_sends_position_payload_with_config_limits(monkeypatch):
     )
     visualizer = None
     joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP, JointId.FF_PIP))
+    position_hold_planner = MagicMock()
+    position_hold_planner.compute.return_value = {
+        TactileSensorId.THUMB: ForceDecision(
+            control_u=0.0,
+            next_torque=29,
+            target_angles={},
+            is_fragile_mode=False,
+            next_speed=17,
+        ),
+    }
+    force_reference_planner = MagicMock()
+    force_reference_planner.compute.return_value = ForceReferenceDecision(
+        force_refs={TactileSensorId.THUMB: 0.5},
+        contact_ratios={TactileSensorId.THUMB: 1.0},
+        F_ref_total=0.5,
+    )
     controller = HoldController(
         hand, sensor, safety, tactile, visualizer,
         joint_builder, cfg, current_torque=10,
+        force_reference_planner=force_reference_planner,
+        position_hold_planner=position_hold_planner,
     )
 
     result = controller.run_step(current_time=0.0)
@@ -54,8 +70,8 @@ def test_hold_step_sends_position_payload_with_config_limits(monkeypatch):
     assert len(hand.calls) == 1
     assert hand.calls[0]["mode"] == CtrlMode.POSITION
     for joint in hand.calls[0]["joints"]:
-        assert joint.speed == cfg.position_speed_limit
-        assert 0 <= joint.torque <= cfg.position_torque_limit
+        assert joint.speed == 17
+        assert joint.torque == 29
 
 
 def test_hold_step_fault_triggers_release():
@@ -154,7 +170,7 @@ def test_hold_step_can_send_torque_payload_to_active_mcp_pip_joints():
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(
         adaptive_hold_command_mode="torque",
-        adaptive_hold_torque=20,
+        torque_hold_base_torque=20,
         active_fingers={TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
     )
     sensor = MagicMock()
@@ -398,10 +414,7 @@ def test_hold_loop_passes_force_reference_to_visualizer():
 
 def test_hold_step_uses_contact_snapshot_when_joint_feedback_missing():
     hand = _MockHand()
-    cfg = AdaptiveGraspConfig(
-        position_speed_limit=17,
-        position_torque_limit=29,
-    )
+    cfg = AdaptiveGraspConfig()
     sensor = MagicMock()
     sensor.tactile_data = {}
     sensor.joint_feedback = None
@@ -438,10 +451,7 @@ def test_hold_step_uses_contact_snapshot_when_joint_feedback_missing():
 
 def test_position_hold_clamps_target_angles_to_contact_snapshot_window():
     hand = _MockHand()
-    cfg = AdaptiveGraspConfig(
-        position_speed_limit=17,
-        position_torque_limit=29,
-    )
+    cfg = AdaptiveGraspConfig()
     sensor = MagicMock()
     sensor.tactile_data = {}
     sensor.joint_feedback = [
@@ -476,6 +486,7 @@ def test_position_hold_clamps_target_angles_to_contact_snapshot_window():
                 JointId.FF_PIP: 0.40 - math.radians(10),
             },
             is_fragile_mode=False,
+            next_speed=17,
         ),
     }
     contact_angles = {
@@ -504,8 +515,6 @@ def test_position_hold_clamps_target_angles_to_configured_contact_snapshot_windo
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(
         contact_snapshot_angle_limit=math.radians(5),
-        position_speed_limit=17,
-        position_torque_limit=29,
     )
     sensor = MagicMock()
     sensor.tactile_data = {}
@@ -541,6 +550,7 @@ def test_position_hold_clamps_target_angles_to_configured_contact_snapshot_windo
                 JointId.FF_PIP: 0.40 - math.radians(10),
             },
             is_fragile_mode=False,
+            next_speed=17,
         ),
     }
     contact_angles = {
@@ -567,7 +577,7 @@ def test_position_hold_clamps_target_angles_to_configured_contact_snapshot_windo
 def test_apply_torque_hold_commands_active_mcp_pip_joints():
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(
-        adaptive_hold_torque=20,
+        torque_hold_base_torque=20,
         active_fingers={TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
     )
     joint_builder = JointCommandBuilder(

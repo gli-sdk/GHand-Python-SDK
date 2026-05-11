@@ -9,6 +9,7 @@ from .states import GraspState
 from .sensor import SensorClient
 from .safety import SafetyMonitor, SafetyStatus
 from .joint_builder import JointCommandBuilder
+from .object_profile import ObjectProfile
 from .utils import clip
 
 _logger = logging.getLogger("xiaoyao.adaptive_grasp.grasp_sequence")
@@ -56,15 +57,17 @@ class PhaseController:
         config: AdaptiveGraspConfig,
         get_time: Callable[[], float],
         on_state_change: Callable[[GraspState], None],
+        object_profile: Optional[ObjectProfile] = None,
     ):
         self.hand = hand
         self._sensor = sensor
         self._safety = safety
         self._joint_builder = joint_builder
         self.config = config
+        self._object_profile = object_profile
         self._get_monotonic_time = get_time
         self._on_state_change = on_state_change
-        self.current_torque = int(clip(config.phase_closing_torque, -100.0, config.max_torque))
+        self.current_torque = self._phase_closing_torque()
         self._phase_should_release = False
         self._contact_snapshot: Optional[ContactSnapshot] = None
 
@@ -100,6 +103,14 @@ class PhaseController:
 
     def _set_state(self, state: GraspState) -> None:
         self._on_state_change(state)
+
+    def _phase_closing_torque(self) -> int:
+        torque = (
+            self._object_profile.phase_closing_torque
+            if self._object_profile is not None
+            else 30
+        )
+        return int(clip(torque, -100.0, self.config.max_torque))
 
     def _execute_position_phase(
         self,
@@ -137,7 +148,7 @@ class PhaseController:
     def _phase_closing(self, is_running: Callable[[], bool]) -> bool:
         self._set_state(GraspState.CLOSING_TO_CONTACT)
         start = self._get_monotonic_time()
-        self.current_torque = int(clip(self.config.phase_closing_torque, -100.0, self.config.max_torque))
+        self.current_torque = self._phase_closing_torque()
 
         if joints_feedback := self._sensor.joint_feedback:
             self._safety.set_closing_baseline(joints_feedback)
@@ -204,7 +215,7 @@ class PhaseController:
         return True
 
     def _try_confirm_force_contact(self, frame: ClosingSensorFrame) -> bool:
-        if frame.total_fz < self.config.contact_threshold_z:
+        if frame.total_fz < self.config.closing_total_contact_threshold_n:
             return False
         if not all(frame.touch_flags.values()):
             return False

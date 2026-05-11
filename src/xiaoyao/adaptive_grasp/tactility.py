@@ -8,6 +8,76 @@ from xiaoyao.dexhand import TactileSensorId
 from .config import AdaptiveGraspConfig
 
 
+@dataclass(frozen=True)
+class TactileLayoutPoint:
+    index: int
+    x: float
+    y: float
+
+
+_THUMB_TACTILE_COORDS: tuple[tuple[float, float], ...] = (
+    (10, 385), (8, 338), (10, 286), (10, 238), (17, 191),
+    (51, 402), (51, 347), (53, 292), (53, 239),
+    (22, 139),
+    (58, 184), (59, 130),
+    (37, 66),
+    (70, 88),
+    (93, 408), (93, 354), (96, 296), (92, 238), (100, 178),
+    (100, 118), (102, 66),
+    (73, 27),
+    (141, 411), (141, 358), (141, 300), (140, 238), (140, 176),
+    (139, 113), (138, 58), (139, 13),
+    (189, 355),
+    (183, 179), (180, 116), (177, 67),
+    (191, 409),
+    (186, 297), (183, 239),
+    (200, 27), (210, 89), (217, 130),
+    (238, 67),
+    (232, 403), (230, 347), (227, 292), (234, 238), (224, 185),
+    (261, 190), (253, 138),
+    (267, 338),
+    (266, 285), (264, 240),
+    (268, 386),
+)
+
+
+_FOUR_FINGER_TACTILE_COORDS: tuple[tuple[float, float], ...] = (
+    (22, 365), (26, 297), (29, 235), (30, 172), (36, 107),
+    (78, 285), (79, 227), (80, 172),
+    (76, 348),
+    (83, 116),
+    (55, 38),
+    (90, 70),
+    (136, 339), (136, 275), (136, 223), (135, 171), (135, 122),
+    (135, 75), (135, 20),
+    (179, 70),
+    (188, 347), (188, 285),
+    (186, 116),
+    (214, 38),
+    (188, 226), (187, 171),
+    (240, 364), (239, 298),
+    (234, 172), (227, 107),
+    (236, 235),
+)
+
+
+def _build_layout_points(coords: tuple[tuple[float, float], ...]) -> tuple[TactileLayoutPoint, ...]:
+    return tuple(
+        TactileLayoutPoint(index=index, x=float(x), y=float(y))
+        for index, (x, y) in enumerate(coords)
+    )
+
+
+THUMB_TACTILE_LAYOUT_POINTS = _build_layout_points(_THUMB_TACTILE_COORDS)
+FOUR_FINGER_TACTILE_LAYOUT_POINTS = _build_layout_points(_FOUR_FINGER_TACTILE_COORDS)
+
+
+def get_tactile_layout_points(finger: TactileSensorId) -> tuple[TactileLayoutPoint, ...]:
+    if finger == TactileSensorId.THUMB:
+        return THUMB_TACTILE_LAYOUT_POINTS
+    return FOUR_FINGER_TACTILE_LAYOUT_POINTS
+
+
 @dataclass
 class PerFingerAnalysis:
     variance: float
@@ -33,16 +103,16 @@ class TactileAnalysis:
     finger_fz: dict[TactileSensorId, float]
     total_fz: float
     per_finger: dict[TactileSensorId, PerFingerAnalysis] = field(default_factory=dict)
-
+    
 
 @dataclass(frozen=True)
 class FingerTactileSample:
     finger: TactileSensorId
     info: Any
-    fx: float
-    fy: float
-    fz: float
-    ft: float
+    fx: float #x轴方向切向力
+    fy: float #y轴方向切向力
+    fz: float #法向力
+    ft: float #合成切向力
 
 
 class OnlineWindowNormalizer:
@@ -185,6 +255,7 @@ class TactileAnalyzer:
             0.0,
             1.0,
         )
+        # return clip(r_k,0.0,1.0)
 
     def _update_slip_debounce(self, finger: TactileSensorId, slip_risk: float) -> bool:
         count = self._slip_count.get(finger, 0)

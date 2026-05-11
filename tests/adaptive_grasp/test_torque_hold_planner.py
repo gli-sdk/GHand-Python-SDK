@@ -44,7 +44,7 @@ def _reference(
 def test_torque_hold_planner_returns_base_torque_when_force_error_zero():
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB},
-        adaptive_hold_torque=5,
+        torque_hold_base_torque=5,
         torque_hold_K_p=5.0,
         torque_hold_K_i=0.0,
         torque_hold_K_d=0.0,
@@ -65,7 +65,7 @@ def test_torque_hold_planner_returns_base_torque_when_force_error_zero():
 def test_torque_hold_planner_increases_torque_for_low_force_finger():
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
-        adaptive_hold_torque=5,
+        torque_hold_base_torque=5,
         torque_hold_K_p=5.0,
         torque_hold_K_i=0.0,
         torque_hold_K_d=0.0,
@@ -95,7 +95,7 @@ def test_torque_hold_planner_increases_torque_for_low_force_finger():
 def test_torque_hold_planner_can_command_negative_torque_for_high_force_finger():
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB},
-        adaptive_hold_torque=5,
+        torque_hold_base_torque=5,
         torque_hold_K_p=5.0,
         torque_hold_K_i=0.0,
         torque_hold_K_d=0.0,
@@ -114,7 +114,7 @@ def test_torque_hold_planner_can_command_negative_torque_for_high_force_finger()
 def test_torque_hold_planner_clips_torque_to_config_max():
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB},
-        adaptive_hold_torque=5,
+        torque_hold_base_torque=5,
         max_torque=8,
         torque_hold_K_p=100.0,
         torque_hold_K_i=0.0,

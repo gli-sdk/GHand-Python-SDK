@@ -434,13 +434,13 @@ delta_tau_i = torque_hold_K_p * e_i
 基础保持力矩：
 
 ```text
-adaptive_hold_torque
+torque_hold_base_torque
 ```
 
 目标力矩：
 
 ```text
-tau_i = adaptive_hold_torque + delta_tau_i
+tau_i = torque_hold_base_torque + delta_tau_i
 ```
 
 力矩限幅：
@@ -482,7 +482,7 @@ thumb_aux_torque
 | 控制对象 | MCP/PIP 目标角度 | MCP/PIP 目标力矩 |
 | 是否使用接触快照角度限幅 | 是 | 否 |
 | 是否使用 `delta_theta_limit` | 是 | 否 |
-| 是否使用 `adaptive_hold_torque` | 否 | 是 |
+| 是否使用 `torque_hold_base_torque` | 否 | 是 |
 | 是否使用 `position_torque_limit` | 是 | 否 |
 
 可以把两种模式理解为：

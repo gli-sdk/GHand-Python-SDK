@@ -62,7 +62,7 @@ class TorqueHoldPlanner:
         )
 
     def _initial_hold_torque(self) -> int:
-        return self.config.adaptive_hold_torque
+        return self.config.torque_hold_base_torque
 
     def _compute_finger_torque(
         self,

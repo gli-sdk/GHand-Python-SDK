@@ -74,16 +74,31 @@ class PositionHoldPlanner:
         finger_count: int,
         dt: float,
     ) -> float:
-        fz = analysis.finger_fz.get(finger, 0.0)
-        fz_ref = force_reference.force_refs.get(finger, 0.0)
-        fz_limit = self._get_max_normal_force_per_finger(finger_count)
-        return self._compute_pid_control_u(
+        return self._compute_finger_direct_control_u(
             finger,
-            fz=fz,
-            fz_limit=fz_limit,
-            F_n_ref=fz_ref,
-            dt=dt,
+            analysis,
+            finger_count,
         )
+
+    def _compute_finger_direct_control_u(
+        self,
+        finger: TactileSensorId,
+        analysis: TactileAnalysis,
+        finger_count: int,
+    ) -> float:
+        fz = analysis.finger_fz.get(finger, 0.0)
+        fz_limit = self._get_max_normal_force_per_finger(finger_count)
+        finger_analysis = analysis.per_finger.get(finger)
+        slip_risk = finger_analysis.s_total if finger_analysis is not None else 0.0
+        slip_confirmed = finger_analysis.slip_confirmed if finger_analysis is not None else False
+
+        u_slip = self._compute_slip_control_u(slip_risk)
+        u_boost = self._compute_confirmed_slip_boost_u(slip_confirmed)
+        u_over = self._compute_overlimit_control_u(fz, fz_limit)
+        control_u = u_slip + u_boost + u_over
+        if self.is_fragile_mode and fz >= fz_limit:
+            control_u = min(control_u, 0.0)
+        return control_u
 
     def _compute_pid_control_u(
         self,
@@ -100,6 +115,21 @@ class PositionHoldPlanner:
         if self.is_fragile_mode and fz >= fz_limit:
             control_u = min(control_u, 0.0)
         return control_u
+
+    def _compute_slip_control_u(self, slip_risk: float) -> float:
+        cfg = self.config
+        denominator = cfg.direct_slip_risk_full - cfg.direct_slip_risk_deadband
+        normalized_risk = clip(
+            (slip_risk - cfg.direct_slip_risk_deadband) / denominator,
+            0.0,
+            1.0,
+        )
+        return cfg.delta_theta_limit * (normalized_risk ** cfg.direct_slip_risk_gamma)
+
+    def _compute_confirmed_slip_boost_u(self, slip_confirmed: bool) -> float:
+        if not slip_confirmed:
+            return 0.0
+        return self.config.delta_theta_limit * self.config.direct_slip_confirmed_boost_ratio
 
     def _compute_overlimit_control_u(self, fz: float, fz_limit: float) -> float:
         normal_overlimit_error = max(0.0, (fz - fz_limit) / (fz_limit + self.config.epsilon))
@@ -180,21 +210,17 @@ class PositionHoldPlanner:
         return self.config.max_normal_force_per_finger
 
     def _compute_next_torque(self) -> int:
-        next_torque = (
-            self.profile.position_hold_torque
-            if self.profile is not None and self.profile.position_hold_torque is not None
-            else self.config.position_torque_limit
-        )
+        if self.profile is None or self.profile.position_hold_torque is None:
+            raise ValueError("ObjectProfile.position_hold_torque is required for position hold mode")
+        next_torque = self.profile.position_hold_torque
         if self.is_fragile_mode:
             next_torque = int(next_torque * self.config.fragile_torque_reduction)
         return next_torque
 
     def _compute_next_speed(self) -> int:
-        next_speed = (
-            self.profile.position_hold_speed
-            if self.profile is not None and self.profile.position_hold_speed is not None
-            else self.config.position_speed_limit
-        )
+        if self.profile is None or self.profile.position_hold_speed is None:
+            raise ValueError("ObjectProfile.position_hold_speed is required for position hold mode")
+        next_speed = self.profile.position_hold_speed
         return int(clip(next_speed, 0, 100))
 
     def _get_or_create_pid(self, finger: TactileSensorId) -> PidController:

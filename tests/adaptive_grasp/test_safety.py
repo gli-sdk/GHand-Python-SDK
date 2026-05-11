@@ -15,7 +15,7 @@ def test_sensor_fault_on_joint_feedback_missing():
 
 
 def test_empty_grasp_when_closing_with_no_contact():
-    cfg = AdaptiveGraspConfig(contact_threshold_z=1.0)
+    cfg = AdaptiveGraspConfig(closing_total_contact_threshold_n=1.0)
     monitor = SafetyMonitor(cfg)
     monitor.set_closing_baseline([Joint(id=JointId.THUMB_MCP, angle=0.0)])
 
@@ -68,7 +68,7 @@ def _tactile_data(*fz_values):
 def test_object_dropped_after_three_low_force_cycles(caplog):
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
-        contact_threshold_z=1.0,
+        closing_total_contact_threshold_n=1.0,
         drop_detect_debounce_cycles=3,
     )
     monitor = SafetyMonitor(cfg)
@@ -93,7 +93,7 @@ def test_object_dropped_after_three_low_force_cycles(caplog):
 def test_object_dropped_logs_active_finger_last_and_current_fz(caplog):
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
-        contact_threshold_z=1.0,
+        closing_total_contact_threshold_n=1.0,
         drop_detect_debounce_cycles=3,
     )
     monitor = SafetyMonitor(cfg)
@@ -132,7 +132,7 @@ def test_object_dropped_logs_active_finger_last_and_current_fz(caplog):
 def test_object_drop_counter_resets_when_force_recovers():
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
-        contact_threshold_z=1.0,
+        closing_total_contact_threshold_n=1.0,
         drop_detect_debounce_cycles=3,
     )
     monitor = SafetyMonitor(cfg)
@@ -165,7 +165,7 @@ def test_object_drop_threshold_is_configurable():
 
 def test_empty_grasp_respects_baseline():
     """验证空抓判断基于相对变化量：baseline 15°，当前 20°，变化仅 5°，不应误判。"""
-    cfg = AdaptiveGraspConfig(contact_threshold_z=1.0)
+    cfg = AdaptiveGraspConfig(closing_total_contact_threshold_n=1.0)
     monitor = SafetyMonitor(cfg)
 
     # baseline 15°，当前 20°，变化量 5° < 30° 阈值

@@ -96,7 +96,7 @@ class HoldController:
 
     def apply_torque_hold(self) -> bool:
         """Hold with torque mode by commanding active fingers' MCP/PIP joints."""
-        joints = self._joint_builder.hold_torque_command(self.config.adaptive_hold_torque)
+        joints = self._joint_builder.hold_torque_command(self.config.torque_hold_base_torque)
         return self.hand.move_joints(joints, mode=CtrlMode.TORQUE)
 
     def run_step(self, current_time: float) -> HoldStepResult:
@@ -286,13 +286,13 @@ class HoldController:
 
     def _next_speed(self, decisions: ForceDecisions) -> int:
         if not decisions:
-            return self.config.position_speed_limit
+            return 0
         next_speed = next(iter(decisions.values())).next_speed
-        return self.config.position_speed_limit if next_speed is None else next_speed
+        return 0 if next_speed is None else next_speed
 
     def _default_hold_torque(self) -> int:
         if self.config.adaptive_hold_command_mode == "torque":
-            return self.config.adaptive_hold_torque
+            return self.config.torque_hold_base_torque
         return self._current_torque
 
     def _default_hold_mode(self) -> CtrlMode:

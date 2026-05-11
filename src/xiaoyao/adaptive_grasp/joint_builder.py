@@ -38,7 +38,7 @@ class JointCommandBuilder:
         return {
             JointId.THUMB_PIP: math.radians(0),
             JointId.THUMB_MCP: math.radians(0),
-            JointId.THUMB_SWING: math.radians(20),
+            JointId.THUMB_SWING: math.radians(80),
             JointId.THUMB_ROTATION: math.radians(0),
             JointId.FF_PIP: math.radians(0),
             JointId.FF_MCP: math.radians(0),
@@ -113,12 +113,8 @@ class JointCommandBuilder:
         angles: Optional[Mapping[JointId, float]] = None,
         speed: Optional[int] = None,
     ) -> list[Joint]:
-        limited_torque = int(clip(abs(torque), 0.0, float(self._config.position_torque_limit)))
-        limited_speed = int(clip(
-            self._config.position_speed_limit if speed is None else speed,
-            0.0,
-            100.0,
-        ))
+        limited_torque = int(clip(abs(torque), 0.0, float(self._config.max_torque)))
+        limited_speed = int(clip(0 if speed is None else speed, 0.0, 100.0))
         hold_angles = angles or self.init_hold_angles()
         return [
             Joint(

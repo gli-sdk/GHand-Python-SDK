@@ -15,7 +15,7 @@ from .position_hold_planner import ForceDecision
 from .safety import SafetyMonitor, SafetyReport
 from .torque_hold_planner import TorqueHoldDecision
 from .visualization import TactileVisualizer
-from .utils import clip, JOINT_TO_FINGER
+from .utils import JOINT_TO_FINGER
 from .joint_builder import JointCommandBuilder, TORQUE_CONTROL_JOINTS
 from .grasp_sequence import ContactSnapshot, PhaseController
 from .adaptive_hold_loop import HoldController, HoldResult
@@ -28,7 +28,7 @@ class AdaptiveGrasper:
         self.hand = hand
         self.config = config or AdaptiveGraspConfig()
         self.state = GraspState.IDLE
-        self.current_torque = int(clip(self.config.base_torque, -100.0, self.config.max_torque))
+        self.current_torque = 0
         self._running = False
         self._control_thread: Optional[threading.Thread] = None
         self._adaptive_hold_started_at: Optional[float] = None
@@ -44,7 +44,7 @@ class AdaptiveGrasper:
         self._sensor = SensorClient(
             hand,
             active_fingers=set(self.config.active_fingers),
-            touch_detect_force_threshold_n=self.config.touch_detect_force_threshold_n,
+            finger_touch_threshold_n=self.config.finger_touch_threshold_n,
             get_monotonic_time=self._get_monotonic_time,
         )
 
@@ -106,6 +106,9 @@ class AdaptiveGrasper:
 
     def release(self) -> bool:
         return self._perform_release(wait_control_thread=True)
+
+    def release_fast(self, wait_s: float = 2.0) -> bool:
+        return self._perform_release(wait_control_thread=False, release_wait_s=wait_s)
 
     def stop(self) -> None:
         self._running = False
@@ -200,6 +203,7 @@ class AdaptiveGrasper:
         self._grasp_sequence = PhaseController(
             self.hand, self._sensor, self._safety, self._joint_builder,
             self.config, self._get_monotonic_time, on_state_change=self._set_state,
+            object_profile=self._object_profile,
         )
         return self._grasp_sequence.run(lambda: self._running)
 
@@ -266,7 +270,11 @@ class AdaptiveGrasper:
         elapsed = self._get_monotonic_time() - self._adaptive_hold_started_at
         return elapsed >= self.config.release_hold_time_s
 
-    def _perform_release(self, wait_control_thread: bool) -> bool:
+    def _perform_release(
+        self,
+        wait_control_thread: bool,
+        release_wait_s: Optional[float] = None,
+    ) -> bool:
         self.state = GraspState.RELEASE
         self._running = False
         self._adaptive_hold_started_at = None
@@ -287,7 +295,7 @@ class AdaptiveGrasper:
             torque=self.config.release_open_torque,
         )
         ok = self.hand.move_joints(joints, mode=CtrlMode.POSITION)
-        time.sleep(self.config.release_timeout_s)
+        time.sleep(self.config.release_timeout_s if release_wait_s is None else release_wait_s)
         if not ok:
             _logger.error("RELEASE phase: move_joints failed")
             self.state = GraspState.ERROR
@@ -312,7 +320,7 @@ class AdaptiveGrasper:
     def _reset_runtime_state(self) -> None:
         self._tactile.reset()
         self._safety.reset()
-        self.current_torque = int(clip(self.config.base_torque, -100.0, self.config.max_torque))
+        self.current_torque = 0
         self._adaptive_hold_started_at = None
         self._last_tactile_analysis = None
         self._last_safety_report = None

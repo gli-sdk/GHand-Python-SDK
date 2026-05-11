@@ -10,8 +10,6 @@ from xiaoyao.dexhand import JointId, TactileSensorId
 def test_position_hold_defaults():
     cfg = AdaptiveGraspConfig()
 
-    assert cfg.position_speed_limit == 15
-    assert cfg.position_torque_limit == 15
     assert cfg.delta_theta_limit == pytest.approx(math.radians(2.0))
     assert cfg.thumb_K_MCP == pytest.approx(0.7)
     assert cfg.thumb_K_PIP == pytest.approx(0.3)
@@ -24,18 +22,15 @@ def test_delta_theta_limit_must_be_positive():
         AdaptiveGraspConfig(delta_theta_limit=0.0)
 
 
-def test_position_speed_limit_bounds():
-    with pytest.raises(ValueError):
-        AdaptiveGraspConfig(position_speed_limit=-1)
-    with pytest.raises(ValueError):
-        AdaptiveGraspConfig(position_speed_limit=101)
+def test_position_hold_speed_and_torque_limits_removed_from_config():
+    cfg = AdaptiveGraspConfig()
 
-
-def test_position_torque_limit_bounds():
-    with pytest.raises(ValueError):
-        AdaptiveGraspConfig(position_torque_limit=-1)
-    with pytest.raises(ValueError):
-        AdaptiveGraspConfig(position_torque_limit=101)
+    assert not hasattr(cfg, "position_speed_limit")
+    assert not hasattr(cfg, "position_torque_limit")
+    with pytest.raises(TypeError):
+        AdaptiveGraspConfig(position_speed_limit=15)
+    with pytest.raises(TypeError):
+        AdaptiveGraspConfig(position_torque_limit=15)
 
 
 def test_global_joint_allocation_params_removed():
@@ -137,14 +132,25 @@ def test_v2_params_defaults():
     cfg = AdaptiveGraspConfig()
     assert cfg.slip_detect_debounce_cycles == 3
     assert cfg.fragile_step_reduction == pytest.approx(0.5)
-    assert cfg.phase_closing_torque == 30
 
 
-def test_phase_closing_torque_bounds():
-    with pytest.raises(ValueError):
-        AdaptiveGraspConfig(phase_closing_torque=-101)
-    with pytest.raises(ValueError):
-        AdaptiveGraspConfig(phase_closing_torque=101)
+def test_phase_closing_torque_removed_from_config():
+    cfg = AdaptiveGraspConfig()
+
+    assert not hasattr(cfg, "phase_closing_torque")
+    with pytest.raises(TypeError):
+        AdaptiveGraspConfig(phase_closing_torque=30)
+
+
+def test_base_torque_and_torque_adjust_step_removed_from_config():
+    cfg = AdaptiveGraspConfig()
+
+    assert not hasattr(cfg, "base_torque")
+    assert not hasattr(cfg, "torque_adjust_step")
+    with pytest.raises(TypeError):
+        AdaptiveGraspConfig(base_torque=30)
+    with pytest.raises(TypeError):
+        AdaptiveGraspConfig(torque_adjust_step=5)
 
 
 def test_slip_detect_debounce_positive():
@@ -166,7 +172,8 @@ def test_adaptive_hold_guard_defaults_are_configurable():
     assert cfg.contact_snapshot_angle_limit == pytest.approx(math.radians(10.0))
     assert cfg.near_force_limit_ratio == pytest.approx(0.9)
     assert cfg.near_limit_step_scale == pytest.approx(0.8)
-    assert cfg.touch_detect_force_threshold_n == pytest.approx(0.1)
+    assert cfg.closing_total_contact_threshold_n == pytest.approx(0.2)
+    assert cfg.finger_touch_threshold_n == pytest.approx(0.1)
     assert cfg.thumb_aux_torque == 5
     assert cfg.tactile_sensor_update_period_s == pytest.approx(0.02)
     assert cfg.tactile_dispatch_period_s == pytest.approx(0.02)
@@ -186,7 +193,9 @@ def test_adaptive_hold_guard_constraints():
     with pytest.raises(ValueError):
         AdaptiveGraspConfig(near_limit_step_scale=1.1)
     with pytest.raises(ValueError):
-        AdaptiveGraspConfig(touch_detect_force_threshold_n=-0.1)
+        AdaptiveGraspConfig(closing_total_contact_threshold_n=-0.1)
+    with pytest.raises(ValueError):
+        AdaptiveGraspConfig(finger_touch_threshold_n=-0.1)
     with pytest.raises(ValueError):
         AdaptiveGraspConfig(tactile_sensor_update_period_s=0.0)
     with pytest.raises(ValueError):
@@ -195,6 +204,20 @@ def test_adaptive_hold_guard_constraints():
         AdaptiveGraspConfig(thumb_aux_torque=-101)
     with pytest.raises(ValueError):
         AdaptiveGraspConfig(thumb_aux_torque=101)
+
+
+def test_ambiguous_contact_and_torque_hold_params_removed_from_config():
+    cfg = AdaptiveGraspConfig()
+
+    assert not hasattr(cfg, "contact_threshold_z")
+    assert not hasattr(cfg, "touch_detect_force_threshold_n")
+    assert not hasattr(cfg, "adaptive_hold_torque")
+    with pytest.raises(TypeError):
+        AdaptiveGraspConfig(contact_threshold_z=0.2)
+    with pytest.raises(TypeError):
+        AdaptiveGraspConfig(touch_detect_force_threshold_n=0.1)
+    with pytest.raises(TypeError):
+        AdaptiveGraspConfig(adaptive_hold_torque=5)
 
 
 def test_drop_detect_constraints():
@@ -340,6 +363,7 @@ def test_force_reference_defaults():
 def test_torque_hold_closed_loop_defaults():
     cfg = AdaptiveGraspConfig()
 
+    assert cfg.torque_hold_base_torque == 5
     assert cfg.torque_hold_K_p == pytest.approx(5.0)
     assert cfg.torque_hold_K_i == pytest.approx(0.0)
     assert cfg.torque_hold_K_d == pytest.approx(0.0)

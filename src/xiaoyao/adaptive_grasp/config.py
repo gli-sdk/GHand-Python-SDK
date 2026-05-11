@@ -62,6 +62,17 @@ _PRESET_ACTIVE_FINGERS: dict[str, set[TactileSensorId]] = {
         TactileSensorId.THUMB,
         TactileSensorId.FOREFINGER,
         TactileSensorId.MIDDLE_FINGER,
+    },
+    "paper_cup_grasp":{
+        TactileSensorId.THUMB,
+        TactileSensorId.FOREFINGER,
+        TactileSensorId.MIDDLE_FINGER,
+        TactileSensorId.RING_FINGER,
+        TactileSensorId.LITTLE_FINGER
+    },
+    "paper_cup_two_finger_grasp":{
+        TactileSensorId.THUMB,
+        TactileSensorId.FOREFINGER,
     }
 }
 
@@ -148,8 +159,10 @@ _PRE_GRASP_PRESET_DEGREE = {
         thumb_mcp=6.0,
     ),
     "small_pinch": _pose_degrees(
-        ff_mcp=10.0,
-        ff_pip=30.0,
+        thumb_swing=84,
+        thumb_pip=10,
+        ff_mcp=45.0,
+        ff_pip=22.0,
         thumb_mcp=3.0,
     ),
     "cone_pinch": _pose_degrees(
@@ -189,6 +202,26 @@ _PRE_GRASP_PRESET_DEGREE = {
         ff_swing=5,
         mf_pip=18,
         mf_mcp=40
+    ),
+    "paper_cup_grasp":_pose_degrees(
+        thumb_mcp=15,
+        thumb_pip=20,
+        thumb_swing=80,
+        thumb_rotation=4,
+        ff_pip=45,
+        ff_mcp=25,
+        mf_pip=40,
+        mf_mcp=40,
+        rf_pip=40,
+        rf_mcp=40,
+        lf_pip=38,
+        lf_mcp=38,
+    ),
+    "paper_cup_two_finger_grasp":_pose_degrees(
+        thumb_swing=75,
+        thumb_pip=28,
+        ff_pip=50,
+        ff_mcp=20
     )
 }
 
@@ -241,16 +274,14 @@ class AdaptiveGraspConfig:
     per_finger_pid: dict[TactileSensorId, PerFingerPidConfig] = field(default_factory=dict)
 
     # Open, pre-grasp, and closing-to-contact phases.
-    base_torque: int = 30
     open_speed: int = 50
     open_torque: int = 50
     open_wait_s: float = 3.0
     pre_grasp_speed: int = 50
     pre_grasp_torque: int = 50
     pre_grasp_wait_s: float = 5.0
-    phase_closing_torque: int = 10
-    contact_threshold_z: float = 0.2
-    touch_detect_force_threshold_n: float = 0.1
+    closing_total_contact_threshold_n: float = 0.2
+    finger_touch_threshold_n: float = 0.1
     max_torque: int = 80
     thumb_aux_torque: int = 5
     phase_timeout: float = 10.0
@@ -269,9 +300,9 @@ class AdaptiveGraspConfig:
     max_normal_force_per_finger: float = 25.0
     variance_threshold: float = 0.003
     variance_baseline: float = 0.00001
-    variance_weight: float = 0.34
-    direction_weight: float = 0.33
-    friction_weight: float = 0.33
+    variance_weight: float = 0.2
+    direction_weight: float = 0.3
+    friction_weight: float = 0.5
     epsilon: float = 1e-6
     slip_detect_debounce_cycles: int = 3
     default_friction_coeff: float = 0.7
@@ -289,26 +320,28 @@ class AdaptiveGraspConfig:
     force_ref_min_contact_ratio: float = 0.15
 
     # Position hold mode.
-    position_speed_limit: int = 15
-    position_torque_limit: int = 15
-    delta_theta_limit: float = math.radians(2)
-    contact_snapshot_angle_limit: float = math.radians(10)
+    delta_theta_limit: float = math.radians(3)
+    contact_snapshot_angle_limit: float = math.radians(20)
     adaptive_hold_move_failure_limit: int = 3
     near_force_limit_ratio: float = 0.9
     near_limit_step_scale: float = 0.8
     thumb_K_MCP: float = 0.7
     thumb_K_PIP: float = 0.3
-    finger_K_MCP: float = 0.2
-    finger_K_PIP: float = 0.8
+    finger_K_MCP: float = 0.5
+    finger_K_PIP: float = 0.5
     position_hold_K_p: float = 0.08
     position_hold_K_i: float = 0.02
     position_hold_K_d: float = 0.0
     position_hold_I_min: float = -1.0
     position_hold_I_max: float = 1.0
-    K_n: float = 1.0
+    direct_slip_risk_deadband: float = 0.25
+    direct_slip_risk_full: float = 0.85
+    direct_slip_risk_gamma: float = 1.5
+    direct_slip_confirmed_boost_ratio: float = 0.5
+    K_n: float = 1.0 #法向力超限时的关节角度释放系数，超限多少，乘该系数，就是手指关节角度的减少量
 
     # Torque hold mode.
-    adaptive_hold_torque: int = 5
+    torque_hold_base_torque: int = 5
     torque_hold_K_p: float = 8.0
     torque_hold_K_i: float = 0.2
     torque_hold_K_d: float = 0.0
@@ -335,9 +368,6 @@ class AdaptiveGraspConfig:
     # Visualization.
     enable_visualization: bool = True
     visualization_backend: str = "TkAgg"
-
-    # Legacy closing torque step retained for compatibility.
-    torque_adjust_step: int = 5
 
     def __post_init__(self) -> None:
         self._derive_pre_grasp_preset()
@@ -372,14 +402,11 @@ class AdaptiveGraspConfig:
         _validate("pre_grasp_torque", self.pre_grasp_torque, greater_equal=0, less_equal=100)
         _validate("pre_grasp_wait_s", self.pre_grasp_wait_s, greater_than=0)
 
-        _validate("base_torque", self.base_torque, greater_equal=-100, less_equal=100)
-        _validate("phase_closing_torque", self.phase_closing_torque, greater_equal=-100, less_equal=100)
         _validate("max_torque", self.max_torque, greater_than=0)
         _validate("thumb_aux_torque", self.thumb_aux_torque, greater_equal=-100, less_equal=100)
         _validate("phase_timeout", self.phase_timeout, greater_than=0)
-        _validate("torque_adjust_step", self.torque_adjust_step, greater_than=0)
-        _validate("contact_threshold_z", self.contact_threshold_z, greater_equal=0.0)
-        _validate("touch_detect_force_threshold_n", self.touch_detect_force_threshold_n, greater_equal=0.0)
+        _validate("closing_total_contact_threshold_n", self.closing_total_contact_threshold_n, greater_equal=0.0)
+        _validate("finger_touch_threshold_n", self.finger_touch_threshold_n, greater_equal=0.0)
         _validate("closing_stall_angle_threshold", self.closing_stall_angle_threshold, greater_than=0)
         _validate("closing_stall_cycles", self.closing_stall_cycles, greater_than=0)
 
@@ -426,8 +453,6 @@ class AdaptiveGraspConfig:
             raise ValueError("force_ref_min_contact_ratio * active_finger_count must be <= 1.0")
 
     def _validate_position_hold_params(self) -> None:
-        _validate("position_speed_limit", self.position_speed_limit, greater_equal=0, less_equal=100)
-        _validate("position_torque_limit", self.position_torque_limit, greater_equal=0, less_equal=100)
         _validate("delta_theta_limit", self.delta_theta_limit, greater_than=0)
         _validate("contact_snapshot_angle_limit", self.contact_snapshot_angle_limit, greater_than=0)
         _validate("adaptive_hold_move_failure_limit", self.adaptive_hold_move_failure_limit, greater_than=0)
@@ -443,9 +468,15 @@ class AdaptiveGraspConfig:
         _validate("position_hold_K_d", self.position_hold_K_d, greater_equal=0)
         if self.position_hold_I_min > self.position_hold_I_max:
             raise ValueError("position_hold_I_min must be <= position_hold_I_max")
+        _validate("direct_slip_risk_deadband", self.direct_slip_risk_deadband, greater_equal=0.0, less_equal=1.0)
+        _validate("direct_slip_risk_full", self.direct_slip_risk_full, greater_equal=0.0, less_equal=1.0)
+        if self.direct_slip_risk_deadband >= self.direct_slip_risk_full:
+            raise ValueError("direct_slip_risk_deadband must be < direct_slip_risk_full")
+        _validate("direct_slip_risk_gamma", self.direct_slip_risk_gamma, greater_than=0.0)
+        _validate("direct_slip_confirmed_boost_ratio", self.direct_slip_confirmed_boost_ratio, greater_equal=0.0)
 
     def _validate_torque_hold_params(self) -> None:
-        _validate("adaptive_hold_torque", self.adaptive_hold_torque, greater_equal=-100, less_equal=100)
+        _validate("torque_hold_base_torque", self.torque_hold_base_torque, greater_equal=-100, less_equal=100)
         _validate("torque_hold_K_p", self.torque_hold_K_p, greater_equal=0.0)
         _validate("torque_hold_K_i", self.torque_hold_K_i, greater_equal=0.0)
         _validate("torque_hold_K_d", self.torque_hold_K_d, greater_equal=0.0)

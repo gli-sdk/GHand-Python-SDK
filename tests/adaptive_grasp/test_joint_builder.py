@@ -77,13 +77,13 @@ class TestJointCommandBuilder:
         assert joint_map[JointId.THUMB_PIP].speed == 50
         assert joint_map[JointId.THUMB_PIP].torque == 60
 
-    def test_hold_position_command_limits_torque(self):
-        cfg = AdaptiveGraspConfig(position_torque_limit=30, position_speed_limit=20)
+    def test_hold_position_command_clips_to_hardware_ranges(self):
+        cfg = AdaptiveGraspConfig(max_torque=30)
         torque_joints = (JointId.THUMB_PIP,)
         builder = JointCommandBuilder(cfg, torque_joints)
-        joints = builder.hold_position_command(torque=50)
+        joints = builder.hold_position_command(torque=50, speed=120)
         assert joints[0].torque == 30
-        assert joints[0].speed == 20
+        assert joints[0].speed == 100
 
     def test_hold_per_finger_torque_command_maps_finger_to_mcp_pip(self):
         cfg = AdaptiveGraspConfig(

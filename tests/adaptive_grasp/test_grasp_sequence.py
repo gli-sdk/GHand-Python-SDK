@@ -4,6 +4,7 @@ import pytest
 from xiaoyao.adaptive_grasp import AdaptiveGraspConfig, GraspState
 from xiaoyao.adaptive_grasp.grasp_sequence import PhaseController, PhaseResult
 from xiaoyao.adaptive_grasp.joint_builder import JointCommandBuilder
+from xiaoyao.adaptive_grasp.object_profile import ObjectProfile
 from xiaoyao.dexhand import CtrlMode, JointId
 from xiaoyao.dexhand import Joint, TactileSensorId
 
@@ -46,7 +47,7 @@ def test_phase_closing_contact_by_force(monkeypatch):
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(
         pre_grasp_preset="two_finger_pinch",
-        contact_threshold_z=0.5,
+        closing_total_contact_threshold_n=0.5,
         phase_timeout=10.0,
         control_period_s=0.001,
     )
@@ -79,11 +80,21 @@ def test_phase_closing_uses_phase_closing_torque(monkeypatch):
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(
         pre_grasp_preset="two_finger_pinch",
-        base_torque=30,
-        phase_closing_torque=4,
-        contact_threshold_z=0.5,
+        closing_total_contact_threshold_n=0.5,
         phase_timeout=10.0,
         control_period_s=0.001,
+    )
+    profile = ObjectProfile(
+        name="test_object",
+        weight_kg=0.1,
+        safe_force_min=1.0,
+        safe_force_max=5.0,
+        friction_coeff=0.8,
+        is_fragile=False,
+        material="test",
+        position_hold_torque=30,
+        position_hold_speed=30,
+        phase_closing_torque=4,
     )
     sensor = MagicMock()
     safety = MagicMock()
@@ -93,6 +104,7 @@ def test_phase_closing_uses_phase_closing_torque(monkeypatch):
     controller = PhaseController(
         hand, sensor, safety, joint_builder, cfg, time.monotonic,
         on_state_change=lambda _state: None,
+        object_profile=profile,
     )
     monkeypatch.setattr("xiaoyao.adaptive_grasp.grasp_sequence.time.sleep", lambda *_: None)
 
@@ -117,9 +129,20 @@ def test_phase_closing_records_contact_joint_snapshot_by_force(monkeypatch):
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(
         pre_grasp_preset="two_finger_pinch",
-        contact_threshold_z=0.5,
+        closing_total_contact_threshold_n=0.5,
         phase_timeout=10.0,
         control_period_s=0.001,
+    )
+    profile = ObjectProfile(
+        name="test_object",
+        weight_kg=0.1,
+        safe_force_min=1.0,
+        safe_force_max=5.0,
+        friction_coeff=0.8,
+        is_fragile=False,
+        material="test",
+        position_hold_torque=30,
+        position_hold_speed=30,
         phase_closing_torque=12,
     )
     sensor = MagicMock()
@@ -130,6 +153,7 @@ def test_phase_closing_records_contact_joint_snapshot_by_force(monkeypatch):
     controller = PhaseController(
         hand, sensor, safety, joint_builder, cfg, lambda: 10.0,
         on_state_change=lambda _state: None,
+        object_profile=profile,
     )
     monkeypatch.setattr("xiaoyao.adaptive_grasp.grasp_sequence.time.sleep", lambda *_: None)
 
@@ -161,10 +185,9 @@ def test_phase_closing_records_contact_finger_force_snapshot_by_force(monkeypatc
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(
         pre_grasp_preset="two_finger_pinch",
-        contact_threshold_z=0.5,
+        closing_total_contact_threshold_n=0.5,
         phase_timeout=10.0,
         control_period_s=0.001,
-        base_torque=12,
     )
     sensor = MagicMock()
     safety = MagicMock()

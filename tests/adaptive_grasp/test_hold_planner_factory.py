@@ -17,6 +17,8 @@ def _profile() -> ObjectProfile:
         friction_coeff=0.8,
         is_fragile=True,
         material="paper",
+        position_hold_torque=5,
+        position_hold_speed=5,
     )
 
 

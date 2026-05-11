@@ -31,38 +31,37 @@ from xiaoyao.exceptions import (
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the adaptive grasp demo.")
-    parser.add_argument("--base_torque", "--base-torque", type=int, default=8)
-    parser.add_argument("--phase-closing-torque", type=int, default=15)
     parser.add_argument("--max_torque", "--max-torque", type=int, default=80)
-    parser.add_argument("--pre_grasp_preset", "--pre-grasp-preset", default="plastic_three_pinch")
+    parser.add_argument("--pre_grasp_preset", "--pre-grasp-preset", default="paper_cup_grasp")
     parser.add_argument("--hold_time", "--hold-time", type=float, default=100)
-    parser.add_argument("--default_object", dest="object", default="plastic")
+    parser.add_argument("--default_object", dest="object", default="paper_cup")
     parser.add_argument(
         "--hold-command-mode",
         choices=("position", "torque"),
-        default="torque",
+        default="position",
         help="Command mode used in adaptive hold.",
     )
-    parser.add_argument("--adaptive-hold-torque", type=int, default=5)
+    parser.add_argument("--torque-hold-base-torque", type=int, default=4)
     parser.add_argument(
-        "--no-release-on-interrupt",
-        action="store_true",
-        help="Do not call release() when interrupted with Ctrl+C.",
+        "--interrupt-release-wait",
+        type=float,
+        default=1,
+        help="Seconds to wait after sending the open-hand command on Ctrl+C.",
     )
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--enable_visualization",type=bool,default=False)
     return parser
 
 
 def build_config(args: argparse.Namespace) -> AdaptiveGraspConfig:
     arg_to_config = {
-        "base_torque": "base_torque",
-        "phase_closing_torque": "phase_closing_torque",
         "max_torque": "max_torque",
         "pre_grasp_preset": "pre_grasp_preset",
         "hold_time": "release_hold_time_s",
         "hold_command_mode": "adaptive_hold_command_mode",
-        "adaptive_hold_torque": "adaptive_hold_torque",
+        "torque_hold_base_torque": "torque_hold_base_torque",
         "object": "default_object",
+        "enable_visualization":"enable_visualization",
     }
     kwargs = {
         config_name: getattr(args, arg_name)
@@ -227,9 +226,9 @@ def main() -> None:
             f"release_open_speed={config.release_open_speed}, "
             f"release_open_torque={config.release_open_torque}, "
             f"adaptive_hold_command_mode={config.adaptive_hold_command_mode}, "
-            f"adaptive_hold_torque={config.adaptive_hold_torque}"
+            f"torque_hold_base_torque={config.torque_hold_base_torque}"
         )
-        print(f"Pre-grasp preset={config.pre_grasp_preset} (DIP passive)")
+        print(f"Pre-grasp preset={config.pre_grasp_preset} ")
 
         grasp_ok = grasper.grasp_core()
         if not grasp_ok:
@@ -251,7 +250,7 @@ def main() -> None:
             )
             logger.write_row(state_val, grasper.current_torque)
             grasper.poll_visualizer()
-            # time.sleep(0.1)
+            time.sleep(0.1)
         print(f"Final state: {grasper.get_state().value}")
 
         grasper.release()
@@ -260,9 +259,9 @@ def main() -> None:
 
     except KeyboardInterrupt:
         print("\nInterrupted by user.")
-        if grasper is not None and not args.no_release_on_interrupt:
-            print("Releasing hand...")
-            grasper.release()
+        if grasper is not None:
+            print("Sending quick release command...")
+            grasper.release_fast(wait_s=args.interrupt_release_wait)
     except DeviceDisconnectedError as exc:
         print(f"\n[Device Disconnected] {exc.message}")
     except JointFaultError as exc:

@@ -289,6 +289,39 @@ def test_perform_release_from_control_thread_does_not_deadlock(monkeypatch):
     assert g._running is False
 
 
+def test_fast_release_sends_open_command_without_waiting_for_control_thread(monkeypatch):
+    hand = _MockHand()
+    g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
+    g._running = True
+    g.state = GraspState.ADAPTIVE_HOLD
+
+    class _BlockingThread:
+        def __init__(self):
+            self.join_calls = 0
+
+        def is_alive(self):
+            return True
+
+        def join(self, timeout=None):
+            self.join_calls += 1
+            raise AssertionError("fast release should not wait for control thread")
+
+    control_thread = _BlockingThread()
+    g._control_thread = control_thread
+    sleeps = []
+    monkeypatch.setattr(
+        "xiaoyao.adaptive_grasp.adaptive_grasp_manager.time.sleep",
+        lambda value: sleeps.append(value),
+    )
+
+    assert g.release_fast(wait_s=0.123) is True
+    assert control_thread.join_calls == 0
+    assert sleeps == [0.123]
+    assert hand.calls[-1]["mode"] == CtrlMode.POSITION
+    assert g.state == GraspState.COMPLETED
+    assert g._running is False
+
+
 def test_cleanup_grasp_sets_stopped_state():
     hand = _MockHand()
     g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
@@ -491,11 +524,11 @@ def test_adaptive_grasp_manager_accepts_none_config():
     assert grasper._sensor is not None
 
 
-def test_adaptive_grasper_passes_touch_threshold_to_sensor():
-    cfg = AdaptiveGraspConfig(touch_detect_force_threshold_n=0.25)
+def test_adaptive_grasper_passes_finger_touch_threshold_to_sensor():
+    cfg = AdaptiveGraspConfig(finger_touch_threshold_n=0.25)
     grasper = AdaptiveGrasper(_MockHand(), cfg)
 
-    assert grasper._sensor._touch_detect_force_threshold_n == pytest.approx(0.25)
+    assert grasper._sensor._finger_touch_threshold_n == pytest.approx(0.25)
 
 
 def test_adaptive_grasper_constructor_does_not_zero_tactile():
@@ -521,7 +554,7 @@ def test_grasp_core_sets_error_state_when_phase_fails(monkeypatch):
     from xiaoyao.adaptive_grasp.grasp_sequence import PhaseResult
 
     def fail_phase_run(self, is_running):
-        return PhaseResult(success=False, final_torque=cfg.base_torque)
+        return PhaseResult(success=False, final_torque=0)
 
     monkeypatch.setattr(
         "xiaoyao.adaptive_grasp.grasp_sequence.PhaseController.run",
@@ -549,7 +582,7 @@ def test_grasp_core_releases_when_phase_requests_release(monkeypatch):
     from xiaoyao.adaptive_grasp.grasp_sequence import PhaseResult
 
     def fail_phase_run(self, is_running):
-        return PhaseResult(success=False, final_torque=cfg.base_torque, should_release=True)
+        return PhaseResult(success=False, final_torque=0, should_release=True)
 
     monkeypatch.setattr(
         "xiaoyao.adaptive_grasp.grasp_sequence.PhaseController.run",
@@ -564,6 +597,7 @@ def test_grasp_core_stores_contact_snapshot_for_adaptive_hold(monkeypatch):
     hand = _MockHand()
     cfg = AdaptiveGraspConfig()
     grasper = AdaptiveGrasper(hand, cfg)
+    closing_torque = 30
 
     monkeypatch.setattr(grasper, "_start_sensor_subscription", lambda: None)
     monkeypatch.setattr(grasper, "_adaptive_control_loop", lambda: None)
@@ -574,7 +608,7 @@ def test_grasp_core_stores_contact_snapshot_for_adaptive_hold(monkeypatch):
         joint_angles={JointId.THUMB_PIP: 0.12},
         finger_fz={TactileSensorId.THUMB: 1.2},
         total_fz=1.2,
-        torque=cfg.base_torque,
+        torque=closing_torque,
         reason="force_threshold",
         timestamp_s=3.4,
     )
@@ -582,7 +616,7 @@ def test_grasp_core_stores_contact_snapshot_for_adaptive_hold(monkeypatch):
     def successful_phase_run(self, is_running):
         return PhaseResult(
             success=True,
-            final_torque=cfg.base_torque,
+            final_torque=closing_torque,
             contact_snapshot=snapshot,
         )
 
@@ -600,6 +634,7 @@ def test_grasp_sequence_run_receives_only_is_running_callback(monkeypatch):
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(enable_visualization=False)
     grasper = AdaptiveGrasper(hand, cfg)
+    closing_torque = 30
 
     monkeypatch.setattr(grasper, "_start_sensor_subscription", lambda: None)
     monkeypatch.setattr(grasper, "_adaptive_control_loop", lambda: None)
@@ -610,7 +645,7 @@ def test_grasp_sequence_run_receives_only_is_running_callback(monkeypatch):
         joint_angles={JointId.THUMB_PIP: 0.12},
         finger_fz={TactileSensorId.THUMB: 1.2},
         total_fz=1.2,
-        torque=cfg.phase_closing_torque,
+        torque=closing_torque,
         reason="force_threshold",
         timestamp_s=3.4,
     )
@@ -620,7 +655,7 @@ def test_grasp_sequence_run_receives_only_is_running_callback(monkeypatch):
         captured_is_running.append(is_running)
         return PhaseResult(
             success=True,
-            final_torque=cfg.phase_closing_torque,
+            final_torque=closing_torque,
             contact_snapshot=snapshot,
         )
 
@@ -650,12 +685,14 @@ def test_torque_mode_creates_hold_planners_from_contact_snapshot(monkeypatch):
         friction_coeff=0.8,
         is_fragile=True,
         material="paper",
+        position_hold_torque=5,
+        position_hold_speed=5,
     )
     grasper._last_contact_snapshot = ContactSnapshot(
         joint_angles={JointId.THUMB_PIP: 0.12},
         finger_fz={TactileSensorId.THUMB: 0.5},
         total_fz=0.5,
-        torque=cfg.base_torque,
+        torque=30,
         reason="force_threshold",
         timestamp_s=3.4,
     )
@@ -683,12 +720,14 @@ def test_position_mode_creates_position_hold_planner_from_contact_snapshot(monke
         friction_coeff=0.8,
         is_fragile=True,
         material="paper",
+        position_hold_torque=5,
+        position_hold_speed=5,
     )
     grasper._last_contact_snapshot = ContactSnapshot(
         joint_angles={JointId.THUMB_PIP: 0.12},
         finger_fz={TactileSensorId.THUMB: 0.5},
         total_fz=0.5,
-        torque=cfg.base_torque,
+        torque=30,
         reason="force_threshold",
         timestamp_s=3.4,
     )
@@ -725,7 +764,7 @@ def test_full_grasp_lifecycle(monkeypatch):
     """Integration test: IDLE -> OPEN -> PRE_GRASP -> CLOSING -> ADAPTIVE_HOLD -> RELEASE -> COMPLETED。"""
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(
-        contact_threshold_z=0.5,
+        closing_total_contact_threshold_n=0.5,
         release_hold_time_s=0.05,
         control_period_s=0.01,
         release_timeout_s=0.2,

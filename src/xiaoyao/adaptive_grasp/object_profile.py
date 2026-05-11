@@ -1,10 +1,8 @@
-from dataclasses import dataclass
-from email.mime import base
-from turtle import position
 from typing import Literal, Optional
+from dataclasses import dataclass
 
 
-HoldStrategy = Literal["fixed", "adaptive", "slip_triggered"]
+HoldStrategy = Literal["fixed", "adaptive", "slip_triggered", "position"]
 
 
 @dataclass
@@ -18,7 +16,10 @@ class ObjectProfile:
     friction_coeff: float
     is_fragile: bool
     material: str
-
+    position_hold_torque: int
+    position_hold_speed: int
+    phase_closing_torque: int = 30
+    
     # 可选描述信息，预留给视觉识别、仿真或策略选择使用。
     color: Optional[list[float]] = None
     size: Optional[list[float]] = None
@@ -26,9 +27,7 @@ class ObjectProfile:
     roughness: Optional[float] = None
     shape: Optional[str] = None
     hold_strategy: Optional[HoldStrategy] = None
-    base_hold_torque: Optional[int] = None
-    position_hold_torque: Optional[int] = None
-    position_hold_speed: Optional[int] = None
+    
 
 
 class ObjectProfileRegistry:
@@ -63,20 +62,20 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         is_fragile=False,
         material="metal",
         hold_strategy="slip_triggered",
-        base_hold_torque=20,
+        position_hold_torque=30,
+        position_hold_speed=30,
     ),
     ObjectProfile(
         name="plastic",
         weight_kg=0.01,
-        safe_force_min=0.5,
+        safe_force_min=2.0,
         safe_force_max=5.0,
         friction_coeff=0.9,
         is_fragile=False,
         material="plastic",
         hold_strategy="slip_triggered",
-        base_hold_torque=20,
         position_hold_torque=30,
-        position_hold_speed =30,
+        position_hold_speed=30,
     ),
     ObjectProfile(
         name="glass",
@@ -87,9 +86,8 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         is_fragile=True,
         material="glass",
         hold_strategy="fixed",
-        base_hold_torque=20,
         position_hold_torque=30,
-        position_hold_speed =30,
+        position_hold_speed=30,
     ),
     ObjectProfile(
         name="tofu",
@@ -100,7 +98,8 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         is_fragile=True,
         material="tofu",
         hold_strategy="fixed",
-        base_hold_torque=10,
+        position_hold_torque=10,
+        position_hold_speed=30,
     ),
     ObjectProfile(
         name="fruit",
@@ -111,6 +110,8 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         is_fragile=True,
         material="fruit",
         hold_strategy="slip_triggered",
+        position_hold_torque=10,
+        position_hold_speed=30,
     ),
     ObjectProfile(
         name="egg",
@@ -121,6 +122,8 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         is_fragile=True,
         material="egg",
         hold_strategy="fixed",
+        position_hold_torque=5,
+        position_hold_speed=20,
     ),
     ObjectProfile(
         name="balloon",
@@ -131,9 +134,8 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         is_fragile=True,
         material="latex",
         hold_strategy="adaptive",
-        base_hold_torque=10,
         position_hold_torque=10,
-        position_hold_speed =30,
+        position_hold_speed=10,
     ),
     ObjectProfile(
         name="paper_cup",
@@ -143,10 +145,22 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         friction_coeff=0.8,
         is_fragile=True,
         material="paper",
-        hold_strategy="adaptive",
-        base_hold_torque=5,
+        hold_strategy="position",
+        phase_closing_torque=5,
         position_hold_torque=5,
-        position_hold_speed =5,
+        position_hold_speed=5,
+    ),
+    ObjectProfile(
+        name="default",
+        weight_kg=0.1,
+        safe_force_min=1.0,
+        safe_force_max=5.0,
+        friction_coeff=0.9,
+        is_fragile=False,
+        material="default",
+        hold_strategy="position",
+        position_hold_torque=30,
+        position_hold_speed=30,
     )
 )
 
