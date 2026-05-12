@@ -37,6 +37,11 @@ _PRESET_ACTIVE_FINGERS: dict[str, set[TactileSensorId]] = {
         TactileSensorId.FOREFINGER,
         TactileSensorId.MIDDLE_FINGER,
     },
+    "three_finger_grasp": {
+        TactileSensorId.THUMB,
+        TactileSensorId.FOREFINGER,
+        TactileSensorId.MIDDLE_FINGER,
+    },
     "four_finger_grasp": {
         TactileSensorId.THUMB,
         TactileSensorId.FOREFINGER,
@@ -46,7 +51,7 @@ _PRESET_ACTIVE_FINGERS: dict[str, set[TactileSensorId]] = {
     "five_finger_grasp": set(TactileSensorId),
     "lily_pinch": {TactileSensorId.THUMB, TactileSensorId.MIDDLE_FINGER},
     "small_pinch": {TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
-    "cone_pinch": {TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
+    "smooth_ball": {TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
     "balloon_pinch": {TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
     "paper_cup_pinch": {
         TactileSensorId.THUMB,
@@ -112,20 +117,31 @@ def _pose_degrees(
 
 _PRE_GRASP_PRESET_DEGREE = {
     "two_finger_pinch": _pose_degrees(
-        ff_mcp=30.0,
-        ff_pip=25.0,
-        thumb_swing=85.0,
-        thumb_mcp=10.0,
-        thumb_pip=10.0,
+        ff_mcp=60.0,
+        ff_pip=20.0,
+        thumb_swing=80.0,
+        thumb_mcp=0.0,
+        thumb_pip=0.0,
     ),
     "three_finger_pinch": _pose_degrees(
-        mf_mcp=49.0,
+        mf_mcp=50.0,
         mf_pip=10.0,
-        ff_mcp=41.0,
-        ff_pip=14.0,
-        thumb_swing=85.0,
-        thumb_mcp=4.0,
-        thumb_pip=4.0,
+        ff_mcp=42.0,
+        ff_pip=10.0,
+        ff_swing=5.0,
+        thumb_swing=80.0,
+        thumb_pip=10,
+        thumb_mcp=20.0,
+        thumb_rotation=5.0,
+    ),
+    "three_finger_grasp": _pose_degrees(
+        mf_mcp=36.0,
+        mf_pip=35.0,
+        ff_mcp=28.0,
+        ff_pip=41.0,
+        thumb_swing=80.0,
+        thumb_pip=28,
+        thumb_mcp=10.0,
     ),
     "four_finger_grasp": _pose_degrees(
         rf_mcp=60.0,
@@ -165,9 +181,11 @@ _PRE_GRASP_PRESET_DEGREE = {
         ff_pip=22.0,
         thumb_mcp=3.0,
     ),
-    "cone_pinch": _pose_degrees(
-        ff_mcp=58.0,
-        thumb_rotation=-2.0,
+    "smooth_ball": _pose_degrees(
+        ff_mcp=60.0,
+        ff_pip=10,
+        thumb_swing=80,
+        thumb_mcp=15,
     ),
     "balloon_pinch": _pose_degrees(
         ff_mcp=25.0,
@@ -214,8 +232,8 @@ _PRE_GRASP_PRESET_DEGREE = {
         mf_mcp=40,
         rf_pip=40,
         rf_mcp=40,
-        lf_pip=38,
-        lf_mcp=38,
+        lf_pip=35,
+        lf_mcp=35,
     ),
     "paper_cup_two_finger_grasp":_pose_degrees(
         thumb_swing=75,
@@ -283,7 +301,7 @@ class AdaptiveGraspConfig:
     closing_total_contact_threshold_n: float = 0.2
     finger_touch_threshold_n: float = 0.1
     max_torque: int = 80
-    thumb_aux_torque: int = 5
+    thumb_aux_torque: int = 3
     phase_timeout: float = 10.0
     control_period_s: float = 0.02
     closing_period_s: float = 0.2

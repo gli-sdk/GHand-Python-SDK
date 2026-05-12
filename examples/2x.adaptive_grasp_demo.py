@@ -7,6 +7,7 @@ import sys
 import time
 from typing import Optional
 from xiaoyao import configure_logging
+
 _logger = logging.getLogger(__name__)
 configure_logging(level=logging.INFO)
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,13 +29,31 @@ from xiaoyao.exceptions import (
     JointFaultError,
 )
 
-
-def build_parser() -> argparse.ArgumentParser:
+def grasp_case_choose()->dict:
+    grasp_case_choose = "plastic_cup"
+    if grasp_case_choose == "smooth_ball":
+        return {"pre_grasp_preset":"smooth_ball",
+                "object":"plastic"}
+    if grasp_case_choose == "paper_cup":
+        return {"pre_grasp_preset":"paper_cup_grasp",
+                "object":"paper_cup"}
+    if grasp_case_choose == "balloon":
+        return {"pre_grasp_preset":"balloon_pinch",
+                "object":"balloon"}
+    if grasp_case_choose == "glass_cup":
+        return {"pre_grasp_preset":"three_finger_grasp",
+                "object":"glass"}
+    if grasp_case_choose =="plastic_cup":
+        return {"pre_grasp_preset":"paper_cup_grasp",
+                "object":"plastic_cup"}
+def build_parser(grasp_case: dict) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the adaptive grasp demo.")
     parser.add_argument("--max_torque", "--max-torque", type=int, default=80)
-    parser.add_argument("--pre_grasp_preset", "--pre-grasp-preset", default="paper_cup_grasp")
+    parser.add_argument("--pre_grasp_preset", "--pre-grasp-preset", default=grasp_case["pre_grasp_preset"]
+                        ,choices={"smooth_ball","paper_cup_grasp","balloon_pinch","three_finger_grasp"})
     parser.add_argument("--hold_time", "--hold-time", type=float, default=100)
-    parser.add_argument("--default_object", dest="object", default="paper_cup")
+    parser.add_argument("--default_object", dest="object", default=grasp_case["object"]
+                        ,choices={"paper_cup","glass","balloon","plastic_cup"})
     parser.add_argument(
         "--hold-command-mode",
         choices=("position", "torque"),
@@ -190,7 +209,8 @@ class TactileLogger:
 
 
 def main() -> None:
-    args = build_parser().parse_args()
+    grasp_case = grasp_case_choose()
+    args = build_parser(grasp_case).parse_args()
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
 
     hand = DexHand()
