@@ -140,3 +140,21 @@ def test_ensure_hand_command_port_wraps_get_hand_info_dex_hand_like_object():
 
     assert isinstance(port, DexHandCommandPort)
     assert port.hand is hand
+
+
+def test_hand_ports_export_from_adaptive_grasp_package():
+    from xiaoyao.adaptive_grasp import (
+        DexHandCommandPort as ExportedDexHandCommandPort,
+        GraspSequenceHandPort,
+        HandCommandPort,
+        SensorFrameSource,
+        SubscriptionPeriodConfigurator,
+        ensure_hand_command_port as exported_ensure_hand_command_port,
+    )
+
+    assert ExportedDexHandCommandPort is DexHandCommandPort
+    assert exported_ensure_hand_command_port is ensure_hand_command_port
+    assert HandCommandPort.__name__ == "HandCommandPort"
+    assert GraspSequenceHandPort.__name__ == "GraspSequenceHandPort"
+    assert SubscriptionPeriodConfigurator.__name__ == "SubscriptionPeriodConfigurator"
+    assert SensorFrameSource.__name__ == "SensorFrameSource"
