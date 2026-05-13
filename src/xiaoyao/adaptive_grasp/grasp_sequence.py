@@ -1,12 +1,11 @@
 import logging
 import time
-from xiaoyao.gestures import _wait_for_completion as wait_for_completion
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
 from xiaoyao.dexhand import CtrlMode, Joint, JointId, TactileSensorId
 from .config import AdaptiveGraspConfig
-from .ports import HandCommandPort, SensorFrameSource
+from .ports import GraspSequenceHandPort, SensorFrameSource
 from .states import GraspState
 from .safety import SafetyMonitor, SafetyStatus
 from .joint_builder import JointCommandBuilder
@@ -51,7 +50,7 @@ class PhaseResult:
 class PhaseController:
     def __init__(
         self,
-        hand: HandCommandPort,
+        hand: GraspSequenceHandPort,
         sensor: SensorFrameSource,
         safety: SafetyMonitor,
         joint_builder: JointCommandBuilder,
@@ -125,7 +124,7 @@ class PhaseController:
         joints = self._joint_builder.position_command(pose, speed=speed, torque=torque)
         ok = self.hand.move_joints(joints, mode=CtrlMode.POSITION)
         time.sleep(0.02)
-        if not wait_for_completion(self.hand):
+        if not self.hand.wait_for_motion_completion():
             return False 
         return ok
 

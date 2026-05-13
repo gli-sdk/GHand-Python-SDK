@@ -1,6 +1,7 @@
 from typing import Any
 
 from xiaoyao.dexhand import CtrlMode, Joint
+from xiaoyao.gestures import _wait_for_completion as wait_for_completion
 
 from .ports import HandCommandPort
 
@@ -14,6 +15,9 @@ class DexHandCommandPort:
 
     def stop(self) -> None:
         self.hand.stop()
+
+    def wait_for_motion_completion(self) -> bool:
+        return wait_for_completion(self.hand)
 
     def configure_subscription_periods(
         self,

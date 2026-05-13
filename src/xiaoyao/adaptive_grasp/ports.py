@@ -13,6 +13,12 @@ class HandCommandPort(Protocol):
 
 
 @runtime_checkable
+class GraspSequenceHandPort(HandCommandPort, Protocol):
+    def wait_for_motion_completion(self) -> bool:
+        ...
+
+
+@runtime_checkable
 class SubscriptionPeriodConfigurator(Protocol):
     def configure_subscription_periods(
         self,

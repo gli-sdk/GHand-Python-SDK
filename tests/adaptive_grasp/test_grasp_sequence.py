@@ -12,6 +12,7 @@ from xiaoyao.dexhand import Joint, TactileSensorId
 class _MockHand:
     def __init__(self):
         self.calls = []
+        self.wait_calls = 0
 
     def move_joints(self, joints, mode=None):
         self.calls.append({"mode": mode, "joints": list(joints)})
@@ -19,6 +20,10 @@ class _MockHand:
 
     def stop(self):
         return None
+
+    def wait_for_motion_completion(self):
+        self.wait_calls += 1
+        return True
 
 
 class _FailingHand(_MockHand):
@@ -255,6 +260,7 @@ def test_phase_open_and_pre_grasp(monkeypatch):
     assert isinstance(result, PhaseResult)
     assert result.success is True
     assert len(hand.calls) == 3
+    assert hand.wait_calls == 2
     assert hand.calls[0]["mode"] == CtrlMode.POSITION
     assert hand.calls[1]["mode"] == CtrlMode.POSITION
     assert hand.calls[2]["mode"] == CtrlMode.TORQUE
@@ -262,7 +268,7 @@ def test_phase_open_and_pre_grasp(monkeypatch):
     assert {joint.torque for joint in hand.calls[0]["joints"]} == {12}
     assert {joint.speed for joint in hand.calls[1]["joints"]} == {21}
     assert {joint.torque for joint in hand.calls[1]["joints"]} == {22}
-    assert sleep_calls[:2] == [1.5, 2.5]
+    assert sleep_calls[:2] == [0.02, 0.02]
 
 
 def test_phase_failure_sets_error_state(monkeypatch):

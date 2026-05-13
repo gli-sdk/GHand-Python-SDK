@@ -65,6 +65,24 @@ def test_dex_hand_command_port_ignores_missing_subscription_manager():
     port.configure_subscription_periods(recv_period_s=0.01, dispatch_period_s=0.02)
 
 
+def test_dex_hand_command_port_waits_for_motion_completion(monkeypatch):
+    hand = _FakeDexHand()
+    calls = []
+
+    def fake_wait_for_completion(wait_hand):
+        calls.append(wait_hand)
+        return True
+
+    monkeypatch.setattr(
+        "xiaoyao.adaptive_grasp.hand_adapter.wait_for_completion",
+        fake_wait_for_completion,
+    )
+    port = DexHandCommandPort(hand)
+
+    assert port.wait_for_motion_completion() is True
+    assert calls == [hand]
+
+
 def test_ensure_hand_command_port_returns_existing_port_like_object():
     port_like = _PortLikeHand()
 
