@@ -3,13 +3,13 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Any, Optional
 
-from xiaoyao.dexhand import CtrlMode, DexHand, Joint, JointId, TactileSensorId
+from xiaoyao.dexhand import CtrlMode, Joint, JointId, TactileSensorId
 from .config import AdaptiveGraspConfig
 from .force_reference_planner import ForceReferencePlanner
 from .joint_builder import JointCommandBuilder
 from .position_hold_planner import ForceDecision, PositionHoldPlanner
+from .ports import HandCommandPort, SensorFrameSource
 from .safety import SafetyMonitor, SafetyReport, SafetyStatus
-from .sensor import SensorClient
 from .states import GraspState
 from .tactility import TactileAnalyzer, TactileAnalysis
 from .torque_hold_planner import TorqueHoldDecision, TorqueHoldPlanner
@@ -65,8 +65,8 @@ class HoldController:
 
     def __init__(
         self,
-        hand: DexHand,
-        sensor: SensorClient,
+        hand: HandCommandPort,
+        sensor: SensorFrameSource,
         safety: SafetyMonitor,
         tactile: TactileAnalyzer,
         visualizer: Optional[TactileVisualizer],

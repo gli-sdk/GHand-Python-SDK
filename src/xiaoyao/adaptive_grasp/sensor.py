@@ -2,7 +2,7 @@ import logging
 import time
 from typing import Any, Optional
 
-from xiaoyao.dexhand import DexHand, Joint, JointId, State, ErrorCode, TactileInfo, TactileSensorId
+from xiaoyao.dexhand import Joint, JointId, State, ErrorCode, TactileInfo, TactileSensorId
 from xiaoyao.data import Tpdo
 
 _logger = logging.getLogger("xiaoyao.sensor")
@@ -18,7 +18,7 @@ class SensorClient:
 
     def __init__(
         self,
-        hand: DexHand,
+        hand: Any,
         active_fingers: Optional[set[TactileSensorId]] = None,
         finger_touch_threshold_n: float = _DEFAULT_FINGER_TOUCH_THRESHOLD_N,
         get_monotonic_time: Optional[Any] = None,
