@@ -8,6 +8,7 @@ import pytest
 
 import xiaoyao
 from xiaoyao.adaptive_grasp import AdaptiveGraspConfig, AdaptiveGrasper, GraspState
+from xiaoyao.adaptive_grasp.adaptive_hold_runner import AdaptiveHoldRunner
 from xiaoyao.adaptive_grasp.adaptive_hold_loop import HoldResult, HoldStepResult
 from xiaoyao.adaptive_grasp.force_reference_planner import ForceReferencePlanner
 from xiaoyao.adaptive_grasp.position_hold_planner import PositionHoldPlanner
@@ -102,6 +103,149 @@ def test_clip_clamps_and_handles_inverted_bounds():
     assert clip(-1.0, 0.0, 10.0) == pytest.approx(0.0)
     assert clip(11.0, 0.0, 10.0) == pytest.approx(10.0)
     assert clip(3.0, 2.0, 1.0) == pytest.approx(2.0)
+
+
+def test_adaptive_grasper_runtime_public_proxies():
+    hand = _MockHand()
+    grasper = AdaptiveGrasper(hand, AdaptiveGraspConfig())
+
+    assert grasper.hand is hand
+    assert grasper._runtime is not None
+
+    grasper.state = GraspState.ADAPTIVE_HOLD
+    grasper._running = True
+    grasper.current_torque = 17
+
+    assert grasper._runtime.state == GraspState.ADAPTIVE_HOLD
+    assert grasper.get_state() == GraspState.ADAPTIVE_HOLD
+    assert grasper._runtime.running is True
+    assert grasper._runtime.current_torque == 17
+
+
+def test_telemetry_properties_are_runtime_backed():
+    grasper = AdaptiveGrasper(_MockHand(), AdaptiveGraspConfig())
+    contact_snapshot = object()
+    tactile_analysis = object()
+    safety_report = object()
+    force_decisions = object()
+    torque_decision = object()
+
+    grasper._runtime.last_contact_snapshot = contact_snapshot
+    grasper._runtime.last_tactile_analysis = tactile_analysis
+    grasper._runtime.last_safety_report = safety_report
+    grasper._runtime.last_force_decisions = force_decisions
+    grasper._runtime.last_torque_hold_decision = torque_decision
+    grasper._runtime.last_tactile_data_age_s = 0.25
+    grasper._runtime.last_control_cycle_s = 0.03
+    grasper._runtime.last_control_cycle_jitter_s = 0.01
+
+    assert grasper.last_contact_snapshot is contact_snapshot
+    assert grasper.last_tactile_analysis is tactile_analysis
+    assert grasper.last_safety_report is safety_report
+    assert grasper.last_force_decisions is force_decisions
+    assert grasper.last_torque_hold_decision is torque_decision
+    assert grasper.last_tactile_data_age_s == pytest.approx(0.25)
+    assert grasper.last_control_cycle_s == pytest.approx(0.03)
+    assert grasper.last_control_cycle_jitter_s == pytest.approx(0.01)
+
+
+def test_start_adaptive_control_uses_hold_runner_thread(monkeypatch):
+    import xiaoyao.adaptive_grasp.adaptive_hold_runner as runner_module
+
+    hand = _MockHand()
+    cfg = AdaptiveGraspConfig(enable_visualization=False)
+    grasper = AdaptiveGrasper(hand, cfg)
+    grasper._runtime.object_profile = ObjectProfile(
+        name="paper_cup_test",
+        weight_kg=0.01,
+        safe_force_min=0.5,
+        safe_force_max=3.5,
+        friction_coeff=0.8,
+        is_fragile=True,
+        material="paper",
+        position_hold_torque=5,
+        position_hold_speed=5,
+    )
+    grasper._runtime.last_contact_snapshot = ContactSnapshot(
+        joint_angles={JointId.THUMB_PIP: 0.12},
+        finger_fz={TactileSensorId.THUMB: 0.5},
+        total_fz=0.5,
+        torque=30,
+        reason="force_threshold",
+        timestamp_s=3.4,
+    )
+
+    created_threads = []
+
+    class _FakeThread:
+        def __init__(self, *, target, daemon):
+            self.target = target
+            self.daemon = daemon
+            self.start_calls = 0
+            created_threads.append(self)
+
+        def start(self):
+            self.start_calls += 1
+
+        def is_alive(self):
+            return False
+
+    monkeypatch.setattr(runner_module.threading, "Thread", _FakeThread)
+
+    grasper._start_adaptive_control()
+
+    assert isinstance(grasper._hold_runner, AdaptiveHoldRunner)
+    assert grasper._control_thread is created_threads[-1]
+    assert created_threads[-1].target == grasper._hold_runner._run_loop
+    assert created_threads[-1].start_calls == 1
+    assert grasper._adaptive_hold_loop is grasper._hold_runner._hold_controller
+
+
+def test_perform_release_delegates_to_release_controller_with_runner_thread(monkeypatch):
+    grasper = AdaptiveGrasper(_MockHand(), AdaptiveGraspConfig())
+
+    class _RunnerThread:
+        pass
+
+    runner_thread = _RunnerThread()
+    grasper._hold_runner._thread = runner_thread
+    calls = []
+    monkeypatch.setattr(
+        grasper._release_controller,
+        "release",
+        lambda **kwargs: calls.append(kwargs) or True,
+    )
+
+    assert grasper._perform_release(wait_control_thread=True, release_wait_s=0.25) is True
+    assert calls == [
+        {
+            "wait_control_thread": True,
+            "release_wait_s": 0.25,
+            "control_thread": runner_thread,
+        }
+    ]
+
+
+def test_perform_release_prefers_control_thread_override(monkeypatch):
+    grasper = AdaptiveGrasper(_MockHand(), AdaptiveGraspConfig())
+    override_thread = object()
+    grasper._control_thread = override_thread
+    calls = []
+    monkeypatch.setattr(
+        grasper._release_controller,
+        "release",
+        lambda **kwargs: calls.append(kwargs) or True,
+    )
+
+    grasper._perform_release(wait_control_thread=False)
+
+    assert calls == [
+        {
+            "wait_control_thread": False,
+            "release_wait_s": None,
+            "control_thread": override_thread,
+        }
+    ]
 
 
 def test_release_succeeds_without_waiting_for_settle_feedback(monkeypatch):
@@ -605,7 +749,7 @@ def test_grasp_core_stores_contact_snapshot_for_adaptive_hold(monkeypatch):
     closing_torque = 30
 
     monkeypatch.setattr(grasper, "_start_sensor_subscription", lambda: None)
-    monkeypatch.setattr(grasper, "_adaptive_control_loop", lambda: None)
+    monkeypatch.setattr("xiaoyao.adaptive_grasp.adaptive_hold_runner.threading.Thread.start", lambda self: None)
 
     from xiaoyao.adaptive_grasp.grasp_sequence import ContactSnapshot, PhaseResult
 
@@ -642,7 +786,7 @@ def test_grasp_sequence_run_receives_only_is_running_callback(monkeypatch):
     closing_torque = 30
 
     monkeypatch.setattr(grasper, "_start_sensor_subscription", lambda: None)
-    monkeypatch.setattr(grasper, "_adaptive_control_loop", lambda: None)
+    monkeypatch.setattr(grasper._hold_runner, "start", lambda contact_snapshot: None)
 
     from xiaoyao.adaptive_grasp.grasp_sequence import ContactSnapshot, PhaseResult
 
