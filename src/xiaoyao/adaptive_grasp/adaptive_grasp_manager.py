@@ -23,6 +23,9 @@ from .torque_hold_planner import TorqueHoldDecision
 _logger = logging.getLogger("xiaoyao.adaptive_grasp.adaptive_grasp_manager")
 
 
+_NO_CONTROL_THREAD_OVERRIDE = object()
+
+
 class AdaptiveGrasper:
     def __init__(self, hand: DexHand, config: Optional[AdaptiveGraspConfig] = None):
         self.hand = hand
@@ -30,7 +33,7 @@ class AdaptiveGrasper:
         self.config = config or AdaptiveGraspConfig()
         self._runtime = AdaptiveGraspRuntime()
         self._get_monotonic_time = time.monotonic
-        self._control_thread_override = None
+        self._control_thread_override = _NO_CONTROL_THREAD_OVERRIDE
 
         self._configure_subscription_periods()
 
@@ -118,7 +121,7 @@ class AdaptiveGrasper:
 
     @property
     def _control_thread(self):
-        if self._control_thread_override is not None:
+        if self._control_thread_override is not _NO_CONTROL_THREAD_OVERRIDE:
             return self._control_thread_override
         return self._hold_runner.thread
 
@@ -309,17 +312,17 @@ class AdaptiveGrasper:
         )
 
     def _start_adaptive_control(self) -> None:
-        self._control_thread_override = None
+        self._control_thread_override = _NO_CONTROL_THREAD_OVERRIDE
         self._hold_runner.get_monotonic_time = self._get_monotonic_time
         self._hold_runner.start(self._runtime.last_contact_snapshot)
-        self._adaptive_hold_loop = self._hold_runner._hold_controller
+        self._adaptive_hold_loop = self._hold_runner.hold_controller
         if self._visualizer is not None:
             self._visualizer.start()
 
     def _prepare_grasp_runtime(self, object_profile: Optional[ObjectProfile]) -> None:
         self._runtime.reset_for_grasp()
         self._reset_runtime_components()
-        self._control_thread_override = None
+        self._control_thread_override = _NO_CONTROL_THREAD_OVERRIDE
         self._runtime.object_profile = (
             object_profile
             or ObjectProfileRegistry.get(self.config.default_object)
@@ -351,10 +354,11 @@ class AdaptiveGrasper:
         return self._runtime.last_contact_snapshot.joint_angles
 
     def _adaptive_control_loop(self) -> None:
+        self._hold_runner.get_monotonic_time = self._get_monotonic_time
         if self._adaptive_hold_loop is not None:
-            self._hold_runner._hold_controller = self._adaptive_hold_loop
+            self._hold_runner.hold_controller = self._adaptive_hold_loop
         self._hold_runner._run_loop()
-        self._adaptive_hold_loop = self._hold_runner._hold_controller
+        self._adaptive_hold_loop = self._hold_runner.hold_controller
 
     def _update_control_cycle_timing(self, step_start: float) -> None:
         self._runtime.update_control_cycle_timing(
@@ -419,7 +423,7 @@ class AdaptiveGrasper:
         self._sensor.reset()
         self._grasp_sequence = None
         self._adaptive_hold_loop = None
-        self._hold_runner._hold_controller = None
+        self._hold_runner.hold_controller = None
 
     def _configure_subscription_periods(self) -> None:
         configure_periods = getattr(self._hand_port, "configure_subscription_periods", None)
@@ -432,7 +436,11 @@ class AdaptiveGrasper:
 
     def _join_control_thread_override(self, *, timeout: float) -> None:
         thread = self._control_thread_override
-        if thread is None or thread is threading.current_thread():
+        if (
+            thread is _NO_CONTROL_THREAD_OVERRIDE
+            or thread is None
+            or thread is threading.current_thread()
+        ):
             return
         is_alive = getattr(thread, "is_alive", None)
         join = getattr(thread, "join", None)

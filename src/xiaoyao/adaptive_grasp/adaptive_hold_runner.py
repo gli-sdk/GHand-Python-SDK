@@ -57,6 +57,17 @@ class AdaptiveHoldRunner:
     def thread(self) -> Optional[threading.Thread]:
         return self._thread
 
+    @property
+    def hold_controller(self) -> Optional[HoldController | _HoldControllerLike]:
+        return self._hold_controller
+
+    @hold_controller.setter
+    def hold_controller(
+        self,
+        value: Optional[HoldController | _HoldControllerLike],
+    ) -> None:
+        self._hold_controller = value
+
     def start(self, contact_snapshot: ContactSnapshot, *, start_thread: bool = True) -> None:
         self._hold_controller = self.hold_controller_factory(contact_snapshot)
         self.runtime.state = GraspState.ADAPTIVE_HOLD

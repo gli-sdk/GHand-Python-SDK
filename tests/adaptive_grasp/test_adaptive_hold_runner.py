@@ -91,6 +91,19 @@ def test_start_without_thread_initializes_adaptive_hold_state():
     assert runner.thread is None
 
 
+def test_hold_controller_property_exposes_compatibility_controller_slot():
+    runner, _runtime, _sensor, _release, hold = _runner(
+        [HoldStepResult(result=HoldResult.CONTINUE)],
+    )
+    replacement = _FakeHoldController([HoldStepResult(result=HoldResult.ERROR)])
+
+    assert runner.hold_controller is hold
+
+    runner.hold_controller = replacement
+
+    assert runner.hold_controller is replacement
+
+
 def test_run_once_error_sets_runtime_error_stops_sensor_without_release():
     runner, runtime, sensor, release, _hold = _runner(
         [HoldStepResult(result=HoldResult.ERROR)],

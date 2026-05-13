@@ -194,7 +194,7 @@ def test_start_adaptive_control_uses_hold_runner_thread(monkeypatch):
     assert grasper._control_thread is created_threads[-1]
     assert created_threads[-1].target == grasper._hold_runner._run_loop
     assert created_threads[-1].start_calls == 1
-    assert grasper._adaptive_hold_loop is grasper._hold_runner._hold_controller
+    assert grasper._adaptive_hold_loop is grasper._hold_runner.hold_controller
 
 
 def test_hold_runner_auto_release_uses_control_step_time(monkeypatch):
@@ -206,7 +206,7 @@ def test_hold_runner_auto_release_uses_control_step_time(monkeypatch):
     grasper = AdaptiveGrasper(hand, cfg)
     grasper._runtime.running = True
     grasper._runtime.adaptive_hold_started_at = 0.0
-    grasper._hold_runner._hold_controller = type(
+    grasper._hold_runner.hold_controller = type(
         "_ContinueHoldLoop",
         (),
         {"run_step": lambda self, current_time: HoldStepResult(result=HoldResult.CONTINUE)},
@@ -223,6 +223,34 @@ def test_hold_runner_auto_release_uses_control_step_time(monkeypatch):
 
     assert grasper._hold_runner.run_once() is True
     assert calls == []
+
+
+def test_adaptive_control_loop_uses_latest_manager_clock(monkeypatch):
+    grasper = AdaptiveGrasper(
+        _MockHand(),
+        AdaptiveGraspConfig(enable_visualization=False, release_hold_time_s=100.0),
+    )
+    grasper._running = True
+    grasper._adaptive_hold_started_at = 0.0
+    grasper._hold_runner.get_monotonic_time = lambda: 1.0
+    grasper._get_monotonic_time = lambda: 42.0
+    seen_step_times = []
+
+    class _ErrorAfterStepHoldLoop:
+        def run_step(self, current_time):
+            seen_step_times.append(current_time)
+            return HoldStepResult(result=HoldResult.ERROR)
+
+    grasper._adaptive_hold_loop = _ErrorAfterStepHoldLoop()
+    monkeypatch.setattr(
+        grasper._sensor,
+        "stop",
+        lambda clear_joint_feedback=False: None,
+    )
+
+    grasper._adaptive_control_loop()
+
+    assert seen_step_times == [42.0]
 
 
 def test_perform_release_delegates_to_release_controller_with_runner_thread(monkeypatch):
@@ -246,6 +274,29 @@ def test_perform_release_delegates_to_release_controller_with_runner_thread(monk
             "wait_control_thread": True,
             "release_wait_s": 0.25,
             "control_thread": runner_thread,
+        }
+    ]
+
+
+def test_perform_release_honors_explicit_none_control_thread_override(monkeypatch):
+    grasper = AdaptiveGrasper(_MockHand(), AdaptiveGraspConfig())
+    grasper._hold_runner._thread = object()
+    grasper._control_thread = None
+    calls = []
+    monkeypatch.setattr(
+        grasper._release_controller,
+        "release",
+        lambda **kwargs: calls.append(kwargs) or True,
+    )
+
+    grasper._perform_release(wait_control_thread=True)
+
+    assert grasper._control_thread is None
+    assert calls == [
+        {
+            "wait_control_thread": True,
+            "release_wait_s": None,
+            "control_thread": None,
         }
     ]
 
