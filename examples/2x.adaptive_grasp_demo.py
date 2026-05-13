@@ -30,10 +30,10 @@ from xiaoyao.exceptions import (
 )
 
 def grasp_case_choose()->dict:
-    grasp_case_choose = "plastic_cup"
+    grasp_case_choose = "balloon"
     if grasp_case_choose == "smooth_ball":
         return {"pre_grasp_preset":"smooth_ball",
-                "object":"plastic"}
+                "object":"plastic_cup"}
     if grasp_case_choose == "paper_cup":
         return {"pre_grasp_preset":"paper_cup_grasp",
                 "object":"paper_cup"}
@@ -46,6 +46,19 @@ def grasp_case_choose()->dict:
     if grasp_case_choose =="plastic_cup":
         return {"pre_grasp_preset":"paper_cup_grasp",
                 "object":"plastic_cup"}
+    if grasp_case_choose == "minreal_water_bottle_500ml":
+        return {"pre_grasp_preset":"minreal_water_grasp",
+                "object":"minreal_water_bottle_500ml"}
+    if grasp_case_choose == "plastic_object":
+        return {"pre_grasp_preset":"two_finger_pinch",
+                "object":"plastic"}
+    if grasp_case_choose == "orange":
+        return {"pre_grasp_preset":"four_finger_grasp",
+                "object":"fruit"}
+    if grasp_case_choose == "pen":
+        return {"pre_grasp_preset":"pen_pinch",
+                "object":"plastic"}
+    
 def build_parser(grasp_case: dict) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the adaptive grasp demo.")
     parser.add_argument("--max_torque", "--max-torque", type=int, default=80)

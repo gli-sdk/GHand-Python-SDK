@@ -6,7 +6,7 @@ from typing import Any
 from xiaoyao.adaptive_grasp.utils import clip
 from xiaoyao.dexhand import TactileSensorId
 from .config import AdaptiveGraspConfig
-
+from xiaoyao.adaptive_grasp.pid_controller import LowPassFilter
 
 @dataclass(frozen=True)
 class TactileLayoutPoint:
@@ -87,6 +87,7 @@ class PerFingerAnalysis:
     s_total: float
     slip_confirmed: bool
     fz: float
+    fz_filtered: float
 
     @property
     def slip_risk(self) -> float:
@@ -149,7 +150,10 @@ class TactileAnalyzer:
         self._slip_count: dict[TactileSensorId, int] = {}
         self._prev_fx: dict[TactileSensorId, list[float]] = {}
         self._prev_fy: dict[TactileSensorId, list[float]] = {}
-
+        self._fz_filters: dict[TactileSensorId, LowPassFilter] = {
+            finger: LowPassFilter(alpha=config.lowpass_alpha)
+            for finger in config.active_fingers
+        }
     def set_friction_coeff(self, value: float) -> None:
         if value <= 0:
             raise ValueError("friction_coeff must be > 0")
@@ -171,6 +175,8 @@ class TactileAnalyzer:
         self._slip_count = {f: 0 for f in self.config.active_fingers}
         self._prev_fx.clear()
         self._prev_fy.clear()
+        for fz_filter in self._fz_filters.values():
+            fz_filter.reset()
 
     def _collect_active_samples(
         self,
@@ -195,6 +201,7 @@ class TactileAnalyzer:
         r_k = self._calculate_finger_friction_utilization(sample.ft, sample.fz)
         s_total = self._fuse_slip_risk(s_k, d_k, r_k)
         slip_confirmed = self._update_slip_debounce(sample.finger, s_total)
+        fz_filtered = self._fz_filters[sample.finger].compute(sample.fz)
         return PerFingerAnalysis(
             variance=variance,
             s_k=s_k,
@@ -203,6 +210,7 @@ class TactileAnalyzer:
             s_total=s_total,
             slip_confirmed=slip_confirmed,
             fz=sample.fz,
+            fz_filtered=fz_filtered,
         )
 
     def _build_analysis(

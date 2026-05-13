@@ -32,6 +32,7 @@ _ACTIVE_PRE_GRASP_JOINTS = (
 
 _PRESET_ACTIVE_FINGERS: dict[str, set[TactileSensorId]] = {
     "two_finger_pinch": {TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
+    "pen_pinch":{TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
     "three_finger_pinch": {
         TactileSensorId.THUMB,
         TactileSensorId.FOREFINGER,
@@ -51,7 +52,7 @@ _PRESET_ACTIVE_FINGERS: dict[str, set[TactileSensorId]] = {
     "five_finger_grasp": set(TactileSensorId),
     "lily_pinch": {TactileSensorId.THUMB, TactileSensorId.MIDDLE_FINGER},
     "small_pinch": {TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
-    "smooth_ball": {TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
+    "smooth_ball": {TactileSensorId.THUMB, TactileSensorId.FOREFINGER,TactileSensorId.MIDDLE_FINGER},
     "balloon_pinch": {TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
     "paper_cup_pinch": {
         TactileSensorId.THUMB,
@@ -75,10 +76,13 @@ _PRESET_ACTIVE_FINGERS: dict[str, set[TactileSensorId]] = {
         TactileSensorId.RING_FINGER,
         TactileSensorId.LITTLE_FINGER
     },
-    "paper_cup_two_finger_grasp":{
+    "minreal_water_grasp":{
         TactileSensorId.THUMB,
         TactileSensorId.FOREFINGER,
-    }
+        TactileSensorId.MIDDLE_FINGER,
+        TactileSensorId.RING_FINGER,
+        TactileSensorId.LITTLE_FINGER
+    },
 }
 
 
@@ -144,16 +148,16 @@ _PRE_GRASP_PRESET_DEGREE = {
         thumb_mcp=10.0,
     ),
     "four_finger_grasp": _pose_degrees(
-        rf_mcp=60.0,
-        rf_pip=25.0,
-        mf_mcp=53.0,
-        mf_pip=30.0,
-        ff_mcp=45.0,
-        ff_pip=35.0,
-        thumb_rotation=2.0,
-        thumb_swing=60.0,
-        thumb_mcp=2.0,
-        thumb_pip=21.0,
+        rf_mcp=47.0,
+        rf_pip=19.0,
+        mf_mcp=32.0,
+        mf_pip=22.0,
+        ff_mcp=44.0,
+        ff_pip=21.0,
+        thumb_rotation=11.0,
+        thumb_swing=80.0,
+        thumb_mcp=20.0,
+        thumb_pip=5.0,
     ),
     "five_finger_grasp": _pose_degrees(
         lf_mcp=45.0,
@@ -182,10 +186,14 @@ _PRE_GRASP_PRESET_DEGREE = {
         thumb_mcp=3.0,
     ),
     "smooth_ball": _pose_degrees(
-        ff_mcp=60.0,
-        ff_pip=10,
-        thumb_swing=80,
-        thumb_mcp=15,
+        ff_pip=26,
+        ff_mcp=53.0,
+        ff_swing=8,
+        mf_mcp=59,
+        mf_pip=20.0,
+        thumb_swing=90,
+        thumb_mcp=1,
+        thumb_pip=7
     ),
     "balloon_pinch": _pose_degrees(
         ff_mcp=25.0,
@@ -235,12 +243,27 @@ _PRE_GRASP_PRESET_DEGREE = {
         lf_pip=35,
         lf_mcp=35,
     ),
-    "paper_cup_two_finger_grasp":_pose_degrees(
-        thumb_swing=75,
-        thumb_pip=28,
-        ff_pip=50,
-        ff_mcp=20
-    )
+    "minreal_water_grasp":_pose_degrees(
+        thumb_mcp=15,
+        thumb_pip=20,
+        thumb_swing=80,
+        thumb_rotation=4,
+        ff_pip=45,
+        ff_mcp=35,
+        mf_pip=40,
+        mf_mcp=40,
+        rf_pip=40,
+        rf_mcp=40,
+        lf_pip=35,
+        lf_mcp=35,
+    ),
+    "pen_pinch": _pose_degrees(
+        ff_mcp=46.0,
+        ff_pip=52.0,
+        thumb_swing=74.0,
+        thumb_mcp=22.0,
+        thumb_pip=13.0,
+    ),
 }
 
 _OBJECT_PRE_GRASP_PRESET = {
@@ -295,18 +318,20 @@ class AdaptiveGraspConfig:
     open_speed: int = 50
     open_torque: int = 50
     open_wait_s: float = 3.0
-    pre_grasp_speed: int = 50
-    pre_grasp_torque: int = 50
+    pre_grasp_speed: int = 75
+    pre_grasp_torque: int = 75
     pre_grasp_wait_s: float = 5.0
-    closing_total_contact_threshold_n: float = 0.2
-    finger_touch_threshold_n: float = 0.1
+    #接触的判断条件：所有活动手指的法向力合力>阈值 and 各手指的法向力合力>阈值 
+    closing_total_contact_threshold_n: float = 0.2 # 所有手指的法向力合力接触阈值>0.2N
+    finger_touch_threshold_n: float = 0.1 # 各手指的法向力合力>0.1N
+
     max_torque: int = 80
     thumb_aux_torque: int = 3
     phase_timeout: float = 10.0
     control_period_s: float = 0.02
     closing_period_s: float = 0.2
-    closing_stall_angle_threshold: float = math.radians(0.5)
-    closing_stall_cycles: int = 5
+    closing_stall_angle_threshold: float = math.radians(0.5) #关节停转阈值，前后帧关节角度差<0.5度
+    closing_stall_cycles: int = 5 #关节因物理阻碍而停转的计数器
 
     # Tactile subscription timing. Keep these aligned unless you intentionally
     # want to dispatch cached frames faster/slower than hardware reads.
@@ -315,6 +340,7 @@ class AdaptiveGraspConfig:
 
     # Tactile slip analysis.
     sliding_window_size: int = 10
+    lowpass_alpha: float = 0.3
     max_normal_force_per_finger: float = 25.0
     variance_threshold: float = 0.003
     variance_baseline: float = 0.00001
@@ -338,7 +364,7 @@ class AdaptiveGraspConfig:
     force_ref_min_contact_ratio: float = 0.15
 
     # Position hold mode.
-    delta_theta_limit: float = math.radians(3)
+    delta_theta_limit: float = math.radians(2)
     contact_snapshot_angle_limit: float = math.radians(20)
     adaptive_hold_move_failure_limit: int = 3
     near_force_limit_ratio: float = 0.9
@@ -408,6 +434,7 @@ class AdaptiveGraspConfig:
 
     def _validate_values(self) -> None:
         _validate("sliding_window_size", self.sliding_window_size, greater_equal=3)
+        _validate("lowpass_alpha", self.lowpass_alpha, greater_than=0.0, less_equal=1.0)
         _validate("control_period_s", self.control_period_s, greater_than=0)
         _validate("tactile_sensor_update_period_s", self.tactile_sensor_update_period_s, greater_than=0)
         _validate("tactile_dispatch_period_s", self.tactile_dispatch_period_s, greater_than=0)

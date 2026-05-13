@@ -163,7 +163,7 @@ def _wait_for_completion(hand: DexHand) -> bool:
         elif has_been_running:
             # 场景 A：从 RUNNING 变为 STOPPED，立刻判定完成
             break
-        elif time.time() - start_time >= 0.02:
+        elif time.time() - start_time >= 0.1:
             # 场景 B：一直是 STOPPED，20ms 观察期后判定完成
             break
         time.sleep(0.005)

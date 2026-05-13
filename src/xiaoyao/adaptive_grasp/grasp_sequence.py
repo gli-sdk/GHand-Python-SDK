@@ -1,5 +1,6 @@
 import logging
 import time
+from xiaoyao.gestures import _wait_for_completion as wait_for_completion
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
@@ -123,8 +124,9 @@ class PhaseController:
         self._set_state(state)
         joints = self._joint_builder.position_command(pose, speed=speed, torque=torque)
         ok = self.hand.move_joints(joints, mode=CtrlMode.POSITION)
-        if ok:
-            time.sleep(wait_s)
+        time.sleep(0.02)
+        if not wait_for_completion(self.hand):
+            return False 
         return ok
 
     def _phase_open(self, is_running: Callable[[], bool] = lambda: True) -> bool:

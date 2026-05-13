@@ -6,7 +6,7 @@ from xiaoyao.dexhand import JointId, TactileSensorId
 from .config import AdaptiveGraspConfig
 from .force_reference_planner import ForceReferenceDecision
 from .object_profile import ObjectProfile
-from .pid_controller import PidController, PidParams
+from .pid_controller import PidController, PidParams, LowPassFilter
 from .tactility import TactileAnalysis
 from .utils import JOINT_TO_FINGER, clip
 
@@ -36,6 +36,10 @@ class PositionHoldPlanner:
         self.profile = profile
         self.is_fragile_mode = profile.is_fragile if profile else False
         self._finger_pid: dict[TactileSensorId, PidController] = {}
+        self._slip_risk_filters: dict[TactileSensorId, LowPassFilter] = {
+            finger: LowPassFilter(alpha=config.lowpass_alpha)
+            for finger in config.active_fingers
+        }
 
     def compute(
         self,
@@ -65,6 +69,8 @@ class PositionHoldPlanner:
 
     def reset(self) -> None:
         self._finger_pid.clear()
+        for f in self._slip_risk_filters.values():
+            f.reset()
 
     def _compute_finger_control_u(
         self,
@@ -87,19 +93,27 @@ class PositionHoldPlanner:
         finger_count: int,
     ) -> float:
         fz = analysis.finger_fz.get(finger, 0.0)
+        fz_filtered = analysis.per_finger[finger].fz_filtered
         fz_limit = self._get_max_normal_force_per_finger(finger_count)
         finger_analysis = analysis.per_finger.get(finger)
         slip_risk = finger_analysis.s_total if finger_analysis is not None else 0.0
         slip_confirmed = finger_analysis.slip_confirmed if finger_analysis is not None else False
 
-        u_slip = self._compute_slip_control_u(slip_risk)
+        slip_risk_filtered = self._slip_risk_filters[finger].compute(slip_risk)
+        u_slip = self._compute_slip_control_u(slip_risk_filtered)
         u_boost = self._compute_confirmed_slip_boost_u(slip_confirmed)
-        u_over = self._compute_overlimit_control_u(fz, fz_limit)
-        control_u = u_slip + u_boost + u_over
+        u_over = self._compute_overlimit_control_u(fz_filtered, fz_limit)
+        u_ff = self._compute_feedforward_control_u(fz_filtered,finger_count)
+        control_u = u_slip + u_boost + u_over + u_ff
+        #control_u = u_over+u_ff
         if self.is_fragile_mode and fz >= fz_limit:
             control_u = min(control_u, 0.0)
         return control_u
-
+    def _compute_feedforward_control_u(self,fz:float,finger_count:int):
+        safe_force_min_per_finger = self.profile.safe_force_min/finger_count
+        u = max((safe_force_min_per_finger - fz)/safe_force_min_per_finger,0)
+        # u = (safe_force_min_per_finger - fz)/safe_force_min_per_finger
+        return u
     def _compute_pid_control_u(
         self,
         finger: TactileSensorId,
