@@ -2,6 +2,7 @@ import math
 import threading
 import time
 from typing import Callable
+from types import SimpleNamespace
 
 import pytest
 
@@ -66,6 +67,9 @@ class _MockHand:
 
     def get_joints(self):
         return []
+
+    def get_hand_info(self):
+        return SimpleNamespace(state=0, error=0)
 
 
 class _FakeSubscriptionManager:
@@ -222,6 +226,7 @@ def test_full_grasp_state_transitions(monkeypatch):
     monkeypatch.setattr(grasper, "_should_auto_release", lambda: False)
 
     assert grasper.grasp_core() is True
+    assert grasper._grasp_sequence.hand is grasper._hand_port
     assert grasper.state == GraspState.ADAPTIVE_HOLD
 
     time.sleep(0.1)

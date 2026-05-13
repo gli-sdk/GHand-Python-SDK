@@ -18,6 +18,7 @@ from .visualization import TactileVisualizer
 from .utils import JOINT_TO_FINGER
 from .joint_builder import JointCommandBuilder, TORQUE_CONTROL_JOINTS
 from .grasp_sequence import ContactSnapshot, PhaseController
+from .hand_adapter import ensure_hand_command_port
 from .adaptive_hold_loop import HoldController, HoldResult
 
 _logger = logging.getLogger("xiaoyao.adaptive_grasp.adaptive_grasp_manager")
@@ -26,6 +27,7 @@ _logger = logging.getLogger("xiaoyao.adaptive_grasp.adaptive_grasp_manager")
 class AdaptiveGrasper:
     def __init__(self, hand: DexHand, config: Optional[AdaptiveGraspConfig] = None):
         self.hand = hand
+        self._hand_port = ensure_hand_command_port(hand)
         self.config = config or AdaptiveGraspConfig()
         self.state = GraspState.IDLE
         self.current_torque = 0
@@ -174,7 +176,7 @@ class AdaptiveGrasper:
             self._last_contact_snapshot,
         )
         self._adaptive_hold_loop = HoldController(
-            self.hand, self._sensor, self._safety, self._tactile,
+            self._hand_port, self._sensor, self._safety, self._tactile,
             self._visualizer, self._joint_builder,
             self.config, self.current_torque,
             contact_joint_angles=self._contact_joint_angles(),
@@ -201,7 +203,7 @@ class AdaptiveGrasper:
 
     def _run_grasp_sequence(self):
         self._grasp_sequence = PhaseController(
-            self.hand, self._sensor, self._safety, self._joint_builder,
+            self._hand_port, self._sensor, self._safety, self._joint_builder,
             self.config, self._get_monotonic_time, on_state_change=self._set_state,
             object_profile=self._object_profile,
         )
