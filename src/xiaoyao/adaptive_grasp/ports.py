@@ -17,8 +17,8 @@ class SubscriptionPeriodConfigurator(Protocol):
     def configure_subscription_periods(
         self,
         *,
-        recv_period_s: Optional[float] = None,
-        dispatch_period_s: Optional[float] = None,
+        recv_period_s: float,
+        dispatch_period_s: float,
     ) -> None:
         ...
 

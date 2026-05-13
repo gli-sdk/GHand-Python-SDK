@@ -71,6 +71,12 @@ def test_ensure_hand_command_port_returns_existing_port_like_object():
     assert ensure_hand_command_port(port_like) is port_like
 
 
+def test_ensure_hand_command_port_returns_existing_dex_hand_command_port():
+    existing_port = DexHandCommandPort(_FakeDexHand())
+
+    assert ensure_hand_command_port(existing_port) is existing_port
+
+
 def test_ensure_hand_command_port_wraps_dex_hand_like_object():
     hand = _FakeDexHand()
 
