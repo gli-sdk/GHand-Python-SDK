@@ -10,11 +10,14 @@ from xiaoyao.dexhand import JointId, TactileSensorId
 class _FakeSensor:
     tactile_data = {"thumb": object()}
 
+    def __init__(self):
+        self.stop_calls = []
+
     def data_age_s(self, current_time):
         return current_time + 0.25
 
     def stop(self, clear_joint_feedback=False):
-        self.stopped = clear_joint_feedback
+        self.stop_calls.append(clear_joint_feedback)
 
 
 class _FakeReleaseController:
@@ -33,7 +36,10 @@ class _FakeHoldController:
 
     def run_step(self, current_time):
         self.step_times.append(current_time)
-        return self.results.pop(0)
+        result = self.results.pop(0)
+        if isinstance(result, BaseException):
+            raise result
+        return result
 
 
 class _Clock:
@@ -85,8 +91,8 @@ def test_start_without_thread_initializes_adaptive_hold_state():
     assert runner.thread is None
 
 
-def test_run_once_error_sets_runtime_error_without_release():
-    runner, runtime, _sensor, release, _hold = _runner(
+def test_run_once_error_sets_runtime_error_stops_sensor_without_release():
+    runner, runtime, sensor, release, _hold = _runner(
         [HoldStepResult(result=HoldResult.ERROR)],
     )
 
@@ -95,6 +101,20 @@ def test_run_once_error_sets_runtime_error_without_release():
     assert keep_running is False
     assert runtime.state == GraspState.ERROR
     assert runtime.running is False
+    assert sensor.stop_calls == [False]
+    assert release.calls == []
+
+
+def test_run_loop_exception_sets_runtime_error_stops_sensor_without_release():
+    runner, runtime, sensor, release, _hold = _runner(
+        [RuntimeError("hold failed")],
+    )
+
+    runner._run_loop()
+
+    assert runtime.state == GraspState.ERROR
+    assert runtime.running is False
+    assert sensor.stop_calls == [False]
     assert release.calls == []
 
 

@@ -91,8 +91,7 @@ class AdaptiveHoldRunner:
             self._release()
             return False
 
-        self.runtime.state = GraspState.ERROR
-        self.runtime.running = False
+        self._cleanup_error()
         return False
 
     def stop(self) -> None:
@@ -113,8 +112,7 @@ class AdaptiveHoldRunner:
                 self.sleep(self.config.control_period_s)
         except Exception:
             _logger.exception("adaptive hold runner loop exception")
-            self.runtime.state = GraspState.ERROR
-            self.runtime.running = False
+            self._cleanup_error()
 
     def _should_auto_release(self, step_start: float) -> bool:
         started_at = self.runtime.adaptive_hold_started_at
@@ -127,3 +125,8 @@ class AdaptiveHoldRunner:
             wait_control_thread=False,
             control_thread=self._thread,
         )
+
+    def _cleanup_error(self) -> None:
+        self.runtime.state = GraspState.ERROR
+        self.runtime.running = False
+        self.sensor.stop(clear_joint_feedback=False)
