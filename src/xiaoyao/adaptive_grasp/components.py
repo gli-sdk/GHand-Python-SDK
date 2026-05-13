@@ -29,11 +29,15 @@ def build_adaptive_grasp_components(
     sensor: Optional[Any] = None,
 ) -> AdaptiveGraspComponents:
     active_fingers = set(config.active_fingers)
-    sensor_client = sensor or SensorClient(
-        hand,
-        active_fingers=active_fingers,
-        finger_touch_threshold_n=config.finger_touch_threshold_n,
-        get_monotonic_time=get_monotonic_time,
+    sensor_client = (
+        sensor
+        if sensor is not None
+        else SensorClient(
+            hand,
+            active_fingers=active_fingers,
+            finger_touch_threshold_n=config.finger_touch_threshold_n,
+            get_monotonic_time=get_monotonic_time,
+        )
     )
     torque_joints = tuple(
         joint

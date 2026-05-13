@@ -15,6 +15,11 @@ class FakeSensor:
     pass
 
 
+class FalseyFakeSensor:
+    def __bool__(self) -> bool:
+        return False
+
+
 def monotonic_time() -> float:
     return 0.0
 
@@ -41,6 +46,22 @@ def test_build_components_creates_default_dependencies_without_visualizer():
 def test_build_components_uses_injected_sensor():
     config = AdaptiveGraspConfig(enable_visualization=False)
     sensor = FakeSensor()
+
+    from xiaoyao.adaptive_grasp.components import build_adaptive_grasp_components
+
+    components = build_adaptive_grasp_components(
+        hand=FakeHand(),
+        config=config,
+        get_monotonic_time=monotonic_time,
+        sensor=sensor,
+    )
+
+    assert components.sensor is sensor
+
+
+def test_build_components_uses_injected_falsey_sensor():
+    config = AdaptiveGraspConfig(enable_visualization=False)
+    sensor = FalseyFakeSensor()
 
     from xiaoyao.adaptive_grasp.components import build_adaptive_grasp_components
 
