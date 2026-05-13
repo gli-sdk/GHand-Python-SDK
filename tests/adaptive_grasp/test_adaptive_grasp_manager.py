@@ -6,7 +6,6 @@ from types import SimpleNamespace
 
 import pytest
 
-import xiaoyao
 from xiaoyao.adaptive_grasp import AdaptiveGraspConfig, AdaptiveGrasper, GraspState
 from xiaoyao.adaptive_grasp.adaptive_hold_runner import AdaptiveHoldRunner
 from xiaoyao.adaptive_grasp.adaptive_hold_loop import HoldResult, HoldStepResult
@@ -20,9 +19,6 @@ from xiaoyao.adaptive_grasp.tactility import TactileAnalysis
 from xiaoyao.adaptive_grasp.joint_builder import JointCommandBuilder
 from xiaoyao.adaptive_grasp.sensor import SensorClient
 from xiaoyao.dexhand import CtrlMode, Joint, JointId, TactileSensorId
-
-print(xiaoyao.adaptive_grasp.__file__)
-print("hello world")
 
 
 class _FakeTactileInfo:
@@ -201,6 +197,34 @@ def test_start_adaptive_control_uses_hold_runner_thread(monkeypatch):
     assert grasper._adaptive_hold_loop is grasper._hold_runner._hold_controller
 
 
+def test_hold_runner_auto_release_uses_control_step_time(monkeypatch):
+    hand = _MockHand()
+    cfg = AdaptiveGraspConfig(
+        enable_visualization=False,
+        release_hold_time_s=1.0,
+    )
+    grasper = AdaptiveGrasper(hand, cfg)
+    grasper._runtime.running = True
+    grasper._runtime.adaptive_hold_started_at = 0.0
+    grasper._hold_runner._hold_controller = type(
+        "_ContinueHoldLoop",
+        (),
+        {"run_step": lambda self, current_time: HoldStepResult(result=HoldResult.CONTINUE)},
+    )()
+    calls = []
+    monkeypatch.setattr(
+        grasper._release_controller,
+        "release",
+        lambda **kwargs: calls.append(kwargs) or True,
+    )
+    times = iter([0.5, 2.0])
+    grasper._get_monotonic_time = lambda: next(times)
+    grasper._hold_runner.get_monotonic_time = grasper._get_monotonic_time
+
+    assert grasper._hold_runner.run_once() is True
+    assert calls == []
+
+
 def test_perform_release_delegates_to_release_controller_with_runner_thread(monkeypatch):
     grasper = AdaptiveGrasper(_MockHand(), AdaptiveGraspConfig())
 
@@ -352,7 +376,8 @@ def test_release_does_not_require_fresh_hand_feedback_after_subscription_stops(m
 def test_full_grasp_state_transitions(monkeypatch):
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(
-        release_hold_time_s=0.05,
+        enable_visualization=False,
+        release_hold_time_s=3600.0,
         control_period_s=0.01,
     )
     grasper = AdaptiveGrasper(hand, cfg)
@@ -367,7 +392,6 @@ def test_full_grasp_state_transitions(monkeypatch):
         TactileSensorId.FOREFINGER: _FakeTactileInfo(0.0, 0.0, 2.0),
     }
     grasper._sensor._latest_joint_feedback = []
-    monkeypatch.setattr(grasper, "_should_auto_release", lambda: False)
 
     assert grasper.grasp_core() is True
     assert grasper._grasp_sequence.hand is grasper._hand_port
@@ -914,7 +938,8 @@ def test_full_grasp_lifecycle(monkeypatch):
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(
         closing_total_contact_threshold_n=0.5,
-        release_hold_time_s=0.05,
+        enable_visualization=False,
+        release_hold_time_s=3600.0,
         control_period_s=0.01,
         release_timeout_s=0.2,
     )
@@ -932,7 +957,6 @@ def test_full_grasp_lifecycle(monkeypatch):
         TactileSensorId.FOREFINGER: _FakeTactileInfo(0.0, 0.0, 2.0),
     }
     grasper._sensor._latest_joint_feedback = []
-    monkeypatch.setattr(grasper, "_should_auto_release", lambda: False)
 
     assert grasper.state == GraspState.IDLE
 

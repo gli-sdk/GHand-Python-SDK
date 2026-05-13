@@ -64,7 +64,6 @@ class AdaptiveGrasper:
             get_monotonic_time=self._get_monotonic_time,
             sleep=lambda duration: time.sleep(duration),
         )
-        self._hold_runner._should_auto_release = lambda step_start: self._should_auto_release()
 
         self._grasp_sequence: Optional[PhaseController] = None
         self._adaptive_hold_loop: Optional[HoldController] = None
