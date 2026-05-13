@@ -3,7 +3,7 @@ from typing import Any
 from xiaoyao.dexhand import CtrlMode, Joint
 from xiaoyao.gestures import _wait_for_completion as wait_for_completion
 
-from .ports import HandCommandPort
+from .ports import GraspSequenceHandPort
 
 
 class DexHandCommandPort:
@@ -35,13 +35,21 @@ class DexHandCommandPort:
         )
 
 
-def ensure_hand_command_port(hand: Any) -> HandCommandPort:
+def ensure_hand_command_port(hand: Any) -> GraspSequenceHandPort:
     if isinstance(hand, DexHandCommandPort):
         return hand
-    if (
-        hasattr(hand, "move_joints")
-        and hasattr(hand, "stop")
-        and not hasattr(hand, "subscribe")
-    ):
+
+    is_dex_hand_like = hasattr(hand, "subscribe") or hasattr(hand, "get_hand_info")
+    has_command_methods = hasattr(hand, "move_joints") and hasattr(hand, "stop")
+    has_motion_completion = hasattr(hand, "wait_for_motion_completion")
+
+    if is_dex_hand_like:
+        return DexHandCommandPort(hand)
+    if has_command_methods and has_motion_completion:
         return hand
+    if has_command_methods:
+        raise TypeError(
+            "hand port must provide wait_for_motion_completion() or be a "
+            "DexHand-like object with get_hand_info()"
+        )
     return DexHandCommandPort(hand)

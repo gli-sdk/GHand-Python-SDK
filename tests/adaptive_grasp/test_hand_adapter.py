@@ -1,3 +1,5 @@
+import pytest
+
 from xiaoyao.adaptive_grasp.hand_adapter import DexHandCommandPort, ensure_hand_command_port
 from xiaoyao.dexhand import CtrlMode, Joint, JointId
 
@@ -32,6 +34,28 @@ class _PortLikeHand:
 
     def stop(self):
         pass
+
+    def wait_for_motion_completion(self):
+        return True
+
+
+class _CommandOnlyHand:
+    def move_joints(self, joints, mode):
+        return False
+
+    def stop(self):
+        pass
+
+
+class _GetHandInfoDexHandLike:
+    def move_joints(self, joints, *, mode):
+        return True
+
+    def stop(self):
+        pass
+
+    def get_hand_info(self):
+        return None
 
 
 def test_dex_hand_command_port_delegates_move_joints_and_stop():
@@ -89,6 +113,11 @@ def test_ensure_hand_command_port_returns_existing_port_like_object():
     assert ensure_hand_command_port(port_like) is port_like
 
 
+def test_ensure_hand_command_port_rejects_command_only_port():
+    with pytest.raises(TypeError, match="wait_for_motion_completion"):
+        ensure_hand_command_port(_CommandOnlyHand())
+
+
 def test_ensure_hand_command_port_returns_existing_dex_hand_command_port():
     existing_port = DexHandCommandPort(_FakeDexHand())
 
@@ -97,6 +126,15 @@ def test_ensure_hand_command_port_returns_existing_dex_hand_command_port():
 
 def test_ensure_hand_command_port_wraps_dex_hand_like_object():
     hand = _FakeDexHand()
+
+    port = ensure_hand_command_port(hand)
+
+    assert isinstance(port, DexHandCommandPort)
+    assert port.hand is hand
+
+
+def test_ensure_hand_command_port_wraps_get_hand_info_dex_hand_like_object():
+    hand = _GetHandInfoDexHandLike()
 
     port = ensure_hand_command_port(hand)
 
