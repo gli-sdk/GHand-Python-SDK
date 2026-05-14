@@ -11,7 +11,7 @@ from xiaoyao.adaptive_grasp.adaptive_hold_runner import AdaptiveHoldRunner
 from xiaoyao.adaptive_grasp.adaptive_hold_loop import HoldResult, HoldStepResult
 from xiaoyao.adaptive_grasp.force_reference_planner import ForceReferencePlanner
 from xiaoyao.adaptive_grasp.position_hold_planner import PositionHoldPlanner
-from xiaoyao.adaptive_grasp.torque_hold_planner import TorqueHoldDecision, TorqueHoldPlanner
+from xiaoyao.adaptive_grasp.torque_hold_planner import TorqueHoldPlanner
 from xiaoyao.adaptive_grasp.object_profile import ObjectProfile
 from xiaoyao.adaptive_grasp.grasp_sequence import ContactSnapshot
 from xiaoyao.adaptive_grasp.safety import SafetyReport, SafetyStatus
@@ -145,6 +145,33 @@ def test_telemetry_properties_are_runtime_backed():
     assert grasper.last_control_cycle_jitter_s == pytest.approx(0.01)
 
 
+def test_adaptive_grasper_does_not_expose_migrated_runtime_wrappers():
+    grasper = AdaptiveGrasper(_MockHand(), AdaptiveGraspConfig())
+
+    migrated_names = (
+        "_contact_joint_angles",
+        "_update_control_cycle_timing",
+        "_record_hold_step",
+        "_handle_hold_result",
+        "_should_auto_release",
+        "_reset_runtime_state",
+        "_object_profile",
+        "_adaptive_hold_started_at",
+        "_last_tactile_analysis",
+        "_last_safety_report",
+        "_last_force_decisions",
+        "_last_torque_hold_decision",
+        "_last_tactile_data_age_s",
+        "_last_control_step_start_s",
+        "_last_control_cycle_s",
+        "_last_control_cycle_jitter_s",
+        "_last_contact_snapshot",
+    )
+
+    for name in migrated_names:
+        assert not hasattr(grasper, name)
+
+
 def test_start_adaptive_control_uses_hold_runner_thread(monkeypatch):
     import xiaoyao.adaptive_grasp.adaptive_hold_runner as runner_module
 
@@ -231,7 +258,7 @@ def test_adaptive_control_loop_uses_latest_manager_clock(monkeypatch):
         AdaptiveGraspConfig(enable_visualization=False, release_hold_time_s=100.0),
     )
     grasper._running = True
-    grasper._adaptive_hold_started_at = 0.0
+    grasper._runtime.adaptive_hold_started_at = 0.0
     grasper._hold_runner.get_monotonic_time = lambda: 1.0
     grasper._get_monotonic_time = lambda: 42.0
     seen_step_times = []
@@ -926,7 +953,7 @@ def test_torque_mode_creates_hold_planners_from_contact_snapshot(monkeypatch):
         enable_visualization=False,
     )
     grasper = AdaptiveGrasper(hand, cfg)
-    grasper._object_profile = ObjectProfile(
+    grasper._runtime.object_profile = ObjectProfile(
         name="paper_cup_test",
         weight_kg=0.01,
         safe_force_min=0.5,
@@ -937,7 +964,7 @@ def test_torque_mode_creates_hold_planners_from_contact_snapshot(monkeypatch):
         position_hold_torque=5,
         position_hold_speed=5,
     )
-    grasper._last_contact_snapshot = ContactSnapshot(
+    grasper._runtime.last_contact_snapshot = ContactSnapshot(
         joint_angles={JointId.THUMB_PIP: 0.12},
         finger_fz={TactileSensorId.THUMB: 0.5},
         total_fz=0.5,
@@ -961,7 +988,7 @@ def test_position_mode_creates_position_hold_planner_from_contact_snapshot(monke
         enable_visualization=False,
     )
     grasper = AdaptiveGrasper(hand, cfg)
-    grasper._object_profile = ObjectProfile(
+    grasper._runtime.object_profile = ObjectProfile(
         name="paper_cup_test",
         weight_kg=0.01,
         safe_force_min=0.5,
@@ -972,7 +999,7 @@ def test_position_mode_creates_position_hold_planner_from_contact_snapshot(monke
         position_hold_torque=5,
         position_hold_speed=5,
     )
-    grasper._last_contact_snapshot = ContactSnapshot(
+    grasper._runtime.last_contact_snapshot = ContactSnapshot(
         joint_angles={JointId.THUMB_PIP: 0.12},
         finger_fz={TactileSensorId.THUMB: 0.5},
         total_fz=0.5,
@@ -986,27 +1013,6 @@ def test_position_mode_creates_position_hold_planner_from_contact_snapshot(monke
 
     assert isinstance(grasper._adaptive_hold_loop._position_hold_planner, PositionHoldPlanner)
     assert isinstance(grasper._adaptive_hold_loop._force_reference_planner, ForceReferencePlanner)
-
-
-def test_record_hold_step_stores_last_torque_hold_decision():
-    hand = _MockHand()
-    grasper = AdaptiveGrasper(hand, AdaptiveGraspConfig())
-    decision = TorqueHoldDecision(
-        finger_torques={TactileSensorId.THUMB: 6.0},
-        force_refs={TactileSensorId.THUMB: 0.5},
-        contact_ratios={TactileSensorId.THUMB: 1.0},
-        F_ref_total=0.5,
-    )
-
-    grasper._record_hold_step(
-        HoldStepResult(
-            result=HoldResult.CONTINUE,
-            torque_hold_decision=decision,
-        ),
-        step_start=1.0,
-    )
-
-    assert grasper.last_torque_hold_decision is decision
 
 
 def test_full_grasp_lifecycle(monkeypatch):

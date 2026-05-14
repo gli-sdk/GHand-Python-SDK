@@ -3,8 +3,7 @@ from dataclasses import dataclass
 import pytest
 
 from xiaoyao.adaptive_grasp.adaptive_hold_loop import HoldResult, HoldStepResult
-from xiaoyao.adaptive_grasp.runtime import AdaptiveGraspRuntime
-from xiaoyao.adaptive_grasp.states import GraspState
+from xiaoyao.adaptive_grasp.runtime import AdaptiveGraspRuntime, GraspState
 
 
 @dataclass
@@ -97,3 +96,9 @@ def test_record_hold_step_clears_data_age_when_tactile_data_missing():
     runtime.record_hold_step(step, sensor, 12.0)
 
     assert runtime.last_tactile_data_age_s is None
+
+
+def test_grasp_state_is_exported_from_runtime_and_package():
+    from xiaoyao.adaptive_grasp import GraspState as PackageGraspState
+
+    assert PackageGraspState is GraspState

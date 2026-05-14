@@ -30,7 +30,7 @@ from xiaoyao.exceptions import (
 )
 
 def grasp_case_choose()->dict:
-    grasp_case_choose = "balloon"
+    grasp_case_choose = "paper_cup"
     if grasp_case_choose == "smooth_ball":
         return {"pre_grasp_preset":"smooth_ball",
                 "object":"plastic_cup"}

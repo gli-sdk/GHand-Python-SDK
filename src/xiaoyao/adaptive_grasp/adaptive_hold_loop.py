@@ -10,7 +10,7 @@ from .joint_builder import JointCommandBuilder
 from .position_hold_planner import ForceDecision, PositionHoldPlanner
 from .ports import HandCommandPort, SensorFrameSource
 from .safety import SafetyMonitor, SafetyReport, SafetyStatus
-from .states import GraspState
+from .runtime import GraspState
 from .tactility import TactileAnalyzer, TactileAnalysis
 from .torque_hold_planner import TorqueHoldDecision, TorqueHoldPlanner
 from .utils import clip

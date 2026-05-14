@@ -1,30 +1,86 @@
 import logging
 import threading
 import time
-from typing import Optional
+from dataclasses import dataclass
+from typing import Any, Optional
 
-from xiaoyao.dexhand import DexHand, JointId, TactileSensorId
+from xiaoyao.dexhand import DexHand, TactileSensorId
 
-from .adaptive_hold_loop import HoldController, HoldResult
+from .adaptive_hold_loop import HoldController
 from .adaptive_hold_runner import AdaptiveHoldRunner
-from .components import build_adaptive_grasp_components
 from .config import AdaptiveGraspConfig
 from .grasp_sequence import ContactSnapshot, PhaseController
 from .hand_adapter import ensure_hand_command_port
+from .hold_planner_factory import HoldPlannerFactory
+from .joint_builder import JointCommandBuilder, TORQUE_CONTROL_JOINTS
 from .object_profile import ObjectProfile, ObjectProfileRegistry
 from .ports import SensorFrameSource
 from .position_hold_planner import ForceDecision
 from .release_controller import ReleaseController
-from .runtime import AdaptiveGraspRuntime
-from .safety import SafetyReport
-from .states import GraspState
-from .tactility import TactileAnalysis
+from .runtime import AdaptiveGraspRuntime, GraspState
+from .safety import SafetyMonitor, SafetyReport
+from .sensor import SensorClient
+from .tactility import TactileAnalysis, TactileAnalyzer
 from .torque_hold_planner import TorqueHoldDecision
+from .utils import JOINT_TO_FINGER
+from .visualization import TactileVisualizer
 
 _logger = logging.getLogger("xiaoyao.adaptive_grasp.adaptive_grasp_manager")
 
 
 _NO_CONTROL_THREAD_OVERRIDE = object()
+
+
+@dataclass
+class AdaptiveGraspComponents:
+    sensor: Any
+    tactile: TactileAnalyzer
+    safety: SafetyMonitor
+    joint_builder: JointCommandBuilder
+    hold_planner_factory: HoldPlannerFactory
+    visualizer: Optional[TactileVisualizer]
+
+
+def build_adaptive_grasp_components(
+    *,
+    hand: Any,
+    config: AdaptiveGraspConfig,
+    get_monotonic_time: Any,
+    sensor: Optional[Any] = None,
+) -> AdaptiveGraspComponents:
+    active_fingers = set(config.active_fingers)
+    sensor_client = (
+        sensor
+        if sensor is not None
+        else SensorClient(
+            hand,
+            active_fingers=active_fingers,
+            finger_touch_threshold_n=config.finger_touch_threshold_n,
+            get_monotonic_time=get_monotonic_time,
+        )
+    )
+    torque_joints = tuple(
+        joint
+        for joint in TORQUE_CONTROL_JOINTS
+        if JOINT_TO_FINGER[joint] in active_fingers
+    )
+    visualizer = (
+        TactileVisualizer(
+            active_fingers=active_fingers,
+            backend=config.visualization_backend,
+        )
+        if config.enable_visualization
+        else None
+    )
+
+    return AdaptiveGraspComponents(
+        sensor=sensor_client,
+        tactile=TactileAnalyzer(config),
+        safety=SafetyMonitor(config),
+        joint_builder=JointCommandBuilder(config, torque_joints),
+        hold_planner_factory=HoldPlannerFactory(config),
+        visualizer=visualizer,
+    )
 
 
 class AdaptiveGrasper:
@@ -136,94 +192,6 @@ class AdaptiveGrasper:
     @_control_thread.setter
     def _control_thread(self, value) -> None:
         self._control_thread_override = value
-
-    @property
-    def _object_profile(self) -> Optional[ObjectProfile]:
-        return self._runtime.object_profile
-
-    @_object_profile.setter
-    def _object_profile(self, value: Optional[ObjectProfile]) -> None:
-        self._runtime.object_profile = value
-
-    @property
-    def _adaptive_hold_started_at(self) -> Optional[float]:
-        return self._runtime.adaptive_hold_started_at
-
-    @_adaptive_hold_started_at.setter
-    def _adaptive_hold_started_at(self, value: Optional[float]) -> None:
-        self._runtime.adaptive_hold_started_at = value
-
-    @property
-    def _last_tactile_analysis(self) -> Optional[TactileAnalysis]:
-        return self._runtime.last_tactile_analysis
-
-    @_last_tactile_analysis.setter
-    def _last_tactile_analysis(self, value: Optional[TactileAnalysis]) -> None:
-        self._runtime.last_tactile_analysis = value
-
-    @property
-    def _last_safety_report(self) -> Optional[SafetyReport]:
-        return self._runtime.last_safety_report
-
-    @_last_safety_report.setter
-    def _last_safety_report(self, value: Optional[SafetyReport]) -> None:
-        self._runtime.last_safety_report = value
-
-    @property
-    def _last_force_decisions(self) -> Optional[dict[TactileSensorId, ForceDecision]]:
-        return self._runtime.last_force_decisions
-
-    @_last_force_decisions.setter
-    def _last_force_decisions(self, value: Optional[dict[TactileSensorId, ForceDecision]]) -> None:
-        self._runtime.last_force_decisions = value
-
-    @property
-    def _last_torque_hold_decision(self) -> Optional[TorqueHoldDecision]:
-        return self._runtime.last_torque_hold_decision
-
-    @_last_torque_hold_decision.setter
-    def _last_torque_hold_decision(self, value: Optional[TorqueHoldDecision]) -> None:
-        self._runtime.last_torque_hold_decision = value
-
-    @property
-    def _last_tactile_data_age_s(self) -> Optional[float]:
-        return self._runtime.last_tactile_data_age_s
-
-    @_last_tactile_data_age_s.setter
-    def _last_tactile_data_age_s(self, value: Optional[float]) -> None:
-        self._runtime.last_tactile_data_age_s = value
-
-    @property
-    def _last_control_step_start_s(self) -> Optional[float]:
-        return self._runtime.last_control_step_start_s
-
-    @_last_control_step_start_s.setter
-    def _last_control_step_start_s(self, value: Optional[float]) -> None:
-        self._runtime.last_control_step_start_s = value
-
-    @property
-    def _last_control_cycle_s(self) -> Optional[float]:
-        return self._runtime.last_control_cycle_s
-
-    @_last_control_cycle_s.setter
-    def _last_control_cycle_s(self, value: Optional[float]) -> None:
-        self._runtime.last_control_cycle_s = value
-
-    @property
-    def _last_control_cycle_jitter_s(self) -> Optional[float]:
-        return self._runtime.last_control_cycle_jitter_s
-
-    @_last_control_cycle_jitter_s.setter
-    def _last_control_cycle_jitter_s(self, value: Optional[float]) -> None:
-        self._runtime.last_control_cycle_jitter_s = value
-
-    @property
-    def _last_contact_snapshot(self) -> Optional[ContactSnapshot]:
-        return self._runtime.last_contact_snapshot
-
-    @_last_contact_snapshot.setter
-    def _last_contact_snapshot(self, value: Optional[ContactSnapshot]) -> None:
-        self._runtime.last_contact_snapshot = value
 
     def _set_state(self, state: GraspState) -> None:
         self._runtime.state = state
@@ -356,42 +324,12 @@ class AdaptiveGrasper:
         )
         return self._grasp_sequence.run(lambda: self._runtime.running)
 
-    def _contact_joint_angles(self) -> Optional[dict[JointId, float]]:
-        if self._runtime.last_contact_snapshot is None:
-            return None
-        return self._runtime.last_contact_snapshot.joint_angles
-
     def _adaptive_control_loop(self) -> None:
         self._hold_runner.get_monotonic_time = self._get_monotonic_time
         if self._adaptive_hold_loop is not None:
             self._hold_runner.hold_controller = self._adaptive_hold_loop
         self._hold_runner._run_loop()
         self._adaptive_hold_loop = self._hold_runner.hold_controller
-
-    def _update_control_cycle_timing(self, step_start: float) -> None:
-        self._runtime.update_control_cycle_timing(
-            step_start,
-            control_period_s=self.config.control_period_s,
-        )
-
-    def _record_hold_step(self, step, step_start: float) -> None:
-        self._runtime.record_hold_step(step, self._sensor, step_start)
-
-    def _handle_hold_result(self, result: HoldResult) -> bool:
-        if result in (HoldResult.AUTO_RELEASE, HoldResult.FAULT_RELEASE):
-            self._perform_release(wait_control_thread=False)
-            return True
-        if result == HoldResult.ERROR:
-            self._cleanup_grasp(state=GraspState.ERROR)
-            return True
-        return False
-
-    def _should_auto_release(self, current_time: Optional[float] = None) -> bool:
-        if self._runtime.adaptive_hold_started_at is None:
-            return False
-        now = self._get_monotonic_time() if current_time is None else current_time
-        elapsed = now - self._runtime.adaptive_hold_started_at
-        return elapsed >= self.config.release_hold_time_s
 
     def _perform_release(
         self,
@@ -416,14 +354,6 @@ class AdaptiveGrasper:
 
     def _stop_sensor_subscription(self) -> None:
         self._sensor.stop(clear_joint_feedback=False)
-
-    def _reset_runtime_state(self) -> None:
-        state = self._runtime.state
-        running = self._runtime.running
-        self._runtime.reset_for_grasp()
-        self._runtime.state = state
-        self._runtime.running = running
-        self._reset_runtime_components()
 
     def _reset_runtime_components(self) -> None:
         self._tactile.reset()

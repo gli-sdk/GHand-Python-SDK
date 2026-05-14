@@ -13,7 +13,7 @@ class TestJointCommandBuilder:
         assert JointId.THUMB_PIP in pose
         assert JointId.THUMB_SWING in pose
         assert JointId.FF_PIP in pose
-        assert pose[JointId.THUMB_SWING] == math.radians(20)
+        assert pose[JointId.THUMB_SWING] == math.radians(80)
 
     def test_torque_command_sets_inactive_to_zero(self):
         cfg = AdaptiveGraspConfig(pre_grasp_preset="two_finger_pinch")
@@ -37,8 +37,8 @@ class TestJointCommandBuilder:
 
         assert joints[-2].id == JointId.THUMB_ROTATION
         assert joints[-1].id == JointId.THUMB_SWING
-        assert joints[-2].torque == 5
-        assert joints[-1].torque == 5
+        assert joints[-2].torque == cfg.thumb_aux_torque
+        assert joints[-1].torque == cfg.thumb_aux_torque
 
     def test_torque_command_uses_configured_thumb_aux_torque(self):
         cfg = AdaptiveGraspConfig(thumb_aux_torque=7)

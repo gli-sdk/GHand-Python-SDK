@@ -263,7 +263,6 @@ class TactileAnalyzer:
             0.0,
             1.0,
         )
-        # return clip(r_k,0.0,1.0)
 
     def _update_slip_debounce(self, finger: TactileSensorId, slip_risk: float) -> bool:
         count = self._slip_count.get(finger, 0)

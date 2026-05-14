@@ -9,7 +9,7 @@ from .config import AdaptiveGraspConfig
 from .joint_builder import JointCommandBuilder
 from .ports import HandCommandPort, SensorFrameSource
 from .runtime import AdaptiveGraspRuntime
-from .states import GraspState
+from .runtime import GraspState
 
 _logger = logging.getLogger("xiaoyao.adaptive_grasp.release_controller")
 

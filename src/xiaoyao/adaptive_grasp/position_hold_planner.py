@@ -6,7 +6,7 @@ from xiaoyao.dexhand import JointId, TactileSensorId
 from .config import AdaptiveGraspConfig
 from .force_reference_planner import ForceReferenceDecision
 from .object_profile import ObjectProfile
-from .pid_controller import PidController, PidParams, LowPassFilter
+from .pid_controller import LowPassFilter
 from .tactility import TactileAnalysis
 from .utils import JOINT_TO_FINGER, clip
 
@@ -29,13 +29,21 @@ ForceDecisions = dict[TactileSensorId, ForceDecision]
 
 
 class PositionHoldPlanner:
-    """Plans position-mode joint corrections from shared force references."""
+    """Plans position-mode joint corrections from shared force references.
 
-    def __init__(self, config: AdaptiveGraspConfig, profile: Optional[ObjectProfile] = None):
+    ``force_reference`` and ``dt`` are kept on ``compute`` so position and
+    torque planners can share the same call shape, even though the direct
+    position-control strategy does not currently use them.
+    """
+
+    def __init__(
+        self,
+        config: AdaptiveGraspConfig,
+        profile: Optional[ObjectProfile] = None,
+    ):
         self.config = config
         self.profile = profile
         self.is_fragile_mode = profile.is_fragile if profile else False
-        self._finger_pid: dict[TactileSensorId, PidController] = {}
         self._slip_risk_filters: dict[TactileSensorId, LowPassFilter] = {
             finger: LowPassFilter(alpha=config.lowpass_alpha)
             for finger in config.active_fingers
@@ -48,17 +56,18 @@ class PositionHoldPlanner:
         force_reference: ForceReferenceDecision,
         dt: float,
     ) -> ForceDecisions:
+        _ = (force_reference, dt)
         finger_count = self._get_effective_contact_count(analysis.finger_fz)
         near_limit = self._is_near_limit(analysis.finger_fz, finger_count)
         decisions: ForceDecisions = {}
         for finger in self.config.active_fingers:
-            control_u = self._compute_finger_control_u(
-                finger,
-                analysis,
-                force_reference,
-                finger_count,
-                dt,
-            )
+            control_u = 0.0
+            if self.config.enable_position_hold_force_control:
+                control_u = self._compute_finger_direct_control_u(
+                    finger,
+                    analysis,
+                    finger_count,
+                )
             decisions[finger] = self._build_decision(
                 finger,
                 control_u,
@@ -68,23 +77,8 @@ class PositionHoldPlanner:
         return decisions
 
     def reset(self) -> None:
-        self._finger_pid.clear()
         for f in self._slip_risk_filters.values():
             f.reset()
-
-    def _compute_finger_control_u(
-        self,
-        finger: TactileSensorId,
-        analysis: TactileAnalysis,
-        force_reference: ForceReferenceDecision,
-        finger_count: int,
-        dt: float,
-    ) -> float:
-        return self._compute_finger_direct_control_u(
-            finger,
-            analysis,
-            finger_count,
-        )
 
     def _compute_finger_direct_control_u(
         self,
@@ -103,32 +97,22 @@ class PositionHoldPlanner:
         u_slip = self._compute_slip_control_u(slip_risk_filtered)
         u_boost = self._compute_confirmed_slip_boost_u(slip_confirmed)
         u_over = self._compute_overlimit_control_u(fz_filtered, fz_limit)
-        u_ff = self._compute_feedforward_control_u(fz_filtered,finger_count)
+        u_ff = self._compute_feedforward_control_u(fz_filtered, finger_count)
+        
         control_u = u_slip + u_boost + u_over + u_ff
-        #control_u = u_over+u_ff
         if self.is_fragile_mode and fz >= fz_limit:
             control_u = min(control_u, 0.0)
         return control_u
-    def _compute_feedforward_control_u(self,fz:float,finger_count:int):
-        safe_force_min_per_finger = self.profile.safe_force_min/finger_count
-        u = max((safe_force_min_per_finger - fz)/safe_force_min_per_finger,0)
-        # u = (safe_force_min_per_finger - fz)/safe_force_min_per_finger
-        return u
-    def _compute_pid_control_u(
+
+    def _compute_feedforward_control_u(
         self,
-        finger: TactileSensorId,
         fz: float,
-        fz_limit: float,
-        F_n_ref: float,
-        dt: float,
+        finger_count: int,
     ) -> float:
-        error = F_n_ref - fz
-        overlimit_u = self._compute_overlimit_control_u(fz, fz_limit)
-        pid_u = self._get_or_create_pid(finger).compute(error=error, dt=dt)
-        control_u = overlimit_u + pid_u
-        if self.is_fragile_mode and fz >= fz_limit:
-            control_u = min(control_u, 0.0)
-        return control_u
+        if self.profile is None:
+            raise ValueError("ObjectProfile is required for position hold mode")
+        safe_force_min_per_finger = self.profile.safe_force_min / finger_count
+        return max((safe_force_min_per_finger - fz) / safe_force_min_per_finger, 0)
 
     def _compute_slip_control_u(self, slip_risk: float) -> float:
         cfg = self.config
@@ -146,7 +130,10 @@ class PositionHoldPlanner:
         return self.config.delta_theta_limit * self.config.direct_slip_confirmed_boost_ratio
 
     def _compute_overlimit_control_u(self, fz: float, fz_limit: float) -> float:
-        normal_overlimit_error = max(0.0, (fz - fz_limit) / (fz_limit + self.config.epsilon))
+        normal_overlimit_error = max(
+            0.0,
+            (fz - fz_limit) / (fz_limit + self.config.epsilon),
+        )
         return -self.config.K_n * normal_overlimit_error
 
     def _build_decision(
@@ -236,28 +223,6 @@ class PositionHoldPlanner:
             raise ValueError("ObjectProfile.position_hold_speed is required for position hold mode")
         next_speed = self.profile.position_hold_speed
         return int(clip(next_speed, 0, 100))
-
-    def _get_or_create_pid(self, finger: TactileSensorId) -> PidController:
-        if finger not in self._finger_pid:
-            self._finger_pid[finger] = PidController(self._get_pid_params(finger))
-        return self._finger_pid[finger]
-
-    def _get_pid_param(self, finger: TactileSensorId, param_name: str) -> float:
-        per_finger_cfg = self.config.per_finger_pid.get(finger)
-        if per_finger_cfg is not None:
-            value = getattr(per_finger_cfg, param_name, None)
-            if value is not None:
-                return value
-        return getattr(self.config, f"position_hold_{param_name}")
-
-    def _get_pid_params(self, finger: TactileSensorId) -> PidParams:
-        return PidParams(
-            K_p=self._get_pid_param(finger, "K_p"),
-            K_i=self._get_pid_param(finger, "K_i"),
-            K_d=self._get_pid_param(finger, "K_d"),
-            I_min=self._get_pid_param(finger, "I_min"),
-            I_max=self._get_pid_param(finger, "I_max"),
-        )
 
     @staticmethod
     def _offset_joint_angle(

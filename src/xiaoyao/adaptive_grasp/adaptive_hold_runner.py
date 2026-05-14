@@ -9,7 +9,7 @@ from .grasp_sequence import ContactSnapshot
 from .ports import SensorFrameSource
 from .release_controller import ReleaseController
 from .runtime import AdaptiveGraspRuntime
-from .states import GraspState
+from .runtime import GraspState
 
 _logger = logging.getLogger("xiaoyao.adaptive_grasp.adaptive_hold_runner")
 

@@ -4,7 +4,7 @@ from xiaoyao.adaptive_grasp.config import AdaptiveGraspConfig
 from xiaoyao.adaptive_grasp.joint_builder import JointCommandBuilder
 from xiaoyao.adaptive_grasp.release_controller import ReleaseController
 from xiaoyao.adaptive_grasp.runtime import AdaptiveGraspRuntime
-from xiaoyao.adaptive_grasp.states import GraspState
+from xiaoyao.adaptive_grasp.runtime import GraspState
 from xiaoyao.dexhand import CtrlMode, JointId
 
 

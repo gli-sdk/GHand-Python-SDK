@@ -2,7 +2,7 @@ import math
 import pytest
 from xiaoyao.adaptive_grasp.config import AdaptiveGraspConfig
 from xiaoyao.adaptive_grasp.safety import SafetyMonitor, SafetyStatus, SafetyReport
-from xiaoyao.adaptive_grasp.states import GraspState
+from xiaoyao.adaptive_grasp.runtime import GraspState
 from xiaoyao.dexhand import Joint, JointId, TactileSensorId
 
 

@@ -1,4 +1,4 @@
-from .states import GraspState
+from .runtime import GraspState
 from .config import AdaptiveGraspConfig
 from .adaptive_grasp_manager import AdaptiveGrasper
 from .sensor import SensorClient

@@ -364,7 +364,8 @@ class AdaptiveGraspConfig:
     force_ref_min_contact_ratio: float = 0.15
 
     # Position hold mode.
-    delta_theta_limit: float = math.radians(2)
+    enable_position_hold_force_control: bool = True
+    delta_theta_limit: float = math.radians(4)
     contact_snapshot_angle_limit: float = math.radians(20)
     adaptive_hold_move_failure_limit: int = 3
     near_force_limit_ratio: float = 0.9
@@ -382,7 +383,7 @@ class AdaptiveGraspConfig:
     direct_slip_risk_full: float = 0.85
     direct_slip_risk_gamma: float = 1.5
     direct_slip_confirmed_boost_ratio: float = 0.5
-    K_n: float = 1.0 #法向力超限时的关节角度释放系数，超限多少，乘该系数，就是手指关节角度的减少量
+    K_n: float = 0.1 #法向力超限时的关节角度释放系数，超限多少，乘该系数，就是手指关节角度的减少量
 
     # Torque hold mode.
     torque_hold_base_torque: int = 5
@@ -498,6 +499,8 @@ class AdaptiveGraspConfig:
             raise ValueError("force_ref_min_contact_ratio * active_finger_count must be <= 1.0")
 
     def _validate_position_hold_params(self) -> None:
+        if not isinstance(self.enable_position_hold_force_control, bool):
+            raise ValueError("enable_position_hold_force_control must be bool")
         _validate("delta_theta_limit", self.delta_theta_limit, greater_than=0)
         _validate("contact_snapshot_angle_limit", self.contact_snapshot_angle_limit, greater_than=0)
         _validate("adaptive_hold_move_failure_limit", self.adaptive_hold_move_failure_limit, greater_than=0)

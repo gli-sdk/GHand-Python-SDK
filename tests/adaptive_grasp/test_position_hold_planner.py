@@ -38,6 +38,7 @@ def _analysis(
                 s_total=(per_finger_slip_risk or {}).get(finger, slip_risk),
                 slip_confirmed=slip_confirmed,
                 fz=fz,
+                fz_filtered=fz,
             )
             for finger, fz in forces.items()
         },
@@ -224,6 +225,27 @@ def test_position_hold_planner_applies_direct_slip_control():
     assert decision.target_angles[JointId.THUMB_PIP] > 0.2
 
 
+def test_position_hold_planner_disables_force_control_when_configured():
+    cfg = AdaptiveGraspConfig(
+        active_fingers={TactileSensorId.THUMB},
+        enable_position_hold_force_control=False,
+        thumb_K_MCP=0.5,
+        thumb_K_PIP=0.5,
+    )
+    planner = PositionHoldPlanner(cfg, _profile(is_fragile=False))
+
+    decision = planner.compute(
+        _analysis(finger_fz={TactileSensorId.THUMB: 0.0}, slip_risk=1.0, slip_confirmed=True),
+        {JointId.THUMB_MCP: 0.1, JointId.THUMB_PIP: 0.2},
+        _reference(force_refs={TactileSensorId.THUMB: 1.0}),
+        dt=0.02,
+    )[TactileSensorId.THUMB]
+
+    assert decision.control_u == pytest.approx(0.0)
+    assert decision.target_angles[JointId.THUMB_MCP] == pytest.approx(0.1)
+    assert decision.target_angles[JointId.THUMB_PIP] == pytest.approx(0.2)
+
+
 def test_direct_control_uses_slip_risk_deadband_boost_and_overlimit():
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB},
@@ -250,7 +272,7 @@ def test_direct_control_uses_slip_risk_deadband_boost_and_overlimit():
             slip_confirmed=True,
         ),
         finger_count=1,
-    ) == pytest.approx(1.5)
+    ) == pytest.approx(0.6833333333333333)
 
     assert planner._compute_finger_direct_control_u(
         TactileSensorId.THUMB,
@@ -272,10 +294,11 @@ def test_direct_control_does_not_fall_back_to_global_slip_risk():
             TactileSensorId.FOREFINGER: 0.5,
         },
         slip_risk=1.0,
-        per_finger_slip_risk={TactileSensorId.THUMB: 1.0},
+        per_finger_slip_risk={
+            TactileSensorId.THUMB: 1.0,
+            TactileSensorId.FOREFINGER: 0.0,
+        },
     )
-    analysis.per_finger.pop(TactileSensorId.FOREFINGER)
-
     assert planner._compute_finger_direct_control_u(
         TactileSensorId.FOREFINGER,
         analysis,
@@ -342,16 +365,34 @@ def test_position_hold_planner_uses_position_hold_speed_when_configured():
     assert decision.next_speed == 7
 
 
-def test_position_hold_planner_requires_profile_for_position_hold_torque():
+def test_position_hold_planner_requires_profile_for_position_hold_mode():
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB},
     )
     planner = PositionHoldPlanner(cfg, profile=None)
 
-    with pytest.raises(ValueError, match="position_hold_torque"):
+    with pytest.raises(ValueError, match="ObjectProfile"):
         planner.compute(
             _analysis(finger_fz={TactileSensorId.THUMB: 0.5}),
             {JointId.THUMB_MCP: 0.0, JointId.THUMB_PIP: 0.0},
             _reference(force_refs={TactileSensorId.THUMB: 0.5}),
             dt=0.02,
         )
+
+
+def test_position_hold_planner_does_not_expose_removed_pid_path():
+    planner = PositionHoldPlanner(
+        AdaptiveGraspConfig(active_fingers={TactileSensorId.THUMB}),
+        _profile(is_fragile=False),
+    )
+
+    removed_names = (
+        "_compute_finger_control_u",
+        "_compute_pid_control_u",
+        "_get_or_create_pid",
+        "_get_pid_param",
+        "_get_pid_params",
+    )
+
+    for name in removed_names:
+        assert not hasattr(planner, name)

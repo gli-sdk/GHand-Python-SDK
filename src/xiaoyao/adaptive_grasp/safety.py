@@ -7,7 +7,7 @@ from typing import Any, Optional
 from xiaoyao.dexhand import TactileSensorId
 
 from .config import AdaptiveGraspConfig
-from .states import GraspState
+from .runtime import GraspState
 
 _logger = logging.getLogger("xiaoyao.adaptive_grasp.safety")
 

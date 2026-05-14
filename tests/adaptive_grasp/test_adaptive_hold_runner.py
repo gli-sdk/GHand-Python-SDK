@@ -3,7 +3,7 @@ from xiaoyao.adaptive_grasp.adaptive_hold_runner import AdaptiveHoldRunner
 from xiaoyao.adaptive_grasp.config import AdaptiveGraspConfig
 from xiaoyao.adaptive_grasp.grasp_sequence import ContactSnapshot
 from xiaoyao.adaptive_grasp.runtime import AdaptiveGraspRuntime
-from xiaoyao.adaptive_grasp.states import GraspState
+from xiaoyao.adaptive_grasp.runtime import GraspState
 from xiaoyao.dexhand import JointId, TactileSensorId
 
 

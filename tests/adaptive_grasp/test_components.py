@@ -1,4 +1,5 @@
 from xiaoyao.adaptive_grasp.config import AdaptiveGraspConfig
+from xiaoyao.adaptive_grasp.adaptive_grasp_manager import build_adaptive_grasp_components
 from xiaoyao.adaptive_grasp.hold_planner_factory import HoldPlannerFactory
 from xiaoyao.adaptive_grasp.joint_builder import JointCommandBuilder
 from xiaoyao.adaptive_grasp.safety import SafetyMonitor
@@ -27,8 +28,6 @@ def monotonic_time() -> float:
 def test_build_components_creates_default_dependencies_without_visualizer():
     config = AdaptiveGraspConfig(enable_visualization=False)
 
-    from xiaoyao.adaptive_grasp.components import build_adaptive_grasp_components
-
     components = build_adaptive_grasp_components(
         hand=FakeHand(),
         config=config,
@@ -47,8 +46,6 @@ def test_build_components_uses_injected_sensor():
     config = AdaptiveGraspConfig(enable_visualization=False)
     sensor = FakeSensor()
 
-    from xiaoyao.adaptive_grasp.components import build_adaptive_grasp_components
-
     components = build_adaptive_grasp_components(
         hand=FakeHand(),
         config=config,
@@ -62,8 +59,6 @@ def test_build_components_uses_injected_sensor():
 def test_build_components_uses_injected_falsey_sensor():
     config = AdaptiveGraspConfig(enable_visualization=False)
     sensor = FalseyFakeSensor()
-
-    from xiaoyao.adaptive_grasp.components import build_adaptive_grasp_components
 
     components = build_adaptive_grasp_components(
         hand=FakeHand(),
@@ -81,8 +76,6 @@ def test_build_components_filters_torque_joints_to_active_fingers():
         enable_visualization=False,
     )
 
-    from xiaoyao.adaptive_grasp.components import build_adaptive_grasp_components
-
     components = build_adaptive_grasp_components(
         hand=FakeHand(),
         config=config,
@@ -96,3 +89,9 @@ def test_build_components_filters_torque_joints_to_active_fingers():
     )
     assert JointId.FF_PIP not in components.joint_builder.torque_joints
     assert JointId.MF_PIP not in components.joint_builder.torque_joints
+
+
+def test_component_builder_lives_with_manager_entrypoint():
+    import xiaoyao.adaptive_grasp.adaptive_grasp_manager as manager_module
+
+    assert manager_module.build_adaptive_grasp_components is build_adaptive_grasp_components

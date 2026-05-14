@@ -6,7 +6,7 @@ from typing import Any, Callable, Optional
 from xiaoyao.dexhand import CtrlMode, Joint, JointId, TactileSensorId
 from .config import AdaptiveGraspConfig
 from .ports import GraspSequenceHandPort, SensorFrameSource
-from .states import GraspState
+from .runtime import GraspState
 from .safety import SafetyMonitor, SafetyStatus
 from .joint_builder import JointCommandBuilder
 from .object_profile import ObjectProfile

@@ -140,15 +140,15 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
     ObjectProfile(
         name="paper_cup",
         weight_kg=0.01,
-        safe_force_min=0.5,
-        safe_force_max=5.0,
+        safe_force_min=1.0,
+        safe_force_max=15.0,
         friction_coeff=0.8,
         is_fragile=True,
         material="paper",
         hold_strategy="position",
         phase_closing_torque=10,
-        position_hold_torque=8,
-        position_hold_speed=8,
+        position_hold_torque=20,
+        position_hold_speed=20,
     ),
     ObjectProfile(
         name="default",
@@ -166,15 +166,15 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
     ObjectProfile(
         name = "plastic_cup",
         weight_kg=0.1,
-        safe_force_min=1.0,
-        safe_force_max=5.0,
-        friction_coeff=0.9,
+        safe_force_min=3.0,
+        safe_force_max=30.0,
+        friction_coeff=0.7,
         is_fragile=True,
         material="plastic",
         hold_strategy="position",
         phase_closing_torque=10,
-        position_hold_torque=5,
-        position_hold_speed=5,
+        position_hold_torque=30,
+        position_hold_speed=30,
     ),
     ObjectProfile(
         name = "minreal_water_bottle_500ml",
@@ -190,6 +190,7 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         position_hold_speed=30,
     )
 )
+
 
 
 def _register_default_profiles() -> None:
