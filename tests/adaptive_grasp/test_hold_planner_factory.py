@@ -35,7 +35,7 @@ def _snapshot() -> ContactSnapshot:
 
 def test_hold_planner_factory_creates_torque_mode_planners_from_contact_snapshot():
     cfg = AdaptiveGraspConfig(
-        adaptive_hold_command_mode="torque",
+        hold_command_mode="torque",
         active_fingers={TactileSensorId.THUMB},
     )
 
@@ -48,7 +48,7 @@ def test_hold_planner_factory_creates_torque_mode_planners_from_contact_snapshot
 
 def test_hold_planner_factory_creates_position_mode_planners_from_contact_snapshot():
     cfg = AdaptiveGraspConfig(
-        adaptive_hold_command_mode="position",
+        hold_command_mode="position",
         active_fingers={TactileSensorId.THUMB},
     )
 

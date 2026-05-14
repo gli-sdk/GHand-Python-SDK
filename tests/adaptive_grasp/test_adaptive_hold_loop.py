@@ -24,8 +24,8 @@ class _MockHand:
 def test_hold_step_sends_position_payload_from_hold_decision(monkeypatch):
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(
-        variance_threshold=0.1,
-        max_normal_force_per_finger=1.0,
+        slip_variance_threshold=0.1,
+        max_normal_force_per_finger_n=1.0,
     )
     sensor = MagicMock()
     sensor.tactile_data = {}
@@ -169,7 +169,7 @@ def test_hold_step_error_uses_configured_move_failure_limit():
 def test_hold_step_can_send_torque_payload_to_active_mcp_pip_joints():
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(
-        adaptive_hold_command_mode="torque",
+        hold_command_mode="torque",
         torque_hold_base_torque=20,
         active_fingers={TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
     )
@@ -210,7 +210,7 @@ def test_hold_step_can_send_torque_payload_to_active_mcp_pip_joints():
 def test_torque_hold_loop_uses_torque_hold_planner_per_finger_torques():
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(
-        adaptive_hold_command_mode="torque",
+        hold_command_mode="torque",
         active_fingers={TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
         control_period_s=0.02,
     )
@@ -285,7 +285,7 @@ def test_torque_hold_loop_uses_torque_hold_planner_per_finger_torques():
 def test_position_hold_loop_uses_position_hold_planner_with_force_reference():
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(
-        adaptive_hold_command_mode="position",
+        hold_command_mode="position",
         active_fingers={TactileSensorId.THUMB},
         control_period_s=0.02,
     )
@@ -355,7 +355,7 @@ def test_position_hold_loop_uses_position_hold_planner_with_force_reference():
 def test_hold_loop_notifies_observer_with_force_reference():
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(
-        adaptive_hold_command_mode="position",
+        hold_command_mode="position",
         active_fingers={TactileSensorId.THUMB},
         control_period_s=0.02,
     )
@@ -515,7 +515,7 @@ def test_position_hold_clamps_target_angles_to_contact_snapshot_window():
 def test_position_hold_clamps_target_angles_to_configured_contact_snapshot_window():
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(
-        contact_snapshot_angle_limit=math.radians(5),
+        contact_angle_guard_margin_rad=math.radians(5),
     )
     sensor = MagicMock()
     sensor.tactile_data = {}

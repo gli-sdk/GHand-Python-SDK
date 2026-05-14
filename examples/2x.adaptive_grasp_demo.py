@@ -90,7 +90,7 @@ def build_config(args: argparse.Namespace) -> AdaptiveGraspConfig:
         "max_torque": "max_torque",
         "pre_grasp_preset": "pre_grasp_preset",
         "hold_time": "release_hold_time_s",
-        "hold_command_mode": "adaptive_hold_command_mode",
+        "hold_command_mode": "hold_command_mode",
         "torque_hold_base_torque": "torque_hold_base_torque",
         "object": "default_object",
         "enable_visualization":"enable_visualization",
@@ -258,7 +258,7 @@ def main() -> None:
             f"release_hold_time_s={config.release_hold_time_s}, "
             f"release_open_speed={config.release_open_speed}, "
             f"release_open_torque={config.release_open_torque}, "
-            f"adaptive_hold_command_mode={config.adaptive_hold_command_mode}, "
+            f"hold_command_mode={config.hold_command_mode}, "
             f"torque_hold_base_torque={config.torque_hold_base_torque}"
         )
         print(f"Pre-grasp preset={config.pre_grasp_preset} ")
@@ -275,7 +275,7 @@ def main() -> None:
             print_hold_status(
                 state_val,
                 grasper.current_torque,
-                mode=config.adaptive_hold_command_mode,
+                mode=config.hold_command_mode,
                 total_fz=analysis.total_fz if analysis is not None else None,
                 slip_risk=analysis.slip_risk if analysis is not None else None,
                 slip_confirmed=analysis.slip_confirmed if analysis is not None else None,

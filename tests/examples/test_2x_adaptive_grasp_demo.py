@@ -97,7 +97,7 @@ def _fake_config():
         release_hold_time_s=0.01,
         release_open_speed=50,
         release_open_torque=50,
-        adaptive_hold_command_mode="position",
+        hold_command_mode="position",
         torque_hold_base_torque=20,
         pre_grasp_preset="two_finger_pinch",
     )
@@ -110,7 +110,7 @@ def test_build_config_accepts_adaptive_hold_command_options():
         def __init__(self, **kwargs):
             captured_kwargs.update(kwargs)
 
-    parser = demo.build_parser()
+    parser = demo.build_parser(demo.grasp_case_choose())
     args = parser.parse_args([
         "--hold-command-mode", "torque",
         "--torque-hold-base-torque", "20",
@@ -125,7 +125,7 @@ def test_build_config_accepts_adaptive_hold_command_options():
         demo.AdaptiveGraspConfig = original_config
 
     assert isinstance(cfg, _ConfigSpy)
-    assert captured_kwargs["adaptive_hold_command_mode"] == "torque"
+    assert captured_kwargs["hold_command_mode"] == "torque"
     assert captured_kwargs["torque_hold_base_torque"] == 20
     assert captured_kwargs["default_object"] == "balloon"
 
@@ -137,7 +137,7 @@ def test_build_config_passes_parser_defaults_when_args_omitted():
         def __init__(self, **kwargs):
             captured_kwargs.update(kwargs)
 
-    parser = demo.build_parser()
+    parser = demo.build_parser(demo.grasp_case_choose())
     args = parser.parse_args([])
 
     original_config = demo.AdaptiveGraspConfig
@@ -150,11 +150,12 @@ def test_build_config_passes_parser_defaults_when_args_omitted():
     assert isinstance(cfg, _ConfigSpy)
     assert captured_kwargs == {
         "max_torque": 80,
-        "pre_grasp_preset": "small_pinch",
+        "pre_grasp_preset": "paper_cup_grasp",
         "release_hold_time_s": 100,
-        "adaptive_hold_command_mode": "position",
+        "hold_command_mode": "position",
         "torque_hold_base_torque": 4,
-        "default_object": "metal",
+        "default_object": "paper_cup",
+        "enable_visualization": False,
     }
 
 

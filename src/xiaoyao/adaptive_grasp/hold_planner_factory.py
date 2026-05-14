@@ -43,11 +43,11 @@ class HoldPlannerFactory:
         self,
         profile: Optional[ObjectProfile],
     ) -> Optional[PositionHoldPlanner]:
-        if self.config.adaptive_hold_command_mode != "position":
+        if self.config.hold_command_mode != "position":
             return None
         return PositionHoldPlanner(self.config, profile)
 
     def _create_torque_hold_planner(self) -> Optional[TorqueHoldPlanner]:
-        if self.config.adaptive_hold_command_mode != "torque":
+        if self.config.hold_command_mode != "torque":
             return None
         return TorqueHoldPlanner(self.config)

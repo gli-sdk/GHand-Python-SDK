@@ -110,10 +110,10 @@ class TactileAnalysis:
 class FingerTactileSample:
     finger: TactileSensorId
     info: Any
-    fx: float #x轴方向切向力
-    fy: float #y轴方向切向力
-    fz: float #法向力
-    ft: float #合成切向力
+    fx: float #x杞存柟鍚戝垏鍚戝姏
+    fy: float #y杞存柟鍚戝垏鍚戝姏
+    fz: float #娉曞悜鍔?
+    ft: float #鍚堟垚鍒囧悜鍔?
 
 
 class OnlineWindowNormalizer:
@@ -137,13 +137,13 @@ class TactileAnalyzer:
         self.config = config
         self._friction_coeff = config.default_friction_coeff
         self._windows: dict[TactileSensorId, deque[float]] = {
-            finger: deque(maxlen=config.sliding_window_size)
+            finger: deque(maxlen=config.tactile_slip_window_size)
             for finger in config.active_fingers
         }
         self._variance_normalizers: dict[TactileSensorId, OnlineWindowNormalizer] = {
             finger: OnlineWindowNormalizer(
-                window_size=config.sliding_window_size,
-                eps=config.epsilon,
+                window_size=config.tactile_slip_window_size,
+                eps=config.numeric_epsilon,
             )
             for finger in config.active_fingers
         }
@@ -151,7 +151,7 @@ class TactileAnalyzer:
         self._prev_fx: dict[TactileSensorId, list[float]] = {}
         self._prev_fy: dict[TactileSensorId, list[float]] = {}
         self._fz_filters: dict[TactileSensorId, LowPassFilter] = {
-            finger: LowPassFilter(alpha=config.lowpass_alpha)
+            finger: LowPassFilter(alpha=config.tactile_lowpass_alpha)
             for finger in config.active_fingers
         }
     def set_friction_coeff(self, value: float) -> None:
@@ -247,26 +247,26 @@ class TactileAnalyzer:
 
     def _normalize_slip_risk(self, variance: float) -> float:
         cfg = self.config
-        if variance <= cfg.variance_baseline:
+        if variance <= cfg.slip_variance_baseline:
             return 0.0
-        if variance >= cfg.variance_threshold:
+        if variance >= cfg.slip_variance_threshold:
             return 1.0
-        denom = (cfg.variance_threshold - cfg.variance_baseline) + cfg.epsilon
-        return clip((variance - cfg.variance_baseline) / denom, 0, 1)
+        denom = (cfg.slip_variance_threshold - cfg.slip_variance_baseline) + cfg.numeric_epsilon
+        return clip((variance - cfg.slip_variance_baseline) / denom, 0, 1)
 
     def _fuse_slip_risk(self, s_k: float, d_k: float, r_k: float) -> float:
         cfg = self.config
         return clip(
-            cfg.variance_weight * s_k
-            + cfg.direction_weight * d_k
-            + cfg.friction_weight * r_k,
+            cfg.slip_variance_weight * s_k
+            + cfg.slip_direction_weight * d_k
+            + cfg.slip_friction_weight * r_k,
             0.0,
             1.0,
         )
 
     def _update_slip_debounce(self, finger: TactileSensorId, slip_risk: float) -> bool:
         count = self._slip_count.get(finger, 0)
-        if slip_risk + self.config.epsilon >= 0.7:
+        if slip_risk + self.config.numeric_epsilon >= 0.7:
             count += 1
         else:
             count = max(0, count - 1)
@@ -305,7 +305,7 @@ class TactileAnalyzer:
     def _calculate_finger_friction_utilization(self, ft: float, fz: float) -> float:
         cfg = self.config
         mu_ref = self._friction_coeff
-        mu_eff = ft / (fz + cfg.epsilon)
+        mu_eff = ft / (fz + cfg.numeric_epsilon)
         return min(1.0, max(0.0, mu_eff / mu_ref))
 
     @staticmethod

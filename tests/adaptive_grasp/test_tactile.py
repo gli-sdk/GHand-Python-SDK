@@ -44,11 +44,10 @@ def test_tactile_layout_points_match_sensor_geometry():
 
 
 def test_tactile_analysis_variance_and_slip_risk():
-    cfg = AdaptiveGraspConfig(variance_baseline=0.0, variance_threshold=1.0, epsilon=1e-6)
+    cfg = AdaptiveGraspConfig(slip_variance_baseline=0.0, slip_variance_threshold=1.0, numeric_epsilon=1e-6)
     analyzer = TactileAnalyzer(cfg)
 
-    # 填充滑动窗口使方差非零（交替切向力产生变化）
-    for i in range(cfg.sliding_window_size):
+    for i in range(cfg.tactile_slip_window_size):
         data = {
             TactileSensorId.THUMB: FakeTactileInfo(0.5 if i % 2 == 0 else 0.0, 0.0, 1.0),
             TactileSensorId.FOREFINGER: FakeTactileInfo(0.0, 0.0, 1.0),
@@ -81,20 +80,20 @@ def test_online_window_normalizer_returns_zero_for_constant_window():
 
 def test_slip_confirmed_after_debounce():
     cfg = AdaptiveGraspConfig(
-        variance_baseline=0.0,
-        variance_threshold=1.0,
+        slip_variance_baseline=0.0,
+        slip_variance_threshold=1.0,
         slip_detect_debounce_cycles=3,
-        variance_weight=0.5,
-        direction_weight=0.0,
-        friction_weight=0.5,
+        slip_variance_weight=0.5,
+        slip_direction_weight=0.0,
+        slip_friction_weight=0.5,
     )
     analyzer = TactileAnalyzer(cfg)
 
-    # 预填充窗口到长度 >= 3（恒定力，方差为 0，不影响 debounce）
+    # Warm up the window with constant force so variance stays near zero.
     for _ in range(3):
         analyzer.update({TactileSensorId.THUMB: FakeTactileInfo(0.0, 0.0, 1.0)})
 
-    # 连续 3 个周期高风险：方差突增且摩擦利用率保持高位。
+    # Drive three consecutive high-risk samples to satisfy the debounce count.
     for _ in range(3):
         data = {
             TactileSensorId.THUMB: FakeTactileInfo(10.0, 0.0, 1.0),
@@ -106,25 +105,25 @@ def test_slip_confirmed_after_debounce():
 
 def test_slip_confirmed_resets_on_clear():
     cfg = AdaptiveGraspConfig(
-        variance_baseline=0.0,
-        variance_threshold=1.0,
+        slip_variance_baseline=0.0,
+        slip_variance_threshold=1.0,
         slip_detect_debounce_cycles=3,
     )
     analyzer = TactileAnalyzer(cfg)
 
-    # 2 个周期高方差（未触发）
+
     for _ in range(2):
         analyzer.update({TactileSensorId.THUMB: FakeTactileInfo(10.0, 0.0, 1.0)})
-    # 1 个周期低方差（衰减）
+
     result = analyzer.update({TactileSensorId.THUMB: FakeTactileInfo(0.0, 0.0, 1.0)})
     assert result.slip_confirmed is False
 
 
 def test_direction_distance_zero_when_stable():
-    cfg = AdaptiveGraspConfig(variance_baseline=0.0, variance_threshold=1.0)
+    cfg = AdaptiveGraspConfig(slip_variance_baseline=0.0, slip_variance_threshold=1.0)
     analyzer = TactileAnalyzer(cfg)
 
-    # 稳定的力场分布：3 个点，Fx=1, Fy=0
+
     stable = [1, 0, 0, 1, 0, 0, 1, 0, 0]
     analyzer.update({TactileSensorId.THUMB: FakeTactileInfo(3.0, 0.0, 1.0, distributed=stable)})
     result = analyzer.update({TactileSensorId.THUMB: FakeTactileInfo(3.0, 0.0, 1.0, distributed=stable)})
@@ -133,11 +132,11 @@ def test_direction_distance_zero_when_stable():
 
 
 def test_direction_distance_one_when_orthogonal():
-    cfg = AdaptiveGraspConfig(variance_baseline=0.0, variance_threshold=1.0)
+    cfg = AdaptiveGraspConfig(slip_variance_baseline=0.0, slip_variance_threshold=1.0)
     analyzer = TactileAnalyzer(cfg)
 
     frame1 = [1, 0, 0, 1, 0, 0, 1, 0, 0]
-    # 力场完全转向：Fx=0, Fy=1
+
     frame2 = [0, 1, 0, 0, 1, 0, 0, 1, 0]
     analyzer.update({TactileSensorId.THUMB: FakeTactileInfo(0.0, 3.0, 1.0, distributed=frame1)})
     result = analyzer.update({TactileSensorId.THUMB: FakeTactileInfo(0.0, 3.0, 1.0, distributed=frame2)})
@@ -147,7 +146,7 @@ def test_direction_distance_one_when_orthogonal():
 
 
 def test_direction_distance_zero_on_first_cycle():
-    cfg = AdaptiveGraspConfig(variance_baseline=0.0, variance_threshold=1.0)
+    cfg = AdaptiveGraspConfig(slip_variance_baseline=0.0, slip_variance_threshold=1.0)
     analyzer = TactileAnalyzer(cfg)
 
     distributed = [1, 0, 0, 2, 0, 0, 3, 0, 0]
@@ -157,7 +156,7 @@ def test_direction_distance_zero_on_first_cycle():
 
 
 def test_direction_distance_with_multiple_fingers():
-    cfg = AdaptiveGraspConfig(variance_baseline=0.0, variance_threshold=1.0)
+    cfg = AdaptiveGraspConfig(slip_variance_baseline=0.0, slip_variance_threshold=1.0)
     analyzer = TactileAnalyzer(cfg)
 
     f1 = [1, 0, 0, 1, 0, 0]
@@ -167,14 +166,14 @@ def test_direction_distance_with_multiple_fingers():
         TactileSensorId.FOREFINGER: FakeTactileInfo(2.0, 0.0, 1.0, distributed=f2),
     })
 
-    # 只有拇指方向变化
+
     f1_next = [0, 1, 0, 0, 1, 0]
     result = analyzer.update({
         TactileSensorId.THUMB: FakeTactileInfo(0.0, 2.0, 1.0, distributed=f1_next),
         TactileSensorId.FOREFINGER: FakeTactileInfo(2.0, 0.0, 1.0, distributed=f2),
     })
 
-    # 有一只手指方向变了，d_k 应该 > 0
+
     assert result.direction_distance > 0.0
     assert result.direction_distance <= 1.0
 
@@ -219,11 +218,11 @@ def test_friction_utilization_multiple_fingers_takes_max():
 
 def test_slip_risk_fusion_with_all_indicators():
     cfg = AdaptiveGraspConfig(
-        variance_baseline=0.0,
-        variance_threshold=1.0,
-        variance_weight=0.5,
-        direction_weight=0.3,
-        friction_weight=0.2,
+        slip_variance_baseline=0.0,
+        slip_variance_threshold=1.0,
+        slip_variance_weight=0.5,
+        slip_direction_weight=0.3,
+        slip_friction_weight=0.2,
     )
     analyzer = TactileAnalyzer(cfg)
 
@@ -231,25 +230,25 @@ def test_slip_risk_fusion_with_all_indicators():
     for _ in range(3):
         analyzer.update({TactileSensorId.THUMB: FakeTactileInfo(0.0, 0.0, 0.01, distributed=frame1)})
 
-    # 方差突增 + 方向变化 + 高摩擦利用率。
+
     dist = [0, 1, 0, 0, 1, 0]
     result = analyzer.update({
         TactileSensorId.THUMB: FakeTactileInfo(10.0, 0.0, 0.01, distributed=dist),
     })
 
-    # s_k=1.0, d_k=1.0, r_k≈1.0 (mu_eff=10/0.01=1000, mu_ref=0.5 => clip 1)
+
     # s_total = 0.5*1 + 0.3*1 + 0.2*1 = 1.0
     assert result.slip_risk == pytest.approx(1.0, abs=1e-6)
 
 
 def test_slip_confirmed_uses_fused_slip_risk():
     cfg = AdaptiveGraspConfig(
-        variance_baseline=0.0,
-        variance_threshold=1.0,
+        slip_variance_baseline=0.0,
+        slip_variance_threshold=1.0,
         slip_detect_debounce_cycles=2,
-        variance_weight=0.5,
-        direction_weight=0.3,
-        friction_weight=0.2,
+        slip_variance_weight=0.5,
+        slip_direction_weight=0.3,
+        slip_friction_weight=0.2,
     )
     analyzer = TactileAnalyzer(cfg)
 
@@ -262,17 +261,17 @@ def test_slip_confirmed_uses_fused_slip_risk():
     result = analyzer.update({
         TactileSensorId.THUMB: FakeTactileInfo(10.0, 0.0, 0.01, distributed=frame1),
     })
-    # 连续两周期 s_total >= 0.7，debounce=2 => confirmed
+
     assert result.slip_confirmed is True
 
 
 def test_slip_risk_fusion_formula():
     cfg = AdaptiveGraspConfig(
-        variance_baseline=0.0,
-        variance_threshold=1.0,
-        variance_weight=0.5,
-        direction_weight=0.3,
-        friction_weight=0.2,
+        slip_variance_baseline=0.0,
+        slip_variance_threshold=1.0,
+        slip_variance_weight=0.5,
+        slip_direction_weight=0.3,
+        slip_friction_weight=0.2,
     )
     analyzer = TactileAnalyzer(cfg)
 
@@ -280,7 +279,7 @@ def test_slip_risk_fusion_formula():
         analyzer.update({TactileSensorId.THUMB: FakeTactileInfo(0.0, 0.0, 1.0)})
 
     result = analyzer.update({TactileSensorId.THUMB: FakeTactileInfo(10.0, 0.0, 1.0)})
-    # s_k=1.0, d_k=0（无distributed）, r_k=clip(10/0.5,0,1)=1.0
+
     # s_total = 0.5*1 + 0.3*0 + 0.2*1 = 0.7
     assert result.slip_risk == pytest.approx(0.7, abs=1e-6)
 
@@ -288,11 +287,11 @@ def test_slip_risk_fusion_formula():
 def test_per_finger_analysis_exposes_individual_slip_risk():
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
-        variance_baseline=0.0,
-        variance_threshold=1.0,
-        variance_weight=0.5,
-        direction_weight=0.0,
-        friction_weight=0.5,
+        slip_variance_baseline=0.0,
+        slip_variance_threshold=1.0,
+        slip_variance_weight=0.5,
+        slip_direction_weight=0.0,
+        slip_friction_weight=0.5,
     )
     analyzer = TactileAnalyzer(cfg)
 

@@ -254,7 +254,7 @@ class HoldController:
         if self._can_plan_position_hold():
             return self._plan_position_hold_command(analysis, current_angles, dt)
 
-        if self.config.adaptive_hold_command_mode == "torque":
+        if self.config.hold_command_mode == "torque":
             return TorqueHoldCommand(
                 angles=current_angles,
                 torque=self._default_hold_torque(),
@@ -269,14 +269,14 @@ class HoldController:
 
     def _can_plan_torque_hold(self) -> bool:
         return (
-            self.config.adaptive_hold_command_mode == "torque"
+            self.config.hold_command_mode == "torque"
             and self._torque_hold_planner is not None
             and self._force_reference_planner is not None
         )
 
     def _can_plan_position_hold(self) -> bool:
         return (
-            self.config.adaptive_hold_command_mode == "position"
+            self.config.hold_command_mode == "position"
             and self._position_hold_planner is not None
             and self._force_reference_planner is not None
         )
@@ -348,7 +348,7 @@ class HoldController:
         return 0 if next_speed is None else next_speed
 
     def _default_hold_torque(self) -> int:
-        if self.config.adaptive_hold_command_mode == "torque":
+        if self.config.hold_command_mode == "torque":
             return self.config.torque_hold_base_torque
         return self._current_torque
 
@@ -426,8 +426,8 @@ class HoldController:
         for joint_id, base_angle in self._contact_joint_angles.items():
             if joint_id not in clamped_angles:
                 continue
-            lower = base_angle - self.config.contact_snapshot_angle_limit
-            upper = base_angle + self.config.contact_snapshot_angle_limit
+            lower = base_angle - self.config.contact_angle_guard_margin_rad
+            upper = base_angle + self.config.contact_angle_guard_margin_rad
             clamped_angles[joint_id] = max(lower, min(clamped_angles[joint_id], upper))
         return clamped_angles
 

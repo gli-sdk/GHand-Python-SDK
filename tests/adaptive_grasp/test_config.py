@@ -24,16 +24,16 @@ def test_position_hold_defaults():
     cfg = AdaptiveGraspConfig()
 
     assert cfg.enable_position_hold_force_control is _config_default("enable_position_hold_force_control")
-    assert cfg.delta_theta_limit == pytest.approx(_config_default("delta_theta_limit"))
-    assert cfg.thumb_K_MCP == pytest.approx(_config_default("thumb_K_MCP"))
-    assert cfg.thumb_K_PIP == pytest.approx(_config_default("thumb_K_PIP"))
-    assert cfg.finger_K_MCP == pytest.approx(_config_default("finger_K_MCP"))
-    assert cfg.finger_K_PIP == pytest.approx(_config_default("finger_K_PIP"))
+    assert cfg.position_hold_max_step_rad == pytest.approx(_config_default("position_hold_max_step_rad"))
+    assert cfg.thumb_mcp_step_ratio == pytest.approx(_config_default("thumb_mcp_step_ratio"))
+    assert cfg.thumb_pip_step_ratio == pytest.approx(_config_default("thumb_pip_step_ratio"))
+    assert cfg.finger_mcp_step_ratio == pytest.approx(_config_default("finger_mcp_step_ratio"))
+    assert cfg.finger_pip_step_ratio == pytest.approx(_config_default("finger_pip_step_ratio"))
 
 
-def test_delta_theta_limit_must_be_positive():
+def test_position_hold_max_step_rad_must_be_positive():
     with pytest.raises(ValueError):
-        AdaptiveGraspConfig(delta_theta_limit=0.0)
+        AdaptiveGraspConfig(position_hold_max_step_rad=0.0)
 
 
 def test_position_hold_force_control_flag_must_be_bool():
@@ -67,34 +67,39 @@ def test_global_joint_allocation_params_removed():
 
 
 def test_thumb_and_finger_joint_allocation_must_be_non_negative():
-    for param_name in ("thumb_K_MCP", "thumb_K_PIP", "finger_K_MCP", "finger_K_PIP"):
+    for param_name in (
+        "thumb_mcp_step_ratio",
+        "thumb_pip_step_ratio",
+        "finger_mcp_step_ratio",
+        "finger_pip_step_ratio",
+    ):
         with pytest.raises(ValueError):
             AdaptiveGraspConfig(**{param_name: -0.1})
 
     cfg = AdaptiveGraspConfig(
-        thumb_K_MCP=0.0,
-        thumb_K_PIP=0.0,
-        finger_K_MCP=0.0,
-        finger_K_PIP=0.0,
+        thumb_mcp_step_ratio=0.0,
+        thumb_pip_step_ratio=0.0,
+        finger_mcp_step_ratio=0.0,
+        finger_pip_step_ratio=0.0,
     )
-    assert cfg.thumb_K_MCP == pytest.approx(0.0)
-    assert cfg.thumb_K_PIP == pytest.approx(0.0)
-    assert cfg.finger_K_MCP == pytest.approx(0.0)
-    assert cfg.finger_K_PIP == pytest.approx(0.0)
+    assert cfg.thumb_mcp_step_ratio == pytest.approx(0.0)
+    assert cfg.thumb_pip_step_ratio == pytest.approx(0.0)
+    assert cfg.finger_mcp_step_ratio == pytest.approx(0.0)
+    assert cfg.finger_pip_step_ratio == pytest.approx(0.0)
 
 
 def test_thumb_and_finger_joint_allocation_can_be_configured_independently():
     cfg = AdaptiveGraspConfig(
-        thumb_K_MCP=0.2,
-        thumb_K_PIP=0.8,
-        finger_K_MCP=0.7,
-        finger_K_PIP=0.3,
+        thumb_mcp_step_ratio=0.2,
+        thumb_pip_step_ratio=0.8,
+        finger_mcp_step_ratio=0.7,
+        finger_pip_step_ratio=0.3,
     )
 
-    assert cfg.thumb_K_MCP == pytest.approx(0.2)
-    assert cfg.thumb_K_PIP == pytest.approx(0.8)
-    assert cfg.finger_K_MCP == pytest.approx(0.7)
-    assert cfg.finger_K_PIP == pytest.approx(0.3)
+    assert cfg.thumb_mcp_step_ratio == pytest.approx(0.2)
+    assert cfg.thumb_pip_step_ratio == pytest.approx(0.8)
+    assert cfg.finger_mcp_step_ratio == pytest.approx(0.7)
+    assert cfg.finger_pip_step_ratio == pytest.approx(0.3)
 
 
 def test_release_and_pid_defaults():
@@ -191,9 +196,9 @@ def test_adaptive_hold_guard_defaults_are_configurable():
     cfg = AdaptiveGraspConfig()
 
     assert cfg.adaptive_hold_move_failure_limit == _config_default("adaptive_hold_move_failure_limit")
-    assert cfg.contact_snapshot_angle_limit == pytest.approx(_config_default("contact_snapshot_angle_limit"))
-    assert cfg.near_force_limit_ratio == pytest.approx(_config_default("near_force_limit_ratio"))
-    assert cfg.near_limit_step_scale == pytest.approx(_config_default("near_limit_step_scale"))
+    assert cfg.contact_angle_guard_margin_rad == pytest.approx(_config_default("contact_angle_guard_margin_rad"))
+    assert cfg.force_limit_slowdown_ratio == pytest.approx(_config_default("force_limit_slowdown_ratio"))
+    assert cfg.force_limit_slowdown_step_scale == pytest.approx(_config_default("force_limit_slowdown_step_scale"))
     assert cfg.closing_total_contact_threshold_n == pytest.approx(
         _config_default("closing_total_contact_threshold_n")
     )
@@ -209,15 +214,15 @@ def test_adaptive_hold_guard_constraints():
     with pytest.raises(ValueError):
         AdaptiveGraspConfig(adaptive_hold_move_failure_limit=0)
     with pytest.raises(ValueError):
-        AdaptiveGraspConfig(contact_snapshot_angle_limit=0.0)
+        AdaptiveGraspConfig(contact_angle_guard_margin_rad=0.0)
     with pytest.raises(ValueError):
-        AdaptiveGraspConfig(near_force_limit_ratio=0.0)
+        AdaptiveGraspConfig(force_limit_slowdown_ratio=0.0)
     with pytest.raises(ValueError):
-        AdaptiveGraspConfig(near_force_limit_ratio=1.1)
+        AdaptiveGraspConfig(force_limit_slowdown_ratio=1.1)
     with pytest.raises(ValueError):
-        AdaptiveGraspConfig(near_limit_step_scale=0.0)
+        AdaptiveGraspConfig(force_limit_slowdown_step_scale=0.0)
     with pytest.raises(ValueError):
-        AdaptiveGraspConfig(near_limit_step_scale=1.1)
+        AdaptiveGraspConfig(force_limit_slowdown_step_scale=1.1)
     with pytest.raises(ValueError):
         AdaptiveGraspConfig(closing_total_contact_threshold_n=-0.1)
     with pytest.raises(ValueError):
@@ -378,22 +383,26 @@ def test_safety_threshold_constraints():
 
 def test_variance_direction_friction_weights_sum_to_one():
     cfg = AdaptiveGraspConfig()
-    assert cfg.variance_weight == pytest.approx(_config_default("variance_weight"))
-    assert cfg.direction_weight == pytest.approx(_config_default("direction_weight"))
-    assert cfg.friction_weight == pytest.approx(_config_default("friction_weight"))
-    total = cfg.variance_weight + cfg.direction_weight + cfg.friction_weight
+    assert cfg.slip_variance_weight == pytest.approx(_config_default("slip_variance_weight"))
+    assert cfg.slip_direction_weight == pytest.approx(_config_default("slip_direction_weight"))
+    assert cfg.slip_friction_weight == pytest.approx(_config_default("slip_friction_weight"))
+    total = cfg.slip_variance_weight + cfg.slip_direction_weight + cfg.slip_friction_weight
     assert total == pytest.approx(1.0)
 
 
 def test_weight_bounds_and_normalization():
     with pytest.raises(ValueError):
-        AdaptiveGraspConfig(variance_weight=-0.1)
+        AdaptiveGraspConfig(slip_variance_weight=-0.1)
     with pytest.raises(ValueError):
-        AdaptiveGraspConfig(direction_weight=1.1)
+        AdaptiveGraspConfig(slip_direction_weight=1.1)
     with pytest.raises(ValueError):
-        AdaptiveGraspConfig(friction_weight=1.1)
+        AdaptiveGraspConfig(slip_friction_weight=1.1)
     with pytest.raises(ValueError):
-        AdaptiveGraspConfig(variance_weight=0.5, direction_weight=0.5, friction_weight=0.5)
+        AdaptiveGraspConfig(
+            slip_variance_weight=0.5,
+            slip_direction_weight=0.5,
+            slip_friction_weight=0.5,
+        )
 
 
 def test_default_friction_coeff():

@@ -45,7 +45,7 @@ class PositionHoldPlanner:
         self.profile = profile
         self.is_fragile_mode = profile.is_fragile if profile else False
         self._slip_risk_filters: dict[TactileSensorId, LowPassFilter] = {
-            finger: LowPassFilter(alpha=config.lowpass_alpha)
+            finger: LowPassFilter(alpha=config.tactile_lowpass_alpha)
             for finger in config.active_fingers
         }
 
@@ -122,19 +122,19 @@ class PositionHoldPlanner:
             0.0,
             1.0,
         )
-        return cfg.delta_theta_limit * (normalized_risk ** cfg.direct_slip_risk_gamma)
+        return cfg.position_hold_max_step_rad * (normalized_risk ** cfg.direct_slip_risk_gamma)
 
     def _compute_confirmed_slip_boost_u(self, slip_confirmed: bool) -> float:
         if not slip_confirmed:
             return 0.0
-        return self.config.delta_theta_limit * self.config.direct_slip_confirmed_boost_ratio
+        return self.config.position_hold_max_step_rad * self.config.direct_slip_confirmed_boost_ratio
 
     def _compute_overlimit_control_u(self, fz: float, fz_limit: float) -> float:
         normal_overlimit_error = max(
             0.0,
-            (fz - fz_limit) / (fz_limit + self.config.epsilon),
+            (fz - fz_limit) / (fz_limit + self.config.numeric_epsilon),
         )
-        return -self.config.K_n * normal_overlimit_error
+        return -self.config.normal_force_release_gain * normal_overlimit_error
 
     def _build_decision(
         self,
@@ -173,20 +173,20 @@ class PositionHoldPlanner:
     ) -> tuple[float, float]:
         if finger == TactileSensorId.THUMB:
             return (
-                total_delta * self.config.thumb_K_MCP,
-                total_delta * self.config.thumb_K_PIP,
+                total_delta * self.config.thumb_mcp_step_ratio,
+                total_delta * self.config.thumb_pip_step_ratio,
             )
         return (
-            total_delta * self.config.finger_K_MCP,
-            total_delta * self.config.finger_K_PIP,
+            total_delta * self.config.finger_mcp_step_ratio,
+            total_delta * self.config.finger_pip_step_ratio,
         )
 
     def _limited_total_delta(self, control_u: float, near_limit: bool) -> float:
-        delta_limit = self.config.delta_theta_limit
+        delta_limit = self.config.position_hold_max_step_rad
         if self.is_fragile_mode:
             delta_limit *= self.config.fragile_step_reduction
         if near_limit:
-            delta_limit *= self.config.near_limit_step_scale
+            delta_limit *= self.config.force_limit_slowdown_step_scale
         return clip(control_u, -delta_limit, delta_limit)
 
     def _get_effective_contact_count(self, finger_fz: FingerForces) -> int:
@@ -194,12 +194,12 @@ class PositionHoldPlanner:
         contacting_fingers = sum(
             1
             for finger in self.config.active_fingers
-            if finger_fz.get(finger, 0.0) > self.config.epsilon
+            if finger_fz.get(finger, 0.0) > self.config.numeric_epsilon
         )
         return contacting_fingers or active_finger_count
 
     def _is_near_limit(self, finger_fz: FingerForces, finger_count: int) -> bool:
-        threshold = self.config.near_force_limit_ratio * self._get_max_normal_force_per_finger(finger_count)
+        threshold = self.config.force_limit_slowdown_ratio * self._get_max_normal_force_per_finger(finger_count)
         return any(
             finger_fz.get(finger, 0.0) >= threshold
             for finger in self.config.active_fingers
@@ -208,7 +208,7 @@ class PositionHoldPlanner:
     def _get_max_normal_force_per_finger(self, finger_count: int) -> float:
         if self.profile is not None:
             return self.profile.safe_force_max / finger_count
-        return self.config.max_normal_force_per_finger
+        return self.config.max_normal_force_per_finger_n
 
     def _compute_next_torque(self) -> int:
         if self.profile is None or self.profile.position_hold_torque is None:

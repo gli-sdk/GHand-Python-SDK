@@ -74,12 +74,12 @@ def _profile(*, is_fragile: bool = True) -> ObjectProfile:
 def test_position_hold_planner_uses_slip_risk_per_finger():
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
-        K_n=0.0,
-        thumb_K_MCP=0.5,
-        thumb_K_PIP=0.5,
-        finger_K_MCP=0.5,
-        finger_K_PIP=0.5,
-        delta_theta_limit=math.radians(2.0),
+        normal_force_release_gain=0.0,
+        thumb_mcp_step_ratio=0.5,
+        thumb_pip_step_ratio=0.5,
+        finger_mcp_step_ratio=0.5,
+        finger_pip_step_ratio=0.5,
+        position_hold_max_step_rad=math.radians(2.0),
     )
     planner = PositionHoldPlanner(cfg, _profile(is_fragile=False))
     angles = {
@@ -119,10 +119,10 @@ def test_position_hold_planner_uses_slip_risk_per_finger():
 def test_position_hold_planner_limits_angle_step():
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB},
-        K_n=0.0,
-        thumb_K_MCP=0.5,
-        thumb_K_PIP=0.5,
-        delta_theta_limit=math.radians(2.0),
+        normal_force_release_gain=0.0,
+        thumb_mcp_step_ratio=0.5,
+        thumb_pip_step_ratio=0.5,
+        position_hold_max_step_rad=math.radians(2.0),
     )
     planner = PositionHoldPlanner(cfg, _profile(is_fragile=False))
 
@@ -140,12 +140,12 @@ def test_position_hold_planner_limits_angle_step():
 def test_position_hold_planner_uses_thumb_and_finger_joint_allocation():
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
-        K_n=0.0,
-        thumb_K_MCP=0.2,
-        thumb_K_PIP=0.8,
-        finger_K_MCP=0.7,
-        finger_K_PIP=0.3,
-        delta_theta_limit=10.0,
+        normal_force_release_gain=0.0,
+        thumb_mcp_step_ratio=0.2,
+        thumb_pip_step_ratio=0.8,
+        finger_mcp_step_ratio=0.7,
+        finger_pip_step_ratio=0.3,
+        position_hold_max_step_rad=10.0,
     )
     planner = PositionHoldPlanner(cfg, _profile(is_fragile=False))
 
@@ -183,12 +183,12 @@ def test_position_hold_planner_uses_thumb_and_finger_joint_allocation():
 def test_position_hold_planner_uses_configured_near_limit_step_scale():
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB},
-        K_n=0.0,
-        thumb_K_MCP=0.5,
-        thumb_K_PIP=0.5,
-        delta_theta_limit=math.radians(2.0),
-        near_force_limit_ratio=0.5,
-        near_limit_step_scale=0.25,
+        normal_force_release_gain=0.0,
+        thumb_mcp_step_ratio=0.5,
+        thumb_pip_step_ratio=0.5,
+        position_hold_max_step_rad=math.radians(2.0),
+        force_limit_slowdown_ratio=0.5,
+        force_limit_slowdown_step_scale=0.25,
     )
     planner = PositionHoldPlanner(cfg, _profile(is_fragile=False))
 
@@ -207,9 +207,9 @@ def test_position_hold_planner_uses_configured_near_limit_step_scale():
 def test_position_hold_planner_applies_direct_slip_control():
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB},
-        K_n=0.0,
-        thumb_K_MCP=0.5,
-        thumb_K_PIP=0.5,
+        normal_force_release_gain=0.0,
+        thumb_mcp_step_ratio=0.5,
+        thumb_pip_step_ratio=0.5,
     )
     planner = PositionHoldPlanner(cfg, _profile(is_fragile=False))
 
@@ -229,8 +229,8 @@ def test_position_hold_planner_disables_force_control_when_configured():
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB},
         enable_position_hold_force_control=False,
-        thumb_K_MCP=0.5,
-        thumb_K_PIP=0.5,
+        thumb_mcp_step_ratio=0.5,
+        thumb_pip_step_ratio=0.5,
     )
     planner = PositionHoldPlanner(cfg, _profile(is_fragile=False))
 
@@ -249,12 +249,12 @@ def test_position_hold_planner_disables_force_control_when_configured():
 def test_direct_control_uses_slip_risk_deadband_boost_and_overlimit():
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB},
-        delta_theta_limit=1.0,
+        position_hold_max_step_rad=1.0,
         direct_slip_risk_deadband=0.2,
         direct_slip_risk_full=0.8,
         direct_slip_risk_gamma=1.0,
         direct_slip_confirmed_boost_ratio=0.5,
-        K_n=1.0,
+        normal_force_release_gain=1.0,
     )
     planner = PositionHoldPlanner(cfg, _profile(is_fragile=False))
 
@@ -284,8 +284,8 @@ def test_direct_control_uses_slip_risk_deadband_boost_and_overlimit():
 def test_direct_control_does_not_fall_back_to_global_slip_risk():
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
-        K_n=0.0,
-        delta_theta_limit=1.0,
+        normal_force_release_gain=0.0,
+        position_hold_max_step_rad=1.0,
     )
     planner = PositionHoldPlanner(cfg, _profile(is_fragile=False))
     analysis = _analysis(
@@ -309,13 +309,13 @@ def test_direct_control_does_not_fall_back_to_global_slip_risk():
 def test_position_hold_planner_uses_direct_slip_curve_params():
     cfg = AdaptiveGraspConfig(
         active_fingers={TactileSensorId.THUMB},
-        K_n=0.0,
+        normal_force_release_gain=0.0,
         direct_slip_risk_deadband=0.2,
         direct_slip_risk_full=0.8,
         direct_slip_risk_gamma=1.0,
-        thumb_K_MCP=0.5,
-        thumb_K_PIP=0.5,
-        delta_theta_limit=10.0,
+        thumb_mcp_step_ratio=0.5,
+        thumb_pip_step_ratio=0.5,
+        position_hold_max_step_rad=10.0,
     )
     planner = PositionHoldPlanner(cfg, _profile(is_fragile=False))
 

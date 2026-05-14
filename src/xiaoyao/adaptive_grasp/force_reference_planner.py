@@ -71,7 +71,7 @@ class ForceReferencePlanner:
     def maximum_force_ref(self) -> float:
         if self.profile is None:
             return float(
-                self.config.max_normal_force_per_finger
+                self.config.max_normal_force_per_finger_n
                 * len(self.config.active_fingers)
             )
         return self.profile.safe_force_max

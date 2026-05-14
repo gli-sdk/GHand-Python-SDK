@@ -948,7 +948,7 @@ def test_grasp_sequence_run_receives_only_is_running_callback(monkeypatch):
 def test_torque_mode_creates_hold_planners_from_contact_snapshot(monkeypatch):
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(
-        adaptive_hold_command_mode="torque",
+        hold_command_mode="torque",
         active_fingers={TactileSensorId.THUMB},
         enable_visualization=False,
     )
@@ -983,7 +983,7 @@ def test_torque_mode_creates_hold_planners_from_contact_snapshot(monkeypatch):
 def test_position_mode_creates_position_hold_planner_from_contact_snapshot(monkeypatch):
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(
-        adaptive_hold_command_mode="position",
+        hold_command_mode="position",
         active_fingers={TactileSensorId.THUMB},
         enable_visualization=False,
     )

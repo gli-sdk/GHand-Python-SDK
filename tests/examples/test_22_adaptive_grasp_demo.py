@@ -84,12 +84,12 @@ class _MockDexHand:
 
 
 def test_build_parser_defaults():
-    parser = demo.build_parser()
+    parser = demo.build_parser(demo.grasp_case_choose())
     args = parser.parse_args([])
     assert args.max_torque == 80
-    assert args.pre_grasp_preset == "small_pinch"
+    assert args.pre_grasp_preset == "paper_cup_grasp"
     assert args.hold_time == 100
-    assert args.object == "metal"
+    assert args.object == "paper_cup"
     assert args.hold_command_mode == "position"
     assert args.torque_hold_base_torque == 4
     assert args.interrupt_release_wait == 1
@@ -97,28 +97,28 @@ def test_build_parser_defaults():
 
 
 def test_build_config_from_args():
-    parser = demo.build_parser()
+    parser = demo.build_parser(demo.grasp_case_choose())
     args = parser.parse_args([
         "--max-torque", "70",
-        "--pre-grasp-preset", "two_finger_pinch",
+        "--pre-grasp-preset", "balloon_pinch",
         "--hold-command-mode", "torque",
         "--torque-hold-base-torque", "6",
     ])
     cfg = demo.build_config(args)
     assert cfg.max_torque == 70
-    assert cfg.pre_grasp_preset == "two_finger_pinch"
-    assert cfg.adaptive_hold_command_mode == "torque"
+    assert cfg.pre_grasp_preset == "balloon_pinch"
+    assert cfg.hold_command_mode == "torque"
     assert cfg.torque_hold_base_torque == 6
     assert TactileSensorId.THUMB in cfg.active_fingers
     assert TactileSensorId.FOREFINGER in cfg.active_fingers
 
 
 def test_build_config_with_object():
-    parser = demo.build_parser()
-    args = parser.parse_args(["--default_object", "egg"])
+    parser = demo.build_parser(demo.grasp_case_choose())
+    args = parser.parse_args(["--default_object", "balloon"])
     cfg = demo.build_config(args)
-    assert cfg.default_object == "egg"
-    assert cfg.pre_grasp_preset == "small_pinch"
+    assert cfg.default_object == "balloon"
+    assert cfg.pre_grasp_preset == "paper_cup_grasp"
 
 
 class _NonClosingStringIO(io.StringIO):
@@ -216,7 +216,7 @@ def test_main_smoke(monkeypatch):
         test_argv = [
             "2x.adaptive_grasp_demo.py",
             "--hold-time", "0.01",
-            "--pre-grasp-preset", "small_pinch",
+            "--pre-grasp-preset", "paper_cup_grasp",
         ]
 
         with patch.object(sys, "argv", test_argv):
