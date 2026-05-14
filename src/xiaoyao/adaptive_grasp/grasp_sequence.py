@@ -118,7 +118,6 @@ class PhaseController:
         pose: dict[JointId, float],
         speed: int,
         torque: int,
-        wait_s: float,
     ) -> bool:
         self._set_state(state)
         joints = self._joint_builder.position_command(pose, speed=speed, torque=torque)
@@ -134,7 +133,6 @@ class PhaseController:
             self._joint_builder.open_pose(),
             speed=self.config.open_speed,
             torque=self.config.open_torque,
-            wait_s=self.config.open_wait_s,
         )
 
     def _phase_pre_grasp(self, is_running: Callable[[], bool] = lambda: True) -> bool:
@@ -143,7 +141,6 @@ class PhaseController:
             self.config.pre_grasp_pose,
             speed=self.config.pre_grasp_speed,
             torque=self.config.pre_grasp_torque,
-            wait_s=self.config.pre_grasp_wait_s,
         )
 
     def _phase_closing(self, is_running: Callable[[], bool]) -> bool:

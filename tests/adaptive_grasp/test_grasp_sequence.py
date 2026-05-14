@@ -1,4 +1,5 @@
 import time
+import inspect
 from unittest.mock import MagicMock
 import pytest
 from xiaoyao.adaptive_grasp import AdaptiveGraspConfig, GraspState
@@ -269,6 +270,12 @@ def test_phase_open_and_pre_grasp(monkeypatch):
     assert {joint.speed for joint in hand.calls[1]["joints"]} == {21}
     assert {joint.torque for joint in hand.calls[1]["joints"]} == {22}
     assert sleep_calls[:2] == [0.02, 0.02]
+
+
+def test_execute_position_phase_signature_has_no_unused_wait_s():
+    parameters = inspect.signature(PhaseController._execute_position_phase).parameters
+
+    assert "wait_s" not in parameters
 
 
 def test_phase_failure_sets_error_state(monkeypatch):
