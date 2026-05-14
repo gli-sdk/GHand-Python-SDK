@@ -43,13 +43,17 @@ class ReleaseController:
         self.runtime.adaptive_hold_started_at = None
         self.sensor.stop(clear_joint_feedback=False)
 
+        is_alive = getattr(control_thread, "is_alive", None)
+        join = getattr(control_thread, "join", None)
         if (
             wait_control_thread
             and control_thread
-            and control_thread.is_alive()
+            and is_alive is not None
+            and join is not None
+            and is_alive()
             and control_thread is not threading.current_thread()
         ):
-            control_thread.join(timeout=2.0)
+            join(timeout=2.0)
 
         joints = self.joint_builder.position_command(
             self.joint_builder.open_pose(),

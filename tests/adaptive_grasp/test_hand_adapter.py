@@ -52,6 +52,10 @@ class _CommandOnlyHand:
         pass
 
 
+class _NotAHand:
+    pass
+
+
 class _GetHandInfoDexHandLike:
     def move_joints(self, joints, *, mode):
         return True
@@ -127,6 +131,11 @@ def test_ensure_hand_command_port_prefers_complete_port_over_dexhand_like_shape(
 def test_ensure_hand_command_port_rejects_command_only_port():
     with pytest.raises(TypeError, match="wait_for_motion_completion"):
         ensure_hand_command_port(_CommandOnlyHand())
+
+
+def test_ensure_hand_command_port_rejects_invalid_object():
+    with pytest.raises(TypeError, match="hand port"):
+        ensure_hand_command_port(_NotAHand())
 
 
 def test_ensure_hand_command_port_returns_existing_dex_hand_command_port():

@@ -52,4 +52,6 @@ def ensure_hand_command_port(hand: Any) -> GraspSequenceHandPort:
             "hand port must provide wait_for_motion_completion() or be a "
             "DexHand-like object with get_hand_info()"
         )
-    return DexHandCommandPort(hand)
+    raise TypeError(
+        "hand port must provide move_joints()/stop() or be a DexHand-like object"
+    )

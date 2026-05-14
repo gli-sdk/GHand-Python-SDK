@@ -120,6 +120,16 @@ def test_release_does_not_join_when_wait_control_thread_is_false():
     assert control_thread.join_calls == []
 
 
+def test_release_ignores_control_thread_without_thread_api():
+    controller, hand, _sensor, _joint_builder, runtime, _cfg, _sleep = _controller()
+
+    result = controller.release(wait_control_thread=True, control_thread=object())
+
+    assert result is True
+    assert runtime.state == GraspState.COMPLETED
+    assert len(hand.calls) == 1
+
+
 def test_release_does_not_join_current_thread():
     controller, _hand, _sensor, _joint_builder, _runtime, _cfg, _sleep = _controller()
     current_thread = threading.current_thread()
