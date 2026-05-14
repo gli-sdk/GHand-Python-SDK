@@ -2,275 +2,13 @@ import math
 from dataclasses import dataclass, field
 from typing import Optional
 
+from xiaoyao.adaptive_grasp.grasp_presets import (
+    build_or_filter_pre_grasp_pose,
+    resolve_active_fingers,
+    resolve_pre_grasp_preset,
+)
 from xiaoyao.adaptive_grasp.object_profile import ObjectProfileRegistry
 from xiaoyao.dexhand import JointId, TactileSensorId
-
-
-_PASSIVE_DIP_JOINTS = {
-    JointId.THUMB_DIP,
-    JointId.FF_DIP,
-    JointId.MF_DIP,
-    JointId.RF_DIP,
-    JointId.LF_DIP,
-}
-
-_ACTIVE_PRE_GRASP_JOINTS = (
-    JointId.LF_MCP,
-    JointId.LF_PIP,
-    JointId.RF_MCP,
-    JointId.RF_PIP,
-    JointId.MF_MCP,
-    JointId.MF_PIP,
-    JointId.FF_SWING,
-    JointId.FF_MCP,
-    JointId.FF_PIP,
-    JointId.THUMB_ROTATION,
-    JointId.THUMB_SWING,
-    JointId.THUMB_MCP,
-    JointId.THUMB_PIP,
-)
-
-_PRESET_ACTIVE_FINGERS: dict[str, set[TactileSensorId]] = {
-    "two_finger_pinch": {TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
-    "pen_pinch":{TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
-    "three_finger_pinch": {
-        TactileSensorId.THUMB,
-        TactileSensorId.FOREFINGER,
-        TactileSensorId.MIDDLE_FINGER,
-    },
-    "three_finger_grasp": {
-        TactileSensorId.THUMB,
-        TactileSensorId.FOREFINGER,
-        TactileSensorId.MIDDLE_FINGER,
-    },
-    "four_finger_grasp": {
-        TactileSensorId.THUMB,
-        TactileSensorId.FOREFINGER,
-        TactileSensorId.MIDDLE_FINGER,
-        TactileSensorId.RING_FINGER,
-    },
-    "five_finger_grasp": set(TactileSensorId),
-    "lily_pinch": {TactileSensorId.THUMB, TactileSensorId.MIDDLE_FINGER},
-    "small_pinch": {TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
-    "smooth_ball": {TactileSensorId.THUMB, TactileSensorId.FOREFINGER,TactileSensorId.MIDDLE_FINGER},
-    "balloon_pinch": {TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
-    "paper_cup_pinch": {
-        TactileSensorId.THUMB,
-        TactileSensorId.FOREFINGER,
-        TactileSensorId.MIDDLE_FINGER,
-    },
-    "glass_pinch": {
-        TactileSensorId.THUMB,
-        TactileSensorId.FOREFINGER,
-        TactileSensorId.MIDDLE_FINGER,
-    },
-    "plastic_three_pinch":{
-        TactileSensorId.THUMB,
-        TactileSensorId.FOREFINGER,
-        TactileSensorId.MIDDLE_FINGER,
-    },
-    "paper_cup_grasp":{
-        TactileSensorId.THUMB,
-        TactileSensorId.FOREFINGER,
-        TactileSensorId.MIDDLE_FINGER,
-        TactileSensorId.RING_FINGER,
-        TactileSensorId.LITTLE_FINGER
-    },
-    "minreal_water_grasp":{
-        TactileSensorId.THUMB,
-        TactileSensorId.FOREFINGER,
-        TactileSensorId.MIDDLE_FINGER,
-        TactileSensorId.RING_FINGER,
-        TactileSensorId.LITTLE_FINGER
-    },
-}
-
-
-def _pose_degrees(
-    *,
-    lf_mcp: float = 0.0,
-    lf_pip: float = 0.0,
-    rf_mcp: float = 0.0,
-    rf_pip: float = 0.0,
-    mf_mcp: float = 0.0,
-    mf_pip: float = 0.0,
-    ff_swing: float = 0.0,
-    ff_mcp: float = 0.0,
-    ff_pip: float = 0.0,
-    thumb_rotation: float = 0.0,
-    thumb_swing: float = 90.0,
-    thumb_mcp: float = 0.0,
-    thumb_pip: float = 0.0,
-) -> dict[JointId, float]:
-    return {
-        JointId.LF_MCP: lf_mcp,
-        JointId.LF_PIP: lf_pip,
-        JointId.RF_MCP: rf_mcp,
-        JointId.RF_PIP: rf_pip,
-        JointId.MF_MCP: mf_mcp,
-        JointId.MF_PIP: mf_pip,
-        JointId.FF_SWING: ff_swing,
-        JointId.FF_MCP: ff_mcp,
-        JointId.FF_PIP: ff_pip,
-        JointId.THUMB_ROTATION: thumb_rotation,
-        JointId.THUMB_SWING: thumb_swing,
-        JointId.THUMB_MCP: thumb_mcp,
-        JointId.THUMB_PIP: thumb_pip,
-    }
-
-
-_PRE_GRASP_PRESET_DEGREE = {
-    "two_finger_pinch": _pose_degrees(
-        ff_mcp=60.0,
-        ff_pip=20.0,
-        thumb_swing=80.0,
-        thumb_mcp=0.0,
-        thumb_pip=0.0,
-    ),
-    "three_finger_pinch": _pose_degrees(
-        mf_mcp=50.0,
-        mf_pip=10.0,
-        ff_mcp=42.0,
-        ff_pip=10.0,
-        ff_swing=5.0,
-        thumb_swing=80.0,
-        thumb_pip=10,
-        thumb_mcp=20.0,
-        thumb_rotation=5.0,
-    ),
-    "three_finger_grasp": _pose_degrees(
-        mf_mcp=36.0,
-        mf_pip=35.0,
-        ff_mcp=28.0,
-        ff_pip=41.0,
-        thumb_swing=80.0,
-        thumb_pip=28,
-        thumb_mcp=10.0,
-    ),
-    "four_finger_grasp": _pose_degrees(
-        rf_mcp=47.0,
-        rf_pip=19.0,
-        mf_mcp=32.0,
-        mf_pip=22.0,
-        ff_mcp=44.0,
-        ff_pip=21.0,
-        thumb_rotation=11.0,
-        thumb_swing=80.0,
-        thumb_mcp=20.0,
-        thumb_pip=5.0,
-    ),
-    "five_finger_grasp": _pose_degrees(
-        lf_mcp=45.0,
-        lf_pip=30.0,
-        rf_mcp=60.0,
-        rf_pip=25.0,
-        mf_mcp=53.0,
-        mf_pip=30.0,
-        ff_mcp=45.0,
-        ff_pip=35.0,
-        thumb_rotation=2.0,
-        thumb_swing=60.0,
-        thumb_mcp=2.0,
-        thumb_pip=21.0,
-    ),
-    "lily_pinch": _pose_degrees(
-        mf_mcp=31.0,
-        thumb_rotation=7.0,
-        thumb_mcp=6.0,
-    ),
-    "small_pinch": _pose_degrees(
-        thumb_swing=84,
-        thumb_pip=10,
-        ff_mcp=45.0,
-        ff_pip=22.0,
-        thumb_mcp=3.0,
-    ),
-    "smooth_ball": _pose_degrees(
-        ff_pip=26,
-        ff_mcp=53.0,
-        ff_swing=8,
-        mf_mcp=59,
-        mf_pip=20.0,
-        thumb_swing=90,
-        thumb_mcp=1,
-        thumb_pip=7
-    ),
-    "balloon_pinch": _pose_degrees(
-        ff_mcp=25.0,
-        ff_pip=25.0,
-        thumb_swing=80.0,
-        thumb_mcp=3.0,
-        thumb_pip=5.0,
-    ),
-    "paper_cup_pinch": _pose_degrees(
-        mf_mcp=49.0,
-        mf_pip=10.0,
-        ff_mcp=41.0,
-        ff_pip=14.0,
-        thumb_swing=85.0,
-        thumb_mcp=4.0,
-        thumb_pip=4.0,
-    ),
-    "glass_pinch": _pose_degrees(
-        mf_mcp=45.0,
-        mf_pip=15.0,
-        ff_mcp=35.0,
-        ff_pip=20.0,
-        thumb_mcp=11.0,
-        thumb_pip=6.0,
-    ),
-    "plastic_three_pinch":_pose_degrees(
-        thumb_mcp=16,
-        thumb_rotation=2,
-        thumb_swing=71,
-        ff_pip=20,
-        ff_mcp=29,
-        ff_swing=5,
-        mf_pip=18,
-        mf_mcp=40
-    ),
-    "paper_cup_grasp":_pose_degrees(
-        thumb_mcp=15,
-        thumb_pip=20,
-        thumb_swing=80,
-        thumb_rotation=4,
-        ff_pip=45,
-        ff_mcp=25,
-        mf_pip=40,
-        mf_mcp=40,
-        rf_pip=40,
-        rf_mcp=40,
-        lf_pip=35,
-        lf_mcp=35,
-    ),
-    "minreal_water_grasp":_pose_degrees(
-        thumb_mcp=15,
-        thumb_pip=20,
-        thumb_swing=80,
-        thumb_rotation=4,
-        ff_pip=45,
-        ff_mcp=35,
-        mf_pip=40,
-        mf_mcp=40,
-        rf_pip=40,
-        rf_mcp=40,
-        lf_pip=35,
-        lf_mcp=35,
-    ),
-    "pen_pinch": _pose_degrees(
-        ff_mcp=46.0,
-        ff_pip=52.0,
-        thumb_swing=74.0,
-        thumb_mcp=22.0,
-        thumb_pip=13.0,
-    ),
-}
-
-_OBJECT_PRE_GRASP_PRESET = {
-    "balloon": "balloon_pinch",
-    "paper_cup": "paper_cup_pinch",
-    "glass": "glass_pinch",
-}
 
 
 @dataclass
@@ -422,16 +160,16 @@ class AdaptiveGraspConfig:
         self._validate_default_object()
 
     def _derive_pre_grasp_preset(self) -> None:
-        if self.pre_grasp_preset is not None:
-            return
-        self.pre_grasp_preset = _OBJECT_PRE_GRASP_PRESET.get(
+        self.pre_grasp_preset = resolve_pre_grasp_preset(
             self.default_object,
-            "balloon_pinch",
+            self.pre_grasp_preset,
         )
 
     def _derive_active_fingers(self) -> None:
-        if not self.active_fingers:
-            self.active_fingers = set(_PRESET_ACTIVE_FINGERS.get(self.pre_grasp_preset, set(TactileSensorId)))
+        self.active_fingers = resolve_active_fingers(
+            self.pre_grasp_preset,
+            self.active_fingers,
+        )
 
     def _validate_values(self) -> None:
         _validate("sliding_window_size", self.sliding_window_size, greater_equal=3)
@@ -544,11 +282,10 @@ class AdaptiveGraspConfig:
         _validate("drop_detect_debounce_cycles", self.drop_detect_debounce_cycles, greater_than=0)
 
     def _build_or_filter_pre_grasp_pose(self) -> None:
-        if self.pre_grasp_pose:
-            filtered = self._filter_passive_dip_joints(self.pre_grasp_pose)
-            self.pre_grasp_pose = filtered if filtered else self._build_pre_grasp_pose_from_preset()
-            return
-        self.pre_grasp_pose = self._build_pre_grasp_pose_from_preset()
+        self.pre_grasp_pose = build_or_filter_pre_grasp_pose(
+            self.pre_grasp_preset,
+            self.pre_grasp_pose,
+        )
 
     def _validate_default_object(self) -> None:
         if ObjectProfileRegistry.get(self.default_object) is not None:
@@ -556,23 +293,3 @@ class AdaptiveGraspConfig:
         supported = ", ".join(sorted(ObjectProfileRegistry.list_all()))
         raise ValueError(f"default_object must be one of: {supported}")
 
-    def _build_pre_grasp_pose_from_preset(self) -> dict[JointId, float]:
-        if self.pre_grasp_preset not in _PRE_GRASP_PRESET_DEGREE:
-            supported = ", ".join(sorted(_PRE_GRASP_PRESET_DEGREE.keys()))
-            raise ValueError(f"pre_grasp_preset must be one of: {supported}")
-
-        degrees_map = _PRE_GRASP_PRESET_DEGREE[self.pre_grasp_preset]
-        return {
-            joint_id: math.radians(degrees_map.get(joint_id, 0.0))
-            for joint_id in _ACTIVE_PRE_GRASP_JOINTS
-        }
-
-    @staticmethod
-    def _filter_passive_dip_joints(
-        pose: dict[JointId, float],
-    ) -> dict[JointId, float]:
-        return {
-            joint_id: angle
-            for joint_id, angle in pose.items()
-            if joint_id not in _PASSIVE_DIP_JOINTS
-        }

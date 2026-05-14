@@ -4,6 +4,7 @@ from dataclasses import MISSING
 import pytest
 
 import xiaoyao.adaptive_grasp.config as config_module
+import xiaoyao.adaptive_grasp.grasp_presets as preset_module
 from xiaoyao.adaptive_grasp import AdaptiveGraspConfig
 from xiaoyao.dexhand import JointId, TactileSensorId
 
@@ -16,7 +17,7 @@ def _config_default(name: str):
 
 
 def _preset_degrees(preset: str, joint_id: JointId) -> float:
-    return config_module._PRE_GRASP_PRESET_DEGREE[preset][joint_id]
+    return preset_module.PRE_GRASP_PRESET_DEGREE[preset][joint_id]
 
 
 def test_position_hold_defaults():
@@ -254,7 +255,7 @@ def test_drop_detect_constraints():
 
 def test_default_pre_grasp_preset_is_explicit_balloon_pinch():
     cfg = AdaptiveGraspConfig()
-    expected_preset = config_module._OBJECT_PRE_GRASP_PRESET.get(
+    expected_preset = preset_module.OBJECT_PRE_GRASP_PRESET.get(
         _config_default("default_object"),
         "balloon_pinch",
     )
@@ -282,7 +283,7 @@ def test_object_specific_pre_grasp_preset_is_config_driven():
     preset = "paper_cup_pinch"
     cfg = AdaptiveGraspConfig(pre_grasp_preset=preset)
 
-    assert cfg.active_fingers == config_module._PRESET_ACTIVE_FINGERS[preset]
+    assert cfg.active_fingers == preset_module.PRESET_ACTIVE_FINGERS[preset]
     assert cfg.pre_grasp_pose[JointId.FF_MCP] == pytest.approx(
         math.radians(_preset_degrees(preset, JointId.FF_MCP))
     )
@@ -294,13 +295,29 @@ def test_object_specific_pre_grasp_preset_is_config_driven():
     )
 
 
+def test_pre_grasp_preset_requires_explicit_active_finger_mapping(monkeypatch):
+    preset = "unmapped_test_preset"
+    monkeypatch.setitem(
+        preset_module.PRE_GRASP_PRESET_DEGREE,
+        preset,
+        preset_module.pose_degrees(ff_mcp=20.0),
+    )
+
+    with pytest.raises(ValueError) as exc_info:
+        AdaptiveGraspConfig(pre_grasp_preset=preset)
+    message = str(exc_info.value)
+    assert preset in message
+    assert "PRESET_ACTIVE_FINGERS" in message
+    assert "active_fingers explicitly" in message
+
+
 def test_default_object_can_drive_default_pre_grasp_preset():
     default_object = "paper_cup"
-    expected_preset = config_module._OBJECT_PRE_GRASP_PRESET[default_object]
+    expected_preset = preset_module.OBJECT_PRE_GRASP_PRESET[default_object]
     cfg = AdaptiveGraspConfig(default_object=default_object)
 
     assert cfg.pre_grasp_preset == expected_preset
-    assert cfg.active_fingers == config_module._PRESET_ACTIVE_FINGERS[expected_preset]
+    assert cfg.active_fingers == preset_module.PRESET_ACTIVE_FINGERS[expected_preset]
     assert cfg.pre_grasp_pose[JointId.FF_MCP] == pytest.approx(
         math.radians(_preset_degrees(expected_preset, JointId.FF_MCP))
     )

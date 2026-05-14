@@ -352,7 +352,7 @@ def test_position_hold_loop_uses_position_hold_planner_with_force_reference():
     assert joint_map[JointId.THUMB_PIP].speed == 7
 
 
-def test_hold_loop_passes_force_reference_to_visualizer():
+def test_hold_loop_notifies_observer_with_force_reference():
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(
         adaptive_hold_command_mode="position",
@@ -376,7 +376,7 @@ def test_hold_loop_passes_force_reference_to_visualizer():
     )
     tactile = MagicMock()
     tactile.update.return_value = analysis
-    visualizer = MagicMock()
+    observer = MagicMock()
     force_reference_planner = MagicMock()
     force_reference = ForceReferenceDecision(
         force_refs={TactileSensorId.THUMB: 0.7},
@@ -395,20 +395,21 @@ def test_hold_loop_passes_force_reference_to_visualizer():
     }
     joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP,))
     controller = HoldController(
-        hand, sensor, safety, tactile, visualizer,
+        hand, sensor, safety, tactile, None,
         joint_builder, cfg, current_torque=10,
         force_reference_planner=force_reference_planner,
         position_hold_planner=position_hold_planner,
+        observer=observer,
     )
 
     controller.run_step(current_time=0.0)
 
-    visualizer.update.assert_called_once_with(
-        sensor.tactile_data,
-        analysis,
-        joint_angles={JointId.THUMB_PIP: 0.10},
+    observer.on_hold_step.assert_called_once_with(
+        tactile_data=sensor.tactile_data,
+        analysis=analysis,
+        current_angles={JointId.THUMB_PIP: 0.10},
+        current_time=0.0,
         force_refs={TactileSensorId.THUMB: 0.7},
-        timestamp=0.0,
     )
 
 
@@ -573,27 +574,3 @@ def test_position_hold_clamps_target_angles_to_configured_contact_snapshot_windo
     assert joint_map[JointId.THUMB_PIP].angle == pytest.approx(0.20 + math.radians(5))
     assert joint_map[JointId.FF_PIP].angle == pytest.approx(0.40 - math.radians(5))
 
-
-def test_apply_torque_hold_commands_active_mcp_pip_joints():
-    hand = _MockHand()
-    cfg = AdaptiveGraspConfig(
-        torque_hold_base_torque=20,
-        active_fingers={TactileSensorId.THUMB, TactileSensorId.FOREFINGER},
-    )
-    joint_builder = JointCommandBuilder(
-        cfg,
-        (JointId.THUMB_PIP, JointId.THUMB_MCP, JointId.FF_PIP, JointId.FF_MCP),
-    )
-    controller = HoldController(
-        hand, MagicMock(), MagicMock(), MagicMock(), None,
-        joint_builder, cfg, current_torque=10,
-    )
-
-    ok = controller.apply_torque_hold()
-
-    joint_map = {joint.id: joint for joint in hand.calls[0]["joints"]}
-    assert ok is True
-    assert len(hand.calls) == 1
-    assert hand.calls[0]["mode"] == CtrlMode.TORQUE
-    for joint_id in (JointId.THUMB_PIP, JointId.THUMB_MCP, JointId.FF_PIP, JointId.FF_MCP):
-        assert joint_map[joint_id].torque == 20
