@@ -1,11 +1,10 @@
 import importlib.util
-from types import SimpleNamespace
 import sys
 from pathlib import Path
 from unittest.mock import patch
 
-from xiaoyao.adaptive_grasp.torque_hold_planner import TorqueHoldDecision
-from xiaoyao.dexhand import TactileSensorId
+from xiaoyao.adaptive_grasp.demo_config import DemoRuntimeConfig
+from xiaoyao.adaptive_grasp.config import AdaptiveGraspConfig
 
 _DEMO_PATH = Path(__file__).resolve().parents[2] / "examples" / "2x.adaptive_grasp_demo.py"
 spec = importlib.util.spec_from_file_location("adaptive_grasp_demo_2x", _DEMO_PATH)
@@ -74,136 +73,37 @@ class _InterruptingGrasper:
         return demo.GraspState.ERROR
 
 
-class _FakeTactileLogger:
-    last_instance = None
-
-    def __init__(self, hand, output_dir):
-        type(self).last_instance = self
-        self.hand = hand
-        self.output_dir = output_dir
-        self.csv_path = output_dir / "fake_tactile.csv"
-        self.closed = False
-        self.rows: list[tuple[str, int]] = []
-
-    def write_row(self, state: str, torque: int) -> None:
-        self.rows.append((state, torque))
-
-    def close(self) -> None:
-        self.closed = True
-
-
 def _fake_config():
-    return SimpleNamespace(
+    return AdaptiveGraspConfig(
+        default_object="paper_cup",
         release_hold_time_s=0.01,
-        release_open_speed=50,
-        release_open_torque=50,
-        hold_command_mode="position",
-        torque_hold_base_torque=20,
         pre_grasp_preset="two_finger_pinch",
+        enable_visualization=False,
     )
 
 
-def test_build_config_accepts_adaptive_hold_command_options():
-    captured_kwargs = {}
-
-    class _ConfigSpy:
-        def __init__(self, **kwargs):
-            captured_kwargs.update(kwargs)
-
-    parser = demo.build_parser(demo.grasp_case_choose())
-    args = parser.parse_args([
-        "--hold-command-mode", "torque",
-        "--torque-hold-base-torque", "20",
-        "--default_object", "balloon",
-    ])
-
-    original_config = demo.AdaptiveGraspConfig
-    demo.AdaptiveGraspConfig = _ConfigSpy
-    try:
-        cfg = demo.build_config(args)
-    finally:
-        demo.AdaptiveGraspConfig = original_config
-
-    assert isinstance(cfg, _ConfigSpy)
-    assert captured_kwargs["hold_command_mode"] == "torque"
-    assert captured_kwargs["torque_hold_base_torque"] == 20
-    assert captured_kwargs["default_object"] == "balloon"
+def test_demo_no_longer_exposes_command_line_parser():
+    assert not hasattr(demo, "build_parser")
+    assert not hasattr(demo, "build_config")
 
 
-def test_build_config_passes_parser_defaults_when_args_omitted():
-    captured_kwargs = {}
-
-    class _ConfigSpy:
-        def __init__(self, **kwargs):
-            captured_kwargs.update(kwargs)
-
-    parser = demo.build_parser(demo.grasp_case_choose())
-    args = parser.parse_args([])
-
-    original_config = demo.AdaptiveGraspConfig
-    demo.AdaptiveGraspConfig = _ConfigSpy
-    try:
-        cfg = demo.build_config(args)
-    finally:
-        demo.AdaptiveGraspConfig = original_config
-
-    assert isinstance(cfg, _ConfigSpy)
-    assert captured_kwargs == {
-        "max_torque": 80,
-        "pre_grasp_preset": "paper_cup_grasp",
-        "release_hold_time_s": 100,
-        "hold_command_mode": "position",
-        "torque_hold_base_torque": 4,
-        "default_object": "paper_cup",
-        "enable_visualization": False,
-    }
-
-
-def test_print_hold_status_uses_newline(capsys):
-    demo.print_hold_status("adaptive_hold", 4)
-
-    captured = capsys.readouterr()
-    assert captured.out == "state=adaptive_hold     ; torque=  4\n"
-
-
-def test_format_hold_status_includes_torque_decision():
-    decision = TorqueHoldDecision(
-        finger_torques={
-            TactileSensorId.THUMB: 5.4,
-            TactileSensorId.FOREFINGER: 6.2,
-        },
-        force_refs={},
-        contact_ratios={},
-        F_ref_total=0.8,
-    )
-
-    line = demo.format_hold_status(
-        state="adaptive_hold",
-        torque=6,
-        mode="torque",
-        total_fz=0.7,
-        slip_risk=0.4,
-        slip_confirmed=False,
-        torque_decision=decision,
-    )
-
-    assert "state=adaptive_hold" in line
-    assert "mode=torque" in line
-    assert "total_fz=0.70" in line
-    assert "slip_risk=0.40" in line
-    assert "F_ref_total=0.80" in line
-    assert "THUMB=5.40" in line
-    assert "FOREFINGER=6.20" in line
+def test_demo_no_longer_exposes_internal_diagnostics():
+    assert not hasattr(demo, "TactileLogger")
+    assert not hasattr(demo, "format_hold_status")
+    assert not hasattr(demo, "print_hold_status")
 
 
 def test_main_zeroes_tactile_after_open(monkeypatch):
     monkeypatch.setattr(demo, "DexHand", _MockHand)
     monkeypatch.setattr(demo, "AdaptiveGrasper", _InterruptingGrasper)
-    monkeypatch.setattr(demo, "TactileLogger", _FakeTactileLogger)
-    monkeypatch.setattr(demo, "build_config", lambda _args: _fake_config())
+    monkeypatch.setattr(
+        demo,
+        "build_demo_runtime_config",
+        lambda: DemoRuntimeConfig(adaptive_config=_fake_config()),
+    )
     monkeypatch.setattr(demo.time, "sleep", lambda _x: None)
 
-    with patch.object(sys, "argv", ["2x.adaptive_grasp_demo.py"]):
+    with patch.object(sys, "argv", ["2x.adaptive_grasp_demo.py", "--ignored-cli-arg"]):
         demo.main()
 
     assert _MockHand.last_instance is not None
@@ -214,8 +114,11 @@ def test_main_zeroes_tactile_after_open(monkeypatch):
 def test_main_fast_releases_on_keyboard_interrupt_by_default(monkeypatch):
     monkeypatch.setattr(demo, "DexHand", _MockHand)
     monkeypatch.setattr(demo, "AdaptiveGrasper", _InterruptingGrasper)
-    monkeypatch.setattr(demo, "TactileLogger", _FakeTactileLogger)
-    monkeypatch.setattr(demo, "build_config", lambda _args: _fake_config())
+    monkeypatch.setattr(
+        demo,
+        "build_demo_runtime_config",
+        lambda: DemoRuntimeConfig(adaptive_config=_fake_config()),
+    )
     monkeypatch.setattr(demo.time, "sleep", lambda _x: None)
 
     with patch.object(sys, "argv", ["2x.adaptive_grasp_demo.py"]):
@@ -226,22 +129,20 @@ def test_main_fast_releases_on_keyboard_interrupt_by_default(monkeypatch):
     assert _InterruptingGrasper.last_instance.fast_release_waits == [1.0]
 
 
-def test_main_can_configure_fast_release_wait_on_keyboard_interrupt(monkeypatch):
+def test_main_uses_internal_fast_release_wait_on_keyboard_interrupt(monkeypatch):
     monkeypatch.setattr(demo, "DexHand", _MockHand)
     monkeypatch.setattr(demo, "AdaptiveGrasper", _InterruptingGrasper)
-    monkeypatch.setattr(demo, "TactileLogger", _FakeTactileLogger)
-    monkeypatch.setattr(demo, "build_config", lambda _args: _fake_config())
+    monkeypatch.setattr(
+        demo,
+        "build_demo_runtime_config",
+        lambda: DemoRuntimeConfig(
+            adaptive_config=_fake_config(),
+            interrupt_release_wait_s=0.05,
+        ),
+    )
     monkeypatch.setattr(demo.time, "sleep", lambda _x: None)
 
-    with patch.object(
-        sys,
-        "argv",
-        [
-            "2x.adaptive_grasp_demo.py",
-            "--interrupt-release-wait",
-            "0.05",
-        ],
-    ):
+    with patch.object(sys, "argv", ["2x.adaptive_grasp_demo.py"]):
         demo.main()
 
     assert _InterruptingGrasper.last_instance is not None
