@@ -70,6 +70,7 @@ class AdaptiveHoldRunner:
 
     def start(self, contact_snapshot: ContactSnapshot, *, start_thread: bool = True) -> None:
         self._hold_controller = self.hold_controller_factory(contact_snapshot)
+        self.runtime.running = True
         self.runtime.state = GraspState.ADAPTIVE_HOLD
         self.runtime.adaptive_hold_started_at = self.get_monotonic_time()
 

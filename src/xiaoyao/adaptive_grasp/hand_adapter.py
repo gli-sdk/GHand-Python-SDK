@@ -43,10 +43,10 @@ def ensure_hand_command_port(hand: Any) -> GraspSequenceHandPort:
     has_command_methods = hasattr(hand, "move_joints") and hasattr(hand, "stop")
     has_motion_completion = hasattr(hand, "wait_for_motion_completion")
 
-    if is_dex_hand_like:
-        return DexHandCommandPort(hand)
     if has_command_methods and has_motion_completion:
         return hand
+    if is_dex_hand_like:
+        return DexHandCommandPort(hand)
     if has_command_methods:
         raise TypeError(
             "hand port must provide wait_for_motion_completion() or be a "

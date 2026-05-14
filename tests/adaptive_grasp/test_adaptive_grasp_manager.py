@@ -748,6 +748,31 @@ def test_adaptive_grasp_manager_accepts_none_config():
     assert grasper._sensor is not None
 
 
+def test_adaptive_grasper_uses_injected_sensor_port():
+    hand = _MockHand()
+    sensor = type(
+        "_InjectedSensor",
+        (),
+        {
+            "start": lambda self: None,
+            "stop": lambda self, clear_joint_feedback=False: None,
+            "reset": lambda self: None,
+            "tactile_data": property(lambda self: None),
+            "joint_feedback": property(lambda self: None),
+            "sample_time_s": property(lambda self: None),
+            "data_age_s": lambda self, current_time: None,
+            "sum_active_finger_normal_force": lambda self: 0.0,
+            "active_finger_touch_flag": lambda self: {},
+        },
+    )()
+
+    grasper = AdaptiveGrasper(hand, AdaptiveGraspConfig(), sensor=sensor)
+
+    assert grasper._sensor is sensor
+    assert grasper._hold_runner.sensor is sensor
+    assert grasper._release_controller.sensor is sensor
+
+
 def test_adaptive_grasper_passes_finger_touch_threshold_to_sensor():
     cfg = AdaptiveGraspConfig(finger_touch_threshold_n=0.25)
     grasper = AdaptiveGrasper(_MockHand(), cfg)

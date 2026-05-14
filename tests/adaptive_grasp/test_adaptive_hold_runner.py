@@ -83,10 +83,12 @@ def _runner(results, *, runtime=None, config=None, clock=None, start_thread=Fals
 def test_start_without_thread_initializes_adaptive_hold_state():
     runner, runtime, _sensor, _release, _hold = _runner(
         [HoldStepResult(result=HoldResult.CONTINUE)],
+        runtime=AdaptiveGraspRuntime(running=False),
         clock=_Clock(12.5),
     )
 
     assert runtime.state == GraspState.ADAPTIVE_HOLD
+    assert runtime.running is True
     assert runtime.adaptive_hold_started_at == 12.5
     assert runner.thread is None
 

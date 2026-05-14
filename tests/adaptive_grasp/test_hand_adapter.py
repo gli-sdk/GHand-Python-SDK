@@ -39,6 +39,11 @@ class _PortLikeHand:
         return True
 
 
+class _SubscribingPortLikeHand(_PortLikeHand):
+    def subscribe(self, callback):
+        return 1
+
+
 class _CommandOnlyHand:
     def move_joints(self, joints, mode):
         return False
@@ -109,6 +114,12 @@ def test_dex_hand_command_port_waits_for_motion_completion(monkeypatch):
 
 def test_ensure_hand_command_port_returns_existing_port_like_object():
     port_like = _PortLikeHand()
+
+    assert ensure_hand_command_port(port_like) is port_like
+
+
+def test_ensure_hand_command_port_prefers_complete_port_over_dexhand_like_shape():
+    port_like = _SubscribingPortLikeHand()
 
     assert ensure_hand_command_port(port_like) is port_like
 

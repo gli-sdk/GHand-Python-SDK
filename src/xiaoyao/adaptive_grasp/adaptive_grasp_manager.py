@@ -12,6 +12,7 @@ from .config import AdaptiveGraspConfig
 from .grasp_sequence import ContactSnapshot, PhaseController
 from .hand_adapter import ensure_hand_command_port
 from .object_profile import ObjectProfile, ObjectProfileRegistry
+from .ports import SensorFrameSource
 from .position_hold_planner import ForceDecision
 from .release_controller import ReleaseController
 from .runtime import AdaptiveGraspRuntime
@@ -27,7 +28,13 @@ _NO_CONTROL_THREAD_OVERRIDE = object()
 
 
 class AdaptiveGrasper:
-    def __init__(self, hand: DexHand, config: Optional[AdaptiveGraspConfig] = None):
+    def __init__(
+        self,
+        hand: DexHand,
+        config: Optional[AdaptiveGraspConfig] = None,
+        *,
+        sensor: Optional[SensorFrameSource] = None,
+    ):
         self.hand = hand
         self._hand_port = ensure_hand_command_port(hand)
         self.config = config or AdaptiveGraspConfig()
@@ -41,6 +48,7 @@ class AdaptiveGrasper:
             hand=hand,
             config=self.config,
             get_monotonic_time=self._get_monotonic_time,
+            sensor=sensor,
         )
         self._sensor = self._components.sensor
         self._tactile = self._components.tactile
