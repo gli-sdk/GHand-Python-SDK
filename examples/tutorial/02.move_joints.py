@@ -1,7 +1,7 @@
 import time
 import math
 import logging
-from ghand.dexhand import DexHand, CommType, Joint, JointId
+from ghand.ghand import GHand, CommType, Joint, JointId
 from ghand.types import State, ErrorCode
 from ghand import configure_logging
 from ghand.types import (
@@ -15,7 +15,7 @@ from ghand.types import (
 configure_logging(level=logging.INFO)
 
 def main():
-    hand = DexHand()
+    hand = GHand()
     connected = hand.open(CommType.ETHERCAT, "auto")
 
     try:

@@ -1,7 +1,7 @@
 import time
 import logging
 from ghand import (
-    DexHand,
+    GHand,
     CommType,
     GestureType,
     execute_gesture,
@@ -15,7 +15,7 @@ from ghand import (
 def main():
     """主执行函数，演示如何执行预设手势。"""
     print("***** 枭尧灵巧手 SDK - 预设手势功能演示 *****\n")
-    hand = DexHand()
+    hand = GHand()
     connected = hand.open(CommType.ETHERCAT, "auto")
 
     try:

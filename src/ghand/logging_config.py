@@ -20,7 +20,7 @@ from typing import Union
 ROOT_LOGGER_NAME = "ghand"
 
 MODULE_LOGGERS = {
-    "dexhand": f"{ROOT_LOGGER_NAME}.dexhand",
+    "ghand": f"{ROOT_LOGGER_NAME}.ghand",
     "ethercat_driver": f"{ROOT_LOGGER_NAME}.ethercat_driver",
 }
 
@@ -170,16 +170,16 @@ def get_logger(name: str = ROOT_LOGGER_NAME) -> logging.Logger:
     获取指定名称的 logger
 
     Args:
-        name: logger 名称，支持 "ghand", "ghand.dexhand" 等
-             也支持简写，如 "dexhand" 会自动加上 "ghand." 前缀
+        name: logger 名称，支持 "ghand", "ghand.ghand" 等
+             也支持简写，如 "ghand" 会自动加上 "ghand." 前缀
 
     Returns:
         Logger 实例
 
     Example:
         >>> from ghand.logging_config import get_logger
-        >>> logger = get_logger("ghand.dexhand")
-        >>> logger = get_logger("dexhand")  # 等同于上
+        >>> logger = get_logger("ghand.ghand")
+        >>> logger = get_logger("ghand")  # 等同于上
     """
     # 支持简写形式
     if not name.startswith(ROOT_LOGGER_NAME):

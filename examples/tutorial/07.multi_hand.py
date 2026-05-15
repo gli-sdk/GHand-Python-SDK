@@ -8,14 +8,14 @@ import time
 import math
 import logging
 from typing import List, Dict, Optional
-from ghand.dexhand import DexHand, CommType, Joint, JointId
+from ghand.ghand import GHand, CommType, Joint, JointId
 from ghand import configure_logging
 
 # Configure SDK logging
 configure_logging(level=logging.INFO)
 
 
-class MultiDexHandController:
+class MultiGHandController:
     """
     多灵巧手控制器
 
@@ -24,10 +24,10 @@ class MultiDexHandController:
 
     用法示例:
         # 方式1：自动搜索所有可用接口并连接
-        controller = MultiDexHandController(auto_search=True)
+        controller = MultiGHandController(auto_search=True)
 
         # 方式2：手动指定网络接口
-        controller = MultiDexHandController(
+        controller = MultiGHandController(
             interfaces=["\\Device\\NPF_{...}", "\\Device\\NPF_{...}"]
         )
 
@@ -58,7 +58,7 @@ class MultiDexHandController:
         self.interfaces = interfaces or []
 
         # 存储所有手的信息
-        self.hands: Dict[str, DexHand] = {}
+        self.hands: Dict[str, GHand] = {}
         self.hand_info: Dict[str, dict] = {}
         self.interface_to_hand: Dict[str, str] = {}  # interface -> hand_name
 
@@ -67,7 +67,7 @@ class MultiDexHandController:
 
         # 如果启用自动搜索，获取所有可用接口
         if auto_search:
-            temp_hand = DexHand()
+            temp_hand = GHand()
             self.interfaces = temp_hand.get_connectable_devices()
             del temp_hand
             print(f"自动搜索到 {len(self.interfaces)} 个可连接设备")
@@ -89,7 +89,7 @@ class MultiDexHandController:
             print(f"  测试接口 {i}: {iface}")
 
             # 尝试连接
-            test_hand = DexHand()
+            test_hand = GHand()
             try:
                 if test_hand.open(CommType.ETHERCAT, iface):
                     # 成功检测到设备
@@ -127,7 +127,7 @@ class MultiDexHandController:
         for i, interface in enumerate(self.interfaces):
             print(f"  连接设备 {i}: {interface}")
 
-            hand = DexHand()
+            hand = GHand()
             try:
                 if hand.open(CommType.ETHERCAT, interface):
                     hand_name = f"hand_{i}"
@@ -336,10 +336,10 @@ def main():
 
     # 方式1：自动搜索并连接所有可用设备（推荐）
     print("=== 方式1：自动搜索模式 ===")
-    controller = MultiDexHandController(auto_search=True)
+    controller = MultiGHandController(auto_search=True)
 
     # 方式2：手动指定网络接口
-    # controller = MultiDexHandController(
+    # controller = MultiGHandController(
     #     interfaces=[
     #         "\\Device\\NPF_{FDC7358F-FC71-4446-8247-A53015F23C29}",
     #         "\\Device\\NPF_{D40A6875-C1A4-499A-BD51-273F04D08604}"

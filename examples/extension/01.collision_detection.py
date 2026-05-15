@@ -11,7 +11,7 @@ import math
 import logging
 from ghand import configure_logging
 from ghand.converter import joints_to_nparray, nparray_to_joints
-from ghand.dexhand import DexHand, CommType, Joint, JointId
+from ghand.ghand import GHand, CommType, Joint, JointId
 
 # 配置日志
 configure_logging(level=logging.INFO)
@@ -24,7 +24,7 @@ DEFAULT_TORQUE = 100
 def main():
     print("===== 枭尧灵巧手 SDK - 在线碰撞检测演示 =====\n")
 
-    hand = DexHand()
+    hand = GHand()
 
     try:
         print("正在连接设备...")

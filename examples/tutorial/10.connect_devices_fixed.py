@@ -1,13 +1,13 @@
 """
 示例：连接两只灵巧手
 
-现在 EthercatClient 已经移除了单例模式，可以直接创建多个 DexHand 实例
+现在 EthercatClient 已经移除了单例模式，可以直接创建多个 GHand 实例
 来连接多个设备。
 """
 import time
 import math
 import logging
-from ghand.dexhand import DexHand, CommType, Joint, JointId
+from ghand.ghand import GHand, CommType, Joint, JointId
 from ghand import configure_logging
 
 # Configure SDK logging
@@ -19,7 +19,7 @@ def main():
 
     # 创建并连接第一只手
     print("正在连接第一只灵巧手...")
-    hand1 = DexHand()
+    hand1 = GHand()
     connected1 = hand1.open(
         CommType.ETHERCAT, "\\Device\\NPF_{B1A930DF-53B0-483A-ABB8-6C3146F1FC2D}"
     )
@@ -29,7 +29,7 @@ def main():
 
         # 创建并连接第二只手
     print("正在连接第二只灵巧手...")
-    hand2 = DexHand()
+    hand2 = GHand()
     connected2 = hand2.open(
         CommType.ETHERCAT, "\\Device\\NPF_{5539C758-F9F9-482D-B319-1760CE5958A6}"
     )

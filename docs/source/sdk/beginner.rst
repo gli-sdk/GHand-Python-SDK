@@ -20,10 +20,10 @@
 ------------------------
 .. code-block:: python
 
-   from ghand.dexhand import DexHand, CommType
-   
+   from ghand.ghand import GHand, CommType
+
    # 创建灵巧手对象
-   hand = DexHand()
+   hand = GHand()
    
    # 连接灵巧手设备
    hand.open(CommType.ETHERCAT, "your device id")

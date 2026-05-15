@@ -16,7 +16,7 @@ class EthercatClient(object):
         """
         初始化EtherCAT客户端对象
 
-        注意：已移除单例模式，每个 DexHand 实例都有自己独立的 EthercatClient
+        注意：已移除单例模式，每个 GHand 实例都有自己独立的 EthercatClient
         这样可以支持多个网络接口同时连接不同的设备
         """
         self._master = pysoem.Master()

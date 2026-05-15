@@ -2,7 +2,7 @@ import time
 import math
 import logging
 from ghand import (
-    DexHand,
+    GHand,
     CommType,
     Joint,
     JointId,
@@ -321,7 +321,7 @@ def execute_joint_positions(hand, joint_positions, description):
     """通用的关节位置执行函数
 
     Args:
-        hand: DexHand实例
+        hand: GHand实例
         joint_positions: 关节位置字典
         description: 动作描述
 
@@ -371,7 +371,7 @@ def thumb_touch_tp(hand):
     5. 复位到零位
 
     Args:
-        hand: DexHand实例
+        hand: GHand实例
 
     Returns:
         bool: 动作执行成功返回True，失败返回False
@@ -409,7 +409,7 @@ def fist_then_open(hand):
     2. 张开手掌
 
     Args:
-        hand: DexHand实例
+        hand: GHand实例
 
     Returns:
         bool: 动作执行成功返回True，失败返回False
@@ -441,7 +441,7 @@ def seq_open_finger(hand):
     6. 张开大拇指
 
     Args:
-        hand: DexHand实例
+        hand: GHand实例
 
     Returns:
         bool: 动作执行成功返回True，失败返回False
@@ -488,7 +488,7 @@ def swing_index_finger(hand):
     5. 复位到初始姿势
 
     Args:
-        hand: DexHand实例
+        hand: GHand实例
 
     Returns:
         bool: 动作执行成功返回True，失败返回False
@@ -523,7 +523,7 @@ def flex_finger_movement(hand, cycle_count=FLEX_CYCLE_COUNT):
     8. 复位到零位
 
     Args:
-        hand: DexHand实例
+        hand: GHand实例
         cycle_count: 循环次数，默认4次
 
     Returns:
@@ -569,7 +569,7 @@ def make_ok(hand):
     拇指和食指指尖触碰
 
     Args:
-        hand: DexHand实例
+        hand: GHand实例
 
     Returns:
         bool: 动作执行成功返回True，失败返回False
@@ -589,7 +589,7 @@ def first_action(hand):
     2. 握拳和张开（重复两次）
 
     Args:
-        hand: DexHand实例
+        hand: GHand实例
 
     Returns:
         bool: 动作执行成功返回True，失败返回False
@@ -615,7 +615,7 @@ def second_action(hand, flex_cycles=FLEX_CYCLE_COUNT):
     4. OK手势
 
     Args:
-        hand: DexHand实例
+        hand: GHand实例
         flex_cycles: 手指弯曲动作的循环次数，默认4次
 
     Returns:
@@ -639,7 +639,7 @@ def second_action(hand, flex_cycles=FLEX_CYCLE_COUNT):
 
 def main():
     logger.info("***** 枭尧灵巧手 SDK - 手势舞功能演示 *****")
-    hand = DexHand()
+    hand = GHand()
     connected = hand.open(CommType.ETHERCAT, "auto")
 
     try:

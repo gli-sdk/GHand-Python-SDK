@@ -1,12 +1,12 @@
 import logging
-from ghand.dexhand import DexHand, CommType
+from ghand.ghand import GHand, CommType
 from ghand import configure_logging
 
 # Configure SDK logging (shows connection state, errors, etc.)
 configure_logging(level=logging.INFO)
 
 def main():
-    hand = DexHand()
+    hand = GHand()
     connected = hand.open(CommType.ETHERCAT, "auto")
     if not connected:
         print("Connection failed")

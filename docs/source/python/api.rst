@@ -2,7 +2,7 @@
 Python API
 ===================
 
-.. autoclass:: ghand.dexhand.DexHand
+.. autoclass:: ghand.ghand.GHand
    :members: 
    :show-inheritance:
    :exclude-members:

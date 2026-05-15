@@ -1,7 +1,7 @@
 import socket
 import time
 import math
-from ghand.dexhand import DexHand, CommType, Joint, JointId
+from ghand.ghand import GHand, CommType, Joint, JointId
 
 UDP_IP = "192.168.1.19"
 UDP_PORT = 8080
@@ -169,7 +169,7 @@ def main():
     主函数，负责接收数据并处理显示
     """
     # 创建EtherCAT连接
-    hand = DexHand()
+    hand = GHand()
     connected = hand.open(CommType.ETHERCAT,  "auto")
     if not connected:
         print("connect failed")

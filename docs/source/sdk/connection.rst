@@ -9,9 +9,9 @@ EtherCAT连接
 ------------
 .. code-block:: python
 
-   from ghand.hand import DexHand, CommType
-   
-   hand = DexHand()
+   from ghand.ghand import GHand, CommType
+
+   hand = GHand()
    hand.open_ethercat(CommType.ETHERCAT, "device_id_123")
 
    # 或自动连接您当前的灵巧手设备

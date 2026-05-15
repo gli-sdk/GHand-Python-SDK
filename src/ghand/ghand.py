@@ -20,9 +20,9 @@ from collision_sdk import CollisionSDK, CollisionCheckResult
 
 from ._converter import joints_to_nparray, nparray_to_joints
 
-logger = logging.getLogger("ghand.dexhand")
+logger = logging.getLogger("ghand.ghand")
 
-class DexHand(object):
+class GHand(object):
     def __init__(self,
                  product_type: ProductType = ProductType.G5,
                  comm_type: CommType = CommType.ETHERCAT):
@@ -820,7 +820,7 @@ class DexHand(object):
             ValueError: 如果 margin 超出 [0.0, 1.0] 范围
 
         Example:
-            >>> hand = DexHand()
+            >>> hand = GHand()
             >>> hand.open(CommType.ETHERCAT, "auto")
             >>> hand.set_safety_margin(0.5)  # 设置1mm安全边距
         """
@@ -856,7 +856,7 @@ class DexHand(object):
                                    collision_pairs。
 
         Example:
-            >>> hand = DexHand()
+            >>> hand = GHand()
             >>> result = hand.check_collision(joints)
             >>> if result.has_collision:
             ...     print("检测到碰撞，使用安全角度")

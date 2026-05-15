@@ -1,7 +1,7 @@
 import time
 import math
 import logging
-from ghand.dexhand import DexHand, CommType, Joint, JointId
+from ghand.ghand import GHand, CommType, Joint, JointId
 from ghand import configure_logging
 
 # Configure SDK logging (shows connection state, warnings, errors)
@@ -9,7 +9,7 @@ configure_logging(level=logging.INFO)
 
 
 def main():
-    hand = DexHand()
+    hand = GHand()
 
     # 为每个关节创建独立的参数字典
     joint_params = {

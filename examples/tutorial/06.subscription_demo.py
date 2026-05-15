@@ -1,7 +1,7 @@
 import time
 import math
 import logging
-from ghand.dexhand import DexHand
+from ghand.ghand import GHand
 from ghand import configure_logging
 from ghand.types import State, ErrorCode
 
@@ -24,7 +24,7 @@ def data_callback(tpdo):
 
 def main():
     # 创建灵巧手实例
-    hand = DexHand()
+    hand = GHand()
     
     # 打开连接
     if not hand.open():

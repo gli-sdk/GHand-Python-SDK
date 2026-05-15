@@ -10,7 +10,7 @@ import time
 import logging
 from typing import Dict
 
-from .dexhand import DexHand
+from .ghand import GHand
 from .types import JointId, State, ErrorCode, Joint, GestureType
 
 logger = logging.getLogger("ghand.gestures")
@@ -98,7 +98,7 @@ GESTURE_DEFINITIONS: Dict[GestureType, Dict[JointId, float]] = {
 
 
 def execute_gesture(
-    hand: DexHand,
+    hand: GHand,
     gesture: GestureType,
     speed: int = 100,
     torque: int = 100,
@@ -107,7 +107,7 @@ def execute_gesture(
     """执行预设手势
 
     Args:
-        hand: DexHand 实例
+        hand: GHand 实例
         gesture: 要执行的手势类型
         speed: 速度百分比 (0-100)，默认 100
         torque: 力矩百分比 (0-100)，默认 100
@@ -134,11 +134,11 @@ def execute_gesture(
     return result
 
 
-def _wait_for_completion(hand: DexHand) -> bool:
+def _wait_for_completion(hand: GHand) -> bool:
     """等待动作完成并检查状态
 
     Args:
-        hand: DexHand 实例
+        hand: GHand 实例
 
     Returns:
         bool: 成功返回 True，失败返回 False

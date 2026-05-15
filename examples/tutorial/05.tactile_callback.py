@@ -1,12 +1,12 @@
 import time
 import sys
 import threading
-from ghand.dexhand import DexHand, CommType
+from ghand.ghand import GHand, CommType
 
 
 class TactileDisplay:
     def __init__(self):
-        self.hand = DexHand()
+        self.hand = GHand()
         self.connected = False
         self.tactile_opened = False
         self.running = False
@@ -59,7 +59,7 @@ class TactileDisplay:
                 
                 if tactile_data:
                     # 直接通过枚举访问各手指的合力数据
-                    from ghand.dexhand import TactileSensorId
+                    from ghand.ghand import TactileSensorId
                     
                     thumb_data = tactile_data[TactileSensorId.THUMB]
                     ff_data = tactile_data[TactileSensorId.FOREFINGER]

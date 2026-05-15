@@ -2,7 +2,7 @@ import sys
 if sys.version_info < (3, 10):
     sys.exit("GHand SDK requires Python 3.10 or higher")
 
-from .dexhand import DexHand
+from .ghand import GHand
 from .types import (
     Joint, JointId, HandInfo, HandType, CommType, CtrlMode,
     TactileSensorId, TactileInfo, State, ErrorCode, ProductType, GestureType,
@@ -22,7 +22,7 @@ from . import logging_config
 # 导出便捷函数
 __all__ = [
     # 核心类
-    "DexHand",
+    "GHand",
     "Joint",
     "JointId",
     "ProductType",

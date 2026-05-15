@@ -1,7 +1,7 @@
 import time
 import math
 import logging
-from ghand.dexhand import DexHand, CommType, Joint, JointId
+from ghand.ghand import GHand, CommType, Joint, JointId
 from ghand import configure_logging
 
 # Configure SDK logging (shows connection state, warnings, errors)
@@ -117,7 +117,7 @@ def hand_zero(hand):
 
 def main():
     print("***** 枭尧灵巧手 SDK - 按功能演示 *****\n")
-    hand = DexHand()
+    hand = GHand()
     connected = hand.open(CommType.ETHERCAT, "auto")
     try:
         if not connected:
