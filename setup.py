@@ -5,7 +5,7 @@ dir_path = os.path.abspath(os.path.dirname(__file__))
 
 
 def fetch_version():
-    with open(os.path.join(dir_path, 'src', 'xiaoyao', 'version.py')) as f:
+    with open(os.path.join(dir_path, 'src', 'ghand', 'version.py')) as f:
         ns = {}
         exec(f.read(), ns)
         return ns

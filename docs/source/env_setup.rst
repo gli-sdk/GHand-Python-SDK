@@ -3,7 +3,7 @@
 
 检查Python版本
 --------------
-Xiaoyao SDK支持Python 3.10到3.13版本。
+GHand SDK支持Python 3.10到3.13版本。
 
 .. code-block:: bash
 

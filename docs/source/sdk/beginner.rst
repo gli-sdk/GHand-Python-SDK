@@ -4,7 +4,7 @@
 新手入门
 ####################################
 
-本指南将帮助您快速开始使用Xiaoyao Python SDK。
+本指南将帮助您快速开始使用GHand Python SDK。
 
 第一步：安装SDK
 ------------------------
@@ -20,7 +20,7 @@
 ------------------------
 .. code-block:: python
 
-   from xiaoyao.dexhand import DexHand, CommType
+   from ghand.dexhand import DexHand, CommType
    
    # 创建灵巧手对象
    hand = DexHand()
@@ -37,4 +37,4 @@
 
 使用示例程序
 ------------------------
-更多示例程序在``/xiaoyao/examples``目录下。
+更多示例程序在``/ghand/examples``目录下。

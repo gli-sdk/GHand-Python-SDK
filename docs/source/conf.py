@@ -4,7 +4,7 @@ import sys
 sys.path.insert(0, os.path.abspath('../../src'))
 
 # -- Project information -----------------------------------------------------
-project = 'Xiaoyao Python SDK'
+project = 'GHand Python SDK'
 copyright = '2025, Shenzhen GLI Technology Ltd.'
 author = 'glitech'
 autodoc_member_order = 'bysource'

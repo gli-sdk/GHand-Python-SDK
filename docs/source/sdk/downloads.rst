@@ -6,15 +6,15 @@
 SDK安装包
 -----------
 
-您可以通过以下方式获取 Xiaoyao Python SDK：
+您可以通过以下方式获取 GHand Python SDK：
 
 **从源代码安装（当前唯一方式）**
 
 .. code-block:: bash
 
    # 克隆仓库
-   git clone https://gitee.com/glitech/xiaoyao-sdk.git
-   cd xiaoyao-sdk
+   git clone https://gitee.com/glitech/ghand-sdk.git
+   cd ghand-sdk
 
    # 安装 SDK
    python setup.py install
@@ -107,7 +107,7 @@ SDK安装包
 
 **在线文档**
 
-- **GitHub/Gitee 仓库**: https://gitee.com/glitech/xiaoyao-sdk
+- **GitHub/Gitee 仓库**: https://gitee.com/glitech/ghand-sdk
   - 包含最新源码、问题追踪和更新日志
 
 - **API 参考文档**: 本文档系统提供完整的 API 参考

@@ -3,13 +3,13 @@
 设备连接指南
 ==============
 
-Xiaoyao灵巧手支持多种连接方式：
+枭尧灵巧手支持多种连接方式：
 
 EtherCAT连接
 ------------
 .. code-block:: python
 
-   from xiaoyao.hand import DexHand, CommType
+   from ghand.hand import DexHand, CommType
    
    hand = DexHand()
    hand.open_ethercat(CommType.ETHERCAT, "device_id_123")

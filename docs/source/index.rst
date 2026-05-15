@@ -1,7 +1,7 @@
-.. Xiaoyao灵巧手SDK documentation master file
+.. 枭尧灵巧手SDK documentation master file
    =====================================
 
-欢迎使用Xiaoyao Python SDK
+欢迎使用GHand Python SDK
 =====================================
 
 .. toctree::

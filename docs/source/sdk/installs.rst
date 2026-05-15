@@ -15,11 +15,11 @@
 .. code-block:: bash
 
    # 使用pip安装
-   pip install xiaoyao
+   pip install ghand
    
    # 或者从源代码安装
-   git clone https://gitee.com/glitech/xiaoyao-sdk.git
-   cd xiaoyao-sdk
+   git clone https://gitee.com/glitech/ghand-sdk.git
+   cd ghand-sdk
    python setup.py install
 
 固件升级步骤
@@ -30,4 +30,4 @@
 ---------------------
 .. code-block:: bash
 
-   pip uninstall xiaoyao
+   pip uninstall ghand
