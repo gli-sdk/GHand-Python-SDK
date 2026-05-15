@@ -11,13 +11,13 @@ class ObjectProfile:
 
     name: str
     weight_kg: float
-    safe_force_min: float
-    safe_force_max: float
-    friction_coeff: float
-    is_fragile: bool
+    safe_force_min: float # 最小抓取力下限 保障能抓起物品的力（手指法向力的合力）
+    safe_force_max: float # 最大抓取力上限 避免物体被抓坏（手指法向力的合力）
+    friction_coeff: float # 摩擦系数
+    is_fragile: bool 
     material: str
-    position_hold_torque: int
-    position_hold_speed: int
+    position_hold_torque: int # 用于保持手指位置的电流，该值越大，提供的法向力越大
+    position_hold_speed: int # 用于保持手指位置的角速度，与position_hold_torque一致即可
     phase_closing_torque: int = 30
     
     # 可选描述信息，预留给视觉识别、仿真或策略选择使用。
