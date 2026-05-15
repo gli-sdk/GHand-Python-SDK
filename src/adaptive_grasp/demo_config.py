@@ -27,8 +27,8 @@ DEMO_SCENES: dict[str, DemoScene] = {
     "glass_cup": DemoScene(default_object="glass", pre_grasp_preset="three_finger_grasp"),
     "plastic_cup": DemoScene(default_object="plastic_cup", pre_grasp_preset="paper_cup_grasp"),
     "smooth_ball": DemoScene(default_object="plastic_cup", pre_grasp_preset="smooth_ball"),
-    "minreal_water_bottle_500ml": DemoScene(
-        default_object="minreal_water_bottle_500ml",
+    "mineral_water_bottle_500ml": DemoScene(
+        default_object="mineral_water_bottle_500ml",
         pre_grasp_preset="minreal_water_grasp",
     ),
     "plastic_object": DemoScene(default_object="plastic", pre_grasp_preset="two_finger_pinch"),

@@ -31,6 +31,12 @@ def test_demo_runtime_config_defaults_use_top_level_demo_choices():
     assert runtime.adaptive_config.default_object == DEMO_SCENES[GRASP_OBJECT].default_object
 
 
+def test_mineral_water_bottle_demo_name_has_no_hidden_whitespace():
+    runtime = build_demo_runtime_config("mineral_water_bottle_500ml", HOLD_TIME_S)
+
+    assert runtime.adaptive_config.default_object == "mineral_water_bottle_500ml"
+
+
 @pytest.mark.parametrize("grasp_object, scene", DEMO_SCENES.items())
 def test_all_demo_scenes_build_valid_adaptive_configs(grasp_object, scene):
     runtime = build_demo_runtime_config(grasp_object, HOLD_TIME_S)

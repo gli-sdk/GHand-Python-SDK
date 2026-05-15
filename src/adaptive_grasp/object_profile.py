@@ -177,7 +177,7 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         position_hold_speed=30,
     ),
     ObjectProfile(
-        name = "minreal_water_bottle_500ml",
+        name = "mineral_water_bottle_500ml",
         weight_kg=0.5,
         safe_force_min=10.0,
         safe_force_max=30.0,
