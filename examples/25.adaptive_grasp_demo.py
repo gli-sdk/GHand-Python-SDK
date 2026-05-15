@@ -12,11 +12,11 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from xiaoyao.adaptive_grasp import (
+from adaptive_grasp import (
     AdaptiveGrasper,
     GraspState,
 )
-from xiaoyao.adaptive_grasp.demo_config import build_demo_runtime_config
+from adaptive_grasp.demo_config import build_demo_runtime_config
 from xiaoyao.dexhand import CommType, DexHand
 from xiaoyao.exceptions import (
     DataReceiveError,

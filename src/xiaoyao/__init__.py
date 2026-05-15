@@ -18,7 +18,7 @@ from .exceptions import (
 )
 from .version import __version__
 from .gestures import GestureType, execute_gesture, get_all_gestures, get_gesture_name
-from .adaptive_grasp import GraspState, AdaptiveGraspConfig, AdaptiveGrasper
+from adaptive_grasp import GraspState, AdaptiveGraspConfig, AdaptiveGrasper
 
 # ==============================================================================
 # 日志初始化：符合 SDK 标准
