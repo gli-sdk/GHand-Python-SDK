@@ -540,7 +540,7 @@ def test_perform_release_from_control_thread_does_not_deadlock(monkeypatch):
     assert g._running is False
 
 
-def test_fast_release_sends_open_command_without_waiting_for_control_thread(monkeypatch):
+def test_emergency_release_sends_open_command_without_waiting_for_control_thread(monkeypatch):
     hand = _MockHand()
     g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
     g._running = True
@@ -555,7 +555,7 @@ def test_fast_release_sends_open_command_without_waiting_for_control_thread(monk
 
         def join(self, timeout=None):
             self.join_calls += 1
-            raise AssertionError("fast release should not wait for control thread")
+            raise AssertionError("emergency release should not wait for control thread")
 
     control_thread = _BlockingThread()
     g._control_thread = control_thread
@@ -565,7 +565,8 @@ def test_fast_release_sends_open_command_without_waiting_for_control_thread(monk
         lambda value: sleeps.append(value),
     )
 
-    assert g.release_fast(wait_s=0.123) is True
+    assert not hasattr(g, "release_fast")
+    assert g.emergency_release(wait_s=0.123) is True
     assert control_thread.join_calls == 0
     assert sleeps == [0.123]
     assert hand.calls[-1]["mode"] == CtrlMode.POSITION

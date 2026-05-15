@@ -204,7 +204,11 @@ class AdaptiveGrasper:
     def release(self) -> bool:
         return self._perform_release(wait_control_thread=True)
 
-    def release_fast(self, wait_s: float = 2.0) -> bool:
+    def finish(self) -> None:
+        self.release()
+        self.wait_for_visualizer_close()
+
+    def emergency_release(self, wait_s: float = 2.0) -> bool:
         return self._perform_release(wait_control_thread=False, release_wait_s=wait_s)
 
     def stop(self) -> None:

@@ -65,15 +65,14 @@ def main() -> None:
             time.sleep(0.1)
         print(f"Final state: {grasper.get_state().value}")
 
-        grasper.release()
-        grasper.wait_for_visualizer_close()
+        grasper.finish()
         print("Grasp Done.")
 
     except KeyboardInterrupt:
         print("\nInterrupted by user.")
         if grasper is not None:
             print("Sending quick release command...")
-            grasper.release_fast(wait_s=runtime_config.interrupt_release_wait_s)
+            grasper.emergency_release(wait_s=runtime_config.interrupt_release_wait_s)
     except DeviceDisconnectedError as exc:
         print(f"\n[Device Disconnected] {exc.message}")
     except JointFaultError as exc:

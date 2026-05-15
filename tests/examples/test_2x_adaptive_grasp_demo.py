@@ -52,7 +52,7 @@ class _InterruptingGrasper:
         type(self).last_instance = self
         self.config = config
         self.release_calls = 0
-        self.fast_release_waits: list[float] = []
+        self.emergency_release_waits: list[float] = []
         self.wait_calls = 0
 
     def grasp_core(self):
@@ -62,8 +62,8 @@ class _InterruptingGrasper:
         self.release_calls += 1
         return True
 
-    def release_fast(self, wait_s=0.2):
-        self.fast_release_waits.append(wait_s)
+    def emergency_release(self, wait_s=0.2):
+        self.emergency_release_waits.append(wait_s)
         return True
 
     def wait_for_visualizer_close(self):
@@ -126,7 +126,7 @@ def test_main_fast_releases_on_keyboard_interrupt_by_default(monkeypatch):
 
     assert _InterruptingGrasper.last_instance is not None
     assert _InterruptingGrasper.last_instance.release_calls == 0
-    assert _InterruptingGrasper.last_instance.fast_release_waits == [1.0]
+    assert _InterruptingGrasper.last_instance.emergency_release_waits == [1.0]
 
 
 def test_main_uses_internal_fast_release_wait_on_keyboard_interrupt(monkeypatch):
@@ -146,5 +146,5 @@ def test_main_uses_internal_fast_release_wait_on_keyboard_interrupt(monkeypatch)
         demo.main()
 
     assert _InterruptingGrasper.last_instance is not None
-    assert _InterruptingGrasper.last_instance.fast_release_waits == [0.05]
+    assert _InterruptingGrasper.last_instance.emergency_release_waits == [0.05]
 
