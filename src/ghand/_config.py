@@ -1,4 +1,5 @@
 """产品配置加载器 — JSON 搜索、解析"""
+import glob
 import json
 import logging
 import os
@@ -97,6 +98,8 @@ def _parse_tactile_regions(json_array: list) -> list[TactileRegionConfig]:
 
 
 def load_product_config(product_type: ProductType) -> ProductConfig:
+    if product_type == ProductType.AUTO:
+        return ProductConfig()
     filename = _PRODUCT_TYPE_TO_FILE.get(product_type)
     if not filename:
         raise GHandError(f"Unknown product type: {product_type}")
@@ -105,6 +108,10 @@ def load_product_config(product_type: ProductType) -> ProductConfig:
     if not filepath:
         raise GHandError(f"Config file '{filename}' not found")
 
+    return _load_config_from_file(filepath)
+
+
+def _load_config_from_file(filepath: str) -> ProductConfig:
     try:
         with open(filepath, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -128,3 +135,33 @@ def load_product_config(product_type: ProductType) -> ProductConfig:
 
     logger.info("Loaded product config: %s from %s", config.name, filepath)
     return config
+
+
+def find_config_by_name(device_name: str) -> ProductConfig | None:
+    """根据设备名称在所有配置路径中搜索匹配的产品配置
+
+    Args:
+        device_name: 从设备读取的名称
+
+    Returns:
+        匹配的 ProductConfig，如果未找到则返回 None
+    """
+    if not device_name:
+        return None
+
+    for search_dir in _get_config_search_paths():
+        pattern = os.path.join(search_dir, "*.json")
+        for filepath in glob.glob(pattern):
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                continue
+
+            cfg_name = data.get("name", "")
+            if len(cfg_name) == len(device_name) and cfg_name.lower() == device_name.lower():
+                logger.info("Auto-detected product config: %s -> %s", device_name, filepath)
+                return _load_config_from_file(filepath)
+
+    logger.warning("No matching product config found for device: %s", device_name)
+    return None

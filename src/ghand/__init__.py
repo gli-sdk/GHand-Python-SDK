@@ -11,6 +11,7 @@ from .types import (
 )
 from .version import __version__
 from .gestures import execute_gesture, get_all_gestures
+from ._converter import joints_to_nparray, nparray_to_joints
 
 # ==============================================================================
 # 日志初始化：符合 SDK 标准
@@ -47,6 +48,9 @@ __all__ = [
     "GestureType",
     "execute_gesture",
     "get_all_gestures",
+    # 工具函数
+    "joints_to_nparray",
+    "nparray_to_joints",
     # 日志配置函数
     "configure_logging",
     "configure_logging_console",

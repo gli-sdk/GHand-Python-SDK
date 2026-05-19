@@ -9,9 +9,8 @@
 import time
 import math
 import logging
-from ghand import configure_logging
-from ghand.converter import joints_to_nparray, nparray_to_joints
-from ghand.ghand import GHand, CommType, Joint, JointId
+from ghand import configure_logging, joints_to_nparray, nparray_to_joints
+from ghand import GHand, CommType, Joint, JointId
 
 # 配置日志
 configure_logging(level=logging.INFO)

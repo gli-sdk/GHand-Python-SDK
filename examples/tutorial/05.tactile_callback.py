@@ -2,6 +2,7 @@ import time
 import sys
 import threading
 from ghand.ghand import GHand, CommType
+from ghand import TactileSensorId
 
 
 class TactileDisplay:
@@ -59,8 +60,7 @@ class TactileDisplay:
                 
                 if tactile_data:
                     # 直接通过枚举访问各手指的合力数据
-                    from ghand.ghand import TactileSensorId
-                    
+
                     thumb_data = tactile_data[TactileSensorId.THUMB]
                     ff_data = tactile_data[TactileSensorId.FOREFINGER]
                     mf_data = tactile_data[TactileSensorId.MIDDLE_FINGER]

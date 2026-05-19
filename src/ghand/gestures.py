@@ -158,7 +158,7 @@ def _wait_for_completion(hand: GHand) -> bool:
             break
         time.sleep(0.005)
 
-    if hand_info.state in [State.ABNORMAL_RUNNING, State.PROTECTIVE_STOPED] or \
+    if hand_info.state in [State.ABNORMAL_RUNNING, State.PROTECTIVE_STOPPED] or \
        hand_info.error != ErrorCode.NORMAL:
         logger.warning("Action completed with error state. Please clear fault and retry.")
         return False

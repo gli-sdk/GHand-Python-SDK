@@ -37,7 +37,8 @@ class State(enum.IntEnum):
     STOPPED = 0
     RUNNING = 1
     ABNORMAL_RUNNING = 2
-    PROTECTIVE_STOPED = 3
+    PROTECTIVE_STOPPED = 3
+    PROTECTIVE_STOPED = 3  # deprecated alias, kept for backward compatibility
 
 
 class ErrorCode(enum.IntEnum):
@@ -89,6 +90,7 @@ class TactileSensorId(enum.Enum):
 
 
 class ProductType(enum.Enum):
+    AUTO = "auto"
     G5 = "G5"
 
 
@@ -112,8 +114,8 @@ class TactileRegionConfig:
 
 @dataclass
 class ProductConfig:
-    name: str
-    model: str
+    name: str = ""
+    model: str = ""
     valid_joints: list[JointId] = field(default_factory=list)
     joint_limits: dict[JointId, tuple[float, float]] = field(default_factory=dict)
     has_tactile: bool = False
@@ -150,7 +152,7 @@ class HandInfo:
 @dataclass
 class Joint:
     id: int = JointId.THUMB_DIP
-    angle: float = 0.0
+    angle: float = 0.0  # radians
     speed: int = 0
     torque: int = 0
     state: State = State.STOPPED
@@ -223,7 +225,7 @@ _ERROR_MESSAGES = {
 }
 
 _STATE_MESSAGES = {
-    State.PROTECTIVE_STOPED: "设备进入保护性停止状态",
+    State.PROTECTIVE_STOPPED: "设备进入保护性停止状态",
     State.ABNORMAL_RUNNING: "设备运行异常",
 }
 
@@ -234,7 +236,7 @@ def get_fault_message(error_code: ErrorCode, state: Optional[State] = None, **co
     else:
         base_msg = "设备正常运行"
 
-    if state and state in [State.PROTECTIVE_STOPED, State.ABNORMAL_RUNNING]:
+    if state and state in [State.PROTECTIVE_STOPPED, State.ABNORMAL_RUNNING]:
         state_msg = _STATE_MESSAGES.get(state, f"异常状态: {state.name}")
         if error_code == ErrorCode.NORMAL:
             return f"{state_msg}，但错误码为0"

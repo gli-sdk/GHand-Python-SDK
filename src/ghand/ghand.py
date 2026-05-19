@@ -12,9 +12,9 @@ from .types import (
     JointFaultError, DataReceiveError, FaultInfo, JointFaultInfo,
     get_fault_message,
 )
-from ._config import load_product_config
+from ._config import load_product_config, find_config_by_name
 from ._subscription import SubscriptionManager
-from .comm.ethercat_protocol import JointRpdo, Rpdo, Tpdo
+from .comm.ethercat_protocol import JointRpdo, Rpdo, Tpdo, compute_tpdo_size
 
 from collision_sdk import CollisionSDK, CollisionCheckResult
 
@@ -24,13 +24,13 @@ logger = logging.getLogger("ghand.ghand")
 
 class GHand(object):
     def __init__(self,
-                 product_type: ProductType = ProductType.G5,
+                 product_type: ProductType = ProductType.AUTO,
                  comm_type: CommType = CommType.ETHERCAT):
         """
         初始化灵巧手对象
 
         Args:
-            product_type: 产品型号，默认 ProductType.G5
+            product_type: 产品型号，默认 ProductType.AUTO（自动检测）
             comm_type: 通信类型，默认 CommType.ETHERCAT
         """
         self._product_type = product_type
@@ -40,6 +40,10 @@ class GHand(object):
             jid: (math.radians(mn), math.radians(mx))
             for jid, (mn, mx) in self._product_config.joint_limits.items()
         }
+        self._passive_joints = (
+            set(self._product_config.valid_joints) - set(self._joint_limits.keys())
+        )
+        self._expected_tpdo_size = self._compute_tpdo_size()
         self._comm = self._create_comm(comm_type)
         self._hand_type = HandType.UNKNOWN
         self._firmware_version = ""
@@ -48,11 +52,18 @@ class GHand(object):
         self._safety_margin = 0.0
         self._collision_checker = None
 
-    def __del__(self):
-        """
-        析构函数，关闭灵巧手设备连接
-        """
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
+        return False
+
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            pass
 
     def _create_comm(self, comm_type: CommType) -> IComm:
         """根据通信类型创建对应的 IComm 实例"""
@@ -64,6 +75,25 @@ class GHand(object):
             return RS485Comm(self._product_config)
         else:
             raise ValueError(f"Unknown communication type: {comm_type}")
+
+    def _compute_tpdo_size(self) -> int:
+        config = self._product_config
+        counts = [r.count for r in config.tactile_regions] if config.has_tactile else None
+        return compute_tpdo_size(len(config.valid_joints), counts)
+
+    def _apply_product_config(self, config: ProductConfig):
+        """应用产品配置，更新关节限制并重建通信对象"""
+        self._product_config = config
+        self._joint_limits = {
+            jid: (math.radians(mn), math.radians(mx))
+            for jid, (mn, mx) in config.joint_limits.items()
+        }
+        self._passive_joints = (
+            set(config.valid_joints) - set(self._joint_limits.keys())
+        )
+        self._expected_tpdo_size = self._compute_tpdo_size()
+        self._comm = self._create_comm(self._comm_type)
+        self._sub_manager = SubscriptionManager(self._comm)
 
     def _check_joint_limit(self, joint: Joint, limit):
         """
@@ -168,12 +198,12 @@ class GHand(object):
 
         return connected_interfaces
 
-    def open(self, type: CommType = CommType.ETHERCAT, id: str = "auto"):
+    def open(self, comm_type: CommType = CommType.ETHERCAT, id: str = "auto"):
         """
         打开灵巧手设备连接
 
         Args:
-          type (CommType): 通信类型，默认为ETHERCAT
+          comm_type (CommType): 通信类型，默认为ETHERCAT
           id (str): 设备ID，当设置为"auto"时自动搜索设备，默认为"auto"
 
         Returns:
@@ -182,27 +212,46 @@ class GHand(object):
         if self._opened:
             return True
 
-        if type != self._comm_type:
-            self._comm = self._create_comm(type)
-            self._comm_type = type
+        if comm_type != self._comm_type:
+            self._comm = self._create_comm(comm_type)
+            self._comm_type = comm_type
             self._sub_manager = SubscriptionManager(self._comm)
 
         if id == "auto":
             id_list = self._comm.search_adapters()
             logger.info("Found IDs:\n" + "\n".join([f"\t{id}" for id in id_list]))
-            for adapter_id in id_list:
-                if self._comm.connect(adapter_id):
+            adapter_id = None
+            for aid in id_list:
+                if self._comm.connect(aid):
                     self._opened = True
-                    logger.info(f"Device opened successfully (ID: {adapter_id})")
+                    adapter_id = aid
+                    logger.info(f"Device opened successfully (ID: {aid})")
                     break
                 else:
-                    logger.error(f"Failed to open device (ID: {adapter_id})")
+                    logger.error(f"Failed to open device (ID: {aid})")
         else:
-            self._opened = self._comm.connect(id)
-            if self._opened:
+            if self._comm.connect(id):
+                self._opened = True
+                adapter_id = id
                 logger.info(f"Device opened successfully (ID: {id})")
             else:
                 logger.error(f"Failed to open device (ID: {id})")
+
+        if not self._opened:
+            return False
+
+        if self._product_type == ProductType.AUTO and not self._product_config.name:
+            try:
+                device_name = self.get_device_name()
+            except Exception:
+                logger.debug("Failed to get device name for auto-detection", exc_info=True)
+                device_name = None
+            if device_name:
+                matched = find_config_by_name(device_name)
+                if matched:
+                    self._comm.disconnect()
+                    self._apply_product_config(matched)
+                    self._comm.connect(adapter_id)
 
         return self._opened
 
@@ -278,60 +327,57 @@ class GHand(object):
         获取设备名
 
         Returns:
-            str: 获取成功返回设备ID，失败返回空字符串""
+            str: 设备名称字符串
+
+        Raises:
+            RuntimeError: 通信失败时抛出
         """
-        try:
-            device_name = self._comm.sdo_read(0x1008, 0x00).decode('utf-8')
-        except Exception:
-            return ""
-        return device_name
+        return self._comm.sdo_read(0x1008, 0x00).decode('utf-8')
 
     def get_hardware_version(self):
         """
         获取硬件版本号
 
         Returns:
-            str: 获取成功返回版本号（如："v1.0.0"），失败返回空字符串""
+            str: 硬件版本号（如："v1.0.0"）
+
+        Raises:
+            RuntimeError: 通信失败时抛出
         """
-        try:
-            hardware_version = self._comm.sdo_read(0x1009, 0x00).decode('utf-8')
-        except Exception:
-            return ""
-        return hardware_version
+        return self._comm.sdo_read(0x1009, 0x00).decode('utf-8')
 
     def get_serial_number(self):
         """
         获取产品序列号
 
         Returns:
-            int: 获取成功返回产品序列号，失败返回0
+            int: 产品序列号
+
+        Raises:
+            RuntimeError: 通信失败时抛出
         """
-        try:
-            serial_number = int.from_bytes(
-                self._comm.sdo_read(0x1018, 0x04), byteorder='little')
-        except Exception:
-            return 0
-        return serial_number
+        return int.from_bytes(
+            self._comm.sdo_read(0x1018, 0x04), byteorder='little')
 
     def get_motor_driver_version(self):
         """
         获取电机驱动版本号
 
         Returns:
-            tuple: (主版本号, 子版本号1, 子版本号2)，获取失败返回 (0, 0, 0)
+            tuple: (主版本号, 子版本号1, 子版本号2)
+
+        Raises:
+            RuntimeError: 通信失败时抛出
         """
-        try:
-            main_ver = int.from_bytes(
-                self._comm.sdo_read(0x2007, 0x01), byteorder="little"
-            )
-            sub1_ver = int.from_bytes(
-                self._comm.sdo_read(0x2007, 0x02), byteorder="little"
-            )
-            sub2_ver = int.from_bytes(
-                self._comm.sdo_read(0x2007, 0x03), byteorder="little"
-            )
-        except Exception:
-            return (0, 0, 0)
+        main_ver = int.from_bytes(
+            self._comm.sdo_read(0x2007, 0x01), byteorder="little"
+        )
+        sub1_ver = int.from_bytes(
+            self._comm.sdo_read(0x2007, 0x02), byteorder="little"
+        )
+        sub2_ver = int.from_bytes(
+            self._comm.sdo_read(0x2007, 0x03), byteorder="little"
+        )
         return (main_ver, sub1_ver, sub2_ver)
 
     def fault_clearance(self) -> bool:
@@ -440,13 +486,13 @@ class GHand(object):
         获取手的类型
 
         Returns:
-            HandType: 成功返回手的类型HandType.LEFT_HAND/HandType.RIGHT_HAND，失败返回HandType.UNKNOWN
+            HandType: HandType.LEFT_HAND 或 HandType.RIGHT_HAND
+
+        Raises:
+            RuntimeError: 通信失败时抛出
         """
         if self._hand_type == HandType.UNKNOWN:
-            try:
-                htype = self._comm.get_hand_type()
-            except Exception:
-                return HandType.UNKNOWN
+            htype = self._comm.get_hand_type()
             if htype == 1:
                 self._hand_type = HandType.LEFT_HAND
             elif htype == 2:
@@ -474,7 +520,7 @@ class GHand(object):
           mode (CtrlMode, optional): 模式选择。位置模式/力矩模式/速度模式。默认为位置模式
 
         Returns:
-          bool: 连接成功返回True，否则返回False
+          bool: 发送成功返回True，否则返回False
         """
         try:
             rpdo = Rpdo()
@@ -495,11 +541,8 @@ class GHand(object):
                 JointId.LF_PIP: rpdo.lf_pip,
                 JointId.LF_MCP: rpdo.lf_mcp,
             }
-            passive_joints = {
-                JointId.THUMB_DIP, JointId.FF_DIP, JointId.MF_DIP,
-                JointId.RF_DIP, JointId.LF_DIP,
-            }
 
+            # 第一遍：验证所有关节
             for joint in joints:
                 self._check_speed_limit(joint, mode)
                 self._check_torque_limit(joint, mode)
@@ -507,14 +550,17 @@ class GHand(object):
                 if mode == CtrlMode.POSITION and joint.id in self._joint_limits:
                     self._check_joint_limit(joint, self._joint_limits[joint.id])
 
-                if joint.id in joint_pdo_map:
-                    self._joint_to_pdo(joint, joint_pdo_map[joint.id])
-                elif joint.id in passive_joints:
-                    logger.debug(f"Skipping passive joint: {JointId(joint.id).name}")
-                    continue
-                else:
+                if joint.id not in joint_pdo_map and joint.id not in self._passive_joints:
                     logger.warning(f"[Joint] Invalid joint ID: {joint.id}")
                     return False
+
+            # 第二遍：写入PDO
+            for joint in joints:
+                if joint.id in joint_pdo_map:
+                    self._joint_to_pdo(joint, joint_pdo_map[joint.id])
+                elif joint.id in self._passive_joints:
+                    logger.debug(f"Skipping passive joint: {JointId(joint.id).name}")
+
             self._comm.send_data(rpdo.to_bytes())
             logger.info("Command sent successfully")
             return True
@@ -548,7 +594,7 @@ class GHand(object):
             list[Joint]: 关节列表
 
         Raises:
-            DataReceiveError: 数据长度不正确（期望708字节）
+            DataReceiveError: 数据长度不足
             DeviceDisconnectedError: 设备断连或通信失败
             JointFaultError: 任何关节故障（error != 0 或 state in [2, 3]）
         """
@@ -556,12 +602,12 @@ class GHand(object):
             data = self._comm.recv_data()
 
             # 数据长度验证
-            if len(data) != 708:
-                error_msg = f"Data length insufficient. Expected 708 bytes, got {len(data)} bytes"
+            if len(data) < self._expected_tpdo_size:
+                error_msg = f"Data length insufficient. Expected {self._expected_tpdo_size} bytes, got {len(data)} bytes"
                 logger.warning(error_msg)
                 raise DataReceiveError(
                     error_msg,
-                    expected_length=708,
+                    expected_length=self._expected_tpdo_size,
                     actual_length=len(data)
                 )
 
@@ -602,7 +648,7 @@ class GHand(object):
                 # 检查关节故障
                 if joint_tpdo.error != ErrorCode.NORMAL or joint_tpdo.state in [
                     State.ABNORMAL_RUNNING,
-                    State.PROTECTIVE_STOPED,
+                    State.PROTECTIVE_STOPPED,
                 ]:
                     faulty_joints.append(JointFaultInfo(
                         joint_id=JointId(joint_id).name,
@@ -618,7 +664,7 @@ class GHand(object):
                 joints.append(
                     Joint(
                         id=joint_id,
-                        angle=joint_tpdo.angle,
+                        angle=angle,
                         speed=joint_tpdo.speed,
                         torque=joint_tpdo.torque,
                         state=State(joint_tpdo.state),
@@ -655,7 +701,7 @@ class GHand(object):
             HandInfo: 手部状态信息对象，包含 state（状态）、error（错误码）、temp（温度）
 
         Raises:
-            DataReceiveError: 数据长度不正确（期望708字节）
+            DataReceiveError: 数据长度不足
             DeviceDisconnectedError: 设备断连或通信失败
             DeviceFaultError: 设备故障（state=2/3 或 error!=0）
         """
@@ -663,12 +709,12 @@ class GHand(object):
             data = self._comm.recv_data()
 
             # 数据长度验证
-            if len(data) != 708:
-                error_msg = f"Data length insufficient. Expected 708 bytes, got {len(data)} bytes"
+            if len(data) < self._expected_tpdo_size:
+                error_msg = f"Data length insufficient. Expected {self._expected_tpdo_size} bytes, got {len(data)} bytes"
                 logger.warning(error_msg)
                 raise DataReceiveError(
                     error_msg,
-                    expected_length=708,
+                    expected_length=self._expected_tpdo_size,
                     actual_length=len(data)
                 )
 
@@ -686,7 +732,7 @@ class GHand(object):
                 raise DeviceFaultError(error_msg, fault_info=fault_info)
 
             # 检查异常运行状态（虽然你说 state=2/3 时一定 error!=0，但为了保险再检查一次）
-            if tpdo.hand.state in [State.ABNORMAL_RUNNING, State.PROTECTIVE_STOPED]:
+            if tpdo.hand.state in [State.ABNORMAL_RUNNING, State.PROTECTIVE_STOPPED]:
                 # 如果 error == 0 但状态异常，也抛出异常
                 if tpdo.hand.error == 0:
                     fault_info = FaultInfo(
@@ -736,19 +782,16 @@ class GHand(object):
             data = self._comm.recv_data()
 
             # 数据长度验证
-            if len(data) != 708:
-                error_msg = f"Data length insufficient. Expected 708 bytes, got {len(data)} bytes"
+            if len(data) < self._expected_tpdo_size:
+                error_msg = f"Data length insufficient. Expected {self._expected_tpdo_size} bytes, got {len(data)} bytes"
                 logger.warning(error_msg)
                 raise DataReceiveError(
                     error_msg,
-                    expected_length=708,
+                    expected_length=self._expected_tpdo_size,
                     actual_length=len(data)
                 )
 
             logger.info("Tactile data received successfully")
-            tactile_data = data[148:708]
-            logger.debug(f"Tactile data (560 bytes):\n{' '.join(f'{b:02x}' for b in tactile_data)}")
-
             tpdo = Tpdo.from_bytes(data)
             logger.debug(
                 "Parsed TPDO tactile data:\n"
@@ -840,7 +883,7 @@ class GHand(object):
             self._collision_checker = CollisionSDK()
         return self._collision_checker
 
-    def check_collision(self, joints: list[Joint]) -> CollisionCheckResult:
+    def check_collision(self, joints: list[Joint]):
         """
         检查目标关节姿态是否会发生碰撞。
 

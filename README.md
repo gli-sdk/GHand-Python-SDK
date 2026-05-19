@@ -211,7 +211,7 @@ sudo venv/bin/python3 examples/tutorial/01.get_basic_info.py
 
 ```bash
 source venv/bin/activate
-python3 examples/1.get_basic_info.py
+python3 examples/tutorial/01.get_basic_info.py
 ```
 
 如果提示权限不足，请使用方法 A。

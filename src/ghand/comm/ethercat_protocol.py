@@ -1,6 +1,40 @@
 import struct
-from dataclasses import dataclass, field  # 添加field导入
-from ..types import State, ErrorCode
+from dataclasses import dataclass, field
+from ..types import State, ErrorCode, ProductType
+from .._config import load_product_config
+
+# TPDO 各组件字节大小
+_HAND_TPDO_SIZE = struct.calcsize('<BBh')          # 4
+_JOINT_TPDO_SIZE = struct.calcsize('<BBfbb')        # 8
+_TACTILE_STATE_SIZE = 2                             # BB
+_TACTILE_RESULTANT_SIZE = 6                         # 合力 xyz (int16[3]，低8位有效)
+_TACTILE_SAMPLE_PER_GROUP = 3                       # 每组采样 xyz
+
+# 从产品配置文件读取结构参数
+_config = load_product_config(ProductType.G5)
+_NUM_JOINTS = len(_config.valid_joints)
+_tactile_counts = [r.count for r in _config.tactile_regions] if _config.has_tactile else None
+
+
+def compute_tpdo_size(joint_count: int, tactile_region_counts: list[int] | None = None) -> int:
+    """根据关节数量和触觉传感器采样组数计算 TPDO 总字节数
+
+    Args:
+        joint_count: 关节总数
+        tactile_region_counts: 各触觉区域采样组数列表，不传则按无触觉计算
+
+    Returns:
+        int: TPDO 期望字节数
+    """
+    total = _HAND_TPDO_SIZE + joint_count * _JOINT_TPDO_SIZE
+    if tactile_region_counts:
+        total += _TACTILE_STATE_SIZE
+        for count in tactile_region_counts:
+            total += _TACTILE_RESULTANT_SIZE + count * _TACTILE_SAMPLE_PER_GROUP
+    return total
+
+
+TPDO_SIZE = compute_tpdo_size(_NUM_JOINTS, _tactile_counts)
 
 
 @dataclass
@@ -177,7 +211,7 @@ class Tpdo:
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        if len(data) < 708:
+        if len(data) < TPDO_SIZE:
             # 返回所有字段的默认实例
             return cls(
                 HandTpdo(0, 0, 0),
@@ -255,8 +289,8 @@ class Tpdo:
             data[510:609]
         )  # bytes 510-608
         lf_tactile_raw = FingerTactileData.from_bytes(
-            data[609:708]
-        )  # bytes 609-707 (总共560字节触觉数据)
+            data[609:TPDO_SIZE]
+        )
 
         # 使用辅助函数转换触觉数据为N单位
         thumb_tactile = _convert_tactile_to_N(thumb_tactile_raw)

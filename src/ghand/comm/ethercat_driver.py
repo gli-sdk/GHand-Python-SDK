@@ -8,6 +8,8 @@ import tempfile
 import hashlib
 import platform
 
+from .ethercat_protocol import TPDO_SIZE
+
 logger = logging.getLogger("ghand.ethercat_driver")
 
 
@@ -273,7 +275,6 @@ class EthercatClient(object):
             list[str]: 返回网络接口设备ID列表
         """
         logger.info("Searching for network interfaces...")
-        import platform
         ids = netifaces.interfaces()
         # Linux 上直接使用接口名，Windows 需要 NPF_ 前缀
         if platform.system() == 'Windows':
@@ -330,7 +331,7 @@ class EthercatClient(object):
             logger.error("Not connected or no slave configured")
             return False
 
-        expected_input_size = 708
+        expected_input_size = TPDO_SIZE
         expected_output_size = 80
 
         # 进入初始状态

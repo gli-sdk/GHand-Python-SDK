@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ghand"
+version = "1.1.2"
+description = "Ghand Python SDK"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "GLITECH"},
+]
+requires-python = ">=3.10"
+dependencies = [
+    "pysoem>=0.2.0",
+    "netifaces>=0.11.0",
+    "numpy>=1.24.0",
+    "collision_sdk>=0.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/YourGitHubOrg/GHand-SDK"
+
+[tool.setuptools.packages.find]
+where = ["src"]

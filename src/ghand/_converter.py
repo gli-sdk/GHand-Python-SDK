@@ -1,5 +1,6 @@
 import numpy as np
 from typing import List, Optional
+from ghand.types import Joint, JointId
 
 
 def joints_to_nparray(joints: list, current_joints: Optional[list] = None) -> np.ndarray:
@@ -22,8 +23,6 @@ def nparray_to_joints(angles: np.ndarray, speed: int = 100, torque: int = 100) -
 
     返回的 Joint 列表中，id 顺序为 0-17，对应 ghand.JointId 枚举顺序。
     """
-    from ghand.types import Joint, JointId
-
     return [
         Joint(id=JointId(i), angle=float(angles[i]), speed=speed, torque=torque)
         for i in range(18)
