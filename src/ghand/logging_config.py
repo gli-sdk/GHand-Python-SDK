@@ -1,3 +1,7 @@
+# Copyright (c) 2026 GLITech
+#
+# Licensed under the MIT License. See LICENSE in the project root for license information.
+
 """GHand SDK logging configuration module.
 
 Provides SDK-standard logging setup:
@@ -18,7 +22,7 @@ ROOT_LOGGER_NAME = "ghand"
 
 MODULE_LOGGERS = {
     "ghand": f"{ROOT_LOGGER_NAME}.ghand",
-    "ethercat_driver": f"{ROOT_LOGGER_NAME}.ethercat_driver",
+    "ethercat_client": f"{ROOT_LOGGER_NAME}.ethercat_client",
 }
 
 

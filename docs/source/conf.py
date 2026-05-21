@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
+
 sys.path.insert(0, os.path.abspath('../../src'))
 
 # -- Project information -----------------------------------------------------
@@ -12,19 +13,15 @@ autodoc_member_order = 'bysource'
 # The short X.Y version
 version = '1.1'
 # The full version, including alpha/beta/rc tags
-release = '1.1.0'
+release = '1.1.2'
 
 # -- General configuration ---------------------------------------------------
-extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.viewcode',
-    'sphinx.ext.napoleon'
-]
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.viewcode', 'sphinx.ext.napoleon']
 
 templates_path = ['_templates']
 source_suffix = '.rst'
 master_doc = 'index'
-language = 'zh_CN'
+language = 'en'
 exclude_patterns = []
 pygments_style = 'sphinx'
 

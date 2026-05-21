@@ -1,3 +1,7 @@
+# Copyright (c) 2026 GLITech
+#
+# Licensed under the MIT License. See LICENSE in the project root for license information.
+
 import hashlib
 import logging
 import os
@@ -10,7 +14,7 @@ import netifaces
 import pysoem
 
 
-logger = logging.getLogger("ghand.ethercat_driver")
+logger = logging.getLogger("ghand.ethercat_client")
 
 
 class EthercatClient(object):

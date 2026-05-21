@@ -1,3 +1,7 @@
+# Copyright (c) 2026 GLITech
+#
+# Licensed under the MIT License. See LICENSE in the project root for license information.
+
 """EtherCAT communication implementation.
 
 Wraps EthercatClient and handles PDO encoding/decoding.
@@ -18,7 +22,7 @@ from ..types import (
     State,
     TactileInfo,
 )
-from .ethercat_driver import EthercatClient
+from .ethercat_client import EthercatClient
 from .ethercat_protocol import (
     Rpdo,
     Tpdo,
@@ -44,7 +48,7 @@ class EtherCATComm(IComm):
         )
         self._controlled_joints = [j for j in config.valid_joints if j in config.joint_limits]
         self._expected_rpdo_size = 2 + len(self._controlled_joints) * 6
-        self._sub_manager = SubscriptionManager(self)
+        self._sub_manager = SubscriptionManager(self._client)
 
     def update_config(self, config: ProductConfig) -> None:
         """Update the cached product configuration and derived constants."""
@@ -95,16 +99,6 @@ class EtherCATComm(IComm):
         """Return whether the EtherCAT client is connected."""
         return self._client._connected
 
-    # ===== Low-level data I/O =====
-
-    def recv_data(self) -> bytes:
-        """Receive raw TPDO bytes from the device."""
-        return self._client.recv_data()
-
-    def send_data(self, data: bytes) -> None:
-        """Send raw RPDO bytes to the device."""
-        self._client.send_data(data)
-
     # ===== Joint control =====
 
     def move_joints(self, joints: list[JointCommand], mode: CtrlMode) -> bool:
@@ -152,7 +146,7 @@ class EtherCATComm(IComm):
 
         joints = []
         for joint_id, joint_tpdo in tpdo.joints.items():
-            angle = math.degrees(joint_tpdo.angle)
+            angle = joint_tpdo.angle
             if abs(angle) < 1e-10:
                 angle = 0.0
             joints.append(

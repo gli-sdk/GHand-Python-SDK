@@ -1,3 +1,7 @@
+# Copyright (c) 2026 GLITech
+#
+# Licensed under the MIT License. See LICENSE in the project root for license information.
+
 """Predefined gesture module.
 
 Provides joint-angle definitions and a unified execution interface for

@@ -1,25 +1,25 @@
 .. _connection:
 
-设备连接指南
-==============
+Device Connection Guide
+=======================
 
-枭尧灵巧手支持多种连接方式：
+The XiaoYao Dexterous Hand supports multiple connection methods:
 
-EtherCAT连接
-------------
+EtherCAT Connection
+-------------------
 .. code-block:: python
 
    from ghand.ghand import GHand, CommType
 
    hand = GHand()
-   hand.open_ethercat(CommType.ETHERCAT, "device_id_123")
+   hand.open(CommType.ETHERCAT, "device_id_123")
 
-   # 或自动连接您当前的灵巧手设备
-   hand.open_ethercat(CommType.ETHERCAT, "auto")
+   # Or automatically connect to your current dexterous hand device
+   hand.open(CommType.ETHERCAT, "auto")
 
-连接故障排除
-------------
-1. 检查物理连接是否正常
-2. 确认设备ID正确
-3. 检查波特率设置
-4. 重启设备尝试重新连接
+Connection Troubleshooting
+--------------------------
+1. Check whether the physical connection is normal
+2. Confirm the device ID is correct
+3. Check baud rate settings
+4. Restart the device and attempt to reconnect

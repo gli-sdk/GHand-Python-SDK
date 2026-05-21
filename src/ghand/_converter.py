@@ -1,3 +1,7 @@
+# Copyright (c) 2026 GLITech
+#
+# Licensed under the MIT License. See LICENSE in the project root for license information.
+
 from typing import Optional
 
 import numpy as np

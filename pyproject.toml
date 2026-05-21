@@ -19,17 +19,29 @@ dependencies = [
     "collision_sdk>=0.1.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "yapf>=0.40.0",
+    "mypy>=1.0.0",
+    "pytest>=7.0.0",
+    "pre-commit>=3.0.0",
+]
+
 [project.urls]
 Homepage = "https://github.com/YourGitHubOrg/GHand-SDK"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.black]
-line-length = 100
-target-version = ["py310"]
-skip-string-normalization = true
-
-[tool.isort]
-profile = "black"
-line_length = 100
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+ignore_missing_imports = true
+show_error_codes = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+strict_equality = true

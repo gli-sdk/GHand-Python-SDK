@@ -19,7 +19,7 @@ def data_callback(tpdo):
     print("Received TPDO data:")
     print(f"  Hand state: {tpdo.hand}")
     print(
-        f"  Thumb DIP: angle={tpdo.th_dip.angle:.1f}°, state={State(tpdo.th_dip.state).name}, error={ErrorCode(tpdo.th_dip.error).name}"
+        f"  Thumb DIP: angle={tpdo.thumb_dip.angle:.1f}°, state={State(tpdo.thumb_dip.state).name}, error={ErrorCode(tpdo.thumb_dip.error).name}"
     )
     print(
         f"  FF MCP: angle={tpdo.ff_mcp.angle:.1f}°, state={State(tpdo.ff_mcp.state).name}, error={ErrorCode(tpdo.ff_mcp.error).name}"

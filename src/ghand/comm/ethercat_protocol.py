@@ -1,3 +1,7 @@
+# Copyright (c) 2026 GLITech
+#
+# Licensed under the MIT License. See LICENSE in the project root for license information.
+
 import math
 import struct
 from dataclasses import dataclass, field
@@ -74,7 +78,7 @@ class JointTpdo:
         if len(data) < expected_size:
             return cls(0, 0, 0.0, 0, 0)
         state, error, angle, speed, torque = struct.unpack_from('<BBfbb', data, 0)
-        return cls(state, error, angle, speed, torque)
+        return cls(state, error, math.degrees(angle), speed, torque)
 
     def __str__(self):
         try:
@@ -163,7 +167,9 @@ class Tpdo:
         self.tactile_state = TactileSensorState()
 
         for jid in config.valid_joints:
-            self.joints[jid] = JointTpdo(0, 0, 0.0, 0, 0)
+            joint = JointTpdo(0, 0, 0.0, 0, 0)
+            self.joints[jid] = joint
+            setattr(self, jid.name.lower(), joint)
 
         if config.has_tactile:
             for region in config.tactile_regions:
@@ -193,7 +199,9 @@ class Tpdo:
         offset += _HAND_TPDO_SIZE
 
         for jid in config.valid_joints:
-            instance.joints[jid] = JointTpdo.from_bytes(data[offset:offset + _JOINT_TPDO_SIZE])
+            joint = JointTpdo.from_bytes(data[offset:offset + _JOINT_TPDO_SIZE])
+            instance.joints[jid] = joint
+            setattr(instance, jid.name.lower(), joint)
             offset += _JOINT_TPDO_SIZE
 
         if not config.has_tactile:

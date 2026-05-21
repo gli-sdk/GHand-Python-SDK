@@ -13,5 +13,5 @@ def fetch_version():
 
 ver = fetch_version()['__version__']
 
-# 从setup.cfg中读取所有配置
+# Read all configuration from setup.cfg
 setup(version=ver)

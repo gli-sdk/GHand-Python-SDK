@@ -3,7 +3,7 @@ Python API
 ===================
 
 .. autoclass:: ghand.ghand.GHand
-   :members: 
+   :members:
    :show-inheritance:
    :exclude-members:
    :inherited-members:
