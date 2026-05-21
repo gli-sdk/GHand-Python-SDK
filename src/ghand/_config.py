@@ -1,10 +1,18 @@
-"""产品配置加载器 — JSON 搜索、解析"""
+"""Product configuration loader — JSON search and parsing."""
+
 import glob
 import json
 import logging
 import os
 
-from .types import JointId, ProductType, TactileRegionConfig, ProductConfig, GHandError
+from .types import (
+    GHandError,
+    JointId,
+    ProductConfig,
+    ProductType,
+    TactileRegionConfig,
+    TactileSensorId,
+)
 
 logger = logging.getLogger("ghand.config")
 
@@ -36,6 +44,7 @@ _JOINT_NAME_TO_ID = {
 
 
 def _get_config_search_paths() -> list[str]:
+    """Return the ordered list of directories to search for product configs."""
     paths = []
 
     env_path = os.environ.get("GHAND_SDK_CONFIG")
@@ -55,16 +64,34 @@ def _get_config_search_paths() -> list[str]:
     return paths
 
 
-def _find_config_file(filename: str) -> str | None:
+def _find_config_file(file_name: str) -> str | None:
+    """Search for ``file_name`` across the configured search paths.
+
+    Args:
+        file_name: Name of the JSON config file.
+
+    Returns:
+        Absolute path if found, otherwise None.
+    """
     for search_dir in _get_config_search_paths():
-        full = os.path.join(search_dir, filename)
+        full = os.path.join(search_dir, file_name)
         if os.path.isfile(full):
             logger.debug("Found config: %s", full)
             return full
     return None
 
 
-def _parse_joints(json_array: list) -> tuple[list[JointId], dict[JointId, tuple[float, float]]]:
+def _parse_joints(
+    json_array: list[dict],
+) -> tuple[list[JointId], dict[JointId, tuple[float, float]]]:
+    """Parse the ``joints`` section of a product config.
+
+    Args:
+        json_array: List of joint definition dicts.
+
+    Returns:
+        Tuple of (valid_joint_ids, joint_limits_dict).
+    """
     valid_joints = []
     joint_limits = {}
 
@@ -87,36 +114,71 @@ def _parse_joints(json_array: list) -> tuple[list[JointId], dict[JointId, tuple[
     return valid_joints, joint_limits
 
 
-def _parse_tactile_regions(json_array: list) -> list[TactileRegionConfig]:
+def _parse_tactile_regions(json_array: list[dict]) -> list[TactileRegionConfig]:
+    """Parse the ``tactile_regions`` section of a product config.
+
+    Args:
+        json_array: List of tactile region definition dicts.
+
+    Returns:
+        List of ``TactileRegionConfig`` objects.
+    """
     regions = []
     for item in json_array:
-        name = item.get("name", "")
+        region_id = item.get("id", "")
         count = item.get("count", 0)
-        if name and count > 0:
-            regions.append(TactileRegionConfig(name=name, count=count))
+        try:
+            sensor_id = TactileSensorId[region_id]
+        except KeyError:
+            logger.warning("Unknown tactile region id in config: %s", region_id)
+            continue
+        if count > 0:
+            regions.append(TactileRegionConfig(id=sensor_id, count=count))
     return regions
 
 
 def load_product_config(product_type: ProductType) -> ProductConfig:
+    """Load the product configuration for the given product type.
+
+    Args:
+        product_type: Product type enum value.
+
+    Returns:
+        Populated ``ProductConfig`` instance.
+
+    Raises:
+        GHandError: If the product type is unknown or the config file is missing.
+    """
     if product_type == ProductType.AUTO:
         return ProductConfig()
-    filename = _PRODUCT_TYPE_TO_FILE.get(product_type)
-    if not filename:
+    file_name = _PRODUCT_TYPE_TO_FILE.get(product_type)
+    if not file_name:
         raise GHandError(f"Unknown product type: {product_type}")
 
-    filepath = _find_config_file(filename)
-    if not filepath:
-        raise GHandError(f"Config file '{filename}' not found")
+    file_path = _find_config_file(file_name)
+    if not file_path:
+        raise GHandError(f"Config file '{file_name}' not found")
 
-    return _load_config_from_file(filepath)
+    return _load_config_from_file(file_path)
 
 
-def _load_config_from_file(filepath: str) -> ProductConfig:
+def _load_config_from_file(file_path: str) -> ProductConfig:
+    """Parse a product configuration from disk.
+
+    Args:
+        file_path: Absolute path to the JSON config file.
+
+    Returns:
+        Parsed ``ProductConfig``.
+
+    Raises:
+        GHandError: If the file cannot be read or parsed.
+    """
     try:
-        with open(filepath, "r", encoding="utf-8") as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (json.JSONDecodeError, OSError) as e:
-        raise GHandError(f"Failed to parse {filepath}: {e}") from e
+        raise GHandError(f"Failed to parse {file_path}: {e}") from e
 
     valid_joints, joint_limits = _parse_joints(data.get("joints", []))
     tactile_regions = _parse_tactile_regions(data.get("tactile_regions", []))
@@ -131,37 +193,37 @@ def _load_config_from_file(filepath: str) -> ProductConfig:
     )
 
     if not config.name or not config.valid_joints:
-        raise GHandError(f"Product config in {filepath} is missing required fields")
+        raise GHandError(f"Product config in {file_path} is missing required fields")
 
-    logger.info("Loaded product config: %s from %s", config.name, filepath)
+    logger.info("Loaded product config: %s from %s", config.name, file_path)
     return config
 
 
 def find_config_by_name(device_name: str) -> ProductConfig | None:
-    """根据设备名称在所有配置路径中搜索匹配的产品配置
+    """Search all config paths for a product matching the given device name.
 
     Args:
-        device_name: 从设备读取的名称
+        device_name: Name string read from the device.
 
     Returns:
-        匹配的 ProductConfig，如果未找到则返回 None
+        Matching ``ProductConfig`` if found, otherwise None.
     """
     if not device_name:
         return None
 
     for search_dir in _get_config_search_paths():
         pattern = os.path.join(search_dir, "*.json")
-        for filepath in glob.glob(pattern):
+        for file_path in glob.glob(pattern):
             try:
-                with open(filepath, "r", encoding="utf-8") as f:
+                with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
             except (json.JSONDecodeError, OSError):
                 continue
 
             cfg_name = data.get("name", "")
             if len(cfg_name) == len(device_name) and cfg_name.lower() == device_name.lower():
-                logger.info("Auto-detected product config: %s -> %s", device_name, filepath)
-                return _load_config_from_file(filepath)
+                logger.info("Auto-detected product config: %s -> %s", device_name, file_path)
+                return _load_config_from_file(file_path)
 
     logger.warning("No matching product config found for device: %s", device_name)
     return None

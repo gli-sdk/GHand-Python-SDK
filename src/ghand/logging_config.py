@@ -1,20 +1,17 @@
-"""
-GHand SDK 日志配置模块
+"""GHand SDK logging configuration module.
 
-提供符合 SDK 标准的日志配置方案：
-- 默认输出 WARNING 和 ERROR 到 stderr
-- 支持升级到 INFO 或 DEBUG 级别
-- 支持可选的文件日志输出
-- 保持简单，只支持三个固定级别
+Provides SDK-standard logging setup:
+- Default output of WARNING and ERROR to stderr
+- Support for upgrading to INFO or DEBUG level
+- Optional file log output
+- Simple design with three fixed levels
 """
 
 import logging
 import sys
-from typing import Union
-
 
 # ============================================================================
-# Logger 命名空间
+# Logger namespace
 # ============================================================================
 
 ROOT_LOGGER_NAME = "ghand"
@@ -26,16 +23,11 @@ MODULE_LOGGERS = {
 
 
 # ============================================================================
-# 日志格式
+# Log formats
 # ============================================================================
 
-# 简洁格式（默认）
 FORMAT_SIMPLE = "%(asctime)s [%(levelname)s] %(message)s"
-
-# 详细格式（调试）
 FORMAT_VERBOSE = "%(asctime)s [%(levelname)s] [%(name)s:%(lineno)d] %(message)s"
-
-# 开发格式（带颜色，需要 colorlog）
 FORMAT_COLOR = (
     "%(log_color)s%(asctime)s%(reset)s "
     "[%(log_color)s%(levelname)s%(reset)s] "
@@ -43,11 +35,9 @@ FORMAT_COLOR = (
     "%(message)s"
 )
 
-# 时间格式
 DATEFMT_STANDARD = "%Y-%m-%d %H:%M:%S"
 DATEFMT_ISO = "%Y-%m-%dT%H:%M:%S"
 
-# 颜色配置
 LOG_COLORS = {
     "DEBUG": "cyan",
     "INFO": "green",
@@ -58,22 +48,19 @@ LOG_COLORS = {
 
 
 def _init_package_loggers():
-    """
-    包初始化时调用，创建默认的 WARNING 级别控制台 handler
+    """Initialize the package logger with a default WARNING-level stderr handler.
 
-    这确保了：
-    1. SDK 默认输出 WARNING 和 ERROR 到 stderr
-    2. 不会产生 "No handler found" 警告
-    3. 用户可以通过 configure_logging() 升级到 INFO 或 DEBUG
+    This ensures:
+    1. SDK defaults to emitting WARNING and ERROR to stderr.
+    2. No "No handler found" warnings are produced.
+    3. Users can upgrade verbosity via ``configure_console()``.
     """
-    # 防止重复初始化
     root_logger = logging.getLogger(ROOT_LOGGER_NAME)
-    if hasattr(root_logger, '_ghand_initialized'):
+    if hasattr(root_logger, "_ghand_initialized"):
         return
 
     root_logger._ghand_initialized = True
 
-    # 创建默认的 stderr handler，WARNING 级别
     handler = logging.StreamHandler(sys.stderr)
     handler.setLevel(logging.WARNING)
     handler.setFormatter(logging.Formatter(FORMAT_SIMPLE, DATEFMT_STANDARD))
@@ -81,43 +68,37 @@ def _init_package_loggers():
     root_logger.addHandler(handler)
     root_logger._ghand_stderr_handler = handler
 
-    # 模块 loggers 不需要单独的 handler，它们会继承根 logger 的配置
-
 
 # ============================================================================
-# 便捷配置函数
+# Convenience configuration functions
 # ============================================================================
 
 
-def configure_console(level: Union[int, str]) -> None:
-    """
-    配置控制台日志级别
+def configure_console(level: int | str) -> None:
+    """Configure the console log level.
 
-    只支持 INFO 和 DEBUG 两个级别，用于降低日志级别门槛（从默认 WARNING 升级）。
+    Only INFO and DEBUG are supported, intended to lower the verbosity
+    threshold from the default WARNING.
 
     Args:
-        level: 日志级别，只接受 logging.INFO 或 logging.DEBUG
+        level: Log level. Only ``logging.INFO`` or ``logging.DEBUG`` are accepted.
 
     Raises:
-        ValueError: 如果传入其他级别
+        ValueError: If a level other than INFO or DEBUG is provided.
 
     Example:
         >>> from ghand.logging_config import configure_console
-        >>> configure_console(level=logging.INFO)  # 显示 INFO+ 的日志
-        >>> configure_console(level=logging.DEBUG)  # 显示所有日志
+        >>> configure_console(level=logging.INFO)
     """
-    # 验证级别
     valid_levels = {logging.INFO, logging.DEBUG}
     if level not in valid_levels:
         raise ValueError(
-            f"只支持级别: INFO 或 DEBUG (收到: {logging.getLevelName(level)})"
+            f"Only INFO or DEBUG are supported (received: {logging.getLevelName(level)})"
         )
 
     logger = logging.getLogger(ROOT_LOGGER_NAME)
 
-    # 获取或创建 stderr handler
-    if not hasattr(logger, '_ghand_stderr_handler'):
-        # 理论上不应该到这里，因为 _init_package_loggers 已经创建了
+    if not hasattr(logger, "_ghand_stderr_handler"):
         handler = logging.StreamHandler(sys.stderr)
         handler.setLevel(logging.WARNING)
         handler.setFormatter(logging.Formatter(FORMAT_SIMPLE, DATEFMT_STANDARD))
@@ -126,25 +107,21 @@ def configure_console(level: Union[int, str]) -> None:
     else:
         handler = logger._ghand_stderr_handler
 
-    # 升级级别（如果用户请求的级别更低）
-    # WARNING=30, INFO=20, DEBUG=10
-    # 数字越小，级别越低（输出越多）
     if level < handler.level:
         handler.setLevel(level)
 
-    # 同时设置 logger 级别，确保消息能到达 handler
     logger.setLevel(level)
 
 
-def configure_file(filename: str, level: Union[int, str] = logging.DEBUG) -> None:
-    """
-    配置文件日志输出
+def configure_file(filename: str, level: int | str = logging.DEBUG) -> None:
+    """Configure file log output.
 
-    文件日志与控制台日志独立，可以设置不同的级别。默认使用详细格式（包含文件名和行号）。
+    File logging is independent of console logging and defaults to the verbose
+    format (includes file name and line number).
 
     Args:
-        filename: 日志文件路径
-        level: 日志级别，默认为 DEBUG
+        filename: Path to the log file.
+        level: Log level for the file handler. Defaults to DEBUG.
 
     Example:
         >>> from ghand.logging_config import configure_file
@@ -152,40 +129,33 @@ def configure_file(filename: str, level: Union[int, str] = logging.DEBUG) -> Non
     """
     logger = logging.getLogger(ROOT_LOGGER_NAME)
 
-    # 创建 file handler
     handler = logging.FileHandler(filename, mode="a", encoding="utf-8")
     handler.setLevel(level)
     handler.setFormatter(logging.Formatter(FORMAT_VERBOSE, DATEFMT_ISO))
     logger.addHandler(handler)
 
-    # 设置 logger 级别为所有 handler 中最低的级别
-    # 这样可以确保所有 handler 都能接收到它们需要的消息
     for h in logger.handlers:
         if h.level < logger.level or logger.level == 0:
             logger.setLevel(h.level)
 
 
 def get_logger(name: str = ROOT_LOGGER_NAME) -> logging.Logger:
-    """
-    获取指定名称的 logger
+    """Retrieve a logger by name.
 
     Args:
-        name: logger 名称，支持 "ghand", "ghand.ghand" 等
-             也支持简写，如 "ghand" 会自动加上 "ghand." 前缀
+        name: Logger name, e.g. ``"ghand"`` or ``"ghand.ghand"``.
+            Short names are automatically prefixed with ``"ghand."``.
 
     Returns:
-        Logger 实例
+        A ``logging.Logger`` instance.
 
     Example:
         >>> from ghand.logging_config import get_logger
         >>> logger = get_logger("ghand.ghand")
-        >>> logger = get_logger("ghand")  # 等同于上
     """
-    # 支持简写形式
     if not name.startswith(ROOT_LOGGER_NAME):
         name = f"{ROOT_LOGGER_NAME}.{name}"
     return logging.getLogger(name)
 
 
-# 自动初始化
 _init_package_loggers()

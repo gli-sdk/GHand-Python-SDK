@@ -1,16 +1,17 @@
-"""
-GHand SDK 类型定义
+"""GHand SDK type definitions.
 
-所有枚举、数据类、异常类集中定义，避免循环导入。
+All enums, dataclasses, and exceptions are centralized here to avoid
+circular imports.
 """
+
 import enum
 from dataclasses import dataclass, field
-from typing import List, Optional
-
+from typing import Optional
 
 # ============================================================================
-# 基础枚举
+# Base enums
 # ============================================================================
+
 
 class JointId(enum.IntEnum):
     THUMB_DIP = 0
@@ -38,7 +39,6 @@ class State(enum.IntEnum):
     RUNNING = 1
     ABNORMAL_RUNNING = 2
     PROTECTIVE_STOPPED = 3
-    PROTECTIVE_STOPED = 3  # deprecated alias, kept for backward compatibility
 
 
 class ErrorCode(enum.IntEnum):
@@ -81,12 +81,12 @@ class CtrlMode(enum.Enum):
     SPEED = 2
 
 
-class TactileSensorId(enum.Enum):
-    THUMB = 'thumb'
-    FOREFINGER = 'forefinger'
-    MIDDLE_FINGER = 'middle_finger'
-    RING_FINGER = 'ring_finger'
-    LITTLE_FINGER = 'little_finger'
+class TactileSensorId(enum.IntEnum):
+    THUMB = 0
+    FF = 1
+    MF = 2
+    RF = 3
+    LF = 4
 
 
 class ProductType(enum.Enum):
@@ -103,17 +103,22 @@ class GestureType(enum.Enum):
 
 
 # ============================================================================
-# 数据类
+# Dataclasses
 # ============================================================================
+
 
 @dataclass
 class TactileRegionConfig:
-    name: str
+    """Configuration for a single tactile sensor region."""
+
+    id: TactileSensorId
     count: int
 
 
 @dataclass
 class ProductConfig:
+    """Product-specific configuration loaded from JSON."""
+
     name: str = ""
     model: str = ""
     valid_joints: list[JointId] = field(default_factory=list)
@@ -123,187 +128,132 @@ class ProductConfig:
 
 
 @dataclass
-class FaultInfo:
-    error_code: ErrorCode
+class HandFaultInfo:
+    """Aggregated fault information for the hand device."""
+
     state: State
-    message: str
+    error_code: ErrorCode
+    temperature: Optional[int] = None
 
     def __str__(self):
-        return f"State: {self.state.name}, Error: {self.error_code.name} ({self.error_code.value}) - {self.message}"
+        """Return a human-readable fault description."""
+        if self.error_code != ErrorCode.NORMAL:
+            base_msg = _ERROR_MESSAGES.get(
+                self.error_code, f"Unknown error: {self.error_code.name}"
+            )
+        else:
+            base_msg = "Device operating normally"
+
+        if self.state in [State.PROTECTIVE_STOPPED, State.ABNORMAL_RUNNING]:
+            state_msg = _STATE_MESSAGES.get(self.state, f"Abnormal state: {self.state.name}")
+            if self.error_code == ErrorCode.NORMAL:
+                base_msg = f"{state_msg}, but error code is 0"
+            else:
+                base_msg = f"{state_msg}, {base_msg}"
+
+        parts = []
+        if self.temperature is not None:
+            parts.append(f"Temperature: {self.temperature}°C")
+
+        msg = base_msg
+        if parts:
+            msg = f"{base_msg} ({', '.join(parts)})"
+        return (
+            f"State: {self.state.name}, Error: {self.error_code.name} "
+            f"({self.error_code.value}) - {msg}"
+        )
 
 
 @dataclass
 class JointFaultInfo:
+    """Fault information for an individual joint."""
+
     joint_id: str
     state: State
     error_code: ErrorCode
 
     def __str__(self):
-        return f"{self.joint_id}: State={self.state.name}, Error={self.error_code.name}"
+        """Return a human-readable joint fault description."""
+        return f"{self.joint_id}: State={self.state.name}, " f"Error={self.error_code.name}"
 
 
 @dataclass
-class HandInfo:
+class HandState:
+    """High-level status of the dexterous hand."""
+
     state: State = State.STOPPED
     error: ErrorCode = ErrorCode.NORMAL
-    temp: int = 0
+    temperature: int = 0
 
 
 @dataclass
-class Joint:
+class JointCommand:
+    """Single joint command sent to the device."""
+
     id: int = JointId.THUMB_DIP
-    angle: float = 0.0  # radians
+    angle: float = 0.0  # degrees
     speed: int = 0
     torque: int = 0
+
+
+@dataclass
+class JointData:
+    """Single joint state received from the device."""
+
+    id: int = JointId.THUMB_DIP
     state: State = State.STOPPED
     error: ErrorCode = ErrorCode.NORMAL
-
-    @staticmethod
-    def create_joint_positions(joint_angles_dict, speed=100, torque=100):
-        joints = []
-        for joint_id, angle in joint_angles_dict.items():
-            joints.append(Joint(id=joint_id, angle=angle, speed=speed, torque=torque))
-        return joints
+    angle: float = 0.0  # degrees
+    speed: int = 0
+    torque: int = 0
 
 
 @dataclass
 class TactileInfo:
+    """Tactile sensor reading for a single finger."""
+
     state: bool = False
-    resultant_force: list[int] = None
-    distributed_force: list[int] = None
-
-    def __post_init__(self):
-        if self.resultant_force is None:
-            self.resultant_force = [0, 0, 0]
-        if self.distributed_force is None:
-            self.distributed_force = []
-
-    def get_force_x(self) -> float:
-        return self.resultant_force[0] if len(self.resultant_force) > 0 else 0
-
-    def get_force_y(self) -> float:
-        return self.resultant_force[1] if len(self.resultant_force) > 1 else 0
-
-    def get_force_z(self) -> float:
-        return self.resultant_force[2] if len(self.resultant_force) > 2 else 0
-
-    def get_distributed_force(self) -> list[int]:
-        return self.distributed_force
-
-    def get_distributed_force_at(self, index: int) -> int:
-        if 0 <= index < len(self.distributed_force):
-            return self.distributed_force[index]
-        return 0
-
-    def get_state(self) -> bool:
-        return self.state
+    resultant_force: list[int] | None = None
+    distributed_force: list[int] | None = None
 
 
 # ============================================================================
-# 异常类
+# Exceptions
 # ============================================================================
 
-# 错误消息映射
 _ERROR_MESSAGES = {
-    ErrorCode.MOTOR_HARDWARE_OVERCURRENT: "电机硬件过流",
-    ErrorCode.MOTOR_SOFTWARE_OVERCURRENT: "电机软件过流",
-    ErrorCode.MOTOR_BUS_OVERCURRENT: "电机母线过流",
-    ErrorCode.MOTOR_PHASE_LOST: "电机缺相",
-    ErrorCode.MOTOR_STALLED: "电机堵转",
-    ErrorCode.MOTOR_DRIVER_OVERTEMP: "电机驱动芯片过温",
-    ErrorCode.MOTOR_COMM_ERROR: "电机通信错误",
-    ErrorCode.JOINT_CONFLICT: "关节冲突",
-    ErrorCode.TIP_CONFLICT: "指尖冲突",
-    ErrorCode.LOW_TEMP: "温度过低",
-    ErrorCode.HIGH_TEMP: "温度过高",
-    ErrorCode.LOW_VOLTAGE: "电压过低",
-    ErrorCode.HIGH_VOLTAGE: "电压过高",
-    ErrorCode.TACTILE_ERROR: "触觉传感器错误",
-    ErrorCode.PARAM_ERROR: "参数错误",
-    ErrorCode.TIMEOUT: "超时",
-    ErrorCode.UNKNOWN_ERROR: "未知错误",
+    ErrorCode.MOTOR_HARDWARE_OVERCURRENT: "Motor hardware overcurrent",
+    ErrorCode.MOTOR_SOFTWARE_OVERCURRENT: "Motor software overcurrent",
+    ErrorCode.MOTOR_BUS_OVERCURRENT: "Motor bus overcurrent",
+    ErrorCode.MOTOR_PHASE_LOST: "Motor phase lost",
+    ErrorCode.MOTOR_STALLED: "Motor stalled",
+    ErrorCode.MOTOR_DRIVER_OVERTEMP: "Motor driver overtemperature",
+    ErrorCode.MOTOR_COMM_ERROR: "Motor communication error",
+    ErrorCode.JOINT_CONFLICT: "Joint conflict",
+    ErrorCode.TIP_CONFLICT: "Tip conflict",
+    ErrorCode.LOW_TEMP: "Low temperature",
+    ErrorCode.HIGH_TEMP: "High temperature",
+    ErrorCode.LOW_VOLTAGE: "Low voltage",
+    ErrorCode.HIGH_VOLTAGE: "High voltage",
+    ErrorCode.TACTILE_ERROR: "Tactile sensor error",
+    ErrorCode.PARAM_ERROR: "Parameter error",
+    ErrorCode.TIMEOUT: "Timeout",
+    ErrorCode.UNKNOWN_ERROR: "Unknown error",
 }
 
 _STATE_MESSAGES = {
-    State.PROTECTIVE_STOPPED: "设备进入保护性停止状态",
-    State.ABNORMAL_RUNNING: "设备运行异常",
+    State.PROTECTIVE_STOPPED: "Device entered protective stop",
+    State.ABNORMAL_RUNNING: "Device running abnormally",
 }
 
 
-def get_fault_message(error_code: ErrorCode, state: Optional[State] = None, **context) -> str:
-    if error_code != ErrorCode.NORMAL:
-        base_msg = _ERROR_MESSAGES.get(error_code, f"未知错误: {error_code.name}")
-    else:
-        base_msg = "设备正常运行"
-
-    if state and state in [State.PROTECTIVE_STOPPED, State.ABNORMAL_RUNNING]:
-        state_msg = _STATE_MESSAGES.get(state, f"异常状态: {state.name}")
-        if error_code == ErrorCode.NORMAL:
-            return f"{state_msg}，但错误码为0"
-        else:
-            return f"{state_msg}，{base_msg}"
-
-    context_parts = []
-    if 'temp' in context:
-        context_parts.append(f"温度: {context['temp']}°C")
-    if 'joint_id' in context:
-        context_parts.append(f"关节: {context['joint_id']}")
-
-    if context_parts:
-        return f"{base_msg}（{', '.join(context_parts)}）"
-    return base_msg
-
-
 class GHandError(Exception):
-    """GHand SDK 基础异常类"""
-
-    def __init__(self, message: str):
-        self.message = message
-        super().__init__(self.message)
-
-    def __str__(self):
-        return self.message
+    """Base exception for the GHand SDK."""
 
 
-class DeviceDisconnectedError(GHandError):
-    def __init__(self, message: str, reason: Optional[str] = None):
-        self.reason = reason
-        super().__init__(message)
-
-    def __str__(self):
-        return self.message
+class CommunicationError(GHandError):
+    """Raised when communication with the device fails."""
 
 
-class DeviceFaultError(GHandError):
-    def __init__(self, message: str, fault_info: Optional[FaultInfo] = None):
-        self.fault_info = fault_info
-        super().__init__(message)
-
-    def __str__(self):
-        if self.fault_info:
-            return f"{self.message} - {self.fault_info}"
-        return self.message
-
-
-class JointFaultError(GHandError):
-    def __init__(self, message: str, faulty_joints: Optional[List[JointFaultInfo]] = None):
-        self.faulty_joints: List[JointFaultInfo] = faulty_joints or []
-        super().__init__(message)
-
-    def __str__(self):
-        if self.faulty_joints:
-            joints_str = "\n  ".join(str(j) for j in self.faulty_joints)
-            return f"{self.message}\n  故障关节:\n  {joints_str}"
-        return self.message
-
-
-class DataReceiveError(GHandError):
-    def __init__(self, message: str, expected_length: Optional[int] = None, actual_length: Optional[int] = None):
-        self.expected_length = expected_length
-        self.actual_length = actual_length
-        super().__init__(message)
-
-    def __str__(self):
-        if self.expected_length is not None and self.actual_length is not None:
-            return f"{self.message} (期望: {self.expected_length} 字节, 实际: {self.actual_length} 字节)"
-        return self.message
+class HandStateError(GHandError):
+    """Raised when the device or joints report an abnormal state."""

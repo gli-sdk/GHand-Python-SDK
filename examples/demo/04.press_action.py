@@ -1,164 +1,168 @@
-import time
-import math
 import logging
-from ghand.ghand import GHand, CommType, Joint, JointId
-from ghand import configure_logging
+import time
+
+from ghand import ProductType, configure_logging
+from ghand.ghand import CommType, GHand, JointCommand, JointId
+from ghand.types import GHandError
 
 # Configure SDK logging (shows connection state, warnings, errors)
 configure_logging(level=logging.INFO)
 
 thumb_press = {
-    JointId.THUMB_PIP: math.radians(0),
-    JointId.THUMB_MCP: math.radians(0),
-    JointId.THUMB_SWING: math.radians(30),
-    JointId.THUMB_ROTATION: math.radians(0),
-    JointId.FF_PIP: math.radians(75),
-    JointId.FF_MCP: math.radians(70),
-    JointId.FF_SWING: math.radians(0),
-    JointId.MF_PIP: math.radians(75),
-    JointId.MF_MCP: math.radians(70),
-    JointId.RF_PIP: math.radians(75),
-    JointId.RF_MCP: math.radians(70),
-    JointId.LF_PIP: math.radians(74),
-    JointId.LF_MCP: math.radians(70),
+    JointId.THUMB_PIP: 0,
+    JointId.THUMB_MCP: 0,
+    JointId.THUMB_SWING: 30,
+    JointId.THUMB_ROTATION: 0,
+    JointId.FF_PIP: 75,
+    JointId.FF_MCP: 70,
+    JointId.FF_SWING: 0,
+    JointId.MF_PIP: 75,
+    JointId.MF_MCP: 70,
+    JointId.RF_PIP: 75,
+    JointId.RF_MCP: 70,
+    JointId.LF_PIP: 74,
+    JointId.LF_MCP: 70,
 }
 
 ff_press = {
-    JointId.THUMB_PIP: math.radians(30),
-    JointId.THUMB_MCP: math.radians(20),
-    JointId.THUMB_SWING: math.radians(20),
-    JointId.THUMB_ROTATION: math.radians(0),
-    JointId.FF_PIP: math.radians(0),
-    JointId.FF_MCP: math.radians(0),
-    JointId.FF_SWING: math.radians(0),
-    JointId.MF_PIP: math.radians(75),
-    JointId.MF_MCP: math.radians(70),
-    JointId.RF_PIP: math.radians(75),
-    JointId.RF_MCP: math.radians(70),
-    JointId.LF_PIP: math.radians(74),
-    JointId.LF_MCP: math.radians(70),
+    JointId.THUMB_PIP: 30,
+    JointId.THUMB_MCP: 20,
+    JointId.THUMB_SWING: 20,
+    JointId.THUMB_ROTATION: 0,
+    JointId.FF_PIP: 0,
+    JointId.FF_MCP: 0,
+    JointId.FF_SWING: 0,
+    JointId.MF_PIP: 75,
+    JointId.MF_MCP: 70,
+    JointId.RF_PIP: 75,
+    JointId.RF_MCP: 70,
+    JointId.LF_PIP: 74,
+    JointId.LF_MCP: 70,
 }
 
 mf_press = {
-    JointId.THUMB_PIP: math.radians(60),
-    JointId.THUMB_MCP: math.radians(0),
-    JointId.THUMB_SWING: math.radians(20),
-    JointId.THUMB_ROTATION: math.radians(0),
-    JointId.FF_PIP: math.radians(75),
-    JointId.FF_MCP: math.radians(70),
-    JointId.FF_SWING: math.radians(0),
-    JointId.MF_PIP: math.radians(0),
-    JointId.MF_MCP: math.radians(0),
-    JointId.RF_PIP: math.radians(75),
-    JointId.RF_MCP: math.radians(70),
-    JointId.LF_PIP: math.radians(74),
-    JointId.LF_MCP: math.radians(70),
+    JointId.THUMB_PIP: 60,
+    JointId.THUMB_MCP: 0,
+    JointId.THUMB_SWING: 20,
+    JointId.THUMB_ROTATION: 0,
+    JointId.FF_PIP: 75,
+    JointId.FF_MCP: 70,
+    JointId.FF_SWING: 0,
+    JointId.MF_PIP: 0,
+    JointId.MF_MCP: 0,
+    JointId.RF_PIP: 75,
+    JointId.RF_MCP: 70,
+    JointId.LF_PIP: 74,
+    JointId.LF_MCP: 70,
 }
 
 rf_press = {
-    JointId.THUMB_PIP: math.radians(66),
-    JointId.THUMB_MCP: math.radians(0),
-    JointId.THUMB_SWING: math.radians(20),
-    JointId.THUMB_ROTATION: math.radians(0),
-    JointId.FF_PIP: math.radians(75),
-    JointId.FF_MCP: math.radians(70),
-    JointId.FF_SWING: math.radians(0),
-    JointId.MF_PIP: math.radians(75),
-    JointId.MF_MCP: math.radians(70),
-    JointId.RF_PIP: math.radians(0),
-    JointId.RF_MCP: math.radians(0),
-    JointId.LF_PIP: math.radians(74),
-    JointId.LF_MCP: math.radians(70),
+    JointId.THUMB_PIP: 66,
+    JointId.THUMB_MCP: 0,
+    JointId.THUMB_SWING: 20,
+    JointId.THUMB_ROTATION: 0,
+    JointId.FF_PIP: 75,
+    JointId.FF_MCP: 70,
+    JointId.FF_SWING: 0,
+    JointId.MF_PIP: 75,
+    JointId.MF_MCP: 70,
+    JointId.RF_PIP: 0,
+    JointId.RF_MCP: 0,
+    JointId.LF_PIP: 74,
+    JointId.LF_MCP: 70,
 }
 
 lf_press = {
-    JointId.THUMB_PIP: math.radians(66),
-    JointId.THUMB_MCP: math.radians(0),
-    JointId.THUMB_SWING: math.radians(20),
-    JointId.THUMB_ROTATION: math.radians(0),
-    JointId.FF_PIP: math.radians(75),
-    JointId.FF_MCP: math.radians(70),
-    JointId.FF_SWING: math.radians(0),
-    JointId.MF_PIP: math.radians(75),
-    JointId.MF_MCP: math.radians(70),
-    JointId.RF_PIP: math.radians(75),
-    JointId.RF_MCP: math.radians(70),
-    JointId.LF_PIP: math.radians(0),
-    JointId.LF_MCP: math.radians(0),
+    JointId.THUMB_PIP: 66,
+    JointId.THUMB_MCP: 0,
+    JointId.THUMB_SWING: 20,
+    JointId.THUMB_ROTATION: 0,
+    JointId.FF_PIP: 75,
+    JointId.FF_MCP: 70,
+    JointId.FF_SWING: 0,
+    JointId.MF_PIP: 75,
+    JointId.MF_MCP: 70,
+    JointId.RF_PIP: 75,
+    JointId.RF_MCP: 70,
+    JointId.LF_PIP: 0,
+    JointId.LF_MCP: 0,
 }
-
 
 open_hand = {
-    # 全部手指都在零位
-    JointId.THUMB_PIP: math.radians(0),
-    JointId.THUMB_MCP: math.radians(0),
-    JointId.THUMB_SWING: math.radians(20),
-    JointId.THUMB_ROTATION: math.radians(0),
-    JointId.FF_PIP: math.radians(0),
-    JointId.FF_MCP: math.radians(0),
-    JointId.FF_SWING: math.radians(0),
-    JointId.MF_PIP: math.radians(0),
-    JointId.MF_MCP: math.radians(0),
-    JointId.RF_PIP: math.radians(0),
-    JointId.RF_MCP: math.radians(0),
-    JointId.LF_PIP: math.radians(0),
-    JointId.LF_MCP: math.radians(0),
+    # All fingers at zero position
+    JointId.THUMB_PIP: 0,
+    JointId.THUMB_MCP: 0,
+    JointId.THUMB_SWING: 20,
+    JointId.THUMB_ROTATION: 0,
+    JointId.FF_PIP: 0,
+    JointId.FF_MCP: 0,
+    JointId.FF_SWING: 0,
+    JointId.MF_PIP: 0,
+    JointId.MF_MCP: 0,
+    JointId.RF_PIP: 0,
+    JointId.RF_MCP: 0,
+    JointId.LF_PIP: 0,
+    JointId.LF_MCP: 0,
 }
 
+
 def press(hand):
-    joints = Joint.create_joint_positions(ff_press)
+    joints = [JointCommand(id=joint_id, angle=angle) for joint_id, angle in ff_press.items()]
     result = hand.move_joints(joints)
     return result
+
 
 def hand_zero(hand):
-    joints = Joint.create_joint_positions(open_hand)
+    joints = [JointCommand(id=joint_id, angle=angle) for joint_id, angle in open_hand.items()]
     result = hand.move_joints(joints)
     return result
 
+
 def main():
-    print("***** 枭尧灵巧手 SDK - 按功能演示 *****\n")
-    hand = GHand()
-    connected = hand.open(CommType.ETHERCAT, "auto")
+    print("***** GHand SDK - Press Demo *****\n")
+    hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+    connected = hand.open("auto")
     try:
         if not connected:
-            print("\n[扫描结束] 未能连接到灵巧手。")
+            print("\n[Scan complete] Failed to connect to dexterous hand.")
             return
-        print("\n--- 设备已就绪，将开始按功能演示 ---\n")
+        print("\n--- Device ready, starting press demo ---\n")
 
-        # 循环执行手势动作
+        # Loop through gesture actions
         gesture_cycle = 0
-        max_cycles = 0  # 设置循环次数，可以根据需要调整，0表示无限循环
-        
+        max_cycles = 0  # Set cycle count, 0 means infinite loop
+
         while True:
             gesture_cycle += 1
             if max_cycles > 0 and gesture_cycle > max_cycles:
                 break
 
-            print(f"\n--- 第 {gesture_cycle} 轮功能演示开始 ---")
+            print(f"\n--- Cycle {gesture_cycle}: Demo started ---")
 
             if not press(hand):
-                print(f"第 {gesture_cycle} 轮演示中的按压动作执行失败")
+                print(f"Cycle {gesture_cycle}: Press action failed")
                 break
             time.sleep(5)
 
             if not hand_zero(hand):
-                print(f"第 {gesture_cycle} 轮演示中的复位动作执行失败")
+                print(f"Cycle {gesture_cycle}: Reset action failed")
                 break
             time.sleep(5)
 
-            print(f"--- 第 {gesture_cycle} 轮功能演示结束 ---\n")
+            print(f"--- Cycle {gesture_cycle}: Demo ended ---\n")
 
-            # 提示信息
+            # Prompt
             if max_cycles == 0:
-                print("按 Ctrl+C 停止演示并退出程序\n")
+                print("Press Ctrl+C to stop demo and exit program\n")
     except KeyboardInterrupt:
-        print("\n\n程序被用户中断。")
-    except Exception as e:
-        print(f"\n[严重错误] {e}")
+        print("\n\nProgram interrupted by user.")
+    except GHandError as e:
+        print(f"\n[Critical Error] {e}")
     finally:
         hand.close()
         time.sleep(0.5)
-        print("\n--- 演示结束，断开连接 ---")
+        print("\n--- Demo ended, disconnected ---")
+
 
 if __name__ == "__main__":
     main()

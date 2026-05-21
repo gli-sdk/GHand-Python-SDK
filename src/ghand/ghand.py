@@ -1,53 +1,59 @@
-import math
+"""High-level API for the GHand dexterous hand."""
+
 import logging
-from .comm.ethercat_comm import EtherCATComm
-from .comm.canfd_comm import CANFDComm
-from .comm.rs485_comm import RS485Comm
-from .comm.icomm import IComm
-from .types import (
-    ProductType, ProductConfig, JointId, State, ErrorCode,
-    HandType, CommType, CtrlMode, TactileSensorId,
-    Joint, HandInfo, TactileInfo,
-    GHandError, DeviceDisconnectedError, DeviceFaultError,
-    JointFaultError, DataReceiveError, FaultInfo, JointFaultInfo,
-    get_fault_message,
-)
-from ._config import load_product_config, find_config_by_name
-from ._subscription import SubscriptionManager
-from .comm.ethercat_protocol import JointRpdo, Rpdo, Tpdo, compute_tpdo_size
 
-from collision_sdk import CollisionSDK, CollisionCheckResult
+from collision_sdk import CollisionCheckResult, CollisionSDK
+import numpy as np
 
+from ._config import find_config_by_name, load_product_config
 from ._converter import joints_to_nparray, nparray_to_joints
+from .comm.canfd_comm import CANFDComm
+from .comm.ethercat_comm import EtherCATComm
+from .comm.rs485_comm import RS485Comm
+from .types import (
+    CommType,
+    CommunicationError,
+    CtrlMode,
+    ErrorCode,
+    HandFaultInfo,
+    HandState,
+    HandStateError,
+    HandType,
+    JointCommand,
+    JointData,
+    JointFaultInfo,
+    JointId,
+    ProductConfig,
+    ProductType,
+    State,
+)
 
 logger = logging.getLogger("ghand.ghand")
 
+
 class GHand(object):
-    def __init__(self,
-                 product_type: ProductType = ProductType.AUTO,
-                 comm_type: CommType = CommType.ETHERCAT):
-        """
-        初始化灵巧手对象
+    """High-level API for the GHand dexterous hand."""
+
+    def __init__(
+        self, product_type: ProductType = ProductType.AUTO, comm_type: CommType = CommType.ETHERCAT
+    ):
+        """Initialize the GHand instance.
 
         Args:
-            product_type: 产品型号，默认 ProductType.AUTO（自动检测）
-            comm_type: 通信类型，默认 CommType.ETHERCAT
+            product_type: Product model. Defaults to AUTO for auto-detection.
+            comm_type: Communication protocol. Defaults to ETHERCAT.
         """
         self._product_type = product_type
         self._comm_type = comm_type
         self._product_config = load_product_config(product_type)
-        self._joint_limits = {
-            jid: (math.radians(mn), math.radians(mx))
-            for jid, (mn, mx) in self._product_config.joint_limits.items()
-        }
-        self._passive_joints = (
-            set(self._product_config.valid_joints) - set(self._joint_limits.keys())
+        self._joint_limits = self._product_config.joint_limits.copy()
+        self._passive_joints = set(self._product_config.valid_joints) - set(
+            self._joint_limits.keys()
         )
-        self._expected_tpdo_size = self._compute_tpdo_size()
+        self._has_tactile = self._product_config.has_tactile
         self._comm = self._create_comm(comm_type)
         self._hand_type = HandType.UNKNOWN
         self._firmware_version = ""
-        self._sub_manager = SubscriptionManager(self._comm)
         self._opened = False
         self._safety_margin = 0.0
         self._collision_checker = None
@@ -65,8 +71,8 @@ class GHand(object):
         except Exception:
             pass
 
-    def _create_comm(self, comm_type: CommType) -> IComm:
-        """根据通信类型创建对应的 IComm 实例"""
+    def _create_comm(self, comm_type: CommType):
+        """Instantiate the appropriate IComm implementation."""
         if comm_type == CommType.ETHERCAT:
             return EtherCATComm(self._product_config)
         elif comm_type == CommType.CANFD:
@@ -76,193 +82,205 @@ class GHand(object):
         else:
             raise ValueError(f"Unknown communication type: {comm_type}")
 
-    def _compute_tpdo_size(self) -> int:
-        config = self._product_config
-        counts = [r.count for r in config.tactile_regions] if config.has_tactile else None
-        return compute_tpdo_size(len(config.valid_joints), counts)
-
-    def _apply_product_config(self, config: ProductConfig):
-        """应用产品配置，更新关节限制并重建通信对象"""
-        self._product_config = config
-        self._joint_limits = {
-            jid: (math.radians(mn), math.radians(mx))
-            for jid, (mn, mx) in config.joint_limits.items()
-        }
-        self._passive_joints = (
-            set(config.valid_joints) - set(self._joint_limits.keys())
-        )
-        self._expected_tpdo_size = self._compute_tpdo_size()
-        self._comm = self._create_comm(self._comm_type)
-        self._sub_manager = SubscriptionManager(self._comm)
-
-    def _check_joint_limit(self, joint: Joint, limit):
-        """
-        检查关节角度是否超出限制范围，如果超出则设为边界值
+    def _apply_product_config(self, config: ProductConfig) -> None:
+        """Apply a new product configuration.
 
         Args:
-          joint (Joint): 关节对象
-          limit: 关节限制范围
+            config: New product configuration to apply.
+        """
+        self._product_config = config
+        self._joint_limits = config.joint_limits.copy()
+        self._passive_joints = set(config.valid_joints) - set(self._joint_limits.keys())
+        self._has_tactile = config.has_tactile
+        self._comm.update_config(config)
 
+    def _check_joint_limit(self, joint: JointCommand, limit):
+        """Clamp the joint angle to its configured limits.
+
+        Args:
+            joint: Joint to check and modify in place.
+            limit: Tuple of (min, max) in degrees.
         """
         if joint.angle < limit[0]:
             joint.angle = limit[0]
-            logger.warning(f"[Joint] ID: {JointId(joint.id).name} angle below limit, clamped to min value {math.degrees(limit[0]):.2f} degrees")
+            logger.warning(
+                "[Joint] ID: %s angle below limit, clamped to min value %.1f degrees",
+                JointId(joint.id).name, limit[0]
+            )
         elif joint.angle > limit[1]:
             joint.angle = limit[1]
-            logger.warning(f"[Joint] ID: {JointId(joint.id).name} angle above limit, clamped to max value {math.degrees(limit[1]):.2f} degrees")
+            logger.warning(
+                "[Joint] ID: %s angle above limit, clamped to max value %.1f degrees",
+                JointId(joint.id).name, limit[1]
+            )
 
-    def _check_speed_limit(self, joint: Joint, mode: CtrlMode):
-        """
-        检查关节速度是否在有效范围内，根据控制模式应用不同的限制
+    def _check_speed_limit(self, joint: JointCommand, mode: CtrlMode):
+        """Validate and clamp joint speed based on the control mode.
 
         Args:
-          joint (Joint): 关节对象
-          mode (CtrlMode): 控制模式
-
+            joint: Joint to check and modify in place.
+            mode: Current control mode.
         """
         if mode == CtrlMode.POSITION:
-            # 位置模式：速度范围 0-100，负数取绝对值，绝对值>100取100
             if joint.speed < 0:
                 joint.speed = abs(joint.speed)
-                logger.warning(f"[Joint] ID: {JointId(joint.id).name} speed is negative in POSITION mode, converted to absolute value {joint.speed}")
+                logger.warning(
+                    "[Joint] ID: %s speed is negative in POSITION mode, "
+                    "converted to absolute value %s",
+                    JointId(joint.id).name,
+                    joint.speed,
+                )
             if joint.speed > 100:
                 original_speed = joint.speed
                 joint.speed = 100
-                logger.warning(f"[Joint] ID: {JointId(joint.id).name} speed {original_speed} exceeds limit in POSITION mode, clamped to 100")
+                logger.warning(
+                    "[Joint] ID: %s speed %s exceeds limit in POSITION mode, clamped to 100",
+                    JointId(joint.id).name, original_speed
+                )
         elif mode == CtrlMode.SPEED:
-            # 速度模式：速度范围 -100到100
             if joint.speed < -100:
                 original_speed = joint.speed
                 joint.speed = -100
-                logger.warning(f"[Joint] ID: {JointId(joint.id).name} speed {original_speed} below limit in SPEED mode, clamped to -100")
+                logger.warning(
+                    "[Joint] ID: %s speed %s below limit in SPEED mode, clamped to -100",
+                    JointId(joint.id).name, original_speed
+                )
             elif joint.speed > 100:
                 original_speed = joint.speed
                 joint.speed = 100
-                logger.warning(f"[Joint] ID: {JointId(joint.id).name} speed {original_speed} exceeds limit in SPEED mode, clamped to 100")
-        # 力矩模式：速度不影响，不进行检查
+                logger.warning(
+                    "[Joint] ID: %s speed %s exceeds limit in SPEED mode, clamped to 100",
+                    JointId(joint.id).name, original_speed
+                )
 
-    def _check_torque_limit(self, joint: Joint, mode: CtrlMode):
-        """
-        检查关节力矩是否在有效范围内，根据控制模式应用不同的限制
+    def _check_torque_limit(self, joint: JointCommand, mode: CtrlMode):
+        """Validate and clamp joint torque based on the control mode.
 
         Args:
-          joint (Joint): 关节对象
-          mode (CtrlMode): 控制模式
-
+            joint: Joint to check and modify in place.
+            mode: Current control mode.
         """
         if mode in [CtrlMode.POSITION, CtrlMode.SPEED]:
-            # 位置模式和速度模式：力矩范围 0-100，负数取绝对值，绝对值>100取100
             if joint.torque < 0:
                 joint.torque = abs(joint.torque)
-                logger.warning(f"[Joint] ID: {JointId(joint.id).name} torque is negative in {mode.name} mode, converted to absolute value {joint.torque}")
+                logger.warning(
+                    "[Joint] ID: %s torque is negative in %s mode, converted to absolute value %s",
+                    JointId(joint.id).name, mode.name, joint.torque
+                )
             if joint.torque > 100:
                 original_torque = joint.torque
                 joint.torque = 100
-                logger.warning(f"[Joint] ID: {JointId(joint.id).name} torque {original_torque} exceeds limit in {mode.name} mode, clamped to 100")
+                logger.warning(
+                    "[Joint] ID: %s torque %s exceeds limit in %s mode, clamped to 100",
+                    JointId(joint.id).name, original_torque, mode.name
+                )
         elif mode == CtrlMode.TORQUE:
-            # 力矩模式：力矩范围 -100到100
             if joint.torque < -100:
                 original_torque = joint.torque
                 joint.torque = -100
-                logger.warning(f"[Joint] ID: {JointId(joint.id).name} torque {original_torque} below limit in TORQUE mode, clamped to -100")
+                logger.warning(
+                    "[Joint] ID: %s torque %s below limit in TORQUE mode, clamped to -100",
+                    JointId(joint.id).name, original_torque
+                )
             elif joint.torque > 100:
                 original_torque = joint.torque
                 joint.torque = 100
-                logger.warning(f"[Joint] ID: {JointId(joint.id).name} torque {original_torque} exceeds limit in TORQUE mode, clamped to 100")
+                logger.warning(
+                    "[Joint] ID: %s torque %s exceeds limit in TORQUE mode, clamped to 100",
+                    JointId(joint.id).name, original_torque
+                )
 
-    def get_connectable_devices(self) -> list[str]:
-        """
-        获取可连接的设备列表
+    def search_adapters(self) -> list[str]:
+        """Search for available device adapters.
 
         Returns:
-            list[str]: 返回可连接设备的网络接口ID列表
+            List of adapter IDs.
         """
-        connected_interfaces = []
         id_list = self._comm.search_adapters()
 
-        for iface_id in id_list:
-            try:
-                connected = self._comm.connect(iface_id)
-                if connected:
-                    connected_interfaces.append(iface_id)
-                    self._comm.disconnect()
-            except NotImplementedError:
-                break
-            except Exception:
-                pass
-
-        if connected_interfaces:
-            logger.info("可连接的设备:\n" + "\n".join([f"{id}" for id in connected_interfaces]))
+        if id_list:
+            logger.info("Available adapters:\n" + "\n".join([f"{id}" for id in id_list]))
         else:
-            logger.warning("未找到可连接的设备")
+            logger.warning("No adapters found")
 
-        return connected_interfaces
+        return id_list
 
-    def open(self, comm_type: CommType = CommType.ETHERCAT, id: str = "auto"):
-        """
-        打开灵巧手设备连接
+    def _resolve_product_type(self) -> bool:
+        """Auto-detect or verify the product type and apply configuration.
 
-        Args:
-          comm_type (CommType): 通信类型，默认为ETHERCAT
-          id (str): 设备ID，当设置为"auto"时自动搜索设备，默认为"auto"
+        If ``product_type`` is ``AUTO``, queries the device name and reloads
+        the comm layer with the matched config. Otherwise, verifies the
+        connected device matches the configured product type.
 
         Returns:
-          bool: 连接成功返回True，否则返回False
+            True if the product type is resolved or verified successfully.
+        """
+        try:
+            device_name = self.get_device_name()
+        except Exception:
+            logger.error("Failed to get device name for auto-detection", exc_info=True)
+            return False
+
+        if self._product_type == ProductType.AUTO:
+            matched = find_config_by_name(device_name)
+            if matched:
+                self._apply_product_config(matched)
+            return True
+        else:
+            expected_name = self._product_config.name
+            if device_name != expected_name:  
+                self._comm.disconnect()
+                logger.error(
+                    "Product type mismatch: expected %s, got %s",
+                    expected_name,
+                    device_name,
+                )
+                return False
+            return True
+
+    def open(self, id: str = "auto") -> bool:
+        """Open the device connection.
+
+        Args:
+            id: Device ID. Use "auto" to search automatically.
+
+        Returns:
+            True if the connection is established successfully.
+
+        Raises:
+            CommunicationError: If a specific device ID is provided but connection fails.
         """
         if self._opened:
             return True
 
-        if comm_type != self._comm_type:
-            self._comm = self._create_comm(comm_type)
-            self._comm_type = comm_type
-            self._sub_manager = SubscriptionManager(self._comm)
-
         if id == "auto":
             id_list = self._comm.search_adapters()
             logger.info("Found IDs:\n" + "\n".join([f"\t{id}" for id in id_list]))
-            adapter_id = None
             for aid in id_list:
                 if self._comm.connect(aid):
                     self._opened = True
-                    adapter_id = aid
-                    logger.info(f"Device opened successfully (ID: {aid})")
+                    logger.info("Device opened successfully (ID: %s)", aid)
                     break
                 else:
-                    logger.error(f"Failed to open device (ID: {aid})")
+                    logger.error("Failed to open device (ID: %s)", aid)
         else:
-            if self._comm.connect(id):
-                self._opened = True
-                adapter_id = id
-                logger.info(f"Device opened successfully (ID: {id})")
-            else:
-                logger.error(f"Failed to open device (ID: {id})")
+            if not self._comm.connect(id):
+                raise CommunicationError(f"Failed to open device (ID: {id})")
+            self._opened = True
+            logger.info("Device opened successfully (ID: %s)", id)
 
         if not self._opened:
             return False
-
-        if self._product_type == ProductType.AUTO and not self._product_config.name:
-            try:
-                device_name = self.get_device_name()
-            except Exception:
-                logger.debug("Failed to get device name for auto-detection", exc_info=True)
-                device_name = None
-            if device_name:
-                matched = find_config_by_name(device_name)
-                if matched:
-                    self._comm.disconnect()
-                    self._apply_product_config(matched)
-                    self._comm.connect(adapter_id)
+        self._opened = self._resolve_product_type()
 
         return self._opened
 
     def close(self) -> bool:
-        """
-        关闭灵巧手设备连接
+        """Close the device connection.
 
         Returns:
-          bool: 关闭成功返回True，失败返回False
+            True.
         """
-        self._sub_manager.stop()
         if self._opened:
             self._comm.disconnect()
             logger.info("Disconnected from device")
@@ -270,226 +288,157 @@ class GHand(object):
         return True
 
     def is_connected(self) -> bool:
-        """
-        检查设备是否已连接
-
-        Returns:
-            bool: 已连接返回True，否则返回False
-        """
+        """Return whether the device is currently connected."""
         return self._opened
 
     def subscribe(self, callback):
-        """
-        订阅灵巧手数据更新
+        """Subscribe to device data updates.
 
         Args:
-            callback: 回调函数，当有新数据时会被调用
-                     回调函数应接受一个参数：TPDO数据对象
+            callback: Callable invoked with a Tpdo object when new data arrives.
 
         Returns:
-            int: 订阅ID，可用于取消订阅
+            Subscription ID.
         """
-
-        def wrapper(data_bytes, *args, **kwargs):
-            # 将字节数据转换为TPDO对象
-            tpdo = Tpdo.from_bytes(data_bytes)
-            # 调用用户提供的回调函数
-            callback(tpdo)
-
-        return self._sub_manager.subscribe(wrapper)
+        return self._comm.subscribe(callback)
 
     def unsubscribe(self, sub_id):
-        """
-        取消订阅
+        """Unsubscribe from data updates.
 
         Args:
-            sub_id (int): 订阅ID
+            sub_id: Subscription ID returned by ``subscribe``.
 
         Returns:
-            bool: 取消成功返回True，否则返回False
+            True if the subscription was removed successfully.
         """
-        return self._sub_manager.unsubscribe(sub_id)
+        return self._comm.unsubscribe(sub_id)
 
-    def get_firmware_version(self):
-        """
-        获取灵巧手固件版本号
+    def get_firmware_version(self) -> str:
+        """Retrieve the firmware version.
 
         Returns:
-            str: 返回版本号（如："v1.0.0"）
+            Firmware version string (e.g., "v1.0.0").
         """
         if self._firmware_version == "":
-            self._firmware_version = self._comm.sdo_read(
-                0x100A, 0x00).decode('utf-8')
+            self._firmware_version = self._comm.get_firmware_version()
         return self._firmware_version
 
-    def get_device_name(self):
-        """
-        获取设备名
+    def get_device_name(self) -> str:
+        """Retrieve the device name.
 
         Returns:
-            str: 设备名称字符串
+            Device name string.
 
         Raises:
-            RuntimeError: 通信失败时抛出
+            RuntimeError: If communication fails.
         """
-        return self._comm.sdo_read(0x1008, 0x00).decode('utf-8')
+        return self._comm.get_device_name()
 
-    def get_hardware_version(self):
-        """
-        获取硬件版本号
+    def get_hardware_version(self) -> str:
+        """Retrieve the hardware version.
 
         Returns:
-            str: 硬件版本号（如："v1.0.0"）
+            Hardware version string.
 
         Raises:
-            RuntimeError: 通信失败时抛出
+            RuntimeError: If communication fails.
         """
-        return self._comm.sdo_read(0x1009, 0x00).decode('utf-8')
+        return self._comm.get_hardware_version()
 
-    def get_serial_number(self):
-        """
-        获取产品序列号
+    def get_serial_number(self) -> int:
+        """Retrieve the product serial number.
 
         Returns:
-            int: 产品序列号
+            Serial number.
 
         Raises:
-            RuntimeError: 通信失败时抛出
+            RuntimeError: If communication fails.
         """
-        return int.from_bytes(
-            self._comm.sdo_read(0x1018, 0x04), byteorder='little')
+        return self._comm.get_serial_number()
 
-    def get_motor_driver_version(self):
-        """
-        获取电机驱动版本号
+    def get_motor_driver_version(self) -> tuple:
+        """Retrieve the motor driver version.
 
         Returns:
-            tuple: (主版本号, 子版本号1, 子版本号2)
+            Tuple of (main, sub1, sub2) version numbers.
 
         Raises:
-            RuntimeError: 通信失败时抛出
+            RuntimeError: If communication fails.
         """
-        main_ver = int.from_bytes(
-            self._comm.sdo_read(0x2007, 0x01), byteorder="little"
-        )
-        sub1_ver = int.from_bytes(
-            self._comm.sdo_read(0x2007, 0x02), byteorder="little"
-        )
-        sub2_ver = int.from_bytes(
-            self._comm.sdo_read(0x2007, 0x03), byteorder="little"
-        )
-        return (main_ver, sub1_ver, sub2_ver)
+        return self._comm.get_motor_driver_version()
 
     def fault_clearance(self) -> bool:
-        """
-        故障清除
+        """Clear device faults.
 
         Returns:
-            bool: 清除成功返回True，失败返回False
+            True on success, False on failure.
         """
-        try:
-            self._comm.sdo_write(0x2002, 0x01, b'\x01')
+        result = self._comm.clear_fault()
+        if result:
             logger.info("Fault cleared successfully")
-        except Exception as e:
-            logger.error(f"Failed to clear fault: {e}")
-            return False
-        return True
+        else:
+            logger.error("Failed to clear fault")
+        return result
 
     def joint_init(self) -> bool:
-        """
-        关节初始化
+        """Initialize joint positions.
 
         Returns:
-            bool: 初始化成功返回True，失败返回False
+            True on success, False on failure.
         """
-        try:
-            self._comm.sdo_write(0x2003, 0x01, b'\x01')
+        result = self._comm.init_joint()
+        if result:
             logger.info("Joint initialization completed successfully")
-        except Exception as e:
-            logger.error(f"Failed to initialize joints: {e}")
-            return False
-        return True
+        else:
+            logger.error("Failed to initialize joints")
+        return result
 
     def tactile_open(self) -> bool:
-        """
-        打开触觉传感器
+        """Enable the tactile sensors.
 
         Returns:
-            bool: 打开成功返回True，失败返回False
+            True on success, False if the product has no tactile support or the command fails.
         """
-        if not self._product_config.has_tactile:
+        if not self._has_tactile:
             logger.warning("This product does not support tactile sensors")
             return False
-        try:
-            self._comm.sdo_write(0x2004, 0x01, b'\x01')
-            # 读取结果区（子索引3）
-            result_data = self._comm.sdo_read(0x2004, 0x03)
-            # 检查结果区数据，如果为0则成功，为1则失败
-            if result_data == b'\x00':
-                return True
-            else:
-                return False
-        except Exception as e:
-            logger.error(f"tactile_open error: {e}", exc_info=True)
-            return False
+        return self._comm.open_tactile()
 
     def tactile_close(self) -> bool:
-        """
-        关闭触觉传感器
+        """Disable the tactile sensors.
 
         Returns:
-            bool: 关闭成功返回True，失败返回False
+            True on success, False if the product has no tactile support or the command fails.
         """
-        if not self._product_config.has_tactile:
+        if not self._has_tactile:
             logger.warning("This product does not support tactile sensors")
             return False
-        try:
-            self._comm.sdo_write(0x2004, 0x01, b'\x02')
-            # 读取结果区（子索引3）
-            result_data = self._comm.sdo_read(0x2004, 0x03)
-            # 检查结果区数据，如果为0则成功，为1则失败
-            if result_data == b'\x00':
-                return True
-            else:
-                return False
-        except Exception:
-            return False
+        return self._comm.close_tactile()
 
     def tactile_zero(self) -> bool:
-        """
-        调零触觉传感器
+        """Zero-calibrate the tactile sensors.
 
         Returns:
-            bool: 调零成功返回True，失败返回False
+            True on success, False if the product has no tactile support or the command fails.
         """
-        if not self._product_config.has_tactile:
+        if not self._has_tactile:
             logger.warning("This product does not support tactile sensors")
             return False
-        try:
-            self._comm.sdo_write(0x2004, 0x01, b'\x04')
-            # 读取结果区（子索引3）
-            result_data = self._comm.sdo_read(0x2004, 0x03)
-            # 检查结果区数据，如果为0则成功，为1则失败
-            if result_data == b'\x00':
-                logger.debug("Tactile zero calibration successful")
-                return True
-            else:
-                logger.error(f"tactile_zero failed with result data: {result_data}")
-                return False
-
-        except Exception as e:
-            logger.error(f"tactile_zero error: {e}", exc_info=True)
-            return False
+        result = self._comm.zero_tactile()
+        if result:
+            logger.debug("Tactile zero calibration successful")
+        else:
+            logger.error("tactile_zero failed")
+        return result
 
     def get_hand_type(self) -> HandType:
-        """
-        获取手的类型
+        """Retrieve the hand type (left or right).
 
         Returns:
-            HandType: HandType.LEFT_HAND 或 HandType.RIGHT_HAND
+            HandType.LEFT_HAND or HandType.RIGHT_HAND.
 
         Raises:
-            RuntimeError: 通信失败时抛出
+            RuntimeError: If communication fails.
         """
         if self._hand_type == HandType.UNKNOWN:
             htype = self._comm.get_hand_type()
@@ -499,432 +448,219 @@ class GHand(object):
                 self._hand_type = HandType.RIGHT_HAND
         return self._hand_type
 
-    def _joint_to_pdo(self, joint: Joint, pdo: JointRpdo):
-        """
-        将Joint对象转换为PDO对象
+    def move_joints(self, joints: list[JointCommand], mode: CtrlMode = CtrlMode.POSITION) -> bool:
+        """Send joint control commands.
 
         Args:
-          joint (Joint): 关节对象
-          pdo (JointRpdo): PDO对象
-        """
-        pdo.angle = joint.angle
-        pdo.speed = joint.speed
-        pdo.torque = joint.torque
-
-    def move_joints(self, joints: list[Joint], mode: CtrlMode = CtrlMode.POSITION):
-        """
-        发送多个关节控制指令
-
-        Args:
-          joints (list[Joint]): 关节控制指令
-          mode (CtrlMode, optional): 模式选择。位置模式/力矩模式/速度模式。默认为位置模式
+            joints: List of JointCommand objects.
+            mode: Control mode. Defaults to POSITION.
 
         Returns:
-          bool: 发送成功返回True，否则返回False
+            True if the command is sent successfully.
         """
+        active_joints = []
+        for joint in joints:
+            if joint.id in self._passive_joints:
+                logger.warning("Passive joint %s will be ignored", JointId(joint.id).name)
+                continue
+            self._check_speed_limit(joint, mode)
+            self._check_torque_limit(joint, mode)
+            if mode == CtrlMode.POSITION and joint.id in self._joint_limits:
+                self._check_joint_limit(joint, self._joint_limits[joint.id])
+            active_joints.append(joint)
+
+        if not active_joints:
+            logger.warning("No active joints to move after filtering passive joints")
+            return False
+
         try:
-            rpdo = Rpdo()
-            rpdo.mode = mode.value
-            rpdo.stop = 0
-            joint_pdo_map = {
-                JointId.THUMB_PIP: rpdo.th_pip,
-                JointId.THUMB_MCP: rpdo.th_mcp,
-                JointId.THUMB_SWING: rpdo.th_swing,
-                JointId.THUMB_ROTATION: rpdo.th_rot,
-                JointId.FF_PIP: rpdo.ff_pip,
-                JointId.FF_MCP: rpdo.ff_mcp,
-                JointId.FF_SWING: rpdo.ff_swing,
-                JointId.MF_PIP: rpdo.mf_pip,
-                JointId.MF_MCP: rpdo.mf_mcp,
-                JointId.RF_PIP: rpdo.rf_pip,
-                JointId.RF_MCP: rpdo.rf_mcp,
-                JointId.LF_PIP: rpdo.lf_pip,
-                JointId.LF_MCP: rpdo.lf_mcp,
-            }
-
-            # 第一遍：验证所有关节
-            for joint in joints:
-                self._check_speed_limit(joint, mode)
-                self._check_torque_limit(joint, mode)
-
-                if mode == CtrlMode.POSITION and joint.id in self._joint_limits:
-                    self._check_joint_limit(joint, self._joint_limits[joint.id])
-
-                if joint.id not in joint_pdo_map and joint.id not in self._passive_joints:
-                    logger.warning(f"[Joint] Invalid joint ID: {joint.id}")
-                    return False
-
-            # 第二遍：写入PDO
-            for joint in joints:
-                if joint.id in joint_pdo_map:
-                    self._joint_to_pdo(joint, joint_pdo_map[joint.id])
-                elif joint.id in self._passive_joints:
-                    logger.debug(f"Skipping passive joint: {JointId(joint.id).name}")
-
-            self._comm.send_data(rpdo.to_bytes())
-            logger.info("Command sent successfully")
-            return True
+            result = self._comm.move_joints(active_joints, mode)
+            if result:
+                logger.info("Command sent successfully")
+            return result
         except RuntimeError as e:
-            logger.error(f"Failed to move joints: {e}")
+            logger.error("Failed to move joints: %s", e)
             return False
 
     def stop(self) -> bool:
-        """
-        停止所有关节运动
-
-        Returns:
-            bool: 指令是否发送成功
-        """
+        """Stop all joint motion immediately."""
         try:
-            rpdo = Rpdo()
-            rpdo.mode = 0
-            rpdo.stop = 1
-            self._comm.send_data(rpdo.to_bytes())
-            logger.info("Stop command sent successfully")
-            return True
+            result = self._comm.stop()
+            if result:
+                logger.info("Stop command sent successfully")
+            return result
         except RuntimeError as e:
-            logger.error(f"Failed to stop joints: {e}")
+            logger.error("Failed to stop joints: %s", e)
             return False
 
-    def get_joints(self) -> list[Joint]:
-        """
-        获取所有关节状态及运动信息
+    def get_joints(self) -> list[JointData]:
+        """Retrieve the current state of all joints.
 
         Returns:
-            list[Joint]: 关节列表
+            List of JointData objects.
 
         Raises:
-            DataReceiveError: 数据长度不足
-            DeviceDisconnectedError: 设备断连或通信失败
-            JointFaultError: 任何关节故障（error != 0 或 state in [2, 3]）
+            CommunicationError: If data length is insufficient.
+            CommunicationError: If the device is disconnected.
+            HandStateError: If any joint reports a fault.
         """
         try:
-            data = self._comm.recv_data()
-
-            # 数据长度验证
-            if len(data) < self._expected_tpdo_size:
-                error_msg = f"Data length insufficient. Expected {self._expected_tpdo_size} bytes, got {len(data)} bytes"
-                logger.warning(error_msg)
-                raise DataReceiveError(
-                    error_msg,
-                    expected_length=self._expected_tpdo_size,
-                    actual_length=len(data)
-                )
-
-            logger.info("Joint data received successfully")
-            tpdo = Tpdo.from_bytes(data)
-
-            # 定义关节信息映射
-            joint_mappings = [
-                # thumb
-                (JointId.THUMB_DIP, tpdo.th_dip),
-                (JointId.THUMB_PIP, tpdo.th_pip),
-                (JointId.THUMB_MCP, tpdo.th_mcp),
-                (JointId.THUMB_SWING, tpdo.th_swing),
-                (JointId.THUMB_ROTATION, tpdo.th_rot),
-                # ff
-                (JointId.FF_DIP, tpdo.ff_dip),
-                (JointId.FF_PIP, tpdo.ff_pip),
-                (JointId.FF_MCP, tpdo.ff_mcp),
-                (JointId.FF_SWING, tpdo.ff_swing),
-                # mf
-                (JointId.MF_DIP, tpdo.mf_dip),
-                (JointId.MF_PIP, tpdo.mf_pip),
-                (JointId.MF_MCP, tpdo.mf_mcp),
-                # rf
-                (JointId.RF_DIP, tpdo.rf_dip),
-                (JointId.RF_PIP, tpdo.rf_pip),
-                (JointId.RF_MCP, tpdo.rf_mcp),
-                # lf
-                (JointId.LF_DIP, tpdo.lf_dip),
-                (JointId.LF_PIP, tpdo.lf_pip),
-                (JointId.LF_MCP, tpdo.lf_mcp),
-            ]
-
-            joints = []
-            faulty_joints = []  # 收集所有故障关节
-
-            for joint_id, joint_tpdo in joint_mappings:
-                # 检查关节故障
-                if joint_tpdo.error != ErrorCode.NORMAL or joint_tpdo.state in [
-                    State.ABNORMAL_RUNNING,
-                    State.PROTECTIVE_STOPPED,
-                ]:
-                    faulty_joints.append(JointFaultInfo(
-                        joint_id=JointId(joint_id).name,
-                        state=State(joint_tpdo.state),
-                        error_code=ErrorCode(joint_tpdo.error)
-                    ))
-
-                # 规范化角度：避免 -0.0
-                angle = joint_tpdo.angle
-                if abs(angle) < 1e-10:
-                    angle = 0.0
-
-                joints.append(
-                    Joint(
-                        id=joint_id,
-                        angle=angle,
-                        speed=joint_tpdo.speed,
-                        torque=joint_tpdo.torque,
-                        state=State(joint_tpdo.state),
-                        error=ErrorCode(joint_tpdo.error),
-                    )
-                )
-
-            # 如果有故障关节，抛出异常
-            if faulty_joints:
-                error_msg = f"Detected {len(faulty_joints)} faulty joint(s)"
-                logger.error(error_msg)
-                raise JointFaultError(error_msg, faulty_joints=faulty_joints)
-
-            return joints
-
-        except DataReceiveError:
-            # 重新抛出数据接收错误
-            raise
-        except JointFaultError:
-            # 重新抛出关节故障错误
+            joints = self._comm.get_joints()
+        except CommunicationError:
             raise
         except RuntimeError as e:
-            # 通信错误，转换为设备断连异常
-            # logger.error(f"Communication failed: {e}")
-            raise DeviceDisconnectedError(
-                f"Failed to communicate with device: {e}"
-            ) from e
+            raise CommunicationError(f"Failed to communicate with device: {e}") from e
 
-    def get_hand_info(self) -> HandInfo:
-        """
-        获取手部状态信息
+        logger.info("Joint data received successfully")
+
+        faulty_joints = []
+        for joint in joints:
+            if joint.error != ErrorCode.NORMAL or joint.state in [
+                State.ABNORMAL_RUNNING,
+                State.PROTECTIVE_STOPPED,
+            ]:
+                faulty_joints.append(
+                    JointFaultInfo(
+                        joint_id=JointId(joint.id).name,
+                        state=joint.state,
+                        error_code=joint.error,
+                    )
+                )
+
+        if faulty_joints:
+            error_msg = f"Detected {len(faulty_joints)} faulty joint(s)"
+            logger.error(error_msg)
+            raise HandStateError(error_msg)
+
+        return joints
+
+    def get_hand_info(self) -> HandState:
+        """Retrieve high-level hand status information.
 
         Returns:
-            HandInfo: 手部状态信息对象，包含 state（状态）、error（错误码）、temp（温度）
+            HandState instance.
 
         Raises:
-            DataReceiveError: 数据长度不足
-            DeviceDisconnectedError: 设备断连或通信失败
-            DeviceFaultError: 设备故障（state=2/3 或 error!=0）
+            CommunicationError: If data length is insufficient.
+            CommunicationError: If the device is disconnected.
+            HandStateError: If the device reports a fault.
         """
         try:
-            data = self._comm.recv_data()
+            hand_info = self._comm.get_hand_info()
+        except CommunicationError:
+            raise
+        except RuntimeError as e:
+            logger.error("Communication failed: %s", e)
+            raise CommunicationError(f"Failed to communicate with device: {e}") from e
 
-            # 数据长度验证
-            if len(data) < self._expected_tpdo_size:
-                error_msg = f"Data length insufficient. Expected {self._expected_tpdo_size} bytes, got {len(data)} bytes"
-                logger.warning(error_msg)
-                raise DataReceiveError(
-                    error_msg,
-                    expected_length=self._expected_tpdo_size,
-                    actual_length=len(data)
-                )
-
-            tpdo = Tpdo.from_bytes(data)
-
-            # 检查设备故障状态
-            if tpdo.hand.error != 0:
-                fault_info = FaultInfo(
-                    error_code=ErrorCode(tpdo.hand.error),
-                    state=State(tpdo.hand.state),
-                    message=get_fault_message(ErrorCode(tpdo.hand.error), State(tpdo.hand.state), temp=tpdo.hand.temp)
-                )
-                error_msg = f"Device fault detected - {fault_info}"
-                logger.error(error_msg)
-                raise DeviceFaultError(error_msg, fault_info=fault_info)
-
-            # 检查异常运行状态（虽然你说 state=2/3 时一定 error!=0，但为了保险再检查一次）
-            if tpdo.hand.state in [State.ABNORMAL_RUNNING, State.PROTECTIVE_STOPPED]:
-                # 如果 error == 0 但状态异常，也抛出异常
-                if tpdo.hand.error == 0:
-                    fault_info = FaultInfo(
-                        error_code=ErrorCode.NORMAL,
-                        state=State(tpdo.hand.state),
-                        message=get_fault_message(ErrorCode.NORMAL, State(tpdo.hand.state))
-                    )
-                    error_msg = f"Abnormal device state - {fault_info}"
-                    logger.error(error_msg)
-                    raise DeviceFaultError(error_msg, fault_info=fault_info)
-
-            return HandInfo(
-                state=State(tpdo.hand.state),
-                error=ErrorCode(tpdo.hand.error),
-                temp=tpdo.hand.temp
+        if hand_info.error != ErrorCode.NORMAL:
+            fault_info = HandFaultInfo(
+                error_code=hand_info.error,
+                state=hand_info.state,
+                temperature=hand_info.temperature,
             )
+            raise HandStateError(f"Device fault detected - {fault_info}")
 
-        except DataReceiveError:
-            # 重新抛出数据接收错误
-            raise
-        except DeviceFaultError:
-            # 重新抛出设备故障错误
-            raise
-        except RuntimeError as e:
-            # 通信错误，转换为设备断连异常
-            logger.error(f"Communication failed: {e}")
-            raise DeviceDisconnectedError(
-                f"Failed to communicate with device: {e}",
-                reason=str(e)
-            ) from e
+        if hand_info.state in [State.ABNORMAL_RUNNING, State.PROTECTIVE_STOPPED]:
+            if hand_info.error == ErrorCode.NORMAL:
+                fault_info = HandFaultInfo(
+                    error_code=ErrorCode.NORMAL,
+                    state=hand_info.state,
+                )
+                raise HandStateError(f"Abnormal device state - {fault_info}")
 
-    def get_tactile_data(self):
-        """
-        获取触觉传感器数据
+        return hand_info
+
+    def get_tactile_data(self) -> dict:
+        """Retrieve tactile sensor data.
 
         Returns:
-            dict: 包含各手指触觉传感器数据的字典，键为TactileSensorId枚举，值为TactileInfo对象
+            Dictionary mapping TactileSensorId to TactileInfo.
 
         Raises:
-            DeviceDisconnectedError: 设备断开或通信失败
-            DataReceiveError: 数据接收异常（长度不匹配）
+            CommunicationError: If the device is disconnected.
+            CommunicationError: If data length is insufficient.
         """
-        if not self._product_config.has_tactile:
+        if not self._has_tactile:
             logger.warning("This product does not support tactile sensors")
             return {}
         try:
-            data = self._comm.recv_data()
-
-            # 数据长度验证
-            if len(data) < self._expected_tpdo_size:
-                error_msg = f"Data length insufficient. Expected {self._expected_tpdo_size} bytes, got {len(data)} bytes"
-                logger.warning(error_msg)
-                raise DataReceiveError(
-                    error_msg,
-                    expected_length=self._expected_tpdo_size,
-                    actual_length=len(data)
-                )
-
+            data = self._comm.get_tactile_data()
             logger.info("Tactile data received successfully")
-            tpdo = Tpdo.from_bytes(data)
-            logger.debug(
-                "Parsed TPDO tactile data:\n"
-                + "\n".join(
-                    [
-                        f"tactile_state: {tpdo.tactile_state}",
-                        f"thumb_tactile: {tpdo.thumb_tactile}",
-                        f"ff_tactile: {tpdo.ff_tactile}",
-                        f"mf_tactile: {tpdo.mf_tactile}",
-                        f"rf_tactile: {tpdo.rf_tactile}",
-                        f"lf_tactile: {tpdo.lf_tactile}",
-                    ]
-                )
-            )
-
-            # 返回一个结构化的字典，使用枚举作为键
-            tactile_data = {
-                TactileSensorId.THUMB: TactileInfo(
-                    state=bool(tpdo.tactile_state.state & (1 << 0)),
-                    resultant_force=tpdo.thumb_tactile.resultant_force,
-                    distributed_force=tpdo.thumb_tactile.sample_force,
-                ),
-                TactileSensorId.FOREFINGER: TactileInfo(
-                    state=bool(tpdo.tactile_state.state & (1 << 1)),
-                    resultant_force=tpdo.ff_tactile.resultant_force,
-                    distributed_force=tpdo.ff_tactile.sample_force,
-                ),
-                TactileSensorId.MIDDLE_FINGER: TactileInfo(
-                    state=bool(tpdo.tactile_state.state & (1 << 2)),
-                    resultant_force=tpdo.mf_tactile.resultant_force,
-                    distributed_force=tpdo.mf_tactile.sample_force,
-                ),
-                TactileSensorId.RING_FINGER: TactileInfo(
-                    state=bool(tpdo.tactile_state.state & (1 << 3)),
-                    resultant_force=tpdo.rf_tactile.resultant_force,
-                    distributed_force=tpdo.rf_tactile.sample_force,
-                ),
-                TactileSensorId.LITTLE_FINGER: TactileInfo(
-                    state=bool(tpdo.tactile_state.state & (1 << 4)),
-                    resultant_force=tpdo.lf_tactile.resultant_force,
-                    distributed_force=tpdo.lf_tactile.sample_force,
-                ),
-            }
-
-            return tactile_data
-
-        except DataReceiveError:
-            # 重新抛出数据接收错误
+            return data
+        except CommunicationError:
             raise
         except RuntimeError as e:
-            # 通信错误，转换为设备断连异常
-            raise DeviceDisconnectedError(
-                f"Failed to communicate with device: {e}",
-                reason=str(e)
-            ) from e
-
-    # ==================== 碰撞检测相关方法 ====================
+            raise CommunicationError(f"Failed to communicate with device: {e}") from e
 
     def set_safety_margin(self, margin: float) -> None:
-        """
-        设置碰撞检测的安全边距
+        """Set the collision detection safety margin.
 
         Args:
-            margin: 安全边距，范围 [0.0, 1.0]
-                    0.0 = 无边距（精确接触）
-                    1.0 = 最大边距（2mm）
+            margin: Safety margin in the range [0.0, 1.0].
+                0.0 = no margin (exact contact).
+                1.0 = maximum margin (2 mm).
 
         Raises:
-            ValueError: 如果 margin 超出 [0.0, 1.0] 范围
+            ValueError: If margin is outside [0.0, 1.0].
 
         Example:
             >>> hand = GHand()
-            >>> hand.open(CommType.ETHERCAT, "auto")
-            >>> hand.set_safety_margin(0.5)  # 设置1mm安全边距
+            >>> hand.open("auto")
+            >>> hand.set_safety_margin(0.5)  # 1 mm margin
         """
-        # 限制在有效范围内
         if margin < 0.0 or margin > 1.0:
             logger.warning(
-                f"Safety margin {margin} out of range [0.0, 1.0], clamping to valid range"
+                "Safety margin %s out of range [0.0, 1.0], clamping to valid range",
+                margin,
             )
             margin = max(0.0, min(1.0, margin))
 
         self._safety_margin = margin
-        logger.info(f"Collision safety margin set to {margin} ({margin * 2:.1f} mm)")
+        logger.info("Collision safety margin set to %s (%.1f mm)", margin, margin * 2)
 
-    def _ensure_collision_checker(self):
-        """确保碰撞检测器已初始化（延迟加载）"""
+    def _ensure_collision_checker(self) -> CollisionSDK:
+        """Lazy initialization of the collision checker."""
         if self._collision_checker is None:
             self._collision_checker = CollisionSDK()
         return self._collision_checker
 
-    def check_collision(self, joints: list[Joint]):
-        """
-        检查目标关节姿态是否会发生碰撞。
+    def check_collision(self, joints: list[JointCommand]) -> CollisionCheckResult:
+        """Check whether the target joint pose would cause a collision.
 
-        此方法仅进行碰撞检测并返回结果，不会执行任何关节运动。
-        如果检测到碰撞，返回的结果中会包含安全角度。
+        This method only performs collision detection and does not move the hand.
+        If a collision is detected, the result includes safe angles.
 
         Args:
-            joints: 关节列表。未指定的关节将使用当前关节角度（设备已连接）
-                    或 0°（设备未连接）填充。
+            joints: List of JointCommand objects. Unspecified joints are filled from
+                the current device state if connected, otherwise 0 degrees.
 
         Returns:
-            CollisionCheckResult: 碰撞检测结果，包含 has_collision、safe_angles 和
-                                   collision_pairs。
+            CollisionCheckResult with has_collision, safe_angles, and
+            collision_pairs.
 
         Example:
             >>> hand = GHand()
             >>> result = hand.check_collision(joints)
             >>> if result.has_collision:
-            ...     print("检测到碰撞，使用安全角度")
+            ...     print("Collision detected, using safe angles")
             ...     joints = hand._angles_to_joints(result.safe_angles)
         """
         collision_checker = self._ensure_collision_checker()
 
-        # 获取当前关节状态（用于填充未指定的关节）
         current_joints = None
         if self._opened:
             try:
                 current_joints = self.get_joints()
             except Exception:
-                logger.debug("无法获取当前关节状态，使用默认值（0度）")
+                logger.debug("Unable to get current joint state, using defaults (0 degrees)")
 
-        # 转换 Joint 列表为 numpy 数组
         target_angles = joints_to_nparray(joints, current_joints)
 
-        # 调用 CollisionSDK 进行碰撞检测
         result = collision_checker.collision_check(
-            target_angles=target_angles,
-            safety_margin=self._safety_margin
+            target_angles=np.radians(target_angles), safety_margin=self._safety_margin
         )
 
-        # 若未碰撞，将 safe_angles 设为 target_angles 便于调用方统一处理
         if not result.has_collision:
             result = CollisionCheckResult(
                 has_collision=False,
@@ -933,29 +669,31 @@ class GHand(object):
             )
         return result
 
-    def _joints_to_angles(self, joints: list[Joint], current_joints: list[Joint] | None = None):
-        """
-        将Joint列表转换为numpy数组（私有方法）
+    def _joints_to_angles(
+        self, joints: list[JointCommand], current_joints: list[JointData] | None = None
+    ) -> np.ndarray:
+        """Convert a list of Joints to a numpy array.
 
         Args:
-            joints: 关节列表
-            current_joints: 当前关节状态（用于填充未指定的关节）
+            joints: List of JointCommand objects.
+            current_joints: Optional current joint states for filling unspecified joints.
 
         Returns:
-            np.ndarray: 18个关节角度的数组
+            18-element numpy array of joint angles in degrees.
         """
         return joints_to_nparray(joints, current_joints)
 
-    def _angles_to_joints(self, angles, speed: int = 100, torque: int = 100) -> list[Joint]:
-        """
-        将numpy数组转换为Joint列表（私有方法）
+    def _angles_to_joints(
+        self, angles: np.ndarray, speed: int = 100, torque: int = 100
+    ) -> list[JointCommand]:
+        """Convert a numpy array to a list of JointCommand objects.
 
         Args:
-            angles: 18个关节角度的numpy数组
-            speed: 所有关节的速度参数
-            torque: 所有关节的力矩参数
+            angles: 18-element numpy array of joint angles in degrees.
+            speed: Speed percentage applied to all joints. Defaults to 100.
+            torque: Torque percentage applied to all joints. Defaults to 100.
 
         Returns:
-            list[Joint]: 18个Joint对象的列表
+            List of 18 JointCommand objects.
         """
         return nparray_to_joints(angles, speed, torque)

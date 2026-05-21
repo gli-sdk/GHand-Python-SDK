@@ -1,13 +1,15 @@
 import logging
-from ghand.ghand import GHand, CommType
-from ghand import configure_logging
+
+from ghand import ProductType, configure_logging
+from ghand.ghand import CommType, GHand
 
 # Configure SDK logging (shows connection state, errors, etc.)
 configure_logging(level=logging.INFO)
 
+
 def main():
-    hand = GHand()
-    connected = hand.open(CommType.ETHERCAT, "auto")
+    hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+    connected = hand.open("auto")
     if not connected:
         print("Connection failed")
         return
@@ -29,6 +31,7 @@ def main():
     print(f"\tMotor Driver Version: {motor_ver[0]}.{motor_ver[1]}.{motor_ver[2]}")
     print(f"\thand_state: {hand_info.state}")
     hand.close()
+
 
 if __name__ == "__main__":
     main()

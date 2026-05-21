@@ -1,26 +1,27 @@
-import pysoem
+import hashlib
+import logging
+import os
+import platform
+import tempfile
 import threading
 import time
-import logging
-import netifaces
-import os
-import tempfile
-import hashlib
-import platform
 
-from .ethercat_protocol import TPDO_SIZE
+import netifaces
+import pysoem
+
 
 logger = logging.getLogger("ghand.ethercat_driver")
 
 
 class EthercatClient(object):
-    def __init__(self):
-        """
-        初始化EtherCAT客户端对象
+    """Low-level EtherCAT client wrapping pysoem.
 
-        注意：已移除单例模式，每个 GHand 实例都有自己独立的 EthercatClient
-        这样可以支持多个网络接口同时连接不同的设备
-        """
+    Each :class:`GHand` instance owns an independent ``EthercatClient`` so that
+    multiple adapters can drive different hands concurrently.
+    """
+
+    def __init__(self):
+        """Initialize a new EthercatClient instance."""
         self._master = pysoem.Master()
         self._master.in_op = False
         self._master.do_check_state = False
@@ -29,35 +30,31 @@ class EthercatClient(object):
         self._ch_thread_stop_event = threading.Event()
         self._connected = False
         self._slave = None
-        # 添加连接状态标志
+        # Connection health flag
         self._connection_lost = False
-        # 线程安全锁
+        # Thread-safety lock
         self._data_lock = threading.RLock()
-        # 设备独占锁相关
+        # Exclusive adapter lock
         self._lock_file = None
         self._lock_file_path = None
 
     def __del__(self):
-        """
-        析构函数，确保对象销毁时释放锁
-        """
+        """Destructor — ensures the adapter lock is released."""
         try:
             self._release_lock()
         except Exception:
-            pass  # 忽略析构时的任何异常
+            pass  # ignore errors during destruction
 
     def _get_lock_file_path(self, adapter_name: str) -> str:
-        """
-        生成网卡锁文件路径
-        使用网卡名而不是 device_id
+        """Build the filesystem path for the adapter lock file.
 
         Args:
-            adapter_name (str): 网卡名称
+            adapter_name: Network adapter name.
 
         Returns:
-            str: 锁文件路径
+            Absolute path to the lock file.
         """
-        # 使用网卡名的哈希值作为锁文件名，避免特殊字符问题
+        # Use an MD5 hash of the adapter name to avoid special-character issues
         adapter_hash = hashlib.md5(adapter_name.encode()).hexdigest()
         system = platform.system()
         if system == "Windows":
@@ -67,90 +64,78 @@ class EthercatClient(object):
         return os.path.join(lock_dir, f"ghand_ethernet_{adapter_hash}.lock")
 
     def _acquire_lock(self, adapter_name: str) -> bool:
-        """
-        尝试获取网卡独占锁
+        """Acquire an exclusive filesystem lock for the given adapter.
 
         Args:
-            adapter_name (str): 网卡名称
+            adapter_name: Network adapter name.
 
         Returns:
-            bool: 成功获取锁返回True，否则返回False
+            True if the lock was acquired, False if another process holds it.
         """
         lock_path = self._get_lock_file_path(adapter_name)
         try:
-            # 尝试以独占模式创建/打开锁文件
             if platform.system() == "Windows":
-                # Windows: 尝试以独占写入模式打开文件
                 try:
                     import msvcrt
+
                     self._lock_file = open(lock_path, 'w')
-                    # 尝试锁定文件
                     msvcrt.locking(self._lock_file.fileno(), msvcrt.LK_NBLCK, 1)
-                    # 写入当前进程信息
                     self._lock_file.write(f"{os.getpid()}\n{adapter_name}\n")
                     self._lock_file.flush()
                     self._lock_file_path = lock_path
                     return True
                 except (IOError, OSError):
-                    # 文件已被锁定
                     if self._lock_file:
                         self._lock_file.close()
                     self._lock_file = None
-                    logger.warning(f"Adapter {adapter_name} is already locked by another process")
+                    logger.warning("Adapter %s is already locked by another process", adapter_name)
                     return False
             else:
-                # Linux/Unix: 使用flock进行文件锁定
                 import fcntl
+
                 self._lock_file = open(lock_path, 'w')
                 try:
                     fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    # 写入当前进程信息
                     self._lock_file.write(f"{os.getpid()}\n{adapter_name}\n")
                     self._lock_file.flush()
                     self._lock_file_path = lock_path
                     return True
                 except (IOError, OSError):
-                    # 文件已被锁定
                     if self._lock_file:
                         self._lock_file.close()
                     self._lock_file = None
-                    logger.warning(f"Adapter {adapter_name} is already locked by another process")
+                    logger.warning("Adapter %s is already locked by another process", adapter_name)
                     return False
         except Exception as e:
-            logger.error(f"Error acquiring lock for adapter {adapter_name}: {e}")
+            logger.error("Error acquiring lock for adapter %s: %s", adapter_name, e)
             if self._lock_file:
                 self._lock_file.close()
             self._lock_file = None
             return False
 
     def _release_lock(self):
-        """
-        释放网卡独占锁
-        """
+        """Release the exclusive adapter lock and clean up the lock file."""
         if self._lock_file is not None:
             try:
                 lock_path = self._lock_file_path
-                # 关闭文件（这会自动释放锁）
                 self._lock_file.close()
-                # 删除锁文件
                 if lock_path and os.path.exists(lock_path):
                     try:
                         os.remove(lock_path)
                     except (OSError, IOError):
-                        pass  # 忽略删除失败
+                        pass
             except Exception as e:
-                logger.error(f"Error releasing lock: {e}")
+                logger.error("Error releasing lock: %s", e)
             finally:
                 self._lock_file = None
                 self._lock_file_path = None
 
     @staticmethod
     def _check_slave(slave):
-        """
-        检查从设备状态并进行相应处理
+        """Monitor and recover a single slave's state.
 
         Args:
-            slave: 从设备对象
+            slave: pysoem slave object.
         """
         if slave.state == (pysoem.SAFEOP_STATE + pysoem.STATE_ERROR):
             slave.state = pysoem.SAFEOP_STATE + pysoem.STATE_ACK
@@ -175,10 +160,7 @@ class EthercatClient(object):
                 slave.is_lost = False
 
     def _processdata_thread(self):
-        """
-        处理数据的线程函数，负责发送和接收过程数据
-        """
-        # 添加计数器用于跟踪无效工作计数器的数量
+        """Background thread that sends and receives cyclic process data."""
         invalid_wkc_count = 0
         max_invalid_wkc_count = 30
 
@@ -188,34 +170,33 @@ class EthercatClient(object):
                     self._master.send_processdata()
                     self._actual_wkc = self._master.receive_processdata(15_000)
                 if self._actual_wkc < 1:
-                    logger.warning(f"Invalid working counter (WKC): {self._actual_wkc}")
+                    logger.warning("Invalid working counter (WKC): %s", self._actual_wkc)
                     invalid_wkc_count += 1
-                    # 当无效计数超过阈值时，触发断开连接
                     if invalid_wkc_count >= max_invalid_wkc_count:
-                        logger.error(f"Too many invalid WKC counts ({invalid_wkc_count}), disconnecting...")
-                        # 设置连接丢失标志
+                        logger.error(
+                            "Too many invalid WKC counts (%s), disconnecting...",
+                            invalid_wkc_count,
+                        )
                         self._connection_lost = True
-                        # 在另一个线程中执行断开连接操作，避免死锁
+                        # Spawn a detached thread to avoid dead-lock
                         threading.Thread(target=self.disconnect).start()
-                        # 停止当前线程
                         self._pd_thread_stop_event.set()
                         break
                 else:
-                    # 重置计数器
                     invalid_wkc_count = 0
             except Exception as e:
-                logger.error(f"Error in process data thread: {e}")
+                logger.error("Error in process data thread: %s", e)
             time.sleep(0.01)
 
     def _check_thread(self):
-        """
-        检查线程函数，负责监控和检查从设备状态
-        """
+        """Background thread that monitors slave state and triggers recovery."""
         while not self._ch_thread_stop_event.is_set():
             try:
                 need_check = False
                 with self._data_lock:
-                    if self._master.in_op and (self._actual_wkc < 1 or self._master.do_check_state):
+                    if self._master.in_op and (
+                        self._actual_wkc < 1 or self._master.do_check_state
+                    ):
                         self._master.do_check_state = False
                         self._master.read_state()
                         need_check = True
@@ -227,18 +208,17 @@ class EthercatClient(object):
                                 self._master.do_check_state = True
                                 self._check_slave(slave)
             except Exception as e:
-                logger.error(f"Error in check thread: {e}")
+                logger.error("Error in check thread: %s", e)
             time.sleep(0.01)
 
     def recv_data(self) -> bytes:
-        """
-        接收数据
+        """Receive the latest TPDO bytes from the slave.
 
         Returns:
-            bytes: 从设备输入数据
+            Raw input process data.
 
         Raises:
-            RuntimeError: 如果没有连接从设备或连接丢失
+            RuntimeError: If the device is disconnected.
         """
         with self._data_lock:
             if self._connection_lost:
@@ -249,137 +229,137 @@ class EthercatClient(object):
                 raise RuntimeError("Device disconnected")
 
     def send_data(self, data: bytes):
-        """
-        发送数据
+        """Send RPDO bytes to the slave.
 
         Args:
-            data (bytes): 要发送的数据
+            data: Raw output process data.
 
         Raises:
-            RuntimeError: 如果没有连接从设备或连接丢失
+            RuntimeError: If the device is disconnected.
         """
         with self._data_lock:
             if self._connection_lost:
                 raise RuntimeError("Device disconnected")
             if self._slave is not None:
-                logger.debug(f"Sending {len(data)} bytes: \n{' '.join(f'{b:02x}' for b in data)}")
+                hex_str = ' '.join(f'{b:02x}' for b in data)
+                logger.debug("Sending %d bytes:\n%s", len(data), hex_str)
                 self._slave.output = data
             else:
                 raise RuntimeError("Device disconnected")
 
     def search(self) -> list[str]:
-        """
-        搜索网络接口设备
+        """Discover available network interfaces.
 
         Returns:
-            list[str]: 返回网络接口设备ID列表
+            List of adapter IDs.
         """
         logger.info("Searching for network interfaces...")
         ids = netifaces.interfaces()
-        # Linux 上直接使用接口名，Windows 需要 NPF_ 前缀
         if platform.system() == 'Windows':
             for i in range(len(ids)):
                 ids[i] = "\\Device\\NPF_" + ids[i]
-        # Linux/macOS: 直接使用接口名，如 eth0, ens33 等
-        logger.info(f"Found {len(ids)} network interface(s)")
+        logger.info("Found %s network interface(s)", len(ids))
         return ids
 
-    def connect(self, id):
-        """
-        连接指定网卡名的设备
+    def connect(self, id) -> bool:
+        """Open the specified adapter and initialize the EtherCAT master.
 
         Args:
-            id (str): 网卡名称
+            id: Adapter ID (interface name).
 
         Returns:
-            bool: 连接成功返回True，失败返回False
+            True if the adapter is opened and at least one slave is found.
         """
         if self._connected:
             return True
 
-        # 步骤1：尝试获取网卡独占锁（防止同SDK多进程）
         if not self._acquire_lock(id):
-            logger.error(f"Failed to connect: adapter {id} is already locked by another process")
+            logger.error("Failed to connect: adapter %s is already locked by another process", id)
             return False
 
         try:
-            # 步骤2：打开网卡并初始化
             self._master.open(id)
 
             if not self._master.config_init() > 0:
                 self._master.close()
-                self._release_lock()  # 连接失败时释放锁
+                self._release_lock()
                 return False
             self._connected = True
             self._slave = self._master.slaves[0]
             self._slave.is_lost = False
-            self._master.read_state()  # 刷新状态
+            self._master.read_state()
             return True
         except Exception:
-            logger.error(f"Error connecting to device {id}")
-            self._release_lock()  # 异常时释放锁
+            logger.error("Error connecting to device %s", id)
+            self._release_lock()
             return False
 
-    def run(self):
-        """
-        启动EtherCAT主站并进入操作状态
+    def run(
+        self,
+        expected_input_size: int | None = None,
+        expected_output_size: int | None = None,
+    ) -> bool:
+        """Transition the EtherCAT master to OP state and start cyclic threads.
+
+        Args:
+            expected_input_size: Expected TPDO size in bytes. If None, size check is skipped.
+            expected_output_size: Expected RPDO size in bytes. If None, size check is skipped.
 
         Returns:
-            bool: 启动成功返回True，失败返回False
+            True if the master reaches OP state successfully.
         """
         if not self._connected or self._slave is None:
             logger.error("Not connected or no slave configured")
             return False
 
-        expected_input_size = TPDO_SIZE
-        expected_output_size = 80
-
-        # 进入初始状态
         if self._master.state != pysoem.INIT_STATE:
             self._master.state = pysoem.INIT_STATE
 
-        # 配置映射并等待完成
         try:
-            # 确保从站在INIT状态才能进行映射
             if len(self._master.slaves) > 0:
                 slave = self._master.slaves[0]
 
                 if slave.state != pysoem.INIT_STATE:
                     slave.state = pysoem.INIT_STATE
                     slave.write_state()
-                    # 等待状态转换完成
                     if slave.state_check(pysoem.INIT_STATE, timeout=100_000) != pysoem.INIT_STATE:
-                        logger.error(f"Failed to enter INIT state. Current state: {slave.state}")
+                        logger.error("Failed to enter INIT state. Current state: %s", slave.state)
                         self._master.close()
                         return False
 
-                # 进行配置初始化
                 config_result = self._master.config_init()
                 if config_result <= 0:
-                    logger.error(f"Config init failed with result: {config_result}")
+                    logger.error("Config init failed with result: %s", config_result)
                     self._master.close()
                     return False
 
                 self._master.config_map()
 
-                if len(slave.input) != expected_input_size or len(
-                    slave.output
-                ) != expected_output_size:
-                    logger.error("Expected size error!")
+                if expected_input_size is not None and len(slave.input) != expected_input_size:
+                    logger.error("Expected input size error!")
                     logger.error(
-                        f"Expected input size: {expected_input_size}, "
-                        f"actual input size: {len(slave.input)}"
+                        "Expected input size: %s, actual input size: %s",
+                        expected_input_size,
+                        len(slave.input),
                     )
+                    self._master.close()
+                    return False
+
+                if expected_output_size is not None and len(slave.output) != expected_output_size:
+                    logger.error("Expected output size error!")
                     logger.error(
-                        f"Expected output size: {expected_output_size}, "
-                        f"actual output size: {len(slave.output)}"
+                        "Expected output size: %s, actual output size: %s",
+                        expected_output_size,
+                        len(slave.output),
                     )
+                    self._master.close()
+                    return False
             else:
                 logger.warning("No slaves found")
                 self._master.close()
                 return False
         except Exception as e:
-            logger.error(f"Failed to configure PDO mapping: {e}")
+            logger.error("Failed to configure PDO mapping: %s", e)
             self._master.close()
             return False
 
@@ -387,23 +367,22 @@ class EthercatClient(object):
 
             logger.error("Failed to enter SAFEOP state")
             for i, slave in enumerate(self._master.slaves):
-                logger.error(f'Slave {i}: {slave.name}')
-                logger.error(f'  Current state: {slave.state}')
-                logger.error(f'  Expected state: {pysoem.SAFEOP_STATE}')
+                logger.error("Slave %s: %s", i, slave.name)
+                logger.error("  Current state: %s", slave.state)
+                logger.error("  Expected state: %s", pysoem.SAFEOP_STATE)
                 logger.error(
-                    f'  AL status code: {hex(slave.al_status)} '
-                    f'({pysoem.al_status_code_to_string(slave.al_status)})'
+                    "  AL status code: %s (%s)",
+                    hex(slave.al_status),
+                    pysoem.al_status_code_to_string(slave.al_status),
                 )
-                logger.error(f'  Input size: {len(slave.input)} bytes')
-                logger.error(f'  Output size: {len(slave.output)} bytes')
+                logger.error("  Input size: %s bytes", len(slave.input))
+                logger.error("  Output size: %s bytes", len(slave.output))
             self._master.close()
             return False
 
-        # 设置OP状态
         self._master.state = pysoem.OP_STATE
         self._master.write_state()
 
-        # 启动处理线程
         self.check_thread = threading.Thread(target=self._check_thread)
         self.check_thread.daemon = True
         self.check_thread.start()
@@ -411,15 +390,12 @@ class EthercatClient(object):
         self.proc_thread.daemon = True
         self.proc_thread.start()
 
-        # 等待进入OP状态，增加超时时间
-        self._master.read_state()  # 刷新状态
+        self._master.read_state()
         if self._master.state_check(pysoem.OP_STATE, timeout=500_000) != pysoem.OP_STATE:
             logger.error("Failed to reach OP state")
-            # 如果无法进入OP状态，停止线程
             self._pd_thread_stop_event.set()
             self._ch_thread_stop_event.set()
-            # 等待线程结束
-            thread_join_timeout = 5.0  # 增加超时时间
+            thread_join_timeout = 5.0
             if hasattr(self, 'proc_thread') and self.proc_thread.is_alive():
                 self.proc_thread.join(timeout=thread_join_timeout)
             if hasattr(self, 'check_thread') and self.check_thread.is_alive():
@@ -432,64 +408,53 @@ class EthercatClient(object):
         return True
 
     def disconnect(self):
-        """
-        断开设备连接并清理资源
-
-        Returns:
-            None
-        """
+        """Stop cyclic threads, set the slave to INIT, and close the master."""
         if self._connected:
             self._pd_thread_stop_event.set()
             self._ch_thread_stop_event.set()
-            # 只有在线程存在且活跃时才join
-            thread_join_timeout = 5.0  # 增加超时时间
+            thread_join_timeout = 5.0
             if hasattr(self, 'proc_thread') and self.proc_thread.is_alive():
                 self.proc_thread.join(timeout=thread_join_timeout)
             if hasattr(self, 'check_thread') and self.check_thread.is_alive():
                 self.check_thread.join(timeout=thread_join_timeout)
 
-            # 重置线程停止事件，为下次连接做准备
             self._pd_thread_stop_event.clear()
             self._ch_thread_stop_event.clear()
 
             with self._data_lock:
-                # 先将从站切换为init状态，再关闭主站
                 try:
                     if self._slave:
-                        # 将从站状态设置为INIT状态
                         self._slave.state = pysoem.INIT_STATE
                         self._slave.write_state()
-                        time.sleep(0.01)  # 等待状态切换完成
+                        time.sleep(0.01)
                 except Exception as e:
-                    # 如果切换失败，记录警告但继续关闭主站
-                    logger.warning(f"Failed to switch slave to INIT state: {e}")
+                    logger.warning("Failed to switch slave to INIT state: %s", e)
 
-                # 直接关闭主站
                 if self._master:
                     self._master.close()
                     logger.info("Master closed")
                 self._slave = None
                 self._connected = False
 
-            # 释放设备独占锁
             self._release_lock()
 
-            # 重置所有状态标志，为下次连接做准备
             self._actual_wkc = 0
             self._connection_lost = False
             self._master.in_op = False
             self._master.do_check_state = False
 
     def sdo_read(self, index, subindex=0):
-        """
-        读取SDO对象字典中的值
+        """Read a value from the slave's object dictionary via SDO.
 
         Args:
-            index: 对象字典索引
-            subindex: 子索引，默认为0
+            index: Object dictionary index.
+            subindex: Object dictionary sub-index. Defaults to 0.
 
         Returns:
-            读取到的数据
+            Raw bytes read from the slave.
+
+        Raises:
+            RuntimeError: If the device is disconnected.
         """
         with self._data_lock:
             if self._slave is None:
@@ -497,16 +462,18 @@ class EthercatClient(object):
             return self._slave.sdo_read(index, subindex)
 
     def sdo_write(self, index, subindex, value):
-        """
-        写入SDO对象字典中的值
+        """Write a value to the slave's object dictionary via SDO.
 
         Args:
-            index: 对象字典索引
-            subindex: 子索引
-            value: 要写入的值
+            index: Object dictionary index.
+            subindex: Object dictionary sub-index.
+            value: Raw bytes to write.
 
         Returns:
-            写入操作的结果
+            Result of the SDO write operation.
+
+        Raises:
+            RuntimeError: If the device is disconnected.
         """
         with self._data_lock:
             if self._slave is None:

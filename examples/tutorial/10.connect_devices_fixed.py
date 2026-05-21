@@ -1,125 +1,131 @@
 """
-示例：连接两只灵巧手
+Example: Connecting two dexterous hands
 
-现在 EthercatClient 已经移除了单例模式，可以直接创建多个 GHand 实例
-来连接多个设备。
+Now that EthercatClient has removed the singleton pattern, you can directly
+create multiple GHand instances to connect to multiple devices.
 """
-import time
-import math
+
 import logging
-from ghand.ghand import GHand, CommType, Joint, JointId
-from ghand import configure_logging
+import time
+
+from ghand import ProductType, configure_logging
+from ghand.ghand import CommType, GHand, JointCommand, JointId
+from ghand.types import GHandError
 
 # Configure SDK logging
 configure_logging(level=logging.INFO)
 
 
 def main():
-    """连接并控制两只灵巧手"""
+    """Connect and control two dexterous hands"""
 
-    # 创建并连接第一只手
-    print("正在连接第一只灵巧手...")
-    hand1 = GHand()
-    connected1 = hand1.open(
-        CommType.ETHERCAT, "\\Device\\NPF_{B1A930DF-53B0-483A-ABB8-6C3146F1FC2D}"
-    )
+    # Create and connect first hand
+    print("Connecting first dexterous hand...")
+    hand1 = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+    connected1 = hand1.open("\\Device\\NPF_{B1A930DF-53B0-483A-ABB8-6C3146F1FC2D}")
     if not connected1:
-        print("第一只手连接失败")
+        print("First hand connection failed")
         return
 
-        # 创建并连接第二只手
-    print("正在连接第二只灵巧手...")
-    hand2 = GHand()
-    connected2 = hand2.open(
-        CommType.ETHERCAT, "\\Device\\NPF_{5539C758-F9F9-482D-B319-1760CE5958A6}"
-    )
+        # Create and connect second hand
+    print("Connecting second dexterous hand...")
+    hand2 = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+    connected2 = hand2.open("\\Device\\NPF_{5539C758-F9F9-482D-B319-1760CE5958A6}")
     if not connected2:
-        print("第二只手连接失败")
+        print("Second hand connection failed")
         hand1.close()
         return
 
-    # logger.info("两只灵巧手连接成功！")
+    # logger.info("Two dexterous hands connected successfully!")
 
-    # 获取第一只手的信息
+    # Get info for first hand
     try:
         ver1 = hand1.get_firmware_version()
         name1 = hand1.get_device_name()
         hw_ver1 = hand1.get_hardware_version()
         serial1 = hand1.get_serial_number()
         type1 = hand1.get_hand_type()
-        print(
-            f"第一只手 - 名称: {name1}, 硬件版本: {hw_ver1}, "
-            f"固件版本: {ver1}, 类型: {type1.value}, "
-            f"序列号: {serial1}"
-        )
-    except Exception as e:
-        print(f"获取第一只手信息失败: {e}")
+        print(f"First hand - Name: {name1}, HW: {hw_ver1}, "
+              f"FW: {ver1}, Type: {type1.value}, "
+              f"SN: {serial1}")
+    except GHandError as e:
+        print(f"Failed to get first hand info: {e}")
 
-    # 获取第二只手的信息
+    # Get info for second hand
     try:
         ver2 = hand2.get_firmware_version()
         name2 = hand2.get_device_name()
         hw_ver2 = hand2.get_hardware_version()
         serial2 = hand2.get_serial_number()
         type2 = hand2.get_hand_type()
-        print(
-            f"第二只手 - 名称: {name2}, 硬件版本: {hw_ver2}, "
-            f"固件版本: {ver2}, 类型: {type2.value}, "
-            f"序列号: {serial2}"
-        )
-    except Exception as e:
-        print(f"获取第二只手信息失败: {e}")
+        print(f"Second hand - Name: {name2}, HW: {hw_ver2}, "
+              f"FW: {ver2}, Type: {type2.value}, "
+              f"SN: {serial2}")
+    except GHandError as e:
+        print(f"Failed to get second hand info: {e}")
 
-    print("灵巧手已就绪，可以进行控制操作")
+    print("Dexterous hands ready, control operations can begin")
 
-    # 在这里添加你的控制逻辑...
-    # 例如：
+    # Add your control logic here...
+    # For example:
     # hand1.move_joints([...])
     # hand2.move_joints([...])
     joints1 = []
 
-    joints1.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(0), speed=100, torque=100))   #角度范围为:0~75(度)
-    joints1.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(50), speed=100, torque=100))   #角度范围为:0~55(度)
-    joints1.append(Joint(id=JointId.THUMB_SWING, angle=math.radians(20), speed=100, torque=100))   #角度范围为:0~90(度)
-    joints1.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(0), speed=100, torque=100))   #角度范围为:0~90(度)
-    joints1.append(Joint(id=JointId.FF_PIP, angle=math.radians(0), speed=100, torque=100))   #角度范围为:0~75(度)
-    joints1.append(Joint(id=JointId.FF_MCP, angle=math.radians(0), speed=100, torque=100))   #角度范围为:0~70(度)
+    joints1.append(JointCommand(id=JointId.THUMB_PIP, angle=0, speed=100,
+                                torque=100))  # Angle range: 0~75 (degrees)
+    joints1.append(JointCommand(id=JointId.THUMB_MCP, angle=50, speed=100,
+                                torque=100))  # Angle range: 0~55 (degrees)
+    joints1.append(JointCommand(id=JointId.THUMB_SWING, angle=20, speed=100,
+                                torque=100))  # Angle range: 0~90 (degrees)
+    joints1.append(JointCommand(id=JointId.THUMB_ROTATION, angle=0, speed=100,
+                                torque=100))  # Angle range: 0~90 (degrees)
+    joints1.append(JointCommand(id=JointId.FF_PIP, angle=0, speed=100,
+                                torque=100))  # Angle range: 0~75 (degrees)
+    joints1.append(JointCommand(id=JointId.FF_MCP, angle=0, speed=100,
+                                torque=100))  # Angle range: 0~70 (degrees)
 
     result = hand1.move_joints(joints1)
     if result:
-        print("指令1发送成功")
+        print("Command 1 sent successfully")
         time.sleep(0.7)
-        current_joints  = hand1.get_joints()
+        current_joints = hand1.get_joints()
         if current_joints:
-            joint =current_joints[2]
+            joint = current_joints[2]
             print(
-                f"  {JointId(joint.id).name:<15}- 角度: {math.degrees(joint.angle):.2f} 度,\t速度: {joint.speed},\t扭矩: {joint.torque}"
+                f"  {JointId(joint.id).name:<15}- Angle: {joint.angle:.2f} deg,\tSpeed: {joint.speed},\tTorque: {joint.torque}"
             )
 
-    joints1.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(0), speed=100, torque=100))   #角度范围为:0~75(度)
-    joints1.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(0), speed=100, torque=100))   #角度范围为:0~55(度)
-    joints1.append(Joint(id=JointId.THUMB_SWING, angle=math.radians(20), speed=100, torque=100))   #角度范围为:0~90(度)
-    joints1.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(0), speed=100, torque=100))   #角度范围为:0~90(度)
-    joints1.append(Joint(id=JointId.FF_PIP, angle=math.radians(50), speed=100, torque=100))   #角度范围为:0~75(度)
-    joints1.append(Joint(id=JointId.FF_MCP, angle=math.radians(50), speed=100, torque=100))   #角度范围为:0~70(度)
+    joints1.append(JointCommand(id=JointId.THUMB_PIP, angle=0, speed=100,
+                                torque=100))  # Angle range: 0~75 (degrees)
+    joints1.append(JointCommand(id=JointId.THUMB_MCP, angle=0, speed=100,
+                                torque=100))  # Angle range: 0~55 (degrees)
+    joints1.append(JointCommand(id=JointId.THUMB_SWING, angle=20, speed=100,
+                                torque=100))  # Angle range: 0~90 (degrees)
+    joints1.append(JointCommand(id=JointId.THUMB_ROTATION, angle=0, speed=100,
+                                torque=100))  # Angle range: 0~90 (degrees)
+    joints1.append(JointCommand(id=JointId.FF_PIP, angle=50, speed=100,
+                                torque=100))  # Angle range: 0~75 (degrees)
+    joints1.append(JointCommand(id=JointId.FF_MCP, angle=50, speed=100,
+                                torque=100))  # Angle range: 0~70 (degrees)
 
     result = hand2.move_joints(joints1)
     if result:
-        print("指令1发送成功")
+        print("Command 1 sent successfully")
         time.sleep(0.7)
-        current_joints2  = hand2.get_joints()
+        current_joints2 = hand2.get_joints()
         if current_joints2:
-            joint =current_joints2[7]
+            joint = current_joints2[7]
             print(
-                f"  {JointId(joint.id).name:<15}- 角度: {math.degrees(joint.angle):.2f} 度,\t速度: {joint.speed},\t扭矩: {joint.torque}"
+                f"  {JointId(joint.id).name:<15}- Angle: {joint.angle:.2f} deg,\tSpeed: {joint.speed},\tTorque: {joint.torque}"
             )
 
-    # 程序结束时关闭连接
-    # 注意：也可以使用上下文管理器来自动关闭
-    print("关闭所有连接...")
+    # Close connections when program ends
+    # Note: Context managers can also be used for automatic closing
+    print("Closing all connections...")
     hand1.close()
     hand2.close()
-    print("完成")
+    print("Complete")
 
 
 if __name__ == "__main__":

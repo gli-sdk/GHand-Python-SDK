@@ -1,109 +1,152 @@
 """
-在线碰撞检测示例
+Online collision detection example
 
-演示如何将碰撞检测与关节运动解耦使用：
-1. 调用 check_collision() 检测目标姿态
-2. 检查结果并打印角度对比
-3. 调用 move_joints() 执行运动（或在碰撞时自主选择是否运动）
+Demonstrates how to decouple collision detection from joint motion:
+1. Call check_collision() to detect target pose
+2. Check result and print angle comparison
+3. Call move_joints() to execute motion (or choose not to move when collision detected)
 """
-import time
-import math
-import logging
-from ghand import configure_logging, joints_to_nparray, nparray_to_joints
-from ghand import GHand, CommType, Joint, JointId
 
-# 配置日志
+import logging
+import time
+
+from ghand import (
+    ProductType,
+    CommType,
+    GHand,
+    JointCommand,
+    JointId,
+    configure_logging,
+    joints_to_nparray,
+    nparray_to_joints,
+)
+from ghand.types import GHandError
+
+# Configure logging
 configure_logging(level=logging.INFO)
 
-# 默认速度和力矩
+# Default speed and torque
 DEFAULT_SPEED = 100
 DEFAULT_TORQUE = 100
 
 
 def main():
-    print("===== 枭尧灵巧手 SDK - 在线碰撞检测演示 =====\n")
+    print("===== GHand SDK - Online Collision Detection Demo =====\n")
 
-    hand = GHand()
+    hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
 
     try:
-        print("正在连接设备...")
-        connected = hand.open(CommType.ETHERCAT, "auto")
+        print("Connecting to device...")
+        connected = hand.open("auto")
 
         if not connected:
-            print("[ERROR] 设备连接失败")
+            print("[ERROR] Device connection failed")
             return
 
-        print("[OK] 设备连接成功\n")
+        print("[OK] Device connected successfully\n")
 
-        # 设置安全边距
+        # Set safety margin
         hand.set_safety_margin(1)
-        print("[OK] 安全边距已设置为 0.3mm\n")
+        print("[OK] Safety margin set to 0.3mm\n")
 
-        # 测试：尝试可能导致碰撞的姿态
-        print("--- 测试：检测碰撞并规避 ---")
+        # Test: attempt pose that may cause collision
+        print("--- Test: Detect collision and avoid ---")
         target_joints = [
-            Joint(id=JointId.THUMB_PIP,angle=math.radians(66),speed=DEFAULT_SPEED, torque=DEFAULT_TORQUE ),
-            Joint(id=JointId.THUMB_SWING, angle=math.radians(52),speed=DEFAULT_SPEED, torque=DEFAULT_TORQUE),
-            Joint(id=JointId.THUMB_ROTATION,angle=math.radians(-10),speed=DEFAULT_SPEED,torque=DEFAULT_TORQUE),
-            Joint(id=JointId.FF_PIP,angle=math.radians(70),speed=DEFAULT_SPEED,torque=DEFAULT_TORQUE),
-            Joint(id=JointId.FF_MCP, angle=math.radians(70), speed=DEFAULT_SPEED, torque=DEFAULT_TORQUE),
+            JointCommand(
+                id=JointId.THUMB_PIP,
+                angle=66,
+                speed=DEFAULT_SPEED,
+                torque=DEFAULT_TORQUE,
+            ),
+            JointCommand(
+                id=JointId.THUMB_SWING,
+                angle=52,
+                speed=DEFAULT_SPEED,
+                torque=DEFAULT_TORQUE,
+            ),
+            JointCommand(
+                id=JointId.THUMB_ROTATION,
+                angle=-10,
+                speed=DEFAULT_SPEED,
+                torque=DEFAULT_TORQUE,
+            ),
+            JointCommand(
+                id=JointId.FF_PIP,
+                angle=70,
+                speed=DEFAULT_SPEED,
+                torque=DEFAULT_TORQUE,
+            ),
+            JointCommand(
+                id=JointId.FF_MCP,
+                angle=70,
+                speed=DEFAULT_SPEED,
+                torque=DEFAULT_TORQUE,
+            ),
         ]
 
-        # 第一步：进行碰撞检测（不执行运动）
+        # Step 1: Perform collision detection (without executing motion)
         result = hand.check_collision(target_joints)
 
         if result.has_collision:
-            print("检测到碰撞！")
+            print("Collision detected!")
             collision_info = " <-> ".join(result.collision_pairs or ["unknown"])
-            print(f"碰撞对: {collision_info}\n")
+            print(f"Collision pairs: {collision_info}\n")
 
-            # 打印目标角度和安全角度的对比
-            target_angles = joints_to_nparray(target_joints,hand.get_joints())
-            print("=== 碰撞检测 - 角度对比 (单位: 度) ===")
+            # Print comparison of target and safe angles
+            target_angles = joints_to_nparray(target_joints, hand.get_joints())
+            print("=== Collision Detection - Angle Comparison (unit: degrees) ===")
             print("-" * 70)
-            print(f"{'关节名称':<18} {'目标角度':<12} {'安全角度':<12}")
+            print(f"{'Joint Name':<18} {'Target Angle':<12} {'Safe Angle':<12}")
             print("-" * 70)
             for i in range(18):
-                if JointId(i) in (JointId.THUMB_DIP, JointId.FF_DIP, JointId.MF_DIP, JointId.RF_DIP, JointId.LF_DIP):
+                if JointId(i) in (
+                        JointId.THUMB_DIP,
+                        JointId.FF_DIP,
+                        JointId.MF_DIP,
+                        JointId.RF_DIP,
+                        JointId.LF_DIP,
+                ):
                     continue
                 joint_name = JointId(i).name
-                target_deg = math.degrees(target_angles[i])
-                safe_deg = math.degrees(result.safe_angles[i])
+                target_deg = target_angles[i]
+                safe_deg = result.safe_angles[i]
                 print(f"{joint_name:<25} {target_deg:<12.2f} {safe_deg:<12.2f}")
             print("-" * 70)
             print()
 
-            # 第二步：使用安全角度运动
+            # Step 2: Use safe angles for motion
             safe_joints = nparray_to_joints(
                 result.safe_angles,
                 speed=DEFAULT_SPEED,
                 torque=DEFAULT_TORQUE,
             )
-            print("使用安全角度执行运动...")
+            print("Executing motion with safe angles...")
             success = hand.move_joints(safe_joints)
         else:
-            print("未检测到碰撞，直接使用目标角度运动。")
+            print("No collision detected, using target angles directly.")
             success = hand.move_joints(target_joints)
 
         if success:
             time.sleep(2)
 
-        # 获取当前关节状态并打印
+        # Get current joint states and print
         current_joints = hand.get_joints()
-        print(f"当前角度：拇指PIP={math.degrees(current_joints[JointId.THUMB_PIP.value].angle):.1f}°")
-        print(f"当前角度：拇指SWING={math.degrees(current_joints[JointId.THUMB_SWING.value].angle):.1f}°")
-        print(f"当前角度：拇指ROTATION={math.degrees(current_joints[JointId.THUMB_ROTATION.value].angle):.1f}°")
-        print(f"当前角度：食指PIP={math.degrees(current_joints[JointId.FF_PIP.value].angle):.1f}°")
-        print(f"当前角度：食指MCP={math.degrees(current_joints[JointId.FF_MCP.value].angle):.1f}°")
+        print(f"Current angle: Thumb PIP={current_joints[JointId.THUMB_PIP.value].angle:.1f}°")
+        print(f"Current angle: Thumb SWING={current_joints[JointId.THUMB_SWING.value].angle:.1f}°")
+        print(
+            f"Current angle: Thumb ROTATION={current_joints[JointId.THUMB_ROTATION.value].angle:.1f}°"
+        )
+        print(f"Current angle: Index PIP={current_joints[JointId.FF_PIP.value].angle:.1f}°")
+        print(f"Current angle: Index MCP={current_joints[JointId.FF_MCP.value].angle:.1f}°")
 
-        print("\n===== 演示完成 =====")
+        print("\n===== Demo complete =====")
 
-    except Exception as e:
-        print(f"\n[ERROR] 错误: {type(e).__name__}: {e}")
+    except GHandError as e:
+        print(f"\n[ERROR] Error: {type(e).__name__}: {e}")
 
     finally:
         hand.close()
-        print("\n设备已断开连接")
+        print("\nDevice disconnected")
 
 
 if __name__ == "__main__":

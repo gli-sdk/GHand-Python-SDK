@@ -1,22 +1,17 @@
-import time
-import math
 import logging
-from ghand.ghand import GHand, CommType, Joint, JointId
-from ghand.types import State, ErrorCode
-from ghand import configure_logging
-from ghand.types import (
-    DeviceDisconnectedError,
-    DeviceFaultError,
-    JointFaultError,
-    DataReceiveError
-)
+import time
+
+from ghand import ProductType, configure_logging
+from ghand.ghand import CommType, GHand, JointCommand, JointId
+from ghand.types import ErrorCode, GHandError, HandStateError, State
 
 # Configure SDK logging (shows connection state, warnings, errors)
 configure_logging(level=logging.INFO)
 
+
 def main():
-    hand = GHand()
-    connected = hand.open(CommType.ETHERCAT, "auto")
+    hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+    connected = hand.open("auto")
 
     try:
         if not connected:
@@ -37,19 +32,19 @@ def main():
 
             # Configure joint angles for gesture 1
             joints = []
-            joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(30), speed=100, torque=100))
-            joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(30), speed=100, torque=100))
-            joints.append(Joint(id=JointId.THUMB_SWING, angle=math.radians(30), speed=100, torque=100))
-            joints.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(0), speed=100, torque=100))
-            joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(30), speed=100, torque=100))
-            joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(30), speed=100, torque=100))
-            joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(0), speed=100, torque=100))
-            joints.append(Joint(id=JointId.MF_PIP, angle=math.radians(30), speed=100, torque=100))
-            joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(30), speed=100, torque=100))
-            joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(30), speed=100, torque=100))
-            joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(30), speed=100, torque=100))
-            joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(30), speed=100, torque=100))
-            joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(30), speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.THUMB_PIP, angle=30, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.THUMB_MCP, angle=30, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.THUMB_SWING, angle=30, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.THUMB_ROTATION, angle=0, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.FF_PIP, angle=30, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.FF_MCP, angle=30, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.FF_SWING, angle=0, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.MF_PIP, angle=30, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.MF_MCP, angle=30, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.RF_PIP, angle=30, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.RF_MCP, angle=30, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.LF_PIP, angle=30, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.LF_MCP, angle=30, speed=100, torque=100))
 
             result = hand.move_joints(joints)
             if result:
@@ -58,26 +53,26 @@ def main():
                 current_joints = hand.get_joints()
                 for joint in current_joints:
                     print(
-                        f"  {JointId(joint.id).name:<15}- state:{State(joint.state).name},\terror:{ErrorCode(joint.error).name},\tangle: {math.degrees(joint.angle):.2f}°,\tspeed: {joint.speed},\ttorque: {joint.torque}"
+                        f"  {JointId(joint.id).name:<15}- state:{State(joint.state).name},\terror:{ErrorCode(joint.error).name},\tangle: {joint.angle:.2f}°,\tspeed: {joint.speed},\ttorque: {joint.torque}"
                     )
             else:
                 break
 
             # Configure joint angles for gesture 2 (reset position)
             joints = []
-            joints.append(Joint(id=JointId.THUMB_PIP, angle=math.radians(0), speed=100, torque=100))
-            joints.append(Joint(id=JointId.THUMB_MCP, angle=math.radians(0), speed=100, torque=100))
-            joints.append(Joint(id=JointId.THUMB_SWING, angle=math.radians(20), speed=100, torque=100))
-            joints.append(Joint(id=JointId.THUMB_ROTATION, angle=math.radians(0), speed=100, torque=100))
-            joints.append(Joint(id=JointId.FF_PIP, angle=math.radians(0), speed=100, torque=100))
-            joints.append(Joint(id=JointId.FF_MCP, angle=math.radians(0), speed=100, torque=100))
-            joints.append(Joint(id=JointId.FF_SWING, angle=math.radians(0), speed=100, torque=100))
-            joints.append(Joint(id=JointId.MF_PIP, angle=math.radians(0), speed=100, torque=100))
-            joints.append(Joint(id=JointId.MF_MCP, angle=math.radians(0), speed=100, torque=100))
-            joints.append(Joint(id=JointId.RF_PIP, angle=math.radians(0), speed=100, torque=100))
-            joints.append(Joint(id=JointId.RF_MCP, angle=math.radians(0), speed=100, torque=100))
-            joints.append(Joint(id=JointId.LF_PIP, angle=math.radians(0), speed=100, torque=100))
-            joints.append(Joint(id=JointId.LF_MCP, angle=math.radians(0), speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.THUMB_PIP, angle=0, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.THUMB_MCP, angle=0, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.THUMB_SWING, angle=20, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.THUMB_ROTATION, angle=0, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.FF_PIP, angle=0, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.FF_MCP, angle=0, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.FF_SWING, angle=0, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.MF_PIP, angle=0, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.MF_MCP, angle=0, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.RF_PIP, angle=0, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.RF_MCP, angle=0, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.LF_PIP, angle=0, speed=100, torque=100))
+            joints.append(JointCommand(id=JointId.LF_MCP, angle=0, speed=100, torque=100))
 
             result = hand.move_joints(joints)
             if result:
@@ -88,7 +83,7 @@ def main():
                 current_joints = hand.get_joints()
                 for joint in current_joints:
                     print(
-                        f"  {JointId(joint.id).name:<15}- state:{State(joint.state).name},\terror:{ErrorCode(joint.error).name},\tangle: {math.degrees(joint.angle):.2f}°,\tspeed: {joint.speed},\ttorque: {joint.torque}"
+                        f"  {JointId(joint.id).name:<15}- state:{State(joint.state).name},\terror:{ErrorCode(joint.error).name},\tangle: {joint.angle:.2f}°,\tspeed: {joint.speed},\ttorque: {joint.torque}"
                     )
             else:
                 break
@@ -100,30 +95,15 @@ def main():
 
     except KeyboardInterrupt:
         print("\nProgram interrupted by user.")
-    except DeviceDisconnectedError as e:
-        print(f"\n[Device Disconnected] {e.message}")
-        if e.reason:
-            print(f"Reason: {e.reason}")
-    except JointFaultError as e:
-        print(f"\n[Joint Fault] {e.message}")
-        if e.faulty_joints:
-            print("Faulty joints:")
-            for joint in e.faulty_joints:
-                print(f"  - {joint.joint_id}: state={joint.state.name}, error={joint.error_code.name}")
-    except DeviceFaultError as e:
-        print(f"\n[Device Fault] {e.message}")
-        if e.fault_info:
-            print(f"Details: {e.fault_info}")
-    except DataReceiveError as e:
-        print(f"\n[Data Receive Error] {e.message}")
-        if e.expected_length is not None and e.actual_length is not None:
-            print(f"Expected {e.expected_length} bytes, got {e.actual_length} bytes")
-    except Exception as e:
+    except HandStateError as e:
+        print(f"\n[Hand State Error] {e}")
+    except GHandError as e:
         print(f"\n[Unexpected Error] {type(e).__name__}: {e}")
     finally:
         hand.close()
         time.sleep(0.5)
         print("\n--- Demo ended, disconnected ---")
+
 
 if __name__ == "__main__":
     main()

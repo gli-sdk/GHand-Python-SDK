@@ -1,15 +1,18 @@
 """
-示例：多灵巧手控制器（支持任意数量）
+Example: Multi-GHand Controller (supports any number)
 
-这个示例展示了如何创建一个通用的控制器类，自动连接任意数量的灵巧手，
-并提供了简洁的接口来控制它们。
+This example shows how to create a generic controller class that automatically
+connects to any number of dexterous hands and provides a simple interface
+to control them.
 """
-import time
-import math
+
 import logging
-from typing import List, Dict, Optional
-from ghand.ghand import GHand, CommType, Joint, JointId
-from ghand import configure_logging
+import time
+from typing import Dict, List, Optional
+
+from ghand import ProductType, configure_logging
+from ghand.ghand import CommType, GHand, JointCommand, JointId
+from ghand.types import GHandError
 
 # Configure SDK logging
 configure_logging(level=logging.INFO)
@@ -17,140 +20,141 @@ configure_logging(level=logging.INFO)
 
 class MultiGHandController:
     """
-    多灵巧手控制器
+    Multi-GHand Controller
 
-    自动连接任意数量的灵巧手，并提供便捷的接口来控制它们。
-    支持自动搜索或手动指定网络接口。
+    Automatically connects to any number of dexterous hands and provides
+    convenient interfaces to control them.
+    Supports auto-discovery or manual network interface specification.
 
-    用法示例:
-        # 方式1：自动搜索所有可用接口并连接
+    Usage example:
+        # Method 1: Auto-discover all available interfaces and connect
         controller = MultiGHandController(auto_search=True)
 
-        # 方式2：手动指定网络接口
+        # Method 2: Manually specify network interfaces
         controller = MultiGHandController(
             interfaces=["\\Device\\NPF_{...}", "\\Device\\NPF_{...}"]
         )
 
-        # 初始化（自动连接所有找到的设备）
+        # Initialize (automatically connects all found devices)
         if controller.initialize():
-            # 获取所有手的信息
+            # Get info for all hands
             all_hands = controller.get_all_hands()
 
-            # 控制特定手
+            # Control a specific hand
             controller.move_hand("hand_0", joints)
 
-            # 或同时控制所有手
+            # Or control all hands simultaneously
             controller.move_all_hands([joints0, joints1, ...])
 
-        # 使用完毕后关闭
+        # Close all connections when done
         controller.close_all()
     """
 
     def __init__(self, interfaces: List[str] = None, auto_search: bool = False):
         """
-        初始化多灵巧手控制器
+        Initialize multi-GHand controller
 
         Args:
-            interfaces: 网络接口ID列表（可选）
-            auto_search: 是否自动搜索所有可用网络接口（推荐）
+            interfaces: List of network interface IDs (optional)
+            auto_search: Whether to auto-discover all available network interfaces (recommended)
         """
         self.auto_search = auto_search
         self.interfaces = interfaces or []
 
-        # 存储所有手的信息
+        # Store info for all hands
         self.hands: Dict[str, GHand] = {}
         self.hand_info: Dict[str, dict] = {}
         self.interface_to_hand: Dict[str, str] = {}  # interface -> hand_name
 
-        # 连接状态
+        # Connection state
         self._initialized = False
 
-        # 如果启用自动搜索，获取所有可用接口
+        # If auto-search is enabled, get all available interfaces
         if auto_search:
-            temp_hand = GHand()
+            temp_hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
             self.interfaces = temp_hand.get_connectable_devices()
             del temp_hand
-            print(f"自动搜索到 {len(self.interfaces)} 个可连接设备")
+            print(f"Auto-discovered {len(self.interfaces)} connectable devices")
 
     def _detect_connected_interfaces(self, available_interfaces: List[str]) -> List[str]:
         """
-        检测哪些接口实际连接了设备
+        Detect which interfaces are actually connected to devices
 
         Args:
-            available_interfaces: 所有可用网络接口列表
+            available_interfaces: List of all available network interfaces
 
         Returns:
-            list: 实际连接了设备的接口列表
+            list: List of interfaces with actual device connections
         """
         connected_interfaces = []
 
-        print("\n检测哪些接口连接了设备...")
+        print("\nDetecting which interfaces have devices connected...")
         for i, iface in enumerate(available_interfaces):
-            print(f"  测试接口 {i}: {iface}")
+            print(f"  Testing interface {i}: {iface}")
 
-            # 尝试连接
-            test_hand = GHand()
+            # Attempt connection
+            test_hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
             try:
-                if test_hand.open(CommType.ETHERCAT, iface):
-                    # 成功检测到设备
+                if test_hand.open(iface):
+                    # Device detected successfully
                     connected_interfaces.append(iface)
-                    print(f"    ✓ 检测到设备")
+                    print(f"    ✓ Device detected")
                     test_hand.close()
                 else:
-                    print(f"    ✗ 连接失败")
-            except Exception as e:
-                print(f"    ✗ 错误: {e}")
+                    print(f"    ✗ Connection failed")
+            except GHandError as e:
+                print(f"    ✗ Error: {e}")
             finally:
                 del test_hand
 
-        print(f"\n共检测到 {len(connected_interfaces)} 个设备")
+        print(f"\nDetected {len(connected_interfaces)} devices in total")
         return connected_interfaces
 
     def initialize(self) -> bool:
         """
-        自动连接所有设备并读取设备信息
+        Automatically connect all devices and read device info
 
         Returns:
-            bool: 至少成功连接一个设备返回 True，否则返回 False
+            bool: True if at least one device connected successfully, False otherwise
         """
-        print("\n=== 初始化多灵巧手控制器 ===")
+        print("\n=== Initializing Multi-GHand Controller ===")
 
         if not self.interfaces:
-            print("没有可用的网络接口")
+            print("No available network interfaces")
             return False
 
-        # 第一步：连接所有设备
-        print(f"\n第一步：连接 {len(self.interfaces)} 个设备...")
+        # Step 1: Connect all devices
+        print(f"\nStep 1: Connecting {len(self.interfaces)} devices...")
         connected_hands = []
         connected_interfaces = []
 
         for i, interface in enumerate(self.interfaces):
-            print(f"  连接设备 {i}: {interface}")
+            print(f"  Connecting device {i}: {interface}")
 
-            hand = GHand()
+            hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
             try:
-                if hand.open(CommType.ETHERCAT, interface):
+                if hand.open(interface):
                     hand_name = f"hand_{i}"
                     self.hands[hand_name] = hand
                     self.interface_to_hand[interface] = hand_name
                     connected_hands.append((hand_name, hand))
                     connected_interfaces.append(interface)
-                    print(f"    ✓ 连接成功")
+                    print(f"    ✓ Connection successful")
                 else:
-                    print(f"    ✗ 连接失败")
+                    print(f"    ✗ Connection failed")
                     del hand
-            except Exception as e:
-                print(f"    ✗ 错误: {e}")
+            except GHandError as e:
+                print(f"    ✗ Error: {e}")
                 del hand
 
         if not connected_hands:
-            print("没有成功连接任何设备")
+            print("No devices connected successfully")
             return False
 
-        print(f"\n✓ 成功连接 {len(connected_hands)} 个设备")
+        print(f"\n✓ Successfully connected {len(connected_hands)} devices")
 
-        # 第二步：获取所有设备信息
-        print(f"\n第二步：获取所有设备信息...")
+        # Step 2: Get info for all devices
+        print(f"\nStep 2: Getting info for all devices...")
         for hand_name, hand in connected_hands:
             try:
                 hand_info = {
@@ -159,146 +163,142 @@ class MultiGHandController:
                     'firmware_version': hand.get_firmware_version(),
                     'serial_number': hand.get_serial_number(),
                     'hand_type': hand.get_hand_type().value,
-                    'interface': self.interface_to_hand.get(hand_name, '')
+                    'interface': self.interface_to_hand.get(hand_name, ''),
                 }
                 self.hand_info[hand_name] = hand_info
 
-                print(
-                    f"  {hand_name}: {hand_info['name']} "
-                    f"({hand_info['hand_type']}, "
-                    f"SN: {hand_info['serial_number']}, "
-                    f"FW: {hand_info['firmware_version']}, "
-                    f"HW: {hand_info['hardware_version']})"
-                )
-            except Exception as e:
-                print(f"  获取 {hand_name} 信息失败: {e}")
+                print(f"  {hand_name}: {hand_info['name']} "
+                      f"({hand_info['hand_type']}, "
+                      f"SN: {hand_info['serial_number']}, "
+                      f"FW: {hand_info['firmware_version']}, "
+                      f"HW: {hand_info['hardware_version']})")
+            except GHandError as e:
+                print(f"  Failed to get info for {hand_name}: {e}")
 
         self._initialized = True
-        print(f"\n✓ 初始化完成")
+        print(f"\n✓ Initialization complete")
         return True
 
     def get_hand_names(self) -> List[str]:
         """
-        获取所有已连接手的名称
+        Get names of all connected hands
 
         Returns:
-            list: 手的名称列表
+            list: List of hand names
         """
         return list(self.hands.keys())
 
     def get_hand_count(self) -> int:
         """
-        获取已连接手的数量
+        Get number of connected hands
 
         Returns:
-            int: 手的数量
+            int: Number of hands
         """
         return len(self.hands)
 
     def get_hand_info(self, hand_name: str) -> Optional[dict]:
         """
-        获取指定手的信息
+        Get info for specified hand
 
         Args:
-            hand_name: 手的名称
+            hand_name: Hand name
 
         Returns:
-            dict: 手的信息字典，如果不存在返回 None
+            dict: Hand info dictionary, or None if not found
         """
         return self.hand_info.get(hand_name)
 
     def get_all_hands_info(self) -> Dict[str, dict]:
         """
-        获取所有手的信息
+        Get info for all hands
 
         Returns:
-            dict: 键为手名称，值为信息字典
+            dict: Keys are hand names, values are info dictionaries
         """
         return self.hand_info.copy()
 
-    def move_hand(self, hand_name: str, joints: List[Joint]) -> bool:
+    def move_hand(self, hand_name: str, joints: List[JointCommand]) -> bool:
         """
-        控制指定的手
+        Control specified hand
 
         Args:
-            hand_name: 手的名称
-            joints: 关节命令列表
+            hand_name: Hand name
+            joints: List of joint commands
 
         Returns:
-            bool: 成功返回 True
+            bool: True on success
         """
         if not self._initialized:
-            print("控制器未初始化")
+            print("Controller not initialized")
             return False
 
         if hand_name not in self.hands:
-            print(f"手 '{hand_name}' 不存在")
+            print(f"Hand '{hand_name}' not found")
             return False
 
         hand = self.hands[hand_name]
         return hand.move_joints(joints)
 
-    def move_all_hands(self, joints_list: List[List[Joint]]) -> bool:
+    def move_all_hands(self, joints_list: List[List[JointCommand]]) -> bool:
         """
-        同时控制所有手
+        Control all hands simultaneously
 
         Args:
-            joints_list: 关节命令列表的列表，每个元素对应一只手
+            joints_list: List of joint command lists, each element corresponds to one hand
 
         Returns:
-            bool: 全部成功返回 True
+            bool: True if all succeeded
         """
         if not self._initialized:
-            print("控制器未初始化")
+            print("Controller not initialized")
             return False
 
         hand_names = self.get_hand_names()
 
         if len(joints_list) != len(hand_names):
-            print(
-                f"关节数量不匹配: 有 {len(hand_names)} 只手, "
-                f"但提供了 {len(joints_list)} 组关节命令"
-            )
+            print(f"Joint count mismatch: {len(hand_names)} hands, "
+                  f"but {len(joints_list)} joint command sets provided")
             return False
 
         success_all = True
         for hand_name, joints in zip(hand_names, joints_list):
-            print(f"控制 {hand_name}...")
+            print(f"Controlling {hand_name}...")
             if not self.move_hand(hand_name, joints):
                 success_all = False
 
         return success_all
 
-    def get_hand_joints(self, hand_name: str) -> List[Joint]:
+    def get_hand_joints(self, hand_name: str) -> List[JointCommand]:
         """
-        获取指定手的关节状态
+        Get joint states for specified hand
 
         Args:
-            hand_name: 手的名称
+            hand_name: Hand name
 
         Returns:
-            list: 关节状态列表
+            list: List of joint states
         """
         if not self._initialized:
-            print("控制器未初始化")
+            print("Controller not initialized")
             return []
 
         if hand_name not in self.hands:
-            print(f"手 '{hand_name}' 不存在")
+            print(f"Hand '{hand_name}' not found")
             return []
 
         hand = self.hands[hand_name]
         return hand.get_joints()
 
-    def get_all_joints(self) -> Dict[str, List[Joint]]:
+    def get_all_joints(self) -> Dict[str, List[JointCommand]]:
         """
-        获取所有手的关节状态
+        Get joint states for all hands
 
         Returns:
-            dict: 键为手名称，值为关节状态列表
+            dict: Keys are hand names, values are joint state lists
         """
         if not self._initialized:
-            print("控制器未初始化")
+            print("Controller not initialized")
             return {}
 
         result = {}
@@ -308,37 +308,37 @@ class MultiGHandController:
         return result
 
     def close_all(self):
-        """关闭所有连接"""
+        """Close all connections"""
         if self._initialized:
             for hand_name, hand in self.hands.items():
                 try:
                     hand.close()
-                    print(f"已关闭 {hand_name}")
-                except Exception as e:
-                    print(f"关闭 {hand_name} 失败: {e}")
+                    print(f"Closed {hand_name}")
+                except GHandError as e:
+                    print(f"Failed to close {hand_name}: {e}")
 
             self.hands.clear()
             self.hand_info.clear()
             self._initialized = False
-            print("所有连接已关闭")
+            print("All connections closed")
 
     def __enter__(self):
-        """支持上下文管理器"""
+        """Support context manager"""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """退出时自动关闭"""
+        """Auto-close on exit"""
         self.close_all()
 
 
 def main():
-    """示例：使用多灵巧手控制器"""
+    """Example: Using multi-GHand controller"""
 
-    # 方式1：自动搜索并连接所有可用设备（推荐）
-    print("=== 方式1：自动搜索模式 ===")
+    # Method 1: Auto-discover and connect all available devices (recommended)
+    print("=== Method 1: Auto-search mode ===")
     controller = MultiGHandController(auto_search=True)
 
-    # 方式2：手动指定网络接口
+    # Method 2: Manually specify network interfaces
     # controller = MultiGHandController(
     #     interfaces=[
     #         "\\Device\\NPF_{FDC7358F-FC71-4446-8247-A53015F23C29}",
@@ -346,73 +346,69 @@ def main():
     #     ]
     # )
 
-    # 自动连接所有设备
+    # Automatically connect all devices
     if not controller.initialize():
-        print("初始化失败")
+        print("Initialization failed")
         return
 
-    # 显示设备信息
-    print(f"\n=== 成功连接 {controller.get_hand_count()} 只灵巧手 ===")
+    # Display device info
+    print(f"\n=== Successfully connected {controller.get_hand_count()} dexterous hands ===")
     all_info = controller.get_all_hands_info()
     for hand_name, info in all_info.items():
-        print(
-            f"{hand_name}: {info['name']} "
-            f"({info['hand_type']}, SN: {info['serial_number']})"
-        )
+        print(f"{hand_name}: {info['name']} "
+              f"({info['hand_type']}, SN: {info['serial_number']})")
 
-    # 示例：分别控制每只手
-    print("\n=== 示例：分别控制 ===")
+    # Example: Control each hand individually
+    print("\n=== Example: Individual control ===")
 
-    # 准备关节命令
+    # Prepare joint commands
     test_joints = [
-        Joint(id=JointId.THUMB_PIP, angle=math.radians(30), speed=100, torque=100),
-        Joint(id=JointId.FF_PIP, angle=math.radians(45), speed=100, torque=100),
-        Joint(id=JointId.FF_MCP, angle=math.radians(30), speed=100, torque=100),
+        JointCommand(id=JointId.THUMB_PIP, angle=30, speed=100, torque=100),
+        JointCommand(id=JointId.FF_PIP, angle=45, speed=100, torque=100),
+        JointCommand(id=JointId.FF_MCP, angle=30, speed=100, torque=100),
     ]
 
-    # 控制所有手
+    # Control all hands
     for hand_name in controller.get_hand_names():
-        print(f"控制 {hand_name}...")
+        print(f"Controlling {hand_name}...")
         if controller.move_hand(hand_name, test_joints):
-            print(f"  ✓ 指令发送成功")
+            print(f"  ✓ Command sent successfully")
             time.sleep(1)
 
-            # 读取关节状态
+            # Read joint states
             joints = controller.get_hand_joints(hand_name)
-            print(f"  当前关节数: {len(joints)}")
+            print(f"  Current joint count: {len(joints)}")
 
-    # 示例：同时控制所有手
-    print("\n=== 示例：同时控制 ===")
+    # Example: Control all hands simultaneously
+    print("\n=== Example: Simultaneous control ===")
 
-    # 准备复位命令
+    # Prepare reset commands
     reset_joints = [
-        Joint(id=JointId.THUMB_PIP, angle=math.radians(0), speed=100, torque=100),
-        Joint(id=JointId.FF_PIP, angle=math.radians(0), speed=100, torque=100),
-        Joint(id=JointId.FF_MCP, angle=math.radians(0), speed=100, torque=100),
+        JointCommand(id=JointId.THUMB_PIP, angle=0, speed=100, torque=100),
+        JointCommand(id=JointId.FF_PIP, angle=0, speed=100, torque=100),
+        JointCommand(id=JointId.FF_MCP, angle=0, speed=100, torque=100),
     ]
 
-    # 为每只手准备命令
+    # Prepare commands for each hand
     all_joints = [reset_joints] * controller.get_hand_count()
 
-    print("同时控制所有手...")
+    print("Controlling all hands simultaneously...")
     if controller.move_all_hands(all_joints):
-        print("  ✓ 所有手指令发送成功")
+        print("  ✓ All hand commands sent successfully")
         time.sleep(1)
 
-    # 获取所有手的关节状态
-    print("\n=== 关节状态 ===")
+    # Get joint states for all hands
+    print("\n=== Joint States ===")
     all_joints_state = controller.get_all_joints()
     for hand_name, joints in all_joints_state.items():
-        print(f"\n{hand_name}: {len(joints)} 个关节")
+        print(f"\n{hand_name}: {len(joints)} joints")
         for joint in joints:
-            print(
-                f"  {JointId(joint.id).name:<15}- angle: {math.degrees(joint.angle):.2f}°, "
-                f"speed: {joint.speed}, torque: {joint.torque}"
-            )
+            print(f"  {JointId(joint.id).name:<15}- angle: {joint.angle:.2f}°, "
+                  f"speed: {joint.speed}, torque: {joint.torque}")
 
-    print("\n=== 完成 ===")
+    print("\n=== Complete ===")
 
-    # 关闭所有连接
+    # Close all connections
     controller.close_all()
 
 

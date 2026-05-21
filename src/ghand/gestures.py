@@ -1,23 +1,21 @@
-"""
-预设手势模块
+"""Predefined gesture module.
 
-本模块提供了灵巧手的预设手势定义和执行功能，包括常用手势的
-关节角度配置和统一的执行接口。
+Provides joint-angle definitions and a unified execution interface for
+commonly used dexterous-hand gestures.
 """
 
-import math
-import time
 import logging
+import time
 from typing import Dict
 
 from .ghand import GHand
-from .types import JointId, State, ErrorCode, Joint, GestureType
+from .types import ErrorCode, GestureType, JointCommand, JointId, State
 
 logger = logging.getLogger("ghand.gestures")
 
 
-# 手势定义：关节角度（度数）
-# 键为 GestureType，值为 {JointId: 角度(度)} 的字典
+# Gesture definitions: joint angles in degrees.
+# Key is GestureType, value is a dict of {JointId: angle(degrees)}.
 GESTURE_DEFINITIONS: Dict[GestureType, Dict[JointId, float]] = {
     GestureType.OPEN_HAND: {
         JointId.THUMB_PIP: 0,
@@ -98,31 +96,27 @@ GESTURE_DEFINITIONS: Dict[GestureType, Dict[JointId, float]] = {
 
 
 def execute_gesture(
-    hand: GHand,
-    gesture: GestureType,
-    speed: int = 100,
-    torque: int = 100,
-    wait: bool = True
+    hand: GHand, gesture: GestureType, speed: int = 100, torque: int = 100, wait: bool = True
 ) -> bool:
-    """执行预设手势
+    """Execute a predefined gesture.
 
     Args:
-        hand: GHand 实例
-        gesture: 要执行的手势类型
-        speed: 速度百分比 (0-100)，默认 100
-        torque: 力矩百分比 (0-100)，默认 100
-        wait: 是否等待动作完成，默认 True
+        hand: GHand instance.
+        gesture: Gesture type to execute.
+        speed: Speed percentage (0-100). Defaults to 100.
+        torque: Torque percentage (0-100). Defaults to 100.
+        wait: Whether to block until the motion completes. Defaults to True.
 
     Returns:
-        bool: 成功返回 True，失败返回 False
+        True on success, False on failure.
     """
     if gesture not in GESTURE_DEFINITIONS:
-        logger.error(f"Unknown gesture: {gesture}")
+        logger.error("Unknown gesture: %s", gesture)
         return False
 
     angles = GESTURE_DEFINITIONS[gesture]
     joints = [
-        Joint(id=joint_id, angle=math.radians(angle), speed=speed, torque=torque)
+        JointCommand(id=joint_id, angle=angle, speed=speed, torque=torque)
         for joint_id, angle in angles.items()
     ]
 
@@ -135,13 +129,13 @@ def execute_gesture(
 
 
 def _wait_for_completion(hand: GHand) -> bool:
-    """等待动作完成并检查状态
+    """Wait for the hand motion to complete and verify the final state.
 
     Args:
-        hand: GHand 实例
+        hand: GHand instance.
 
     Returns:
-        bool: 成功返回 True，失败返回 False
+        True if the hand ends in a normal state, False otherwise.
     """
     start_time = time.time()
     has_been_running = False
@@ -151,25 +145,24 @@ def _wait_for_completion(hand: GHand) -> bool:
         if hand_info.state == State.RUNNING:
             has_been_running = True
         elif has_been_running:
-            # 场景 A：从 RUNNING 变为 STOPPED，立刻判定完成
             break
         elif time.time() - start_time >= 0.02:
-            # 场景 B：一直是 STOPPED，20ms 观察期后判定完成
             break
         time.sleep(0.005)
 
-    if hand_info.state in [State.ABNORMAL_RUNNING, State.PROTECTIVE_STOPPED] or \
-       hand_info.error != ErrorCode.NORMAL:
+    if (
+        hand_info.state in [State.ABNORMAL_RUNNING, State.PROTECTIVE_STOPPED]
+        or hand_info.error != ErrorCode.NORMAL
+    ):
         logger.warning("Action completed with error state. Please clear fault and retry.")
         return False
     return True
 
 
 def get_all_gestures() -> list[GestureType]:
-    """获取所有可用的手势类型
+    """Return all available predefined gesture types.
 
     Returns:
-        list[GestureType]: 所有手势类型的列表
+        List of GestureType values.
     """
     return list(GestureType)
-

@@ -1,55 +1,86 @@
-"""CANFD 通信实现 — 桩（待开发）"""
-from .icomm import IComm
+"""CANFD communication stub — not yet implemented."""
+
+from typing import NoReturn
+
 from ..types import ProductConfig
+from .icomm import IComm
 
 
 class CANFDComm(IComm):
-    """IComm 的 CANFD 桩实现"""
+    """IComm stub implementation for CANFD."""
 
     def __init__(self, config: ProductConfig):
         self._config = config
 
-    def connect(self, device_name: str) -> bool:
+    def update_config(self, config: ProductConfig) -> None:
+        """Update the cached product configuration."""
+        self._config = config
+
+    def _raise(self) -> NoReturn:
         raise NotImplementedError("CANFD communication not yet implemented")
+
+    def connect(self, device_name: str) -> bool:
+        self._raise()
 
     def disconnect(self) -> bool:
-        raise NotImplementedError("CANFD communication not yet implemented")
+        self._raise()
 
     def is_connected(self) -> bool:
-        raise NotImplementedError("CANFD communication not yet implemented")
+        self._raise()
 
     def search_adapters(self) -> list[str]:
-        raise NotImplementedError("CANFD communication not yet implemented")
+        self._raise()
 
-    def recv_data(self) -> bytes:
-        raise NotImplementedError("CANFD communication not yet implemented")
+    def move_joints(self, joints: list, mode) -> bool:
+        self._raise()
 
-    def send_data(self, data: bytes) -> None:
-        raise NotImplementedError("CANFD communication not yet implemented")
+    def get_joints(self) -> list:
+        self._raise()
 
-    def sdo_read(self, index: int, subindex: int = 0) -> bytes:
-        raise NotImplementedError("CANFD communication not yet implemented")
+    def stop(self) -> bool:
+        self._raise()
 
-    def sdo_write(self, index: int, subindex: int, data: bytes) -> None:
-        raise NotImplementedError("CANFD communication not yet implemented")
+    def get_hand_info(self):
+        self._raise()
+
+    def get_tactile_data(self) -> dict:
+        self._raise()
 
     def open_tactile(self) -> bool:
-        raise NotImplementedError("CANFD communication not yet implemented")
+        self._raise()
 
     def close_tactile(self) -> bool:
-        raise NotImplementedError("CANFD communication not yet implemented")
+        self._raise()
 
     def zero_tactile(self) -> bool:
-        raise NotImplementedError("CANFD communication not yet implemented")
+        self._raise()
 
     def clear_fault(self) -> bool:
-        raise NotImplementedError("CANFD communication not yet implemented")
+        self._raise()
 
     def init_joint(self) -> bool:
-        raise NotImplementedError("CANFD communication not yet implemented")
+        self._raise()
 
-    def get_device_info(self) -> dict:
-        raise NotImplementedError("CANFD communication not yet implemented")
+    def get_device_name(self) -> str:
+        self._raise()
+
+    def get_hardware_version(self) -> str:
+        self._raise()
+
+    def get_firmware_version(self) -> str:
+        self._raise()
+
+    def get_serial_number(self) -> int:
+        self._raise()
+
+    def get_motor_driver_version(self) -> tuple:
+        self._raise()
 
     def get_hand_type(self) -> int:
-        raise NotImplementedError("CANFD communication not yet implemented")
+        self._raise()
+
+    def subscribe(self, callback, *args, **kwargs) -> int:
+        self._raise()
+
+    def unsubscribe(self, sub_id) -> bool:
+        self._raise()
