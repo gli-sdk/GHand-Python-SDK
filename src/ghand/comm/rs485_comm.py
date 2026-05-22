@@ -10,7 +10,7 @@ from ..types import ProductConfig
 from .icomm import IComm
 
 
-class RS485Comm(IComm):
+class Rs485Comm(IComm):
     """IComm stub implementation for RS485."""
 
     def __init__(self, config: ProductConfig):

@@ -10,7 +10,7 @@ from ..types import ProductConfig
 from .icomm import IComm
 
 
-class CANFDComm(IComm):
+class CanfdComm(IComm):
     """IComm stub implementation for CANFD."""
 
     def __init__(self, config: ProductConfig):

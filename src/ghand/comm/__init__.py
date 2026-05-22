@@ -4,7 +4,7 @@
 
 """Communication layer for the GHand SDK."""
 
-from .canfd_comm import CANFDComm
-from .ethercat_comm import EtherCATComm
+from .canfd_comm import CanfdComm
+from .ethercat_comm import EthercatComm
 from .icomm import IComm
-from .rs485_comm import RS485Comm
+from .rs485_comm import Rs485Comm

@@ -36,7 +36,7 @@ logger = logging.getLogger("ghand.ethercat_comm")
 
 
 
-class EtherCATComm(IComm):
+class EthercatComm(IComm):
     """IComm implementation for EtherCAT."""
 
     def __init__(self, config: ProductConfig):

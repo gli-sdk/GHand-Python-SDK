@@ -11,9 +11,9 @@ import numpy as np
 
 from ._config import find_config_by_name, load_product_config
 from ._converter import joints_to_nparray, nparray_to_joints
-from .comm.canfd_comm import CANFDComm
-from .comm.ethercat_comm import EtherCATComm
-from .comm.rs485_comm import RS485Comm
+from .comm.canfd_comm import CanfdComm
+from .comm.ethercat_comm import EthercatComm
+from .comm.rs485_comm import Rs485Comm
 from .types import (
     CommType,
     CommunicationError,
@@ -78,11 +78,11 @@ class GHand(object):
     def _create_comm(self, comm_type: CommType):
         """Instantiate the appropriate IComm implementation."""
         if comm_type == CommType.ETHERCAT:
-            return EtherCATComm(self._product_config)
+            return EthercatComm(self._product_config)
         elif comm_type == CommType.CANFD:
-            return CANFDComm(self._product_config)
+            return CanfdComm(self._product_config)
         elif comm_type == CommType.RS485:
-            return RS485Comm(self._product_config)
+            return Rs485Comm(self._product_config)
         else:
             raise ValueError(f"Unknown communication type: {comm_type}")
 
