@@ -59,13 +59,13 @@ open_hand = {
 
 
 def grab(hand):
-    joints = [JointCommand(id=joint_id, angle=angle) for joint_id, angle in grab_tightly.items()]
+    joints = [JointCommand(id=joint_id, angle=angle, speed=100, torque=100) for joint_id, angle in grab_tightly.items()]
     result = hand.move_joints(joints)
     return result
 
 
 def hand_zero(hand):
-    joints = [JointCommand(id=joint_id, angle=angle) for joint_id, angle in open_hand.items()]
+    joints = [JointCommand(id=joint_id, angle=angle, speed=100, torque=100) for joint_id, angle in open_hand.items()]
     result = hand.move_joints(joints)
     return result
 
