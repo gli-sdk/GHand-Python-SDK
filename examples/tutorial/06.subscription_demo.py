@@ -29,7 +29,7 @@ def data_callback(tpdo):
 
 def main():
     # Create dexterous hand instance
-    hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+    hand = GHand(product_type=ProductType.G5, comm_type=CommType.RS485)
 
     # Open connection
     if not hand.open():

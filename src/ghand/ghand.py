@@ -299,7 +299,7 @@ class GHand(object):
         """Subscribe to device data updates.
 
         Args:
-            callback: Callable invoked with a Tpdo object when new data arrives.
+            callback: Callable invoked with a device data object when new data arrives.
 
         Returns:
             Subscription ID.

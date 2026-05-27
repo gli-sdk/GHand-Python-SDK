@@ -10,7 +10,7 @@ configure_logging(level=logging.INFO)
 
 
 def main():
-    hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+    hand = GHand(product_type=ProductType.G5, comm_type=CommType.RS485)
     connected = hand.open("auto")
 
     try:
@@ -32,19 +32,19 @@ def main():
 
             # Configure joint angles for gesture 1
             joints = []
-            joints.append(JointCommand(id=JointId.THUMB_PIP, angle=30, speed=100, torque=100))
-            joints.append(JointCommand(id=JointId.THUMB_MCP, angle=30, speed=100, torque=100))
-            joints.append(JointCommand(id=JointId.THUMB_SWING, angle=30, speed=100, torque=100))
-            joints.append(JointCommand(id=JointId.THUMB_ROTATION, angle=0, speed=100, torque=100))
+            # joints.append(JointCommand(id=JointId.THUMB_PIP, angle=30, speed=100, torque=100))
+            # joints.append(JointCommand(id=JointId.THUMB_MCP, angle=30, speed=100, torque=100))
+            # joints.append(JointCommand(id=JointId.THUMB_SWING, angle=30, speed=100, torque=100))
+            # joints.append(JointCommand(id=JointId.THUMB_ROTATION, angle=0, speed=100, torque=100))
             joints.append(JointCommand(id=JointId.FF_PIP, angle=30, speed=100, torque=100))
-            joints.append(JointCommand(id=JointId.FF_MCP, angle=30, speed=100, torque=100))
-            joints.append(JointCommand(id=JointId.FF_SWING, angle=0, speed=100, torque=100))
-            joints.append(JointCommand(id=JointId.MF_PIP, angle=30, speed=100, torque=100))
-            joints.append(JointCommand(id=JointId.MF_MCP, angle=30, speed=100, torque=100))
+            # joints.append(JointCommand(id=JointId.FF_MCP, angle=30, speed=100, torque=100))
+            # joints.append(JointCommand(id=JointId.FF_SWING, angle=0, speed=100, torque=100))
+            # joints.append(JointCommand(id=JointId.MF_PIP, angle=30, speed=100, torque=100))
+            # joints.append(JointCommand(id=JointId.MF_MCP, angle=30, speed=100, torque=100))
             joints.append(JointCommand(id=JointId.RF_PIP, angle=30, speed=100, torque=100))
-            joints.append(JointCommand(id=JointId.RF_MCP, angle=30, speed=100, torque=100))
+            # joints.append(JointCommand(id=JointId.RF_MCP, angle=30, speed=100, torque=100))
             joints.append(JointCommand(id=JointId.LF_PIP, angle=30, speed=100, torque=100))
-            joints.append(JointCommand(id=JointId.LF_MCP, angle=30, speed=100, torque=100))
+            # joints.append(JointCommand(id=JointId.LF_MCP, angle=30, speed=100, torque=100))
 
             result = hand.move_joints(joints)
             if result:
@@ -60,19 +60,19 @@ def main():
 
             # Configure joint angles for gesture 2 (reset position)
             joints = []
-            joints.append(JointCommand(id=JointId.THUMB_PIP, angle=0, speed=100, torque=100))
-            joints.append(JointCommand(id=JointId.THUMB_MCP, angle=0, speed=100, torque=100))
-            joints.append(JointCommand(id=JointId.THUMB_SWING, angle=20, speed=100, torque=100))
-            joints.append(JointCommand(id=JointId.THUMB_ROTATION, angle=0, speed=100, torque=100))
+            # joints.append(JointCommand(id=JointId.THUMB_PIP, angle=0, speed=100, torque=100))
+            # joints.append(JointCommand(id=JointId.THUMB_MCP, angle=0, speed=100, torque=100))
+            # joints.append(JointCommand(id=JointId.THUMB_SWING, angle=20, speed=100, torque=100))
+            # joints.append(JointCommand(id=JointId.THUMB_ROTATION, angle=0, speed=100, torque=100))
             joints.append(JointCommand(id=JointId.FF_PIP, angle=0, speed=100, torque=100))
-            joints.append(JointCommand(id=JointId.FF_MCP, angle=0, speed=100, torque=100))
-            joints.append(JointCommand(id=JointId.FF_SWING, angle=0, speed=100, torque=100))
-            joints.append(JointCommand(id=JointId.MF_PIP, angle=0, speed=100, torque=100))
-            joints.append(JointCommand(id=JointId.MF_MCP, angle=0, speed=100, torque=100))
+            # joints.append(JointCommand(id=JointId.FF_MCP, angle=0, speed=100, torque=100))
+            # joints.append(JointCommand(id=JointId.FF_SWING, angle=0, speed=100, torque=100))
+            # joints.append(JointCommand(id=JointId.MF_PIP, angle=0, speed=100, torque=100))
+            # joints.append(JointCommand(id=JointId.MF_MCP, angle=0, speed=100, torque=100))
             joints.append(JointCommand(id=JointId.RF_PIP, angle=0, speed=100, torque=100))
-            joints.append(JointCommand(id=JointId.RF_MCP, angle=0, speed=100, torque=100))
+            # joints.append(JointCommand(id=JointId.RF_MCP, angle=0, speed=100, torque=100))
             joints.append(JointCommand(id=JointId.LF_PIP, angle=0, speed=100, torque=100))
-            joints.append(JointCommand(id=JointId.LF_MCP, angle=0, speed=100, torque=100))
+            # joints.append(JointCommand(id=JointId.LF_MCP, angle=0, speed=100, torque=100))
 
             result = hand.move_joints(joints)
             if result:

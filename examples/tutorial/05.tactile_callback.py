@@ -10,7 +10,7 @@ from ghand.types import GHandError
 class TactileDisplay:
 
     def __init__(self):
-        self.hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+        self.hand = GHand(product_type=ProductType.G5, comm_type=CommType.RS485)
         self.connected = False
         self.tactile_opened = False
         self.running = False

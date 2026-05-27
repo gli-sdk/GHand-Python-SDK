@@ -10,7 +10,7 @@ configure_logging(level=logging.DEBUG)
 
 
 def main():
-    hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+    hand = GHand(product_type=ProductType.G5, comm_type=CommType.RS485)
     connected = hand.open("auto")
 
     try:
@@ -24,7 +24,7 @@ def main():
 
         # Torque control cycle
         cycle_count = 0
-        max_cycles = 1  # Set to 0 for infinite loop
+        max_cycles = 0  # Set to 0 for infinite loop
 
         while True:
             cycle_count += 1
@@ -37,18 +37,18 @@ def main():
             print("\nStep 1: Applying torque to close fingers (torque=10)")
             joints = []
             for joint_id in [
-                    JointId.THUMB_PIP,
-                    JointId.THUMB_MCP,
+                    # JointId.THUMB_PIP,
+                    # JointId.THUMB_MCP,
                     JointId.FF_PIP,
-                    JointId.FF_MCP,
-                    JointId.MF_PIP,
-                    JointId.MF_MCP,
-                    JointId.RF_PIP,
-                    JointId.RF_MCP,
-                    JointId.LF_PIP,
-                    JointId.LF_MCP,
+                    # JointId.FF_MCP,
+                    # JointId.MF_PIP,
+                    # JointId.MF_MCP,
+                    # JointId.RF_PIP,
+                    # JointId.RF_MCP,
+                    # JointId.LF_PIP,
+                    # JointId.LF_MCP,
             ]:
-                joints.append(JointCommand(id=joint_id, torque=10))
+                joints.append(JointCommand(id=joint_id, torque=-50))
 
             result = hand.move_joints(joints, mode=CtrlMode.TORQUE)
             if result:
@@ -69,16 +69,16 @@ def main():
             print("\nStep 2: Opening fingers (torque=-10)")
             joints = []
             for joint_id in [
-                    JointId.THUMB_PIP,
-                    JointId.THUMB_MCP,
+                    # JointId.THUMB_PIP,
+                    # JointId.THUMB_MCP,
                     JointId.FF_PIP,
-                    JointId.FF_MCP,
-                    JointId.MF_PIP,
-                    JointId.MF_MCP,
-                    JointId.RF_PIP,
-                    JointId.RF_MCP,
-                    JointId.LF_PIP,
-                    JointId.LF_MCP,
+                    # JointId.FF_MCP,
+                    # JointId.MF_PIP,
+                    # JointId.MF_MCP,
+                    # JointId.RF_PIP,
+                    # JointId.RF_MCP,
+                    # JointId.LF_PIP,
+                    # JointId.LF_MCP,
             ]:
                 joints.append(JointCommand(id=joint_id, torque=-10))
 

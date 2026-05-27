@@ -129,6 +129,7 @@ class ProductConfig:
     joint_limits: dict[JointId, tuple[float, float]] = field(default_factory=dict)
     has_tactile: bool = False
     tactile_regions: list[TactileRegionConfig] = field(default_factory=list)
+    slave_id: int = 0x01
 
 
 @dataclass
