@@ -182,7 +182,6 @@ def simple_tactile_display():
             elif command in ['c', 'close']:
                 if display.tactile_opened:
                     display.tactile_close()
-                    print("Tactile sensor closed")
                 else:
                     print("Tactile sensor already closed")
 
