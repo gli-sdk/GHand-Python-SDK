@@ -13,7 +13,7 @@ You can obtain the GHand Python SDK in the following ways:
 .. code-block:: bash
 
    # Clone the repository
-   git clone https://github.com/glitech/ghand-sdk.git
+   git clone https://github.com/gli-sdk/GHand-Python-SDK
    cd ghand-sdk
 
    # Install SDK
@@ -107,7 +107,7 @@ Document Downloads
 
 **Online Documentation**
 
-- **GitHub Repository**: https://github.com/glitech/ghand-sdk
+- **GitHub Repository**: https://github.com/gli-sdk/GHand-Python-SDK
   - Includes latest source code, issue tracking, and changelog
 
 - **API Reference Documentation**: This documentation system provides complete API reference

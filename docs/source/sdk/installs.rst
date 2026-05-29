@@ -18,7 +18,7 @@ Install SDK
    pip install ghand
 
    # Or install from source
-   git clone https://github.com/glitech/ghand-sdk.git
+   git clone https://github.com/gli-sdk/GHand-Python-SDK
    cd ghand-sdk
    python setup.py install
 

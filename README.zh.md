@@ -4,6 +4,8 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 
+[English](README.md)
+
 GHand 灵巧手官方 Python SDK，为机器人操作研究与开发提供精确的关节控制、触觉感知和碰撞检测能力。
 
 ## 目录
@@ -67,9 +69,9 @@ GHand 灵巧手官方 Python SDK，为机器人操作研究与开发提供精确
 ### 从源码安装（推荐用于开发）
 
 ```bash
-git clone https://github.com/gli-sdk/GHand-SDK.git
+git clone https://github.com/gli-sdk/GHand-Python-SDK
 cd GHand-SDK
-pip install -r requirements.txt --find-links ./wheels
+pip install -r requirements.txt
 pip install -e .
 ```
 
@@ -126,7 +128,6 @@ ghand-sdk/
 │   └── extension/          # 高级功能示例
 ├── docs/                   # Sphinx 文档源码
 ├── tests/                  # 单元测试（待补充）
-├── wheels/                 # 预编译依赖 wheel 包
 ├── requirements.txt        # 运行时依赖
 ├── pyproject.toml          # 构建配置
 ├── setup.py                # 包安装配置
