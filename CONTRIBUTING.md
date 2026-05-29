@@ -46,7 +46,7 @@ Enhancement suggestions are welcome. Please provide:
 
 ```bash
 # Clone your fork
-git clone https://github.com/YOUR_USERNAME/GHand-SDK.git
+git clone https://github.com/gli-sdk/GHand-Python-SDK
 cd GHand-SDK
 
 # Create a virtual environment
