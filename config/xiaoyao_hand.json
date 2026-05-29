@@ -1,0 +1,32 @@
+{
+  "model": "G5-13A23D-S01",
+  "name": "XIAOYAO-Hand",
+  "joints": [
+    { "id": "THUMB_DIP" },
+    { "id": "THUMB_PIP",  "min": 0.0,  "max": 66.0 },
+    { "id": "THUMB_MCP",  "min": 0.0,  "max": 50.0 },
+    { "id": "THUMB_SWING","min": 20.0, "max": 90.0 },
+    { "id": "THUMB_ROTATION", "min": -10.0, "max": 60.0 },
+    { "id": "FF_DIP" },
+    { "id": "FF_PIP",    "min": 0.0,  "max": 80.0 },
+    { "id": "FF_MCP",    "min": 0.0,  "max": 90.0 },
+    { "id": "FF_SWING",  "min": -10.0, "max": 10.0 },
+    { "id": "MF_DIP" },
+    { "id": "MF_PIP",    "min": 0.0,  "max": 90.0 },
+    { "id": "MF_MCP",    "min": 0.0,  "max": 90.0 },
+    { "id": "RF_DIP" },
+    { "id": "RF_PIP",    "min": 0.0,  "max": 90.0 },
+    { "id": "RF_MCP",    "min": 0.0,  "max": 90.0 },
+    { "id": "LF_DIP" },
+    { "id": "LF_PIP",    "min": 0.0,  "max": 74.0 },
+    { "id": "LF_MCP",    "min": 0.0,  "max": 90.0 }
+  ],
+  "has_tactile": true,
+  "tactile_regions": [
+    { "id": "THUMB", "count": 52 },
+    { "id": "FF",    "count": 31 },
+    { "id": "MF",    "count": 31 },
+    { "id": "RF",    "count": 31 },
+    { "id": "LF",    "count": 31 }
+  ]
+}

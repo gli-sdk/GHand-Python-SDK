@@ -1,20 +1,20 @@
-.. Xiaoyao灵巧手SDK documentation master file
-   =====================================
+.. GHand Python SDK documentation master file
+   ============================================
 
-欢迎使用Xiaoyao Python SDK
+Welcome to GHand Python SDK
 =====================================
 
 .. toctree::
    :maxdepth: 0
-   :caption: 快速开始
-   
+   :caption: Quick Start
+
    introduction.rst
    env_setup.rst
 
 .. toctree::
    :maxdepth: 0
-   :caption: Python SDK 介绍
-   
+   :caption: Python SDK Guide
+
    sdk/installs.rst
    sdk/downloads.rst
    sdk/connection.rst
@@ -22,14 +22,14 @@
 
 .. toctree::
    :maxdepth: 0
-   :caption: Python API 列表
+   :caption: Python API Reference
    :numbered:
-   
+
    python/api.rst
 
 .. toctree::
     :maxdepth: 0
-    :caption: 版本说明
+    :caption: Version Notes
 
     version.rst
 

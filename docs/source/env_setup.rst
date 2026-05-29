@@ -1,37 +1,37 @@
-环境设置
-==============
+Environment Setup
+=================
 
-检查Python版本
---------------
-Xiaoyao SDK支持Python 3.10到3.13版本。
+Check Python Version
+--------------------
+GHand SDK supports Python 3.10 to 3.13.
 
 .. code-block:: bash
 
-   # 检查Python版本
+   # Check Python version
    python --version
 
-   # 如果版本不符，请安装正确的Python版本
+   # If the version does not match, install the correct Python version
 
-安装Npcap库
---------------
-正确下载并安装Npcap安装程序，Npcap官方网址：https://npcap.com/
+Install Npcap Library
+---------------------
+Download and install the Npcap installer from the official website: https://npcap.com/
 
-检查C/C++ 编译工具
--------------------------------
-在安装依赖前请确保您的系统或环境包含C/C++编译工具。
+Check C/C++ Compilation Tools
+-----------------------------
+Before installing dependencies, ensure your system or environment includes C/C++ compilation tools.
 
-Windows系统可以安装Microsoft C++ 生成工具，并选择“使用C++的桌面开发”，进行C/C++编译工具的安装。
+On Windows, you can install Microsoft C++ Build Tools and select "Desktop development with C++" to install the C/C++ compilation tools.
 
-Microsoft C++ 生成工具官方网址：https://visualstudio.microsoft.com/zh-hans/visual-cpp-build-tools/
+Microsoft C++ Build Tools official website: https://visualstudio.microsoft.com/visual-cpp-build-tools/
 
-安装依赖
---------
-使用pip安装所需依赖：
+Install Dependencies
+--------------------
+Use pip to install the required dependencies:
 
 .. code-block:: bash
 
    pip install -r requirements.txt
 
-配置开发环境
-------------
-推荐使用VS Code作为开发环境，并安装Python扩展。
+Configure Development Environment
+---------------------------------
+VS Code is recommended as the development environment with the Python extension installed.

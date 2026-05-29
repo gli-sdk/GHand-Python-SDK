@@ -1,24 +1,23 @@
 .. _introduction:
 
-产品介绍
+Introduction
 ============
 
-Xiaoyao Python SDK 是为枭尧灵巧手设计的官方开发工具包。它提供了一套完整的 Python API，允许开发者轻松地与灵巧手进行交互，实现对关节、传感器以及其他核心功能的精确控制和数据获取。
+The GHand Python SDK is the official development toolkit for the XiaoYao Dexterous Hand. It provides a complete Python API that allows developers to easily interact with the dexterous hand, enabling precise control and data acquisition for joints, sensors, and other core functions.
 
-主要功能
---------
-- 手部整体控制:
-    - 获取手部整体运行状态及基本信息（设备ID、版本、手部类型等）。
-    - 解除手部保护状态。
-    - 配置及获取通讯方式（EtherCAT, CAN, RS485）。
-    - 手部重启及位置初始化。
-    - 硬件自检（传感器、电机）。
-    - 固件升级。
-- 关节精细控制:
-    - 设置单个或多个关节的目标角度、速度或力矩。
-    - 获取单个或所有关节的当前角度、速度和力矩。
-    - 停止所有关节运动。
-- 触觉感知:
-    - 读取五指触觉传感器阵列及合力数据（大拇指52个传感器，其他四指各31个传感器）。
-    - 触觉传感器控制（开启、关闭、归零）。
-
+Key Features
+------------
+- Hand-level Control:
+    - Get overall hand status and basic information (device ID, version, hand type, etc.).
+    - Clear hand protection state.
+    - Configure and get communication mode (EtherCAT, CAN, RS485).
+    - Hand reboot and position initialization.
+    - Hardware self-test (sensors, motors).
+    - Firmware upgrade.
+- Fine Joint Control:
+    - Set target angle, speed, or torque for single or multiple joints.
+    - Get current angle, speed, and torque for single or all joints.
+    - Stop all joint motion.
+- Tactile Sensing:
+    - Read five-finger tactile sensor arrays and resultant force data (52 sensors for thumb, 31 sensors for each of the other four fingers).
+    - Tactile sensor control (open, close, zero).

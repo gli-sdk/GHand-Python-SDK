@@ -1,148 +1,148 @@
 .. _downloads:
 
-资源下载
-==========
+Resource Downloads
+==================
 
-SDK安装包
------------
+SDK Installation Package
+------------------------
 
-您可以通过以下方式获取 Xiaoyao Python SDK：
+You can obtain the GHand Python SDK in the following ways:
 
-**从源代码安装（当前唯一方式）**
+**Install from Source (currently the only way)**
 
 .. code-block:: bash
 
-   # 克隆仓库
-   git clone https://gitee.com/glitech/xiaoyao-sdk.git
-   cd xiaoyao-sdk
+   # Clone the repository
+   git clone https://github.com/glitech/ghand-sdk.git
+   cd ghand-sdk
 
-   # 安装 SDK
+   # Install SDK
    python setup.py install
 
-**当前版本**
+**Current Version**
 
-- 最新版本：v1.1.1
-- Python 要求：3.10 - 3.13
-- 支持平台：Windows 10/11
+- Latest version: v1.1.2
+- Python requirement: 3.10 - 3.13
+- Supported platforms: Windows 10/11, Linux Ubuntu 18.04+
 
-示例代码
------------
+Example Code
+------------
 
-所有示例代码均包含在 SDK 仓库的 ``examples/`` 目录中。
+All example code is included in the ``examples/`` directory of the SDK repository.
 
-**基础示例**
+**Basic Examples**
 
-1. **获取基本信息** - ``1.get_basic_info.py``
-   - 获取设备 ID、版本号、手部类型等基本信息
-   - 查看手部运行状态
+1. **Get Basic Info** - ``01.get_basic_info.py``
+   - Get device ID, version, hand type, and other basic information
+   - View hand running status
 
-2. **关节控制** - ``2.move_joints.py``
-   - 控制单个关节运动
-   - 控制多个关节同时运动
-   - 设置目标角度、速度和力矩
+2. **Joint Control** - ``02.move_joints.py``
+   - Control single joint motion
+   - Control multiple joints simultaneously
+   - Set target angle, speed, and torque
 
-3. **预设手势** - ``3.do_preset_gestrue.py``
-   - 执行预设的手势动作
-   - 支持多种常用手势模式
+3. **Preset Gestures** - ``01.preset_gesture.py``
+   - Execute preset gesture actions
+   - Support multiple common gesture modes
 
-4. **数据手套** - ``4.get_glove_data.py``
-   - 读取数据手套输入
-   - 实时映射到灵巧手
+4. **Data Glove** - ``08.glove_control.py``
+   - Read data glove input
+   - Real-time mapping to dexterous hand
 
-**动作示例**
+**Action Examples**
 
-5. **舞蹈手势** - ``5.do_gesture_dance.py``
-   - 演示连续手势动作
+5. **Gesture Dance** - ``02.gesture_dance.py``
+   - Demonstrate continuous gesture actions
 
-6. **抓取动作** - ``6.grabbing_action.py``
-   - 演示抓取物体动作
+6. **Grabbing Action** - ``03.grabbing_action.py``
+   - Demonstrate grabbing object action
 
-7. **按压动作** - ``7.press_action.py``
-   - 演示按压操作
+7. **Press Action** - ``04.press_action.py``
+   - Demonstrate press operation
 
-8. **拍手动作** - ``8.clap_action.py``
-   - 演示拍手动作
+8. **Clap Action** - ``05.clap_action.py``
+   - Demonstrate clap action
 
-9. **持握动作** - ``9.hold_action.py``
-   - 演示持握物体动作
+9. **Hold Action** - ``06.hold_action.py``
+   - Demonstrate holding object action
 
-10. **敲击动作** - ``10.knock_action.py``
-    - 演示敲击操作
+10. **Knock Action** - ``07.knock_action.py``
+    - Demonstrate knock operation
 
-11. **抬起动作** - ``11.lift_action.py``
-    - 演示抬举动作
+11. **Lift Action** - ``08.lift_action.py``
+    - Demonstrate lifting action
 
-12. **拉取动作** - ``12.pull_action.py``
-    - 演示拉拽操作
+12. **Pull Action** - ``09.pull_action.py``
+    - Demonstrate pulling action
 
-13. **支撑动作** - ``13.support_action.py``
-    - 演示支撑动作
+13. **Support Action** - ``10.support_action.py``
+    - Demonstrate support action
 
-**高级功能示例**
+**Advanced Function Examples**
 
-14. **触觉合力** - ``14.get_tactile_resultant_force.py``
-    - 获取触觉传感器的合力数据
-    - 用于力反馈控制
+14. **Tactile Resultant Force** - ``05.tactile_callback.py``
+    - Get tactile sensor resultant force data
+    - Used for force feedback control
 
-15. **数据订阅** - ``15.subscription_demo.py``
-    - 演示数据订阅功能
-    - 实时接收关节和传感器数据
+15. **Data Subscription** - ``06.subscription_demo.py``
+    - Demonstrate data subscription functionality
+    - Real-time reception of joint and sensor data
 
-16. **交互式控制** - ``16.interactive_joint_control.py``
-    - 提供交互式命令行控制界面
-    - 实时调整关节参数
+16. **Interactive Control** - ``09.interactive_joint_control.py``
+    - Provide interactive command-line control interface
+    - Real-time adjustment of joint parameters
 
-**运行示例**
+**Running Examples**
 
 .. code-block:: bash
 
-   # 进入示例目录
+   # Enter example directory
    cd examples
 
-   # 运行特定示例（需要先连接设备）
-   python 1.get_basic_info.py
+   # Run a specific example (device connection required first)
+   python tutorial/01.get_basic_info.py
 
-文档下载
------------
+Document Downloads
+------------------
 
-**在线文档**
+**Online Documentation**
 
-- **GitHub/Gitee 仓库**: https://gitee.com/glitech/xiaoyao-sdk
-  - 包含最新源码、问题追踪和更新日志
+- **GitHub Repository**: https://github.com/glitech/ghand-sdk
+  - Includes latest source code, issue tracking, and changelog
 
-- **API 参考文档**: 本文档系统提供完整的 API 参考
-  - 模块说明
-  - 类和函数详细说明
-  - 参数和返回值说明
+- **API Reference Documentation**: This documentation system provides complete API reference
+  - Module descriptions
+  - Detailed class and function descriptions
+  - Parameter and return value descriptions
 
-**离线文档生成**
+**Offline Document Generation**
 
-如需生成离线文档，请执行：
+To generate offline documentation, please execute:
 
 .. code-block:: bash
 
-   # 安装文档工具
+   # Install documentation tools
    pip install sphinx sphinx-rtd-theme
 
-   # 进入文档目录
+   # Enter docs directory
    cd docs
 
-   # 生成 HTML 文档
+   # Generate HTML documentation
    sphinx-build -b html source build
 
-   # 在浏览器中打开
+   # Open in browser
    # open build/html/index.html  (macOS)
    # xdg-open build/html/index.html  (Linux)
    # start build/html/index.html  (Windows)
 
-**相关资源**
+**Related Resources**
 
-- **依赖库**: Npcap (Windows), EtherCAT 配置工具
-- **驱动程序**: USB 转串口驱动（如使用 RS485 通信）
-- **开发工具**: Python IDE（推荐 PyCharm/VSCode）
+- **Dependencies**: Npcap (Windows), EtherCAT configuration tools
+- **Drivers**: USB to serial port driver (if using RS485 communication)
+- **Development Tools**: Python IDE (PyCharm/VSCode recommended)
 
-**获取帮助**
+**Get Help**
 
-- **问题反馈**: 在 Gitee 仓库提交 Issue
-- **功能建议**: 欢迎提交 Pull Request
-- **技术支持**: 查看文档或联系技术支持团队
+- **Issue Feedback**: Submit an Issue in the GitHub repository
+- **Feature Suggestions**: Pull Requests are welcome
+- **Technical Support**: Check the documentation or contact the technical support team

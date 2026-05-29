@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ghand"
+version = "2.0.0"
+description = "Ghand Python SDK"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "GLITECH"},
+]
+requires-python = ">=3.10"
+dependencies = [
+    "pysoem>=0.2.0",
+    "netifaces>=0.11.0",
+    "numpy>=1.24.0",
+    "collision_sdk>=0.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "yapf>=0.40.0",
+    "mypy>=1.0.0",
+    "pytest>=7.0.0",
+    "pre-commit>=3.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/YourGitHubOrg/GHand-SDK"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+ignore_missing_imports = true
+show_error_codes = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+strict_equality = true

@@ -1,0 +1,102 @@
+# Copyright (c) 2026 GLITech
+#
+# Licensed under the MIT License. See LICENSE in the project root for license information.
+
+import logging
+import threading
+import time
+from typing import Callable, Optional
+
+logger = logging.getLogger("ghand")
+
+
+class SubscriptionManager:
+    """Manages background threads for receiving and dispatching device data."""
+
+    def __init__(self, client):
+        self._lock = threading.Lock()
+        self._running = False
+        self._thread = None
+        self._dispatcher_thread = None
+        self._client = client
+        self._data = None
+        self._sub_id_counter = 0
+        self._subscribers = {}
+
+    def start(self):
+        """Start the background producer and dispatcher threads."""
+        if not self._running:
+            self._running = True
+            self._thread = threading.Thread(target=self._data_producer, daemon=True)
+            self._thread.start()
+            self._dispatcher_thread = threading.Thread(target=self._data_dispatcher, daemon=True)
+            self._dispatcher_thread.start()
+
+    def stop(self):
+        """Stop the background threads and clear pending data."""
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=1)
+            self._thread = None
+        if self._dispatcher_thread:
+            self._dispatcher_thread.join(timeout=1)
+            self._dispatcher_thread = None
+        self._data = None
+
+    def _data_producer(self):
+        """Background thread that continuously receives data from the device."""
+        while self._running:
+            try:
+                data = self._client.recv_data()
+                self._data = data
+            except Exception as e:
+                logger.error("Error receiving data: %s", e)
+            time.sleep(0.1)
+
+    def _data_dispatcher(self):
+        """Background thread that dispatches received data to all subscribers."""
+        while self._running:
+            if self._data:
+                with self._lock:
+                    subscribers_copy = self._subscribers.copy()
+                for sub_id, (callback, args, kwargs) in subscribers_copy.items():
+                    if callback:
+                        try:
+                            callback(self._data, *args, **kwargs)
+                        except Exception as e:
+                            logger.error("Error in callback %s: %s", sub_id, e)
+            time.sleep(0.1)
+
+    def subscribe(self, callback: Optional[Callable] = None, *args, **kwargs):
+        """Register a callback to receive device data updates.
+
+        Args:
+            callback: Callable invoked with received data.
+
+        Returns:
+            Subscription ID.
+        """
+        with self._lock:
+            self._sub_id_counter += 1
+            sub_id = self._sub_id_counter
+            self._subscribers[sub_id] = (callback, args, kwargs)
+        if not self._running:
+            self.start()
+        return sub_id
+
+    def unsubscribe(self, sub_id):
+        """Remove a previously registered subscription.
+
+        Args:
+            sub_id: Subscription ID returned by ``subscribe``.
+
+        Returns:
+            True if the subscription existed and was removed.
+        """
+        with self._lock:
+            if sub_id in self._subscribers:
+                del self._subscribers[sub_id]
+                if not self._subscribers:
+                    self.stop()
+                return True
+            return False

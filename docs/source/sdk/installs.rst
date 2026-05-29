@@ -1,33 +1,33 @@
 .. _installs:
 
-安装与配置指南
-================
+Installation and Configuration Guide
+====================================
 
-系统要求
---------
+System Requirements
+-------------------
 - Python 3.10 to 3.13
-- Windows 10/Linux Ubuntu 18.04+/macOS 10.15+
-- 推荐内存：8GB+
-- 存储空间：1GB+
+- Windows 10 / Linux Ubuntu 18.04+ / macOS 10.15+
+- Recommended memory: 8GB+
+- Storage space: 1GB+
 
-安装SDK
--------
+Install SDK
+-----------
 .. code-block:: bash
 
-   # 使用pip安装
-   pip install xiaoyao
-   
-   # 或者从源代码安装
-   git clone https://gitee.com/glitech/xiaoyao-sdk.git
-   cd xiaoyao-sdk
+   # Install using pip
+   pip install ghand
+
+   # Or install from source
+   git clone https://github.com/glitech/ghand-sdk.git
+   cd ghand-sdk
    python setup.py install
 
-固件升级步骤
----------------------
+Firmware Upgrade Steps
+----------------------
 
 
-卸载SDK
----------------------
+Uninstall SDK
+-------------
 .. code-block:: bash
 
-   pip uninstall xiaoyao
+   pip uninstall ghand
