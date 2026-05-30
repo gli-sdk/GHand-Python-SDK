@@ -141,7 +141,7 @@ ghand-sdk/
 
 - **GLI 开源中心**：[GLI GitHub 组织](https://github.com/gli-sdk)
 - **官方文档**：[GHand 灵巧手文档](https://fcnzogxju7xr.feishu.cn/docx/AhZ6ds2iCoguaAxIzBxciYHinNo)
-- **C++ SDK**：[GHand SDK C++](https://github.com/gli-sdk/ghand_sdk_cpp)
+- **C++ SDK**：[GHand SDK C++](https://github.com/gli-sdk/GHand-Cpp-SDK)
 
 ## 更新日志
 
