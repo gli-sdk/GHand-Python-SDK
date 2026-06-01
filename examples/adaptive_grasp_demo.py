@@ -3,7 +3,9 @@ from pathlib import Path
 import sys
 import time
 from typing import Optional
-from ghand import configure_logging
+from ghand import ProductType, configure_logging
+from ghand.ghand import CommType, GHand
+from ghand.types import  HandStateError
 
 _logger = logging.getLogger(__name__)
 configure_logging(level=logging.INFO)
@@ -23,10 +25,11 @@ from ghand import CommunicationError, GHand, HandStateError
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
-    hand = GHand()
+    hand =  GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+    connected = hand.open("auto")
     grasper: Optional[AdaptiveGrasper] = None
 
-    connected = hand.open("auto")
+    
     runtime_config = build_demo_runtime_config()
     try:
         if not connected:

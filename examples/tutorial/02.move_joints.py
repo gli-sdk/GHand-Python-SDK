@@ -11,6 +11,7 @@ configure_logging(level=logging.INFO)
 
 def main():
     hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+    
     connected = hand.open("auto")
 
     try:
