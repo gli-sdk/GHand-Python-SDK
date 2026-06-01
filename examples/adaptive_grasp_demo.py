@@ -1,26 +1,26 @@
-import logging
-from pathlib import Path
 import sys
-import time
-from typing import Optional
-from ghand import ProductType, configure_logging
-from ghand.ghand import CommType, GHand
-from ghand.types import  HandStateError
-
-_logger = logging.getLogger(__name__)
-configure_logging(level=logging.INFO)
+from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from adaptive_grasp import (
-    AdaptiveGrasper,
-)
+import logging
+import time
+from typing import Optional
+from ghand import configure_logging
+from ghand.ghand import CommType, GHand, ProductType
+from ghand.types import  HandStateError
+from ghand import CommunicationError, GHand, HandStateError
+_logger = logging.getLogger(__name__)
+configure_logging(level=logging.INFO)
+
+
+from adaptive_grasp import AdaptiveGrasper
 from adaptive_grasp.demo_config import (
     build_demo_runtime_config,
 )
-from ghand import CommunicationError, GHand, HandStateError
+
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)

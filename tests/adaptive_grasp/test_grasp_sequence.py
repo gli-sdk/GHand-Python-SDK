@@ -1,5 +1,6 @@
 import time
 import inspect
+import math
 from unittest.mock import MagicMock
 import pytest
 from adaptive_grasp import AdaptiveGraspConfig, GraspState
@@ -49,6 +50,11 @@ class _FakeTactileInfo:
     def get_force_z(self) -> float:
         return self._fz
 
+
+class _PositionFeedbackSensor:
+    def __init__(self, feedback):
+        self.joint_feedback = feedback
+
 def test_phase_closing_contact_by_force(monkeypatch):
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(
@@ -67,6 +73,7 @@ def test_phase_closing_contact_by_force(monkeypatch):
         hand, sensor, safety, joint_builder, cfg, time.monotonic,
         on_state_change=states.append,
     )
+    monkeypatch.setattr(controller, "_wait_until_position_reached", lambda _pose: True)
     monkeypatch.setattr("adaptive_grasp.grasp_sequence.time.sleep", lambda *_: None)
 
     sensor.tactile_data = {
@@ -112,6 +119,7 @@ def test_phase_closing_uses_phase_closing_torque(monkeypatch):
         on_state_change=lambda _state: None,
         object_profile=profile,
     )
+    monkeypatch.setattr(controller, "_wait_until_position_reached", lambda _pose: True)
     monkeypatch.setattr("adaptive_grasp.grasp_sequence.time.sleep", lambda *_: None)
 
     sensor.tactile_data = {
@@ -161,6 +169,7 @@ def test_phase_closing_records_contact_joint_snapshot_by_force(monkeypatch):
         on_state_change=lambda _state: None,
         object_profile=profile,
     )
+    monkeypatch.setattr(controller, "_wait_until_position_reached", lambda _pose: True)
     monkeypatch.setattr("adaptive_grasp.grasp_sequence.time.sleep", lambda *_: None)
 
     sensor.tactile_data = {
@@ -204,6 +213,7 @@ def test_phase_closing_records_contact_finger_force_snapshot_by_force(monkeypatc
         hand, sensor, safety, joint_builder, cfg, lambda: 10.0,
         on_state_change=lambda _state: None,
     )
+    monkeypatch.setattr(controller, "_wait_until_position_reached", lambda _pose: True)
     monkeypatch.setattr("adaptive_grasp.grasp_sequence.time.sleep", lambda *_: None)
 
     sensor.tactile_data = {
@@ -244,6 +254,7 @@ def test_phase_open_and_pre_grasp(monkeypatch):
         hand, sensor, safety, joint_builder, cfg, time.monotonic,
         on_state_change=states.append,
     )
+    monkeypatch.setattr(controller, "_wait_until_position_reached", lambda _pose: True)
     monkeypatch.setattr(
         "adaptive_grasp.grasp_sequence.time.sleep",
         lambda duration: sleep_calls.append(duration),
@@ -261,7 +272,7 @@ def test_phase_open_and_pre_grasp(monkeypatch):
     assert isinstance(result, PhaseResult)
     assert result.success is True
     assert len(hand.calls) == 3
-    assert hand.wait_calls == 2
+    assert hand.wait_calls == 0
     assert hand.calls[0]["mode"] == CtrlMode.POSITION
     assert hand.calls[1]["mode"] == CtrlMode.POSITION
     assert hand.calls[2]["mode"] == CtrlMode.TORQUE
@@ -269,7 +280,79 @@ def test_phase_open_and_pre_grasp(monkeypatch):
     assert {JointCommand.torque for JointCommand in hand.calls[0]["joints"]} == {12}
     assert {JointCommand.speed for JointCommand in hand.calls[1]["joints"]} == {21}
     assert {JointCommand.torque for JointCommand in hand.calls[1]["joints"]} == {22}
-    assert sleep_calls[:2] == [0.02, 0.02]
+    assert sleep_calls == [cfg.closing_period_s, cfg.control_period_s]
+
+
+def test_wait_until_position_reached_requires_all_pose_joints(monkeypatch):
+    hand = _MockHand()
+    cfg = AdaptiveGraspConfig(pre_grasp_preset="two_finger_pinch")
+    pose = {
+        JointId.THUMB_PIP: math.radians(30.0),
+        JointId.FF_PIP: math.radians(20.0),
+    }
+    sensor = _PositionFeedbackSensor(
+        [
+            JointCommand(id=JointId.THUMB_PIP, angle=math.radians(28.6)),
+            JointCommand(id=JointId.FF_PIP, angle=math.radians(17.0)),
+        ]
+    )
+    safety = MagicMock()
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP, JointId.FF_PIP))
+    now = {"value": 0.0}
+    sleeps = []
+    controller = PhaseController(
+        hand,
+        sensor,
+        safety,
+        joint_builder,
+        cfg,
+        lambda: now["value"],
+        on_state_change=lambda _state: None,
+    )
+
+    def fake_sleep(duration):
+        sleeps.append(duration)
+        now["value"] += duration
+        sensor.joint_feedback = [
+            JointCommand(id=JointId.THUMB_PIP, angle=math.radians(28.6)),
+            JointCommand(id=JointId.FF_PIP, angle=math.radians(18.6)),
+        ]
+
+    monkeypatch.setattr("adaptive_grasp.grasp_sequence.time.sleep", fake_sleep)
+
+    assert controller._wait_until_position_reached(pose) is True
+    assert sleeps == [0.5]
+
+
+def test_wait_until_position_reached_times_out(monkeypatch):
+    hand = _MockHand()
+    cfg = AdaptiveGraspConfig(pre_grasp_preset="two_finger_pinch")
+    pose = {JointId.THUMB_PIP: math.radians(30.0)}
+    sensor = _PositionFeedbackSensor(
+        [JointCommand(id=JointId.THUMB_PIP, angle=math.radians(20.0))]
+    )
+    safety = MagicMock()
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP,))
+    now = {"value": 0.0}
+    sleeps = []
+    controller = PhaseController(
+        hand,
+        sensor,
+        safety,
+        joint_builder,
+        cfg,
+        lambda: now["value"],
+        on_state_change=lambda _state: None,
+    )
+
+    def fake_sleep(duration):
+        sleeps.append(duration)
+        now["value"] += duration
+
+    monkeypatch.setattr("adaptive_grasp.grasp_sequence.time.sleep", fake_sleep)
+
+    assert controller._wait_until_position_reached(pose) is False
+    assert sleeps == [0.5] * 20
 
 
 def test_execute_position_phase_signature_has_no_unused_wait_s():
@@ -289,6 +372,7 @@ def test_phase_failure_sets_error_state(monkeypatch):
         hand, sensor, safety, joint_builder, cfg, time.monotonic,
         on_state_change=states.append,
     )
+    monkeypatch.setattr(controller, "_wait_until_position_reached", lambda _pose: True)
     monkeypatch.setattr("adaptive_grasp.grasp_sequence.time.sleep", lambda *_: None)
 
     result = controller.run(is_running=lambda: True)

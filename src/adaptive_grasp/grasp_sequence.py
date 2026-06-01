@@ -1,4 +1,5 @@
 import logging
+import math
 import time
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
@@ -13,6 +14,10 @@ from .object_profile import ObjectProfile
 from .utils import clip, tactile_force_xyz
 
 _logger = logging.getLogger("adaptive_grasp.grasp_sequence")
+
+_POSITION_REACHED_TOLERANCE_RAD = math.radians(1.5)
+_POSITION_REACHED_TIMEOUT_S = 10.0
+_POSITION_REACHED_POLL_S = 0.5
 
 
 @dataclass(frozen=True)
@@ -124,10 +129,31 @@ class PhaseController:
         self._set_state(state)
         joints = self._joint_builder.position_command(pose, speed=speed, torque=torque)
         ok = self.hand_port.move_joints(joints, mode=CtrlMode.POSITION)
-        time.sleep(0.02)
-        if not self.hand_port.wait_for_motion_completion():
-            return False 
-        return ok
+        if not ok:
+            return False
+        return self._wait_until_position_reached(pose)
+
+    def _wait_until_position_reached(self, pose: dict[JointId, float]) -> bool:
+        start = self._get_monotonic_time()
+        while True:
+            feedback = self._sensor.joint_feedback
+            if feedback:
+                current_angles = {joint.id: joint.angle for joint in feedback}
+                reached = True
+                for joint_id, target_angle in pose.items():
+                    current_angle = current_angles.get(joint_id)
+                    if current_angle is None:
+                        reached = False
+                        break
+                    if abs(current_angle - target_angle) > _POSITION_REACHED_TOLERANCE_RAD:
+                        reached = False
+                        break
+                if reached:
+                    return True
+
+            if self._get_monotonic_time() - start >= _POSITION_REACHED_TIMEOUT_S:
+                return False
+            time.sleep(_POSITION_REACHED_POLL_S)
 
     def _phase_open(self, is_running: Callable[[], bool] = lambda: True) -> bool:
         return self._execute_position_phase(
