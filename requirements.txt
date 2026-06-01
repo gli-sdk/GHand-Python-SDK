@@ -1,3 +1,5 @@
+collision_sdk @ git+https://gitee.com/glitech/collision-collisions-detection.git
 pysoem>=0.2.0
 netifaces>=0.11.0
 numpy>=1.24.0
+matplotlib
