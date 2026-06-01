@@ -46,8 +46,8 @@ Enhancement suggestions are welcome. Please provide:
 
 ```bash
 # Clone your fork
-git clone https://github.com/YOUR_USERNAME/GHand-SDK.git
-cd GHand-SDK
+git clone https://github.com/gli-sdk/GHand-Python-SDK
+cd GHand-Python-SDK
 
 # Create a virtual environment
 python -m venv venv

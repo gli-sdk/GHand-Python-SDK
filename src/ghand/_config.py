@@ -63,7 +63,7 @@ def _get_config_search_paths() -> list[str]:
     paths.append("." + os.sep + "config" + os.sep)
 
     home = os.path.expanduser("~")
-    paths.append(os.path.join(home, ".ghand-sdk", "config") + os.sep)
+    paths.append(os.path.join(home, ".ghand", "config") + os.sep)
 
     return paths
 

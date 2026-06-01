@@ -117,8 +117,8 @@ class TactileData:
     """Tactile data for a single finger region."""
 
     count: int = 0
-    resultant_force: list[int] = field(default_factory=lambda: [0, 0, 0])
-    sample_force: list[int] = field(default_factory=list)
+    resultant_force: list[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
+    sample_force: list[float] = field(default_factory=list)
 
     @classmethod
     def from_bytes(cls, data: bytes, count: int):
@@ -135,27 +135,18 @@ class TactileData:
         if len(data) < expected_size:
             return cls(count=count)
 
-        rf_x_low = struct.unpack_from('<b', data, 0)[0]
-        rf_y_low = struct.unpack_from('<b', data, 2)[0]
-        rf_z_low = struct.unpack_from('<B', data, 4)[0]
-        resultant_force = [rf_x_low, rf_y_low, rf_z_low]
+        rf_x = struct.unpack_from('<b', data, 0)[0] / 10.0
+        rf_y = struct.unpack_from('<b', data, 2)[0] / 10.0
+        rf_z = struct.unpack_from('<B', data, 4)[0] / 10.0
+        resultant_force = [rf_x, rf_y, rf_z]
 
         sample_force = []
         for i in range(count):
             offset = 6 + i * 3
             x, y, z = struct.unpack_from('<bbB', data, offset)
-            sample_force.extend([x, y, z])
+            sample_force.extend([x / 10.0, y / 10.0, z / 10.0])
 
         return cls(count=count, resultant_force=resultant_force, sample_force=sample_force)
-
-
-def _convert_tactile_to_N(tactile_data: TactileData) -> TactileData:
-    """Convert tactile data from 0.1 N units to N units."""
-    return TactileData(
-        count=tactile_data.count,
-        resultant_force=[round(f * 0.1, 1) for f in tactile_data.resultant_force],
-        sample_force=[round(f * 0.1, 1) for f in tactile_data.sample_force],
-    )
 
 
 class Tpdo:
@@ -218,9 +209,7 @@ class Tpdo:
             setattr(
                 instance,
                 attr,
-                _convert_tactile_to_N(
-                    TactileData.from_bytes(data[offset:offset + size], region.count)
-                ),
+                TactileData.from_bytes(data[offset:offset + size], region.count),
             )
             offset += size
 

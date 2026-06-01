@@ -218,8 +218,8 @@ class TactileInfo:
     """Tactile sensor reading for a single finger."""
 
     state: bool = False
-    resultant_force: list[int] | None = None
-    distributed_force: list[int] | None = None
+    resultant_force: list[float] | None = None
+    distributed_force: list[float] | None = None
 
 
 # ============================================================================

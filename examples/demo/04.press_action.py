@@ -107,13 +107,13 @@ open_hand = {
 
 
 def press(hand):
-    joints = [JointCommand(id=joint_id, angle=angle) for joint_id, angle in ff_press.items()]
+    joints = [JointCommand(id=joint_id, angle=angle, speed=100, torque=100) for joint_id, angle in ff_press.items()]
     result = hand.move_joints(joints)
     return result
 
 
 def hand_zero(hand):
-    joints = [JointCommand(id=joint_id, angle=angle) for joint_id, angle in open_hand.items()]
+    joints = [JointCommand(id=joint_id, angle=angle, speed=100, torque=100) for joint_id, angle in open_hand.items()]
     result = hand.move_joints(joints)
     return result
 

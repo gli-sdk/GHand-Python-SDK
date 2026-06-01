@@ -18,8 +18,8 @@ Install SDK
    pip install ghand
 
    # Or install from source
-   git clone https://github.com/glitech/ghand-sdk.git
-   cd ghand-sdk
+   git clone https://github.com/gli-sdk/GHand-Python-SDK
+   cd GHand-Python-SDK
    python setup.py install
 
 Firmware Upgrade Steps

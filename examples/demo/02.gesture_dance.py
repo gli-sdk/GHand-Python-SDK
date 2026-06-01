@@ -317,7 +317,8 @@ def execute_joint_positions(hand, joint_positions, description):
     """
     try:
         joints = [
-            JointCommand(id=joint_id, angle=angle) for joint_id, angle in joint_positions.items()
+            JointCommand(id=joint_id, angle=angle, speed=100, torque=100)
+            for joint_id, angle in joint_positions.items()
         ]
         if not hand.move_joints(joints):
             logger.error("%s execution failed", description)

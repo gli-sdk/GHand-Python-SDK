@@ -4,6 +4,8 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 
+[中文](README.zh.md)
+
 The official Python SDK for the GHand Dexterous Hand — providing precise joint control, tactile sensing, and collision detection for robotic manipulation research and development.
 
 ## Table of Contents
@@ -67,9 +69,9 @@ For detailed technical specifications and API references, visit the [Python SDK 
 ### Install from Source
 
 ```bash
-git clone https://github.com/gli-sdk/GHand-SDK.git
-cd GHand-SDK
-pip install -r requirements.txt --find-links ./wheels
+git clone https://github.com/gli-sdk/GHand-Python-SDK
+cd GHand-Python-SDK
+pip install -r requirements.txt
 pip install -e .
 ```
 
@@ -101,7 +103,7 @@ hand.close()
 ## Project Structure
 
 ```
-ghand-sdk/
+GHand-Python-SDK/
 ├── src/ghand/              # Core SDK source code
 │   ├── ghand.py            # Main GHand class and public API
 │   ├── types.py            # Data types, enums, and structures
@@ -124,7 +126,6 @@ ghand-sdk/
 │   └── extension/          # Advanced feature examples
 ├── docs/                   # Sphinx documentation source
 ├── tests/                  # Unit tests (to be added)
-├── wheels/                 # Precompiled dependency wheels
 ├── requirements.txt        # Runtime dependencies
 ├── pyproject.toml          # Build configuration
 ├── setup.py                # Package setup
@@ -138,7 +139,7 @@ ghand-sdk/
 
 - **GLI Open Source Hub**: [GLI GitHub Organization](https://github.com/gli-sdk)
 - **Official Documentation**: [GHand Dexterous Hand Docs](https://fcnzogxju7xr.feishu.cn/docx/AhZ6ds2iCoguaAxIzBxciYHinNo)
-- **C++ SDK**: [GHand SDK C++](https://github.com/gli-sdk/ghand_sdk_cpp)
+- **C++ SDK**: [GHand SDK C++](https://github.com/gli-sdk/GHand-Cpp-SDK)
 
 ## Changelog
 
