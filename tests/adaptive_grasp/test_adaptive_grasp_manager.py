@@ -474,7 +474,7 @@ def test_full_grasp_state_transitions(monkeypatch):
     grasper._sensor._latest_joint_feedback = []
 
     assert grasper.grasp_core() is True
-    assert grasper._grasp_sequence.hand is grasper._hand_port
+    assert grasper._grasp_sequence.hand_port is grasper._hand_port
     assert grasper.state == GraspState.ADAPTIVE_HOLD
 
     time.sleep(0.1)

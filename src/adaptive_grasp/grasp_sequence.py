@@ -50,7 +50,7 @@ class PhaseResult:
 class PhaseController:
     def __init__(
         self,
-        hand: GraspSequenceHandPort,
+        hand_port: GraspSequenceHandPort,
         sensor: SensorFrameSource,
         safety: SafetyMonitor,
         joint_builder: JointCommandBuilder,
@@ -59,7 +59,9 @@ class PhaseController:
         on_state_change: Callable[[GraspState], None],
         object_profile: Optional[ObjectProfile] = None,
     ):
-        self.hand = hand
+        # PhaseController only depends on the hand port abstraction; mock vs
+        # hardware wrapping is handled before this controller is constructed.
+        self.hand_port = hand_port
         self._sensor = sensor
         self._safety = safety
         self._joint_builder = joint_builder
@@ -121,9 +123,9 @@ class PhaseController:
     ) -> bool:
         self._set_state(state)
         joints = self._joint_builder.position_command(pose, speed=speed, torque=torque)
-        ok = self.hand.move_joints(joints, mode=CtrlMode.POSITION)
+        ok = self.hand_port.move_joints(joints, mode=CtrlMode.POSITION)
         time.sleep(0.02)
-        if not self.hand.wait_for_motion_completion():
+        if not self.hand_port.wait_for_motion_completion():
             return False 
         return ok
 
@@ -159,7 +161,7 @@ class PhaseController:
                 _logger.error("CLOSING phase timeout")
                 return False
 
-            self.hand.move_joints(self._joint_builder.torque_command(self.current_torque), mode=CtrlMode.TORQUE)
+            self.hand_port.move_joints(self._joint_builder.torque_command(self.current_torque), mode=CtrlMode.TORQUE)
             time.sleep(self.config.closing_period_s)
 
             frame = self._read_closing_sensor_frame()
