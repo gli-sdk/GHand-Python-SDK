@@ -70,7 +70,7 @@ For detailed technical specifications and API references, visit the [Python SDK 
 
 ```bash
 git clone https://github.com/gli-sdk/GHand-Python-SDK
-cd GHand-SDK
+cd GHand-Python-SDK
 pip install -r requirements.txt
 pip install -e .
 ```
@@ -103,7 +103,7 @@ hand.close()
 ## Project Structure
 
 ```
-ghand-sdk/
+GHand-Python-SDK/
 ├── src/ghand/              # Core SDK source code
 │   ├── ghand.py            # Main GHand class and public API
 │   ├── types.py            # Data types, enums, and structures
