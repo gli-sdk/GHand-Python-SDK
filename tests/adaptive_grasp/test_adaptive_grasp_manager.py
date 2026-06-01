@@ -644,6 +644,76 @@ def test_wait_for_visualizer_close_blocks_on_visualizer(monkeypatch):
     assert events == ["wait"]
 
 
+def test_wait_until_finished_polls_until_hold_lifecycle_finishes(monkeypatch):
+    hand = _MockHand()
+    g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
+    g.state = GraspState.ADAPTIVE_HOLD
+    g._running = True
+
+    poll_states = []
+    sleeps = []
+
+    def fake_poll_visualizer():
+        poll_states.append(g.get_state())
+        if len(poll_states) == 2:
+            g.state = GraspState.COMPLETED
+            g._running = False
+
+    monkeypatch.setattr(g, "poll_visualizer", fake_poll_visualizer)
+    monkeypatch.setattr(
+        g,
+        "_perform_release",
+        lambda **kwargs: (_ for _ in ()).throw(
+            AssertionError("wait_until_finished should not release")
+        ),
+    )
+    monkeypatch.setattr(
+        "adaptive_grasp.adaptive_grasp_manager.time.sleep",
+        lambda value: sleeps.append(value),
+    )
+
+    assert g.wait_until_finished(poll_period_s=0.05) == GraspState.COMPLETED
+    assert poll_states == [GraspState.ADAPTIVE_HOLD, GraspState.ADAPTIVE_HOLD]
+    assert sleeps == [0.05]
+
+
+def test_wait_until_finished_waits_through_release_state_and_joins_thread(monkeypatch):
+    hand = _MockHand()
+    g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
+    g.state = GraspState.RELEASE
+
+    class _FakeThread:
+        def __init__(self):
+            self.join_calls = []
+
+        def is_alive(self):
+            return True
+
+        def join(self, timeout=None):
+            self.join_calls.append(timeout)
+
+    thread = _FakeThread()
+    g._control_thread = thread
+    sleeps = []
+
+    def fake_sleep(value):
+        sleeps.append(value)
+        g.state = GraspState.COMPLETED
+
+    monkeypatch.setattr("adaptive_grasp.adaptive_grasp_manager.time.sleep", fake_sleep)
+
+    assert g.wait_until_finished(poll_period_s=0.25) == GraspState.COMPLETED
+    assert sleeps == [0.25]
+    assert thread.join_calls == [1.0]
+
+
+def test_wait_until_finished_rejects_non_positive_poll_period():
+    g = AdaptiveGrasper(_MockHand(), AdaptiveGraspConfig())
+
+    with pytest.raises(ValueError, match="poll_period_s"):
+        g.wait_until_finished(poll_period_s=0.0)
+
+
 def test_release_does_not_release_original_visualizer(monkeypatch):
     hand = _MockHand()
     g = AdaptiveGrasper(hand, AdaptiveGraspConfig())

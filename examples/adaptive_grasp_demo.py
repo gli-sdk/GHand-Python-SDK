@@ -14,7 +14,6 @@ if str(SRC) not in sys.path:
 
 from adaptive_grasp import (
     AdaptiveGrasper,
-    GraspState,
 )
 from adaptive_grasp.demo_config import (
     build_demo_runtime_config,
@@ -38,7 +37,7 @@ def main() -> None:
             print("Failed to open tactile sensors.")
             return
         time.sleep(0.5)
-
+        
         config = runtime_config.adaptive_config
         grasper = AdaptiveGrasper(hand=hand, config=config)
 
@@ -54,14 +53,8 @@ def main() -> None:
             return
 
         print("Holding object...")
-        while grasper.get_state() == GraspState.ADAPTIVE_HOLD:
-            state_val = grasper.get_state().value
-            print(f"state={state_val}; torque={grasper.current_torque}\n", flush=True)
-            grasper.poll_visualizer()
-            time.sleep(0.1)
-        print(f"Final state: {grasper.get_state().value}")
-
-        grasper.finish()
+        final_state = grasper.wait_until_finished()
+        print(f"Final state: {final_state.value}")
         print("Grasp Done.")
 
     except KeyboardInterrupt:

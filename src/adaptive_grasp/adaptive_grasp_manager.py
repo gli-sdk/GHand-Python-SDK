@@ -92,6 +92,10 @@ class AdaptiveGrasper:
         sensor: Optional[SensorFrameSource] = None,
     ):
         self.hand = hand
+        try:
+            self.hand.tactile_zero()
+        except Exception:
+            _logger.exception("Failed to zero tactile sensors")
         self._hand_port = ensure_hand_command_port(hand)
         self.config = config or AdaptiveGraspConfig()
         self._runtime = AdaptiveGraspRuntime()
@@ -159,6 +163,10 @@ class AdaptiveGrasper:
             self._cleanup_grasp(state=GraspState.ERROR)
             return False
 
+
+
+
+
     @property
     def state(self) -> GraspState:
         return self._runtime.state
@@ -207,6 +215,19 @@ class AdaptiveGrasper:
     def finish(self) -> None:
         self.release()
         self.wait_for_visualizer_close()
+
+    def wait_until_finished(self, poll_period_s: float = 0.1) -> GraspState:
+        if poll_period_s <= 0:
+            raise ValueError("poll_period_s must be > 0")
+
+        while self.get_state() in (GraspState.ADAPTIVE_HOLD, GraspState.RELEASE):
+            self.poll_visualizer()
+            if self.get_state() not in (GraspState.ADAPTIVE_HOLD, GraspState.RELEASE):
+                break
+            time.sleep(poll_period_s)
+
+        self._join_control_thread_override(timeout=1.0)
+        return self.get_state()
 
     def emergency_release(self, wait_s: float = 2.0) -> bool:
         return self._perform_release(wait_control_thread=False, release_wait_s=wait_s)
