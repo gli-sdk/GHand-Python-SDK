@@ -51,8 +51,8 @@ HOLD_TIME_S = 60.0
 ```
 DEMO 参数解读
 - `GRASP_OBJECT`：Demo 场景名，必须是 `DEMO_SCENES` 中已有的 key。
-- `HOLD_TIME_S`：进入自适应保持后的自动释放时间，单位为秒，必须大于 0。
-
+- `HOLD_TIME_S`：进入自适应保持后的自动释放时间，单位为秒，必须大于 0；小于等于 1 秒时会给出运行警告。
+- `_INTERRUPT_RELEASE_WAIT_S` 必须大于 0；小于等于 3 秒时会给出运行警告。
 
 ### 快速运行：
 
@@ -171,6 +171,7 @@ interrupt_release_wait_s = _INTERRUPT_RELEASE_WAIT_S
 ```
 
 `interrupt_release_wait_s` 属于 Demo 运行时配置，不属于 `AdaptiveGraspConfig`；它只影响 `Ctrl+C` 中断场景下快速释放后的等待时间。普通释放阶段使用的是 `AdaptiveGraspConfig.release_timeout_s`。
+
 
 
 ## 自定义抓取物品和关节角度

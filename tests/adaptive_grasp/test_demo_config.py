@@ -59,7 +59,7 @@ def test_all_demo_scenes_build_valid_adaptive_configs(grasp_object, scene):
 
 
 def test_hidden_demo_defaults_follow_adaptive_config_defaults_where_possible():
-    runtime = build_demo_runtime_config("balloon", 1.0)
+    runtime = build_demo_runtime_config("balloon", 1.1)
     default_config = AdaptiveGraspConfig(
         default_object=runtime.adaptive_config.default_object,
         pre_grasp_preset=runtime.adaptive_config.pre_grasp_preset,
@@ -77,6 +77,33 @@ def test_unknown_demo_object_tells_user_which_setting_to_edit():
 def test_invalid_demo_hold_time_tells_user_which_setting_to_edit():
     with pytest.raises(ValueError, match="HOLD_TIME_S"):
         build_demo_runtime_config(GRASP_OBJECT, 0)
+
+
+def test_short_demo_hold_time_warns_but_still_builds():
+    with pytest.warns(UserWarning, match="HOLD_TIME_S.*> 1"):
+        runtime = build_demo_runtime_config(GRASP_OBJECT, 1.0)
+
+    assert runtime.adaptive_config.release_hold_time_s == 1.0
+
+
+def test_short_interrupt_release_wait_warns_but_still_builds():
+    with pytest.warns(UserWarning, match="_INTERRUPT_RELEASE_WAIT_S.*> 3"):
+        runtime = build_demo_runtime_config(
+            GRASP_OBJECT,
+            HOLD_TIME_S,
+            interrupt_release_wait_s=3.0,
+        )
+
+    assert runtime.interrupt_release_wait_s == 3.0
+
+
+def test_invalid_interrupt_release_wait_tells_user_which_setting_to_edit():
+    with pytest.raises(ValueError, match="_INTERRUPT_RELEASE_WAIT_S"):
+        build_demo_runtime_config(
+            GRASP_OBJECT,
+            HOLD_TIME_S,
+            interrupt_release_wait_s=0,
+        )
 
 
 def test_demo_config_is_code_defined_without_toml_loader():
