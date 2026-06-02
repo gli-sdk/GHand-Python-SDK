@@ -1,7 +1,9 @@
-import warnings
+import logging
 from dataclasses import dataclass
 
 from .config import AdaptiveGraspConfig
+
+_logger = logging.getLogger("ghand.adaptive_grasp.demo_config")
 
 
 # Demo users only need to edit these two values before pressing Run.
@@ -11,7 +13,7 @@ HOLD_TIME_S = 60.0 #default_hold_time
 _ENABLE_TACTILE_CSV = False
 _ENABLE_VISUALIZATION = False
 _HOLD_COMMAND_MODE = "position"
-_INTERRUPT_RELEASE_WAIT_S = 5.0
+_INTERRUPT_RELEASE_WAIT_S = 3.0
 
 
 @dataclass(frozen=True)
@@ -64,24 +66,20 @@ def build_demo_runtime_config(
             "Edit HOLD_TIME_S in adaptive_grasp.demo_config."
         )
     if hold_time_s <= 1:
-        warnings.warn(
+        _logger.warning(
             "HOLD_TIME_S should be > 1 for a stable demo hold duration. "
             "Edit HOLD_TIME_S in adaptive_grasp.demo_config.",
-            UserWarning,
-            stacklevel=2,
         )
     if interrupt_release_wait_s <= 0:
         raise ValueError(
-            "_INTERRUPT_RELEASE_WAIT_S must be > 0. "
+            f"_INTERRUPT_RELEASE_WAIT_S must be > 0. "
             "Edit _INTERRUPT_RELEASE_WAIT_S in adaptive_grasp.demo_config."
         )
-    if interrupt_release_wait_s <= 3:
-        warnings.warn(
-            "the value of _INTERRUPT_RELEASE_WAIT_S is recommended to be >3 to allow hardware "
-            "teardown after an interrupted release."
+    if interrupt_release_wait_s < 3:
+        _logger.warning(
+            "_INTERRUPT_RELEASE_WAIT_S should be >= 3 "
+            "to allow hardware teardown after an interrupted release. "
             "Edit _INTERRUPT_RELEASE_WAIT_S in adaptive_grasp.demo_config.",
-            UserWarning,
-            stacklevel=2,
         )
 
     scene = DEMO_SCENES[grasp_object]
