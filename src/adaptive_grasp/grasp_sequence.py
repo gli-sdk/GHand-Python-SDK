@@ -8,7 +8,7 @@ from ghand import CtrlMode, JointCommand, JointId, TactileSensorId
 from .config import AdaptiveGraspConfig
 from .ports import GraspSequenceHandPort, SensorFrameSource
 from .runtime import GraspState
-from .safety import SafetyMonitor, SafetyStatus
+from .safety import SafetyMonitor, SafetyReport, SafetyStatus
 from .joint_builder import JointCommandBuilder
 from .object_profile import ObjectProfile
 from .utils import active_finger_normal_forces, clip
@@ -45,11 +45,13 @@ class PhaseResult:
         final_torque: int,
         should_release: bool = False,
         contact_snapshot: Optional[ContactSnapshot] = None,
+        safety_report: Optional[SafetyReport] = None,
     ):
         self.success = success
         self.final_torque = final_torque
         self.should_release = should_release
         self.contact_snapshot = contact_snapshot
+        self.safety_report = safety_report
 
 
 class PhaseController:
@@ -77,10 +79,12 @@ class PhaseController:
         self.current_torque = self._phase_closing_torque()
         self._phase_should_release = False
         self._contact_snapshot: Optional[ContactSnapshot] = None
+        self._safety_report: Optional[SafetyReport] = None
 
     def run(self, is_running: Callable[[], bool]) -> PhaseResult:
         self._phase_should_release = False
         self._contact_snapshot = None
+        self._safety_report = None
         for phase_method, name in (
             (self._phase_open, "OPEN"),
             (self._phase_pre_grasp, "PRE_GRASP"),
@@ -92,6 +96,7 @@ class PhaseController:
                     final_torque=self.current_torque,
                     should_release=self._phase_should_release,
                     contact_snapshot=self._contact_snapshot,
+                    safety_report=self._safety_report,
                 )
             if not phase_method(is_running):
                 _logger.error("%s phase failed", name)
@@ -101,6 +106,7 @@ class PhaseController:
                     final_torque=self.current_torque,
                     should_release=self._phase_should_release,
                     contact_snapshot=self._contact_snapshot,
+                    safety_report=self._safety_report,
                 )
         return PhaseResult(
             success=True,
@@ -246,6 +252,7 @@ class PhaseController:
             return False
 
         _logger.error("CLOSING phase: Grasp Empty")
+        self._safety_report = report
         self._phase_should_release = True
         self._set_state(GraspState.ERROR)
         return True

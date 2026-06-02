@@ -596,6 +596,48 @@ def test_cleanup_grasp_sets_stopped_state():
     assert g._running is False
 
 
+def test_grasp_core_exposes_empty_grasp_joint_report(monkeypatch):
+    hand = _MockHand()
+    cfg = AdaptiveGraspConfig(
+        active_fingers={TactileSensorId.THUMB},
+        pre_grasp_preset="two_finger_pinch",
+        closing_total_contact_threshold_n=10.0,
+        empty_grasp_angle_threshold=math.radians(30.0),
+        enable_visualization=False,
+    )
+    g = AdaptiveGrasper(hand, cfg)
+    monkeypatch.setattr("adaptive_grasp.adaptive_grasp_manager.time.sleep", lambda *_: None)
+    monkeypatch.setattr("adaptive_grasp.grasp_sequence.time.sleep", lambda *_: None)
+    monkeypatch.setattr(g, "_start_sensor_subscription", lambda: None)
+    monkeypatch.setattr(g._sensor, "reset", lambda: None)
+    monkeypatch.setattr(
+        "adaptive_grasp.grasp_sequence.PhaseController._wait_until_position_reached",
+        lambda self, pose, **_kwargs: True,
+    )
+
+    g._sensor._latest_joint_feedback = [JointCommand(id=JointId.THUMB_MCP, angle=0.0)]
+    g._sensor._latest_tactile_data = {
+        TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 0.0),
+    }
+    monkeypatch.setattr(g._sensor, "sum_active_finger_normal_force", lambda: 0.0)
+
+    def _move_and_advance(joints, mode=None):
+        hand.calls.append({"mode": mode, "joints": list(joints)})
+        if mode == CtrlMode.TORQUE:
+            g._sensor._latest_joint_feedback = [
+                JointCommand(id=JointId.THUMB_MCP, angle=math.radians(35.0))
+            ]
+        return True
+
+    monkeypatch.setattr(g._hand_port, "move_joints", _move_and_advance)
+
+    assert g.grasp_core() is False
+    assert g.last_safety_report is not None
+    assert g.last_safety_report.fault_type == "empty_grasp"
+    assert g.last_safety_report.details["empty_grasp_joints"][0]["joint"] == "THUMB_MCP"
+    assert g.last_safety_report.details["empty_grasp_joints"][0]["delta_deg"] == pytest.approx(35.0)
+
+
 def test_hold_runner_loop_cleans_up_when_hold_step_errors(monkeypatch):
     hand = _MockHand()
     g = AdaptiveGrasper(hand, AdaptiveGraspConfig())

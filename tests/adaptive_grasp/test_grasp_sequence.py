@@ -455,3 +455,41 @@ def test_phase_closing_empty_grasp_requests_release(monkeypatch):
 
     assert result.success is False
     assert result.should_release is True
+
+
+def test_phase_closing_empty_grasp_returns_safety_report(monkeypatch):
+    hand = _MockHand()
+    cfg = AdaptiveGraspConfig(
+        pre_grasp_preset="two_finger_pinch",
+        phase_timeout=10.0,
+        control_period_s=0.001,
+    )
+    sensor = MagicMock()
+    safety = MagicMock()
+    from adaptive_grasp.safety import SafetyReport, SafetyStatus
+    empty_report = SafetyReport(
+        SafetyStatus.FAULT,
+        "empty_grasp",
+        "No contact while joints moved: THUMB_MCP=35.0deg",
+        details={"empty_grasp_joints": [{"joint": "THUMB_MCP"}]},
+    )
+    safety.is_grasp_empty.return_value = empty_report
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP, JointId.FF_PIP))
+    controller = PhaseController(
+        hand, sensor, safety, joint_builder, cfg, time.monotonic,
+        on_state_change=lambda _state: None,
+    )
+    monkeypatch.setattr(controller, "_wait_until_position_reached", _position_reached)
+    monkeypatch.setattr("adaptive_grasp.grasp_sequence.time.sleep", lambda *_: None)
+
+    sensor.tactile_data = {
+        TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 0.0),
+        TactileSensorId.FF: _FakeTactileInfo(0.0, 0.0, 0.0),
+    }
+    sensor.joint_feedback = [JointCommand(id=JointId.THUMB_MCP, angle=0.0)]
+    sensor.sum_active_finger_normal_force.return_value = 0.0
+
+    result = controller.run(is_running=lambda: True)
+
+    assert result.success is False
+    assert result.safety_report is empty_report

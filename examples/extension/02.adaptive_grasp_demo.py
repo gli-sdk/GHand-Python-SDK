@@ -1,25 +1,27 @@
 import sys
-from pathlib import Path
-ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
-
-import logging
+# import logging
 import time
+from pathlib import Path
 from typing import Optional
 
-from ghand import CommunicationError, GHand, HandStateError
-from ghand import CommType, ProductType, configure_logging
-
-_logger = logging.getLogger(__name__)
-configure_logging(level=logging.INFO)
-
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+SRC_ROOT = str(PROJECT_ROOT / "src")
+if SRC_ROOT not in sys.path:
+    sys.path.insert(0, SRC_ROOT)
 
 from adaptive_grasp import AdaptiveGrasper
-from adaptive_grasp.demo_config import (
-    build_demo_runtime_config,
+from adaptive_grasp.demo_config import build_demo_runtime_config
+from ghand import (
+    CommType,
+    CommunicationError,
+    GHand,
+    HandStateError,
+    ProductType,
+    configure_logging,
 )
+
+
+# configure_logging(level=logging.INFO)
 
 
 def main() -> None:
@@ -27,9 +29,13 @@ def main() -> None:
     connected = hand.open("auto")
     grasper: Optional[AdaptiveGrasper] = None
 
-    
     runtime_config = build_demo_runtime_config()
     try:
+        if connected:
+            print("Hand connect successful.")
+        else:
+            print("Not connected.")
+            return
         if not connected:
             print("Connection failed.")
             return

@@ -1,6 +1,6 @@
 import logging
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Optional
 
@@ -24,6 +24,7 @@ class SafetyReport:
     status: SafetyStatus
     fault_type: Optional[str] = None
     message: str = ""
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 class SafetyMonitor:
@@ -148,14 +149,39 @@ class SafetyMonitor:
         if not joint_feedback or not self._closing_baseline_angles:
             return SafetyReport(SafetyStatus.OK)
 
-        max_delta = max(
-            (abs(j.angle - self._closing_baseline_angles.get(j.id, 0.0)) for j in joint_feedback),
-            default=0.0,
-        )
-        if max_delta > self.config.empty_grasp_angle_threshold:
-            _logger.error("Empty grasp detected: max_delta=%.1f deg", math.degrees(max_delta))
-            return SafetyReport(SafetyStatus.FAULT, "empty_grasp", "No contact while joints moved")
+        threshold = self.config.empty_grasp_angle_threshold
+        exceeded_joints = []
+        for joint in joint_feedback:
+            delta = abs(joint.angle - self._closing_baseline_angles.get(joint.id, 0.0))
+            if delta > threshold:
+                exceeded_joints.append(
+                    {
+                        "joint": self._joint_label(joint.id),
+                        "delta_rad": delta,
+                        "delta_deg": math.degrees(delta),
+                        "threshold_deg": math.degrees(threshold),
+                    }
+                )
+
+        if exceeded_joints:
+            summary = ", ".join(
+                f"{item['joint']}={item['delta_deg']:.1f}deg"
+                for item in exceeded_joints
+            )
+            _logger.error("Empty grasp detected: measured angle > empty grasp threshold: %s > %.1f deg", 
+                          summary, math.degrees(threshold))
+            return SafetyReport(
+                SafetyStatus.FAULT,
+                "empty_grasp",
+                f"No contact while joints moved: {summary}",
+                details={"empty_grasp_joints": exceeded_joints},
+            )
         return SafetyReport(SafetyStatus.OK)
+
+    @staticmethod
+    def _joint_label(joint_id: Any) -> str:
+        name = getattr(joint_id, "name", None)
+        return str(name) if name is not None else str(joint_id)
 
     def reset(self) -> None:
         self._last_total_fz = 0.0

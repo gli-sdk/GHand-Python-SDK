@@ -25,6 +25,45 @@ def test_empty_grasp_when_closing_with_no_contact():
     assert report.fault_type == "empty_grasp"
 
 
+def test_empty_grasp_reports_joints_exceeding_angle_threshold():
+    cfg = AdaptiveGraspConfig(empty_grasp_angle_threshold=math.radians(30.0))
+    monitor = SafetyMonitor(cfg)
+    monitor.set_closing_baseline(
+        [
+            JointCommand(id=JointId.THUMB_MCP, angle=math.radians(5.0)),
+            JointCommand(id=JointId.FF_MCP, angle=math.radians(10.0)),
+        ]
+    )
+
+    joints = [
+        JointCommand(id=JointId.THUMB_MCP, angle=math.radians(36.0)),
+        JointCommand(id=JointId.FF_MCP, angle=math.radians(55.0)),
+    ]
+    report = monitor.is_grasp_empty(
+        joint_feedback=joints,
+        state=GraspState.CLOSING_TO_CONTACT,
+    )
+
+    assert report.status == SafetyStatus.FAULT
+    assert report.message == (
+        "No contact while joints moved: THUMB_MCP=31.0deg, FF_MCP=45.0deg"
+    )
+    assert report.details["empty_grasp_joints"] == [
+        {
+            "joint": "THUMB_MCP",
+            "delta_rad": pytest.approx(math.radians(31.0)),
+            "delta_deg": pytest.approx(31.0),
+            "threshold_deg": pytest.approx(30.0),
+        },
+        {
+            "joint": "FF_MCP",
+            "delta_rad": pytest.approx(math.radians(45.0)),
+            "delta_deg": pytest.approx(45.0),
+            "threshold_deg": pytest.approx(30.0),
+        },
+    ]
+
+
 def test_tactile_missing_fault_cycles_are_configurable():
     cfg = AdaptiveGraspConfig(sensor_missing_fault_cycles=2)
     monitor = SafetyMonitor(cfg)

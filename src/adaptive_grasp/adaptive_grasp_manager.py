@@ -141,6 +141,7 @@ class AdaptiveGrasper:
         try:
             self._prepare_grasp_runtime(object_profile)
             result = self._run_grasp_sequence()
+            self._runtime.last_safety_report = result.safety_report
             if not result.success:
                 if result.should_release:
                     self._perform_release(wait_control_thread=False)
