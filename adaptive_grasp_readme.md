@@ -106,16 +106,16 @@ Demo 会执行以下动作：
 
 ```python
 import time
-
 from adaptive_grasp import AdaptiveGrasper
 from adaptive_grasp.demo_config import build_demo_runtime_config
-from ghand import GHand
+from ghand import GHand,CommType, ProductType
 
-hand = GHand()
+hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
 grasper = None
 runtime_config = build_demo_runtime_config("paper_cup", 60.0)
 
 try:
+    
     if not hand.open("auto"):
         raise RuntimeError("Connection failed")
 

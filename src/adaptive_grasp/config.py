@@ -129,8 +129,8 @@ class AdaptiveGraspConfig:
 
     # Release phase.
     release_hold_time_s: float = 20.0  # Duration to keep adaptive hold before automatic release in the demo sequence.
-    release_open_speed: int = 50  # Speed command used during release opening.
-    release_open_torque: int = 50  # Torque/current limit used during release opening.
+    release_open_speed: int = 80  # Speed command used during release opening.
+    release_open_torque: int = 80  # Torque/current limit used during release opening.
     release_timeout_s: float = 5.0  # Timeout for the release phase.
 
     # Safety policy.
