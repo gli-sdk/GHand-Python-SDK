@@ -1,8 +1,17 @@
 import math
+from pathlib import Path
+
 import pytest
 from adaptive_grasp import AdaptiveGraspConfig
+import adaptive_grasp.joint_builder as joint_builder_module
 from adaptive_grasp.joint_builder import JointCommandBuilder
+from adaptive_grasp.utils import FINGER_TO_MCP_PIP
 from ghand import JointId, TactileSensorId
+
+
+JOINT_BUILDER_SOURCE = (
+    Path(__file__).parents[2] / "src" / "adaptive_grasp" / "joint_builder.py"
+)
 
 
 class TestJointCommandBuilder:
@@ -120,3 +129,17 @@ class TestJointCommandBuilder:
         assert joint_map[JointId.MF_MCP].torque == 9
         assert joint_map[JointId.RF_PIP].torque == 0
         assert joint_map[JointId.LF_PIP].torque == 0
+
+    def test_hold_per_finger_torque_command_uses_utils_finger_mapping(self):
+        cfg = AdaptiveGraspConfig(active_fingers={TactileSensorId.THUMB})
+        builder = JointCommandBuilder(cfg, FINGER_TO_MCP_PIP[TactileSensorId.THUMB])
+
+        joints = builder.hold_per_finger_torque_command({TactileSensorId.THUMB: 6.0})
+        joint_map = {joint.id: joint for joint in joints}
+
+        for joint_id in FINGER_TO_MCP_PIP[TactileSensorId.THUMB]:
+            assert joint_map[joint_id].torque == 6
+
+        source = JOINT_BUILDER_SOURCE.read_text(encoding="utf-8")
+        assert joint_builder_module.FINGER_TO_MCP_PIP is FINGER_TO_MCP_PIP
+        assert "FINGER_TORQUE_JOINTS" not in source

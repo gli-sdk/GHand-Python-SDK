@@ -1,6 +1,7 @@
 import pytest
 from pathlib import Path
 
+import adaptive_grasp.pid_controller as pid_module
 from adaptive_grasp.pid_controller import PidController, PidParams
 
 
@@ -17,10 +18,11 @@ def test_pid_controller_exports_from_adaptive_grasp_package():
     assert ExportedPidParams is PidParams
 
 
-def test_pid_controller_does_not_depend_on_project_utils():
+def test_pid_controller_uses_project_clip_helper():
     source = PID_CONTROLLER_SOURCE.read_text(encoding="utf-8")
 
-    assert "from .utils import" not in source
+    assert pid_module.PidController.compute.__globals__["clip"] is pid_module.clip
+    assert "def _clamp" not in source
 
 
 def test_pid_controller_computes_p_i_d_terms():

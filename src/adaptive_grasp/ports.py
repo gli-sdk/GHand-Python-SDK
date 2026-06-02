@@ -14,8 +14,7 @@ class HandCommandPort(Protocol):
 
 @runtime_checkable
 class GraspSequenceHandPort(HandCommandPort, Protocol):
-    def wait_for_motion_completion(self) -> bool:
-        ...
+    pass
 
 
 @runtime_checkable

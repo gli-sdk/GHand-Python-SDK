@@ -10,6 +10,7 @@ from .joint_builder import JointCommandBuilder
 from .ports import HandCommandPort, SensorFrameSource
 from .runtime import AdaptiveGraspRuntime
 from .runtime import GraspState
+from .utils import join_thread_if_alive
 
 _logger = logging.getLogger("adaptive_grasp.release_controller")
 
@@ -43,17 +44,8 @@ class ReleaseController:
         self.runtime.adaptive_hold_started_at = None
         self.sensor.stop(clear_joint_feedback=False)
 
-        is_alive = getattr(control_thread, "is_alive", None)
-        join = getattr(control_thread, "join", None)
-        if (
-            wait_control_thread
-            and control_thread
-            and is_alive is not None
-            and join is not None
-            and is_alive()
-            and control_thread is not threading.current_thread()
-        ):
-            join(timeout=2.0)
+        if wait_control_thread:
+            join_thread_if_alive(control_thread, timeout=2.0)
 
         joints = self.joint_builder.position_command(
             self.joint_builder.open_pose(),

@@ -4,7 +4,7 @@ import time
 from typing import Any, Optional
 
 from ghand import ErrorCode, JointData, State, TactileInfo, TactileSensorId
-from .utils import tactile_force_xyz
+from .utils import active_finger_normal_forces, normal_force_z
 
 _logger = logging.getLogger("ghand.sensor")
 _DEFAULT_FINGER_TOUCH_THRESHOLD_N = 0.1
@@ -89,11 +89,11 @@ class SensorClient:
     def sum_active_finger_normal_force(self) -> float:
         if self._latest_tactile_data is None:
             return 0.0
-        return sum(
-            abs(tactile_force_xyz(info)[2])
-            for finger, info in self._latest_tactile_data.items()
-            if finger in self._active_fingers
+        normal_forces = active_finger_normal_forces(
+            self._latest_tactile_data,
+            self._active_fingers,
         )
+        return sum(normal_forces.values())
     def active_finger_touch_flag(self) -> dict[TactileSensorId, bool]:
         # 判断活动手指是否都接触
         if self._latest_tactile_data is None:
@@ -105,7 +105,7 @@ class SensorClient:
             touch_flag[finger] = (
                 info is not None
                 and info.state
-                and abs(tactile_force_xyz(info)[2]) >= self._finger_touch_threshold_n
+                and normal_force_z(info) >= self._finger_touch_threshold_n
             )
         return touch_flag
 

@@ -38,3 +38,7 @@ def test_default_profiles_define_position_hold_command_params():
         assert 0 <= profile.position_hold_torque <= 100
         assert isinstance(profile.position_hold_speed, int), name
         assert 0 <= profile.position_hold_speed <= 100
+
+
+def test_registry_exposes_only_list_all_for_names():
+    assert not hasattr(ObjectProfileRegistry, "list_names")

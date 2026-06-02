@@ -1,6 +1,5 @@
 import json
 import logging
-import math
 import os
 import subprocess
 import sys
@@ -16,7 +15,7 @@ import matplotlib.pyplot as plt
 
 from ghand import JointId, TactileSensorId
 from .tactility import TactileAnalysis
-from .utils import FINGER_TO_MCP_PIP, tactile_force_xyz
+from .utils import FINGER_TO_MCP_PIP
 
 _logger = logging.getLogger("adaptive_grasp.visualization")
 
@@ -183,13 +182,11 @@ class TactileVisualizer:
                 info = tactile_data.get(finger)
                 per = analysis.per_finger.get(finger)
                 if info is not None and per is not None:
-                    fx, fy, _ = tactile_force_xyz(info)
-                    ft = math.hypot(fx, fy)
                     self._data[finger]["fz"].append(per.fz)
                     self._data[finger]["fz_ref"].append(
                         force_refs.get(finger) if force_refs is not None else None
                     )
-                    self._data[finger]["ft"].append(ft)
+                    self._data[finger]["ft"].append(per.ft)
                     self._data[finger]["s_k"].append(per.s_k)
                     self._data[finger]["d_k"].append(per.d_k)
                     self._data[finger]["r_k"].append(per.r_k)

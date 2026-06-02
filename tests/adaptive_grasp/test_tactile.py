@@ -81,6 +81,7 @@ def test_tactile_analysis_accepts_ghand_tactile_fields():
 
     per = result.per_finger[TactileSensorId.THUMB]
     assert per.fz == pytest.approx(2.0)
+    assert per.ft == pytest.approx(0.5)
     assert per.r_k > 0.0
     assert result.direction_distance == pytest.approx(0.0)
 

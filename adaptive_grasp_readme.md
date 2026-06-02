@@ -16,8 +16,17 @@
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -U pip
+python -m pip install -r requirements.txt
+python -m pip install -e .
+```
+
+如果需要运行测试和开发工具，再安装 dev 依赖：
+
+```powershell
 python -m pip install -e ".[dev]"
 ```
+
+`requirements.txt` 只保留运行 SDK 和 Demo 需要的依赖；`pytest`、`mypy`、`yapf`、`pre-commit` 等开发工具由 `pyproject.toml` 的 `dev` extra 管理。
 
 VS Code 已配置默认解释器：
 
@@ -49,6 +58,14 @@ HOLD_TIME_S = 60.0
 - `GRASP_OBJECT`：Demo 场景名，必须是 `DEMO_SCENES` 中已有的 key。
 - `HOLD_TIME_S`：进入自适应保持后的自动释放时间，单位为秒，必须大于 0。
 
+中断释放等待时间由模块内默认值提供：
+
+```python
+_INTERRUPT_RELEASE_WAIT_S = 3.0
+```
+
+运行 Demo 时按 `Ctrl+C` 会调用 `emergency_release(wait_s=runtime_config.interrupt_release_wait_s)`。`DemoRuntimeConfig.interrupt_release_wait_s` 的默认值只来自 `_INTERRUPT_RELEASE_WAIT_S`；如果调用 `build_demo_runtime_config(..., interrupt_release_wait_s=...)`，传入值会覆盖这个默认值。
+
 运行：
 
 ```powershell
@@ -65,7 +82,7 @@ Demo 会执行以下动作：
 6. 到达 `HOLD_TIME_S` 后自动释放。
 7. 在 `finally` 中关闭触觉和通信。
 
-运行中按 `Ctrl+C` 会触发 `emergency_release()` 快速释放。
+运行中按 `Ctrl+C` 会触发 `emergency_release(wait_s=runtime_config.interrupt_release_wait_s)` 快速释放。
 
 ## 当前支持的 Demo 场景
 
@@ -96,6 +113,7 @@ from ghand import GHand
 
 hand = GHand()
 grasper = None
+runtime_config = build_demo_runtime_config("paper_cup", 60.0)
 
 try:
     if not hand.open("auto"):
@@ -106,7 +124,6 @@ try:
 
     time.sleep(0.5)
 
-    runtime_config = build_demo_runtime_config("paper_cup", 60.0)
     grasper = AdaptiveGrasper(
         hand=hand,
         config=runtime_config.adaptive_config,
@@ -118,6 +135,9 @@ try:
 
     final_state = grasper.wait_until_finished()
     print(f"Final state: {final_state.value}")
+except KeyboardInterrupt:
+    if grasper is not None:
+        grasper.emergency_release(wait_s=runtime_config.interrupt_release_wait_s)
 finally:
     hand.tactile_close()
     hand.close()
@@ -127,7 +147,7 @@ finally:
 
 - `grasp_core()`：执行张开、预抓取、闭合到接触，并启动自适应保持线程。成功返回后不要立刻调用 `finish()`，否则会马上释放。
 - `wait_until_finished()`：等待自适应保持和自动释放流程结束，并返回最终 `GraspState`。
-- `get_state()` / `state`：读取当前抓取状态。
+- `get_state()`：读取当前抓取状态。
 - `release()`：正常释放。
 - `finish()`：主动提前释放并等待可视化窗口关闭。
 - `emergency_release(wait_s=...)`：中断场景下快速释放。
@@ -177,7 +197,10 @@ Demo 默认：
 ```python
 enable_visualization = False
 hold_command_mode = "position"
+interrupt_release_wait_s = _INTERRUPT_RELEASE_WAIT_S
 ```
+
+`interrupt_release_wait_s` 属于 Demo 运行时配置，不属于 `AdaptiveGraspConfig`；它只影响 `Ctrl+C` 中断场景下快速释放后的等待时间。普通释放阶段使用的是 `AdaptiveGraspConfig.release_timeout_s`。
 
 ## 自定义物体或姿态
 
@@ -212,10 +235,16 @@ hold_command_mode = "position"
 .\.venv\Scripts\python.exe -m pytest
 ```
 
+只验证 `adaptive_grasp` 模块可运行：
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests\adaptive_grasp -q
+```
+
 当前环境验证结果：
 
 ```text
-236 passed
+253 passed
 ```
 
 ## 主要文件

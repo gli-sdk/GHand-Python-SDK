@@ -7,6 +7,11 @@ from .config import AdaptiveGraspConfig
 GRASP_OBJECT = "paper_cup" #default_object
 HOLD_TIME_S = 60.0 #default_hold_time
 
+_ENABLE_TACTILE_CSV = False
+_ENABLE_VISUALIZATION = False
+_HOLD_COMMAND_MODE = "position"
+_INTERRUPT_RELEASE_WAIT_S = 3.0
+
 
 @dataclass(frozen=True)
 class DemoScene:
@@ -18,7 +23,7 @@ class DemoScene:
 class DemoRuntimeConfig:
     adaptive_config: AdaptiveGraspConfig
     enable_tactile_csv: bool = False
-    interrupt_release_wait_s: float = 1.0
+    interrupt_release_wait_s: float = _INTERRUPT_RELEASE_WAIT_S
 
 
 DEMO_SCENES: dict[str, DemoScene] = {
@@ -35,11 +40,6 @@ DEMO_SCENES: dict[str, DemoScene] = {
     "orange": DemoScene(default_object="fruit", pre_grasp_preset="four_finger_grasp"),
     "pen": DemoScene(default_object="plastic", pre_grasp_preset="pen_pinch"),
 }
-
-_ENABLE_TACTILE_CSV = False
-_ENABLE_VISUALIZATION = False
-_HOLD_COMMAND_MODE = "position"
-_INTERRUPT_RELEASE_WAIT_S = 1.0
 
 def build_demo_runtime_config(
     grasp_object: str = GRASP_OBJECT,

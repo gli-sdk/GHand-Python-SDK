@@ -109,8 +109,9 @@ def test_adaptive_grasper_runtime_public_proxies():
 
     assert grasper.hand is hand
     assert grasper._runtime is not None
+    assert not hasattr(type(grasper), "state")
 
-    grasper.state = GraspState.ADAPTIVE_HOLD
+    grasper._runtime.state = GraspState.ADAPTIVE_HOLD
     grasper._running = True
     grasper.current_torque = 17
 
@@ -168,6 +169,8 @@ def test_adaptive_grasper_does_not_expose_migrated_runtime_wrappers():
         "_last_control_cycle_s",
         "_last_control_cycle_jitter_s",
         "_last_contact_snapshot",
+        "_adaptive_hold_loop",
+        "_adaptive_control_loop",
     )
 
     for name in migrated_names:
@@ -223,7 +226,7 @@ def test_start_adaptive_control_uses_hold_runner_thread(monkeypatch):
     assert grasper._control_thread is created_threads[-1]
     assert created_threads[-1].target == grasper._hold_runner._run_loop
     assert created_threads[-1].start_calls == 1
-    assert grasper._adaptive_hold_loop is grasper._hold_runner.hold_controller
+    assert grasper._hold_runner.hold_controller is not None
 
 
 def test_hold_runner_auto_release_uses_control_step_time(monkeypatch):
@@ -254,7 +257,7 @@ def test_hold_runner_auto_release_uses_control_step_time(monkeypatch):
     assert calls == []
 
 
-def test_adaptive_control_loop_uses_latest_manager_clock(monkeypatch):
+def test_hold_runner_loop_uses_latest_manager_clock(monkeypatch):
     grasper = AdaptiveGrasper(
         _MockHand(),
         AdaptiveGraspConfig(enable_visualization=False, release_hold_time_s=100.0),
@@ -270,14 +273,15 @@ def test_adaptive_control_loop_uses_latest_manager_clock(monkeypatch):
             seen_step_times.append(current_time)
             return HoldStepResult(result=HoldResult.ERROR)
 
-    grasper._adaptive_hold_loop = _ErrorAfterStepHoldLoop()
+    grasper._hold_runner.hold_controller = _ErrorAfterStepHoldLoop()
+    grasper._hold_runner.get_monotonic_time = grasper._get_monotonic_time
     monkeypatch.setattr(
         grasper._sensor,
         "stop",
         lambda clear_joint_feedback=False: None,
     )
 
-    grasper._adaptive_control_loop()
+    grasper._hold_runner._run_loop()
 
     assert seen_step_times == [42.0]
 
@@ -377,7 +381,7 @@ def test_release_succeeds_without_waiting_for_settle_feedback(monkeypatch):
     g._get_monotonic_time = lambda: (t.__setitem__("v", t["v"] + 0.01) or t["v"])
 
     assert g.release() is True
-    assert g.state == GraspState.COMPLETED
+    assert g.get_state() == GraspState.COMPLETED
 
 
 def test_release_does_not_check_whether_joints_are_settled(monkeypatch):
@@ -394,7 +398,7 @@ def test_release_does_not_check_whether_joints_are_settled(monkeypatch):
     monkeypatch.setattr("adaptive_grasp.adaptive_grasp_manager.time.sleep", lambda *_: None)
 
     assert g.release() is True
-    assert g.state == GraspState.COMPLETED
+    assert g.get_state() == GraspState.COMPLETED
     assert get_joints_called == [False]
 
 
@@ -424,7 +428,7 @@ def test_release_ignores_unsettled_feedback_after_open_command(monkeypatch):
     g._get_monotonic_time = lambda: (t.__setitem__("v", t["v"] + 0.01) or t["v"])
 
     assert g.release() is True
-    assert g.state == GraspState.COMPLETED
+    assert g.get_state() == GraspState.COMPLETED
 
 
 def test_release_does_not_require_fresh_hand_feedback_after_subscription_stops(monkeypatch):
@@ -450,7 +454,7 @@ def test_release_does_not_require_fresh_hand_feedback_after_subscription_stops(m
     g._get_monotonic_time = lambda: (t.__setitem__("v", t["v"] + 0.01) or t["v"])
 
     assert g.release() is True
-    assert g.state == GraspState.COMPLETED
+    assert g.get_state() == GraspState.COMPLETED
 
 
 def test_full_grasp_state_transitions(monkeypatch):
@@ -469,7 +473,7 @@ def test_full_grasp_state_transitions(monkeypatch):
     monkeypatch.setattr(grasper._sensor, "sum_active_finger_normal_force", lambda: 4.0)
     monkeypatch.setattr(
         "adaptive_grasp.grasp_sequence.PhaseController._wait_until_position_reached",
-        lambda self, pose: True,
+        lambda self, pose, **_kwargs: True,
     )
     grasper._sensor._latest_tactile_data = {
         TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 2.0),
@@ -479,7 +483,7 @@ def test_full_grasp_state_transitions(monkeypatch):
 
     assert grasper.grasp_core() is True
     assert grasper._grasp_sequence.hand_port is grasper._hand_port
-    assert grasper.state == GraspState.ADAPTIVE_HOLD
+    assert grasper.get_state() == GraspState.ADAPTIVE_HOLD
 
     time.sleep(0.1)
     # Provide joint feedback matching open pose so release settles successfully
@@ -488,7 +492,7 @@ def test_full_grasp_state_transitions(monkeypatch):
         JointCommand(id=joint_id, angle=angle) for joint_id, angle in open_pose.items()
     ]
     grasper.release()
-    assert grasper.state in (GraspState.COMPLETED, GraspState.RELEASE)
+    assert grasper.get_state() in (GraspState.COMPLETED, GraspState.RELEASE)
 
 
 def test_perform_release_waits_for_control_thread(monkeypatch):
@@ -496,7 +500,7 @@ def test_perform_release_waits_for_control_thread(monkeypatch):
     hand = _MockHand()
     g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
     g._running = True
-    g.state = GraspState.ADAPTIVE_HOLD
+    g._runtime.state = GraspState.ADAPTIVE_HOLD
     # Existing feedback is ignored by release; success depends on the open command.
     open_pose = g._joint_builder.open_pose()
     g._sensor._latest_joint_feedback = [
@@ -521,7 +525,7 @@ def test_perform_release_waits_for_control_thread(monkeypatch):
 
     g._perform_release(wait_control_thread=True)
     assert joined[0] is True
-    assert g.state == GraspState.COMPLETED
+    assert g.get_state() == GraspState.COMPLETED
     assert g._running is False
 
 
@@ -530,7 +534,7 @@ def test_perform_release_from_control_thread_does_not_deadlock(monkeypatch):
     hand = _MockHand()
     g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
     g._running = True
-    g.state = GraspState.ADAPTIVE_HOLD
+    g._runtime.state = GraspState.ADAPTIVE_HOLD
     g._control_thread = threading.current_thread()
     # Existing feedback is ignored by release; success depends on the open command.
     open_pose = g._joint_builder.open_pose()
@@ -542,7 +546,7 @@ def test_perform_release_from_control_thread_does_not_deadlock(monkeypatch):
 
     result = g._perform_release(wait_control_thread=False)
     assert result is True
-    assert g.state == GraspState.COMPLETED
+    assert g.get_state() == GraspState.COMPLETED
     assert g._running is False
 
 
@@ -550,7 +554,7 @@ def test_emergency_release_sends_open_command_without_waiting_for_control_thread
     hand = _MockHand()
     g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
     g._running = True
-    g.state = GraspState.ADAPTIVE_HOLD
+    g._runtime.state = GraspState.ADAPTIVE_HOLD
 
     class _BlockingThread:
         def __init__(self):
@@ -576,28 +580,28 @@ def test_emergency_release_sends_open_command_without_waiting_for_control_thread
     assert control_thread.join_calls == 0
     assert sleeps == [0.123]
     assert hand.calls[-1]["mode"] == CtrlMode.POSITION
-    assert g.state == GraspState.COMPLETED
+    assert g.get_state() == GraspState.COMPLETED
     assert g._running is False
 
 
 def test_cleanup_grasp_sets_stopped_state():
     hand = _MockHand()
     g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
-    g.state = GraspState.CLOSING_TO_CONTACT
+    g._runtime.state = GraspState.CLOSING_TO_CONTACT
     g._running = True
 
     g._cleanup_grasp(state=GraspState.STOPPED)
 
-    assert g.state == GraspState.STOPPED
+    assert g.get_state() == GraspState.STOPPED
     assert g._running is False
 
 
-def test_adaptive_control_loop_cleans_up_when_hold_step_errors(monkeypatch):
+def test_hold_runner_loop_cleans_up_when_hold_step_errors(monkeypatch):
     hand = _MockHand()
     g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
     g._running = True
-    g.state = GraspState.ADAPTIVE_HOLD
-    g._adaptive_hold_loop = type(
+    g._runtime.state = GraspState.ADAPTIVE_HOLD
+    g._hold_runner.hold_controller = type(
         "_ErrorHoldLoop",
         (),
         {"run_step": lambda self, current_time: HoldStepResult(result=HoldResult.ERROR)},
@@ -605,30 +609,30 @@ def test_adaptive_control_loop_cleans_up_when_hold_step_errors(monkeypatch):
     stop_calls = []
     monkeypatch.setattr(g._sensor, "stop", lambda clear_joint_feedback=False: stop_calls.append(clear_joint_feedback))
 
-    g._adaptive_control_loop()
+    g._hold_runner._run_loop()
 
-    assert g.state == GraspState.ERROR
+    assert g.get_state() == GraspState.ERROR
     assert g._running is False
     assert stop_calls == [False]
 
 
-def test_adaptive_control_loop_catches_unexpected_hold_exceptions(monkeypatch):
+def test_hold_runner_loop_catches_unexpected_hold_exceptions(monkeypatch):
     hand = _MockHand()
     g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
     g._running = True
-    g.state = GraspState.ADAPTIVE_HOLD
+    g._runtime.state = GraspState.ADAPTIVE_HOLD
 
     class _RaisingHoldLoop:
         def run_step(self, current_time):
             raise RuntimeError("hold boom")
 
-    g._adaptive_hold_loop = _RaisingHoldLoop()
+    g._hold_runner.hold_controller = _RaisingHoldLoop()
     stop_calls = []
     monkeypatch.setattr(g._sensor, "stop", lambda clear_joint_feedback=False: stop_calls.append(clear_joint_feedback))
 
-    g._adaptive_control_loop()
+    g._hold_runner._run_loop()
 
-    assert g.state == GraspState.ERROR
+    assert g.get_state() == GraspState.ERROR
     assert g._running is False
     assert stop_calls == [False]
 
@@ -651,7 +655,7 @@ def test_wait_for_visualizer_close_blocks_on_visualizer(monkeypatch):
 def test_wait_until_finished_polls_until_hold_lifecycle_finishes(monkeypatch):
     hand = _MockHand()
     g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
-    g.state = GraspState.ADAPTIVE_HOLD
+    g._runtime.state = GraspState.ADAPTIVE_HOLD
     g._running = True
 
     poll_states = []
@@ -660,7 +664,7 @@ def test_wait_until_finished_polls_until_hold_lifecycle_finishes(monkeypatch):
     def fake_poll_visualizer():
         poll_states.append(g.get_state())
         if len(poll_states) == 2:
-            g.state = GraspState.COMPLETED
+            g._runtime.state = GraspState.COMPLETED
             g._running = False
 
     monkeypatch.setattr(g, "poll_visualizer", fake_poll_visualizer)
@@ -684,7 +688,7 @@ def test_wait_until_finished_polls_until_hold_lifecycle_finishes(monkeypatch):
 def test_wait_until_finished_waits_through_release_state_and_joins_thread(monkeypatch):
     hand = _MockHand()
     g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
-    g.state = GraspState.RELEASE
+    g._runtime.state = GraspState.RELEASE
 
     class _FakeThread:
         def __init__(self):
@@ -702,7 +706,7 @@ def test_wait_until_finished_waits_through_release_state_and_joins_thread(monkey
 
     def fake_sleep(value):
         sleeps.append(value)
-        g.state = GraspState.COMPLETED
+        g._runtime.state = GraspState.COMPLETED
 
     monkeypatch.setattr("adaptive_grasp.adaptive_grasp_manager.time.sleep", fake_sleep)
 
@@ -896,7 +900,7 @@ def test_adaptive_grasper_constructor_does_not_zero_tactile():
         AdaptiveGraspConfig(),
     )
 
-    assert grasper.state == GraspState.IDLE
+    assert grasper.get_state() == GraspState.IDLE
 
 
 def test_grasp_core_sets_error_state_when_phase_fails(monkeypatch):
@@ -917,7 +921,7 @@ def test_grasp_core_sets_error_state_when_phase_fails(monkeypatch):
     )
 
     assert grasper.grasp_core() is False
-    assert grasper.state == GraspState.ERROR
+    assert grasper.get_state() == GraspState.ERROR
     assert grasper._running is False
 
 
@@ -982,7 +986,7 @@ def test_grasp_core_stores_contact_snapshot_for_adaptive_hold(monkeypatch):
 
     assert grasper.grasp_core() is True
     assert grasper.last_contact_snapshot is snapshot
-    assert grasper._adaptive_hold_loop._contact_joint_angles == snapshot.joint_angles
+    assert grasper._hold_runner.hold_controller._contact_joint_angles == snapshot.joint_angles
 
 
 def test_grasp_sequence_run_receives_only_is_running_callback(monkeypatch):
@@ -1055,8 +1059,8 @@ def test_torque_mode_creates_hold_planners_from_contact_snapshot(monkeypatch):
 
     grasper._start_adaptive_control()
 
-    assert isinstance(grasper._adaptive_hold_loop._torque_hold_planner, TorqueHoldPlanner)
-    assert isinstance(grasper._adaptive_hold_loop._force_reference_planner, ForceReferencePlanner)
+    assert isinstance(grasper._hold_runner.hold_controller._torque_hold_planner, TorqueHoldPlanner)
+    assert isinstance(grasper._hold_runner.hold_controller._force_reference_planner, ForceReferencePlanner)
 
 
 def test_position_mode_creates_position_hold_planner_from_contact_snapshot(monkeypatch):
@@ -1090,8 +1094,8 @@ def test_position_mode_creates_position_hold_planner_from_contact_snapshot(monke
 
     grasper._start_adaptive_control()
 
-    assert isinstance(grasper._adaptive_hold_loop._position_hold_planner, PositionHoldPlanner)
-    assert isinstance(grasper._adaptive_hold_loop._force_reference_planner, ForceReferencePlanner)
+    assert isinstance(grasper._hold_runner.hold_controller._position_hold_planner, PositionHoldPlanner)
+    assert isinstance(grasper._hold_runner.hold_controller._force_reference_planner, ForceReferencePlanner)
 
 
 def test_full_grasp_lifecycle(monkeypatch):
@@ -1113,7 +1117,7 @@ def test_full_grasp_lifecycle(monkeypatch):
     monkeypatch.setattr(grasper._sensor, "sum_active_finger_normal_force", lambda: 4.0)
     monkeypatch.setattr(
         "adaptive_grasp.grasp_sequence.PhaseController._wait_until_position_reached",
-        lambda self, pose: True,
+        lambda self, pose, **_kwargs: True,
     )
 
     # Provide tactile and joint feedback for the closing phase and adaptive hold
@@ -1123,11 +1127,11 @@ def test_full_grasp_lifecycle(monkeypatch):
     }
     grasper._sensor._latest_joint_feedback = []
 
-    assert grasper.state == GraspState.IDLE
+    assert grasper.get_state() == GraspState.IDLE
 
     ok = grasper.grasp_core()
     assert ok is True
-    assert grasper.state == GraspState.ADAPTIVE_HOLD
+    assert grasper.get_state() == GraspState.ADAPTIVE_HOLD
     assert grasper._running is True
     assert grasper._control_thread is not None
     assert grasper._control_thread.is_alive()
@@ -1144,7 +1148,7 @@ def test_full_grasp_lifecycle(monkeypatch):
     # Release and verify it reaches COMPLETED
     ok_release = grasper.release()
     assert ok_release is True
-    assert grasper.state == GraspState.COMPLETED
+    assert grasper.get_state() == GraspState.COMPLETED
     assert grasper._running is False
 
     # Verify hand received the expected phases:

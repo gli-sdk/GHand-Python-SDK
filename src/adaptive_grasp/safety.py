@@ -8,7 +8,7 @@ from ghand import TactileSensorId
 
 from .config import AdaptiveGraspConfig
 from .runtime import GraspState
-from .utils import tactile_force_xyz
+from .utils import active_finger_normal_forces
 
 _logger = logging.getLogger("adaptive_grasp.safety")
 
@@ -101,11 +101,10 @@ class SafetyMonitor:
     def _is_below_drop_threshold(self, total_fz: float) -> bool:
         return total_fz < self._drop_threshold()
     def _get_active_finger_fz(self, tactile_data: dict) -> dict[Any, float]:
-        return {
-            finger: abs(tactile_force_xyz(tactile_data[finger])[2])
-            for finger in self._ordered_active_fingers()
-            if finger in tactile_data
-        }
+        return active_finger_normal_forces(
+            tactile_data,
+            self._ordered_active_fingers(),
+        )
 
     def _ordered_active_fingers(self) -> list[Any]:
         active_fingers = set(self.config.active_fingers)

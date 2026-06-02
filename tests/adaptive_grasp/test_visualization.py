@@ -1,11 +1,10 @@
-import math
 import time
 from pathlib import Path
 
 import pytest
 
 from adaptive_grasp.config import AdaptiveGraspConfig
-from adaptive_grasp.tactility import TactileAnalyzer, TactileAnalysis
+from adaptive_grasp.tactility import PerFingerAnalysis, TactileAnalyzer, TactileAnalysis
 from adaptive_grasp.visualization import TactileVisualizer
 from ghand import TactileSensorId
 
@@ -86,6 +85,42 @@ def test_visualizer_update_accepts_ghand_tactile_fields():
     viz.update(tactile_data, analysis, timestamp=0.0)
 
     assert viz._data[TactileSensorId.THUMB]["ft"][0] == pytest.approx(1.0)
+
+
+def test_visualizer_uses_analysis_tangential_force_as_single_source():
+    viz = TactileVisualizer(
+        active_fingers={TactileSensorId.THUMB},
+        max_points=10,
+    )
+    tactile_data = {
+        TactileSensorId.THUMB: _FakeTactileInfo(0.3, 0.4, 1.0),
+    }
+    analysis = TactileAnalysis(
+        variance=0.0,
+        slip_risk=0.0,
+        direction_distance=0.0,
+        friction_utilization=0.0,
+        slip_confirmed=False,
+        finger_fz={TactileSensorId.THUMB: 1.0},
+        total_fz=1.0,
+        per_finger={
+            TactileSensorId.THUMB: PerFingerAnalysis(
+                variance=0.0,
+                s_k=0.0,
+                d_k=0.0,
+                r_k=0.0,
+                s_total=0.0,
+                slip_confirmed=False,
+                fz=1.0,
+                ft=9.0,
+                fz_filtered=1.0,
+            )
+        },
+    )
+
+    viz.update(tactile_data, analysis, timestamp=0.0)
+
+    assert viz._data[TactileSensorId.THUMB]["ft"][0] == pytest.approx(9.0)
 
 
 def test_visualizer_plots_slip_indicator_components():

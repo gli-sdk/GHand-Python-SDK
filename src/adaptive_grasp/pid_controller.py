@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
+from .utils import clip
 
 
 @dataclass(frozen=True)
@@ -32,7 +33,7 @@ class PidController:
         if dt <= 0:
             raise ValueError("dt must be > 0")
 
-        self.integral = self._clamp(
+        self.integral = clip(
             self.integral + error * dt,
             self.params.I_min,
             self.params.I_max,
@@ -49,10 +50,6 @@ class PidController:
         if self._previous_error is None:
             return 0.0
         return (error - self._previous_error) / dt
-
-    @staticmethod
-    def _clamp(value: float, lower: float, upper: float) -> float:
-        return max(lower, min(value, upper))
 
 
 class LowPassFilter:

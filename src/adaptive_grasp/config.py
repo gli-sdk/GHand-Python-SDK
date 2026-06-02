@@ -55,10 +55,8 @@ class AdaptiveGraspConfig:
     # Open, pre-grasp, and closing-to-contact phases.
     open_speed: int = 50  # Speed command used when opening the hand.
     open_torque: int = 50  # Torque/current limit used when opening the hand.
-    open_wait_s: float = 3.0  # Wait time after sending the open command.
     pre_grasp_speed: int = 75  # Speed command used when moving to the pre-grasp pose.
     pre_grasp_torque: int = 75  # Torque/current limit used when moving to the pre-grasp pose.
-    pre_grasp_wait_s: float = 5.0  # Wait time after sending the pre-grasp command.
     closing_total_contact_threshold_n: float = 0.2  # Total normal force threshold for ending the closing phase.
     finger_touch_threshold_n: float = 0.1  # Per-finger normal force threshold for considering a finger in contact.
 
@@ -179,10 +177,8 @@ class AdaptiveGraspConfig:
 
         _validate("open_speed", self.open_speed, greater_equal=0, less_equal=100)
         _validate("open_torque", self.open_torque, greater_equal=0, less_equal=100)
-        _validate("open_wait_s", self.open_wait_s, greater_than=0)
         _validate("pre_grasp_speed", self.pre_grasp_speed, greater_equal=0, less_equal=100)
         _validate("pre_grasp_torque", self.pre_grasp_torque, greater_equal=0, less_equal=100)
-        _validate("pre_grasp_wait_s", self.pre_grasp_wait_s, greater_than=0)
 
         _validate("max_torque", self.max_torque, greater_than=0)
         _validate("thumb_aux_torque", self.thumb_aux_torque, greater_equal=-100, less_equal=100)

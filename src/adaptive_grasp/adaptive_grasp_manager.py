@@ -1,5 +1,4 @@
 import logging
-import threading
 import time
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -22,7 +21,7 @@ from .safety import SafetyMonitor, SafetyReport
 from .sensor import SensorClient
 from .tactility import TactileAnalysis, TactileAnalyzer
 from .torque_hold_planner import TorqueHoldDecision
-from .utils import JOINT_TO_FINGER
+from .utils import JOINT_TO_FINGER, join_thread_if_alive
 from .visualization import TactileVisualizer
 
 _logger = logging.getLogger("adaptive_grasp.adaptive_grasp_manager")
@@ -137,7 +136,6 @@ class AdaptiveGrasper:
         )
 
         self._grasp_sequence: Optional[PhaseController] = None
-        self._adaptive_hold_loop: Optional[HoldController] = None
 
     def grasp_core(self, object_profile: Optional[ObjectProfile] = None) -> bool:
         try:
@@ -162,18 +160,6 @@ class AdaptiveGrasper:
             _logger.exception("grasp_core exception")
             self._cleanup_grasp(state=GraspState.ERROR)
             return False
-
-
-
-
-
-    @property
-    def state(self) -> GraspState:
-        return self._runtime.state
-
-    @state.setter
-    def state(self, value: GraspState) -> None:
-        self._runtime.state = value
 
     @property
     def _running(self) -> bool:
@@ -316,7 +302,6 @@ class AdaptiveGrasper:
         self._control_thread_override = _NO_CONTROL_THREAD_OVERRIDE
         self._hold_runner.get_monotonic_time = self._get_monotonic_time
         self._hold_runner.start(self._runtime.last_contact_snapshot)
-        self._adaptive_hold_loop = self._hold_runner.hold_controller
         if self._visualizer is not None:
             self._visualizer.start()
 
@@ -349,13 +334,6 @@ class AdaptiveGrasper:
         )
         return self._grasp_sequence.run(lambda: self._runtime.running)
 
-    def _adaptive_control_loop(self) -> None:
-        self._hold_runner.get_monotonic_time = self._get_monotonic_time
-        if self._adaptive_hold_loop is not None:
-            self._hold_runner.hold_controller = self._adaptive_hold_loop
-        self._hold_runner._run_loop()
-        self._adaptive_hold_loop = self._hold_runner.hold_controller
-
     def _perform_release(
         self,
         wait_control_thread: bool,
@@ -385,7 +363,6 @@ class AdaptiveGrasper:
         self._safety.reset()
         self._sensor.reset()
         self._grasp_sequence = None
-        self._adaptive_hold_loop = None
         self._hold_runner.hold_controller = None
 
     def _configure_subscription_periods(self) -> None:
@@ -399,14 +376,6 @@ class AdaptiveGrasper:
 
     def _join_control_thread_override(self, *, timeout: float) -> None:
         thread = self._control_thread_override
-        if (
-            thread is _NO_CONTROL_THREAD_OVERRIDE
-            or thread is None
-            or thread is threading.current_thread()
-        ):
+        if thread is _NO_CONTROL_THREAD_OVERRIDE:
             return
-        is_alive = getattr(thread, "is_alive", None)
-        join = getattr(thread, "join", None)
-        if is_alive is None or join is None or not is_alive():
-            return
-        join(timeout=timeout)
+        join_thread_if_alive(thread, timeout=timeout)

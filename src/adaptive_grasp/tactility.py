@@ -87,6 +87,7 @@ class PerFingerAnalysis:
     s_total: float
     slip_confirmed: bool
     fz: float
+    ft: float
     fz_filtered: float
 
     @property
@@ -209,6 +210,7 @@ class TactileAnalyzer:
             s_total=s_total,
             slip_confirmed=slip_confirmed,
             fz=sample.fz,
+            ft=sample.ft,
             fz_filtered=fz_filtered,
         )
 

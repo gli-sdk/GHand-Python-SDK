@@ -3,7 +3,7 @@ from typing import Mapping, Optional
 
 from ghand import JointCommand, JointId, TactileSensorId
 from .config import AdaptiveGraspConfig
-from .utils import clip
+from .utils import FINGER_TO_MCP_PIP, clip
 
 
 TORQUE_CONTROL_JOINTS = (
@@ -13,15 +13,6 @@ TORQUE_CONTROL_JOINTS = (
     JointId.RF_PIP, JointId.RF_MCP,
     JointId.LF_PIP, JointId.LF_MCP,
 )
-
-FINGER_TORQUE_JOINTS = {
-    TactileSensorId.THUMB: (JointId.THUMB_MCP, JointId.THUMB_PIP),
-    TactileSensorId.FF: (JointId.FF_MCP, JointId.FF_PIP),
-    TactileSensorId.MF: (JointId.MF_MCP, JointId.MF_PIP),
-    TactileSensorId.RF: (JointId.RF_MCP, JointId.RF_PIP),
-    TactileSensorId.LF: (JointId.LF_MCP, JointId.LF_PIP),
-}
-
 
 class JointCommandBuilder:
     _TORQUE_JOINTS = TORQUE_CONTROL_JOINTS
@@ -89,7 +80,7 @@ class JointCommandBuilder:
         joint_torques: dict[JointId, int] = {}
 
         for finger, torque in finger_torques.items():
-            for joint_id in FINGER_TORQUE_JOINTS.get(finger, ()):
+            for joint_id in FINGER_TO_MCP_PIP.get(finger, ()):
                 if joint_id in active_joints:
                     joint_torques[joint_id] = round(
                         clip(torque, -100.0, self._config.max_torque)

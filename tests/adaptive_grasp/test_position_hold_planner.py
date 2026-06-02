@@ -38,6 +38,7 @@ def _analysis(
                 s_total=(per_finger_slip_risk or {}).get(finger, slip_risk),
                 slip_confirmed=slip_confirmed,
                 fz=fz,
+                ft=0.0,
                 fz_filtered=fz,
             )
             for finger, fz in forces.items()

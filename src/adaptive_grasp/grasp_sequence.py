@@ -11,7 +11,7 @@ from .runtime import GraspState
 from .safety import SafetyMonitor, SafetyStatus
 from .joint_builder import JointCommandBuilder
 from .object_profile import ObjectProfile
-from .utils import clip, tactile_force_xyz
+from .utils import active_finger_normal_forces, clip
 
 _logger = logging.getLogger("adaptive_grasp.grasp_sequence")
 
@@ -125,17 +125,25 @@ class PhaseController:
         pose: dict[JointId, float],
         speed: int,
         torque: int,
+        is_running: Callable[[], bool] = lambda: True,
     ) -> bool:
         self._set_state(state)
         joints = self._joint_builder.position_command(pose, speed=speed, torque=torque)
         ok = self.hand_port.move_joints(joints, mode=CtrlMode.POSITION)
         if not ok:
             return False
-        return self._wait_until_position_reached(pose)
+        return self._wait_until_position_reached(pose, is_running=is_running)
 
-    def _wait_until_position_reached(self, pose: dict[JointId, float]) -> bool:
+    def _wait_until_position_reached(
+        self,
+        pose: dict[JointId, float],
+        is_running: Callable[[], bool] = lambda: True,
+    ) -> bool:
         start = self._get_monotonic_time()
         while True:
+            if not is_running():
+                return False
+
             feedback = self._sensor.joint_feedback
             if feedback:
                 current_angles = {joint.id: joint.angle for joint in feedback}
@@ -161,6 +169,7 @@ class PhaseController:
             self._joint_builder.open_pose(),
             speed=self.config.open_speed,
             torque=self.config.open_torque,
+            is_running=is_running,
         )
 
     def _phase_pre_grasp(self, is_running: Callable[[], bool] = lambda: True) -> bool:
@@ -169,6 +178,7 @@ class PhaseController:
             self.config.pre_grasp_pose,
             speed=self.config.pre_grasp_speed,
             torque=self.config.pre_grasp_torque,
+            is_running=is_running,
         )
 
     def _phase_closing(self, is_running: Callable[[], bool]) -> bool:
@@ -290,11 +300,10 @@ class PhaseController:
             for j in joint_feedback
             if j.id in self._joint_builder.torque_joints
         }
-        finger_fz = {
-            finger: abs(tactile_force_xyz(info)[2])
-            for finger, info in tactile_data.items()
-            if finger in self.config.active_fingers
-        }
+        finger_fz = active_finger_normal_forces(
+            tactile_data,
+            self.config.active_fingers,
+        )
         self._contact_snapshot = ContactSnapshot(
             joint_angles=joint_angles,
             finger_fz=finger_fz,

@@ -10,6 +10,7 @@ from .ports import SensorFrameSource
 from .release_controller import ReleaseController
 from .runtime import AdaptiveGraspRuntime
 from .runtime import GraspState
+from .utils import join_thread_if_alive
 
 _logger = logging.getLogger("adaptive_grasp.adaptive_hold_runner")
 
@@ -108,13 +109,7 @@ class AdaptiveHoldRunner:
 
     def stop(self) -> None:
         self.runtime.running = False
-        thread = self._thread
-        if (
-            thread is not None
-            and thread.is_alive()
-            and thread is not threading.current_thread()
-        ):
-            thread.join(timeout=1.0)
+        join_thread_if_alive(self._thread, timeout=1.0)
 
     def _run_loop(self) -> None:
         try:

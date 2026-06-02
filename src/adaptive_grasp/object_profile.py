@@ -47,10 +47,6 @@ class ObjectProfileRegistry:
     def list_all(cls) -> list[str]:
         return list(cls._profiles.keys())
 
-    @classmethod
-    def list_names(cls) -> list[str]:
-        return cls.list_all()
-
 
 DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
     ObjectProfile(

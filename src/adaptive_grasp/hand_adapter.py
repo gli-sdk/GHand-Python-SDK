@@ -57,15 +57,10 @@ def ensure_hand_command_port(hand: Any) -> GraspSequenceHandPort:
     has_command_methods = hasattr(hand, "move_joints") and hasattr(hand, "stop")
     has_motion_completion = hasattr(hand, "wait_for_motion_completion")
 
-    if has_command_methods and has_motion_completion:
+    if has_command_methods and (has_motion_completion or not is_ghand_like):
         return hand
     if is_ghand_like and has_command_methods:
         return GHandCommandPort(hand)
-    if has_command_methods:
-        raise TypeError(
-            "hand port must provide wait_for_motion_completion() or be a "
-            "GHand-like object"
-        )
     raise TypeError(
         "hand port must provide move_joints()/stop() or be a GHand-like object"
     )

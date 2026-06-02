@@ -4,6 +4,7 @@ from adaptive_grasp.config import AdaptiveGraspConfig
 from adaptive_grasp.grasp_presets import PRESET_ACTIVE_FINGERS
 from adaptive_grasp.demo_config import (
     DEMO_SCENES,
+    DemoRuntimeConfig,
     HOLD_TIME_S,
     GRASP_OBJECT,
     build_demo_runtime_config,
@@ -30,6 +31,17 @@ def test_demo_runtime_config_defaults_use_top_level_demo_choices():
 
     assert runtime.adaptive_config.release_hold_time_s == HOLD_TIME_S
     assert runtime.adaptive_config.default_object == DEMO_SCENES[GRASP_OBJECT].default_object
+
+
+def test_demo_runtime_config_interrupt_default_comes_from_module_constant():
+    runtime = DemoRuntimeConfig(
+        adaptive_config=AdaptiveGraspConfig(
+            default_object="paper_cup",
+            pre_grasp_preset="paper_cup_grasp",
+        )
+    )
+
+    assert runtime.interrupt_release_wait_s == demo_config._INTERRUPT_RELEASE_WAIT_S
 
 
 def test_mineral_water_bottle_demo_name_has_no_hidden_whitespace():

@@ -167,9 +167,10 @@ def test_ensure_hand_command_port_prefers_complete_port_over_ghand_like_shape():
     assert ensure_hand_command_port(port_like) is port_like
 
 
-def test_ensure_hand_command_port_rejects_command_only_port():
-    with pytest.raises(TypeError, match="wait_for_motion_completion"):
-        ensure_hand_command_port(_CommandOnlyHand())
+def test_ensure_hand_command_port_accepts_command_only_port():
+    command_only = _CommandOnlyHand()
+
+    assert ensure_hand_command_port(command_only) is command_only
 
 
 def test_ensure_hand_command_port_rejects_invalid_object():

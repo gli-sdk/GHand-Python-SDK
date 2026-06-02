@@ -76,6 +76,7 @@ def _analysis(
                 s_total=risk,
                 slip_confirmed=False,
                 fz=forces.get(finger, 0.0),
+                ft=0.0,
                 fz_filtered=forces.get(finger, 0.0),
             )
             for finger, risk in (per_finger_slip_risk or {}).items()

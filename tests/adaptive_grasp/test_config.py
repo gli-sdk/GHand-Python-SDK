@@ -346,10 +346,18 @@ def test_phase_motion_defaults_are_configurable():
 
     assert cfg.open_speed == _config_default("open_speed")
     assert cfg.open_torque == _config_default("open_torque")
-    assert cfg.open_wait_s == pytest.approx(_config_default("open_wait_s"))
     assert cfg.pre_grasp_speed == _config_default("pre_grasp_speed")
     assert cfg.pre_grasp_torque == _config_default("pre_grasp_torque")
-    assert cfg.pre_grasp_wait_s == pytest.approx(_config_default("pre_grasp_wait_s"))
+
+
+def test_phase_motion_wait_fields_are_not_public_config():
+    assert "open_wait_s" not in AdaptiveGraspConfig.__dataclass_fields__
+    assert "pre_grasp_wait_s" not in AdaptiveGraspConfig.__dataclass_fields__
+
+    with pytest.raises(TypeError):
+        AdaptiveGraspConfig(open_wait_s=1.0)
+    with pytest.raises(TypeError):
+        AdaptiveGraspConfig(pre_grasp_wait_s=1.0)
 
 
 def test_phase_motion_constraints():
@@ -358,13 +366,9 @@ def test_phase_motion_constraints():
     with pytest.raises(ValueError):
         AdaptiveGraspConfig(open_torque=101)
     with pytest.raises(ValueError):
-        AdaptiveGraspConfig(open_wait_s=0.0)
-    with pytest.raises(ValueError):
         AdaptiveGraspConfig(pre_grasp_speed=101)
     with pytest.raises(ValueError):
         AdaptiveGraspConfig(pre_grasp_torque=-1)
-    with pytest.raises(ValueError):
-        AdaptiveGraspConfig(pre_grasp_wait_s=0.0)
 
 
 def test_safety_threshold_defaults_are_configurable():
