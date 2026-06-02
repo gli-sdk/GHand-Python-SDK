@@ -10,7 +10,7 @@ HOLD_TIME_S = 60.0 #default_hold_time
 _ENABLE_TACTILE_CSV = False
 _ENABLE_VISUALIZATION = False
 _HOLD_COMMAND_MODE = "position"
-_INTERRUPT_RELEASE_WAIT_S = 3.0
+_INTERRUPT_RELEASE_WAIT_S = 5.0
 
 
 @dataclass(frozen=True)

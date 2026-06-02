@@ -197,13 +197,17 @@ class AdaptiveGrasper:
         self._runtime.state = state
 
     def release(self) -> bool:
+        """Open the hand and complete the normal release phase."""
         return self._perform_release(wait_control_thread=True)
 
-    def finish(self) -> None:
-        self.release()
+    def release_and_wait_for_visualizer_close(self) -> bool:
+        """Release the grasp, then wait for the visualizer window to close."""
+        ok = self.release()
         self.wait_for_visualizer_close()
+        return ok
 
-    def wait_until_finished(self, poll_period_s: float = 0.1) -> GraspState:
+    def wait_for_completion(self, poll_period_s: float = 0.1) -> GraspState:
+        """Wait for adaptive hold/release to finish without initiating release."""
         if poll_period_s <= 0:
             raise ValueError("poll_period_s must be > 0")
 
@@ -217,9 +221,11 @@ class AdaptiveGrasper:
         return self.get_state()
 
     def emergency_release(self, wait_s: float = 2.0) -> bool:
+        """Open the hand immediately without waiting for the control thread."""
         return self._perform_release(wait_control_thread=False, release_wait_s=wait_s)
 
-    def stop(self) -> None:
+    def shutdown(self) -> None:
+        """Stop control, sensors, visualization, and hand transport without opening."""
         self._runtime.running = False
         self._stop_sensor_subscription()
         self._hold_runner.stop()

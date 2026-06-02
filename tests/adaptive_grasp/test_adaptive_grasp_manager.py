@@ -694,7 +694,7 @@ def test_wait_for_visualizer_close_blocks_on_visualizer(monkeypatch):
     assert events == ["wait"]
 
 
-def test_wait_until_finished_polls_until_hold_lifecycle_finishes(monkeypatch):
+def test_wait_for_completion_polls_until_hold_lifecycle_finishes(monkeypatch):
     hand = _MockHand()
     g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
     g._runtime.state = GraspState.ADAPTIVE_HOLD
@@ -714,7 +714,7 @@ def test_wait_until_finished_polls_until_hold_lifecycle_finishes(monkeypatch):
         g,
         "_perform_release",
         lambda **kwargs: (_ for _ in ()).throw(
-            AssertionError("wait_until_finished should not release")
+            AssertionError("wait_for_completion should not release")
         ),
     )
     monkeypatch.setattr(
@@ -722,12 +722,12 @@ def test_wait_until_finished_polls_until_hold_lifecycle_finishes(monkeypatch):
         lambda value: sleeps.append(value),
     )
 
-    assert g.wait_until_finished(poll_period_s=0.05) == GraspState.COMPLETED
+    assert g.wait_for_completion(poll_period_s=0.05) == GraspState.COMPLETED
     assert poll_states == [GraspState.ADAPTIVE_HOLD, GraspState.ADAPTIVE_HOLD]
     assert sleeps == [0.05]
 
 
-def test_wait_until_finished_waits_through_release_state_and_joins_thread(monkeypatch):
+def test_wait_for_completion_waits_through_release_state_and_joins_thread(monkeypatch):
     hand = _MockHand()
     g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
     g._runtime.state = GraspState.RELEASE
@@ -752,16 +752,92 @@ def test_wait_until_finished_waits_through_release_state_and_joins_thread(monkey
 
     monkeypatch.setattr("adaptive_grasp.adaptive_grasp_manager.time.sleep", fake_sleep)
 
-    assert g.wait_until_finished(poll_period_s=0.25) == GraspState.COMPLETED
+    assert g.wait_for_completion(poll_period_s=0.25) == GraspState.COMPLETED
     assert sleeps == [0.25]
     assert thread.join_calls == [1.0]
 
 
-def test_wait_until_finished_rejects_non_positive_poll_period():
+def test_wait_for_completion_rejects_non_positive_poll_period():
     g = AdaptiveGrasper(_MockHand(), AdaptiveGraspConfig())
 
     with pytest.raises(ValueError, match="poll_period_s"):
-        g.wait_until_finished(poll_period_s=0.0)
+        g.wait_for_completion(poll_period_s=0.0)
+
+
+def test_legacy_adaptive_grasper_method_names_are_removed():
+    g = AdaptiveGrasper(_MockHand(), AdaptiveGraspConfig())
+
+    assert not hasattr(g, "wait_until_finished")
+    assert not hasattr(g, "finish")
+    assert not hasattr(g, "stop")
+
+
+def test_release_and_wait_for_visualizer_close_releases_then_waits(monkeypatch):
+    g = AdaptiveGrasper(_MockHand(), AdaptiveGraspConfig())
+    events = []
+
+    monkeypatch.setattr(g, "release", lambda: events.append("release") or True)
+    monkeypatch.setattr(
+        g,
+        "wait_for_visualizer_close",
+        lambda: events.append("wait"),
+    )
+
+    assert g.release_and_wait_for_visualizer_close() is True
+    assert events == ["release", "wait"]
+
+
+def test_shutdown_stops_runtime_without_opening_hand(monkeypatch):
+    hand = _MockHand()
+    g = AdaptiveGrasper(hand, AdaptiveGraspConfig())
+    g._runtime.state = GraspState.ADAPTIVE_HOLD
+    g._running = True
+    events = []
+
+    class _FakeHoldRunner:
+        def stop(self):
+            events.append("hold_stop")
+
+    class _FakeVisualizer:
+        def stop(self):
+            events.append("viz_stop")
+
+        def detach_window(self):
+            events.append("viz_detach")
+
+    g._hold_runner = _FakeHoldRunner()
+    g._visualizer = _FakeVisualizer()
+    monkeypatch.setattr(g, "_stop_sensor_subscription", lambda: events.append("sensor_stop"))
+    monkeypatch.setattr(
+        g,
+        "_join_control_thread_override",
+        lambda timeout: events.append(("join", timeout)),
+    )
+    monkeypatch.setattr(
+        g,
+        "_perform_release",
+        lambda **kwargs: (_ for _ in ()).throw(
+            AssertionError("shutdown should not release")
+        ),
+    )
+    monkeypatch.setattr(
+        g._hand_port,
+        "stop",
+        lambda: events.append("hand_stop"),
+    )
+
+    g.shutdown()
+
+    assert g._running is False
+    assert g.get_state() == GraspState.STOPPED
+    assert events == [
+        "sensor_stop",
+        "hold_stop",
+        ("join", 1.0),
+        "viz_stop",
+        "viz_detach",
+        "hand_stop",
+    ]
 
 
 def test_release_does_not_release_original_visualizer(monkeypatch):

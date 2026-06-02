@@ -60,7 +60,7 @@ def main() -> None:
             return
 
         print("Holding object...")
-        final_state = grasper.wait_until_finished()
+        final_state = grasper.wait_for_completion()
         print(f"Final state: {final_state.value}")
         print("Grasp Done.")
 
