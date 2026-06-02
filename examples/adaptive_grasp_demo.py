@@ -8,10 +8,10 @@ if str(SRC) not in sys.path:
 import logging
 import time
 from typing import Optional
-from ghand import configure_logging
-from ghand.ghand import CommType, GHand, ProductType
-from ghand.types import  HandStateError
+
 from ghand import CommunicationError, GHand, HandStateError
+from ghand import CommType, ProductType, configure_logging
+
 _logger = logging.getLogger(__name__)
 configure_logging(level=logging.INFO)
 
@@ -23,9 +23,7 @@ from adaptive_grasp.demo_config import (
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO)
-
-    hand =  GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+    hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
     connected = hand.open("auto")
     grasper: Optional[AdaptiveGrasper] = None
 

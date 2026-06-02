@@ -467,6 +467,10 @@ def test_full_grasp_state_transitions(monkeypatch):
     monkeypatch.setattr(grasper, "_start_sensor_subscription", lambda: None)
     monkeypatch.setattr(grasper._sensor, "reset", lambda: None)
     monkeypatch.setattr(grasper._sensor, "sum_active_finger_normal_force", lambda: 4.0)
+    monkeypatch.setattr(
+        "adaptive_grasp.grasp_sequence.PhaseController._wait_until_position_reached",
+        lambda self, pose: True,
+    )
     grasper._sensor._latest_tactile_data = {
         TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 2.0),
         TactileSensorId.FF: _FakeTactileInfo(0.0, 0.0, 2.0),
@@ -1107,6 +1111,10 @@ def test_full_grasp_lifecycle(monkeypatch):
     monkeypatch.setattr(grasper, "_start_sensor_subscription", lambda: None)
     monkeypatch.setattr(grasper._sensor, "reset", lambda: None)
     monkeypatch.setattr(grasper._sensor, "sum_active_finger_normal_force", lambda: 4.0)
+    monkeypatch.setattr(
+        "adaptive_grasp.grasp_sequence.PhaseController._wait_until_position_reached",
+        lambda self, pose: True,
+    )
 
     # Provide tactile and joint feedback for the closing phase and adaptive hold
     grasper._sensor._latest_tactile_data = {

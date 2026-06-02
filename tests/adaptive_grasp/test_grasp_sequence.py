@@ -398,6 +398,7 @@ def test_phase_closing_empty_grasp_requests_release(monkeypatch):
         hand, sensor, safety, joint_builder, cfg, time.monotonic,
         on_state_change=states.append,
     )
+    monkeypatch.setattr(controller, "_wait_until_position_reached", lambda _pose: True)
     monkeypatch.setattr("adaptive_grasp.grasp_sequence.time.sleep", lambda *_: None)
 
     sensor.tactile_data = {
