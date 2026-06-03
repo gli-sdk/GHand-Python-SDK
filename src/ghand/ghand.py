@@ -99,7 +99,7 @@ class GHand(object):
         self._comm.update_config(config)
 
     def _check_joint_limit(self, joint: JointCommand, limit):
-        """Clamp the joint angle to its configured limits.
+        """Clamp the joint angle to its configured physical limits.
 
         Args:
             joint: Joint to check and modify in place.
@@ -125,37 +125,32 @@ class GHand(object):
             joint: Joint to check and modify in place.
             mode: Current control mode.
         """
-        if mode == CtrlMode.POSITION:
-            if joint.speed < 0:
-                joint.speed = abs(joint.speed)
-                logger.warning(
-                    "[Joint] ID: %s speed is negative in POSITION mode, "
-                    "converted to absolute value %s",
-                    JointId(joint.id).name,
-                    joint.speed,
-                )
+        original_speed = joint.speed
+
+        if mode in (CtrlMode.POSITION, CtrlMode.SPEED):
+            # POSITION / SPEED:
+            # >100 -> 100, <-100 -> -100, -100~100 直接透传
+            joint.speed = max(-100, min(100, joint.speed))
+
+        elif mode == CtrlMode.TORQUE:
+            # TORQUE:
+            # >100 -> 100, <-100 -> 100, -100~100 取绝对值
             if joint.speed > 100:
-                original_speed = joint.speed
                 joint.speed = 100
-                logger.warning(
-                    "[Joint] ID: %s speed %s exceeds limit in POSITION mode, clamped to 100",
-                    JointId(joint.id).name, original_speed
-                )
-        elif mode == CtrlMode.SPEED:
-            if joint.speed < -100:
-                original_speed = joint.speed
-                joint.speed = -100
-                logger.warning(
-                    "[Joint] ID: %s speed %s below limit in SPEED mode, clamped to -100",
-                    JointId(joint.id).name, original_speed
-                )
-            elif joint.speed > 100:
-                original_speed = joint.speed
+            elif joint.speed < -100:
                 joint.speed = 100
-                logger.warning(
-                    "[Joint] ID: %s speed %s exceeds limit in SPEED mode, clamped to 100",
-                    JointId(joint.id).name, original_speed
-                )
+            else:
+                joint.speed = abs(joint.speed)
+
+        if joint.speed != original_speed:
+            logger.warning(
+                "[Joint] ID: %s speed %s adjusted to %s in %s mode",
+                JointId(joint.id).name,
+                original_speed,
+                joint.speed,
+                mode.name,
+            )
+
 
     def _check_torque_limit(self, joint: JointCommand, mode: CtrlMode):
         """Validate and clamp joint torque based on the control mode.
@@ -164,35 +159,29 @@ class GHand(object):
             joint: Joint to check and modify in place.
             mode: Current control mode.
         """
-        if mode in [CtrlMode.POSITION, CtrlMode.SPEED]:
-            if joint.torque < 0:
-                joint.torque = abs(joint.torque)
-                logger.warning(
-                    "[Joint] ID: %s torque is negative in %s mode, converted to absolute value %s",
-                    JointId(joint.id).name, mode.name, joint.torque
-                )
+        original_torque = joint.torque
+
+        if mode in (CtrlMode.POSITION, CtrlMode.TORQUE):
+            # POSITION / TORQUE:
+            # >100 -> 100, <-100 -> -100, -100~100 直接透传
+            joint.torque = max(-100, min(100, joint.torque))
+
+        elif mode == CtrlMode.SPEED:
+            # SPEED:
+            # >100 -> 100, <-100 -> 100, -100~100 直接透传
             if joint.torque > 100:
-                original_torque = joint.torque
                 joint.torque = 100
-                logger.warning(
-                    "[Joint] ID: %s torque %s exceeds limit in %s mode, clamped to 100",
-                    JointId(joint.id).name, original_torque, mode.name
-                )
-        elif mode == CtrlMode.TORQUE:
-            if joint.torque < -100:
-                original_torque = joint.torque
-                joint.torque = -100
-                logger.warning(
-                    "[Joint] ID: %s torque %s below limit in TORQUE mode, clamped to -100",
-                    JointId(joint.id).name, original_torque
-                )
-            elif joint.torque > 100:
-                original_torque = joint.torque
+            elif joint.torque < -100:
                 joint.torque = 100
-                logger.warning(
-                    "[Joint] ID: %s torque %s exceeds limit in TORQUE mode, clamped to 100",
-                    JointId(joint.id).name, original_torque
-                )
+
+        if joint.torque != original_torque:
+            logger.warning(
+                "[Joint] ID: %s torque %s adjusted to %s in %s mode",
+                JointId(joint.id).name,
+                original_torque,
+                joint.torque,
+                mode.name,
+            )
 
     def search_adapters(self) -> list[str]:
         """Search for available device adapters.
@@ -469,8 +458,7 @@ class GHand(object):
                 continue
             self._check_speed_limit(joint, mode)
             self._check_torque_limit(joint, mode)
-            if mode == CtrlMode.POSITION and joint.id in self._joint_limits:
-                self._check_joint_limit(joint, self._joint_limits[joint.id])
+            self._check_joint_limit(joint, self._joint_limits[joint.id])
             active_joints.append(joint)
 
         if not active_joints:
