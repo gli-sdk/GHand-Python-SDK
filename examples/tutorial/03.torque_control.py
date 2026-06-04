@@ -3,7 +3,7 @@ import time
 
 from ghand import ProductType, configure_logging
 from ghand.ghand import CommType, CtrlMode, GHand, JointCommand, JointId
-from ghand.types import ErrorCode, GHandError, HandStateError, State
+from ghand.types import ErrorCode, State
 
 # Configure SDK logging (shows connection state, warnings, errors)
 configure_logging(level=logging.DEBUG)
@@ -24,7 +24,7 @@ def main():
 
         # Torque control cycle
         cycle_count = 0
-        max_cycles = 1  # Set to 0 for infinite loop
+        max_cycles = 0  # Set to 0 for infinite loop
 
         while True:
             cycle_count += 1
@@ -103,10 +103,6 @@ def main():
 
     except KeyboardInterrupt:
         print("\nProgram interrupted by user.")
-    except HandStateError as e:
-        print(f"\n[Hand State Error] {e}")
-    except GHandError as e:
-        print(f"\n[Unexpected Error] {type(e).__name__}: {e}")
     finally:
         hand.close()
         time.sleep(0.5)

@@ -1,8 +1,28 @@
-# Copyright (c) 2026 GLITech
+# Copyright 2026 GLITech
 #
-# Licensed under the MIT License. See LICENSE in the project root for license information.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-"""Communication protocol abstraction interface."""
+"""Communication protocol abstraction interface.
+
+Error handling contract:
+- A. Connection management (connect/disconnect/search_adapters): return bool,
+  do NOT raise on normal failure.
+- B. State-change operations (clear_fault/init_joint/tactile_*): return bool
+  to indicate device confirmation; return False when the device rejects the
+  command. Underlying exceptions bubble up naturally.
+- C. Critical control / data retrieval (move_joints/stop/get_*/get_joints):
+  underlying exceptions bubble up naturally.
+"""
 
 from abc import ABC, abstractmethod
 
@@ -71,14 +91,18 @@ class IComm(ABC):
 
     @abstractmethod
     def stop(self) -> bool:
-        """Stop all joint motion."""
+        """Stop all joint motion.
+
+        """
         ...
 
     # ===== State retrieval =====
 
     @abstractmethod
     def get_hand_info(self):
-        """Retrieve hand status information."""
+        """Retrieve hand status information.
+
+        """
         ...
 
     @abstractmethod
@@ -87,6 +111,7 @@ class IComm(ABC):
 
         Returns:
             Dictionary mapping sensor IDs to tactile readings.
+
         """
         ...
 
@@ -97,7 +122,8 @@ class IComm(ABC):
         """Enable the tactile sensors.
 
         Returns:
-            True on success, False on failure.
+            True on success, False if the device rejected the command.
+
         """
         ...
 
@@ -106,7 +132,8 @@ class IComm(ABC):
         """Disable the tactile sensors.
 
         Returns:
-            True on success, False on failure.
+            True on success, False if the device rejected the command.
+
         """
         ...
 
@@ -115,7 +142,8 @@ class IComm(ABC):
         """Zero-calibrate the tactile sensors.
 
         Returns:
-            True on success, False on failure.
+            True on success, False if the device rejected the command.
+
         """
         ...
 
@@ -126,7 +154,8 @@ class IComm(ABC):
         """Clear device faults.
 
         Returns:
-            True on success, False on failure.
+            True on success, False if the device rejected the command.
+
         """
         ...
 
@@ -135,33 +164,44 @@ class IComm(ABC):
         """Initialize joint positions.
 
         Returns:
-            True on success, False on failure.
+            True on success, False if the device rejected the command.
+
         """
         ...
 
     @abstractmethod
     def get_device_name(self) -> str:
-        """Retrieve the device name."""
+        """Retrieve the device name.
+
+        """
         ...
 
     @abstractmethod
     def get_hardware_version(self) -> str:
-        """Retrieve the hardware version."""
+        """Retrieve the hardware version.
+
+        """
         ...
 
     @abstractmethod
     def get_firmware_version(self) -> str:
-        """Retrieve the firmware version."""
+        """Retrieve the firmware version.
+
+        """
         ...
 
     @abstractmethod
     def get_serial_number(self) -> int:
-        """Retrieve the product serial number."""
+        """Retrieve the product serial number.
+
+        """
         ...
 
     @abstractmethod
     def get_motor_driver_version(self) -> tuple:
-        """Retrieve the motor driver version."""
+        """Retrieve the motor driver version.
+
+        """
         ...
 
     @abstractmethod
@@ -170,6 +210,7 @@ class IComm(ABC):
 
         Returns:
             0 for unknown, 1 for left hand, 2 for right hand.
+
         """
         ...
 
