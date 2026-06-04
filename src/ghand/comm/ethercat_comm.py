@@ -60,6 +60,24 @@ class EthercatComm(IComm):
         self._controlled_joints = [j for j in config.valid_joints if j in config.joint_limits]
         self._expected_rpdo_size = 2 + len(self._controlled_joints) * 6
 
+    def start(self) -> bool:
+        """Start EtherCAT cyclic communication with the current product config.
+
+        Returns:
+            True if the EtherCAT master reaches OP state successfully.
+        """
+        if not self._config.valid_joints:
+            logger.error("Cannot start EtherCAT communication without product config")
+            return False
+
+        if not self._client.run(self._expected_tpdo_size, self._expected_rpdo_size):
+            self._client.disconnect()
+            return False
+
+        logger.info("EtherCAT communication started")
+        return True
+
+
     # ===== Connection management =====
 
     def search_adapters(self) -> list[str]:
@@ -77,14 +95,27 @@ class EthercatComm(IComm):
             device_name: Adapter ID to connect to.
 
         Returns:
-            True if the connection and SOEM startup succeed.
+            True if the adapter connection succeeds. If product config is already
+            known, the EtherCAT master is also started with PDO size checks.
         """
         connected = self._client.connect(device_name)
         if not connected:
             return False
+
+        # ProductType.AUTO starts with an empty ProductConfig. In that case, do not
+        # start PDO cyclic communication yet, because the expected TPDO/RPDO sizes
+        # are unknown until the device name is read and the product config is loaded.
+        if not self._config.valid_joints:
+            logger.info(
+                "Device connected via EtherCAT (%s), waiting for product auto-detection",
+                device_name,
+            )
+            return True
+
         if not self._client.run(self._expected_tpdo_size, self._expected_rpdo_size):
             self._client.disconnect()
             return False
+
         logger.info("Device connected via EtherCAT (%s)", device_name)
         return True
 

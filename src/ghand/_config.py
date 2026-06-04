@@ -215,6 +215,8 @@ def find_config_by_name(device_name: str) -> ProductConfig | None:
     if not device_name:
         return None
 
+    normalized_device_name = device_name.strip().strip("\x00").lower()
+
     for search_dir in _get_config_search_paths():
         pattern = os.path.join(search_dir, "*.json")
         for file_path in glob.glob(pattern):
@@ -224,8 +226,10 @@ def find_config_by_name(device_name: str) -> ProductConfig | None:
             except (json.JSONDecodeError, OSError):
                 continue
 
-            cfg_name = data.get("name", "")
-            if len(cfg_name) == len(device_name) and cfg_name.lower() == device_name.lower():
+            cfg_name = data.get("name", "").strip().strip("\x00").lower()
+            cfg_model = data.get("model", "").strip().strip("\x00").lower()
+
+            if normalized_device_name in (cfg_name, cfg_model):
                 logger.info("Auto-detected product config: %s -> %s", device_name, file_path)
                 return _load_config_from_file(file_path)
 

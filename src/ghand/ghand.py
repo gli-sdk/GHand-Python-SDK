@@ -212,24 +212,38 @@ class GHand(object):
             device_name = self.get_device_name()
         except Exception:
             logger.error("Failed to get device name for auto-detection", exc_info=True)
+            self._comm.disconnect()
             return False
 
         if self._product_type == ProductType.AUTO:
             matched = find_config_by_name(device_name)
-            if matched:
-                self._apply_product_config(matched)
-            return True
-        else:
-            expected_name = self._product_config.name
-            if device_name != expected_name:  
+            if not matched:
+                logger.error("No product config matched device name: %s", device_name)
                 self._comm.disconnect()
-                logger.error(
-                    "Product type mismatch: expected %s, got %s",
-                    expected_name,
-                    device_name,
-                )
                 return False
+
+            self._apply_product_config(matched)
+
+            # AUTO mode connected before PDO size was known. Now that the product
+            # config has been resolved, start EtherCAT communication with the
+            # correct TPDO/RPDO sizes.
+            if hasattr(self._comm, "start") and not self._comm.start():
+                logger.error("Failed to start communication after product auto-detection")
+                return False
+
             return True
+
+        expected_name = self._product_config.name
+        if device_name != expected_name:
+            self._comm.disconnect()
+            logger.error(
+                "Product type mismatch: expected %s, got %s",
+                expected_name,
+                device_name,
+            )
+            return False
+
+        return True
 
     def open(self, id: str = "auto") -> bool:
         """Open the device connection.
