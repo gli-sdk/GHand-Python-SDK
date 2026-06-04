@@ -1,7 +1,7 @@
 # GHand Python SDK
 
-[![Version](https://img.shields.io/badge/version-v1.1.2-blue.svg)](src/ghand/version.py)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-v2.0.0-blue.svg)](src/ghand/version.py)
+[![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 
 [中文](README.zh.md)
@@ -70,7 +70,7 @@ For detailed technical specifications and API references, visit the [Python SDK 
 
 ```bash
 git clone https://github.com/gli-sdk/GHand-Python-SDK
-cd GHand-SDK
+cd GHand-Python-SDK
 pip install -r requirements.txt
 pip install -e .
 ```
@@ -103,7 +103,7 @@ hand.close()
 ## Project Structure
 
 ```
-ghand-sdk/
+GHand-Python-SDK/
 ├── src/ghand/              # Core SDK source code
 │   ├── ghand.py            # Main GHand class and public API
 │   ├── types.py            # Data types, enums, and structures
@@ -156,4 +156,4 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for gu
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [Apache License 2.0](LICENSE).

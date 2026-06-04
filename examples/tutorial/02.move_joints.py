@@ -3,7 +3,7 @@ import time
 
 from ghand import ProductType, configure_logging
 from ghand.ghand import CommType, GHand, JointCommand, JointId
-from ghand.types import ErrorCode, GHandError, HandStateError, State
+from ghand.types import ErrorCode, State
 
 # Configure SDK logging (shows connection state, warnings, errors)
 configure_logging(level=logging.INFO)
@@ -53,7 +53,7 @@ def main():
                 current_joints = hand.get_joints()
                 for joint in current_joints:
                     print(
-                        f"  {JointId(joint.id).name:<15}- state:{State(joint.state).name},\terror:{ErrorCode(joint.error).name},\tangle: {joint.angle:.2f}°,\tspeed: {joint.speed},\ttorque: {joint.torque}"
+                        f"  {JointId(joint.id).name:<15}- state:{State(joint.state).name:<15},\terror:{ErrorCode(joint.error).name:<15},\tangle: {joint.angle:.2f}°,\tspeed: {joint.speed},\ttorque: {joint.torque}"
                     )
             else:
                 break
@@ -95,10 +95,6 @@ def main():
 
     except KeyboardInterrupt:
         print("\nProgram interrupted by user.")
-    except HandStateError as e:
-        print(f"\n[Hand State Error] {e}")
-    except GHandError as e:
-        print(f"\n[Unexpected Error] {type(e).__name__}: {e}")
     finally:
         hand.close()
         time.sleep(0.5)

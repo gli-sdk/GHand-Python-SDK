@@ -70,7 +70,7 @@ GHand 灵巧手官方 Python SDK，为机器人操作研究与开发提供精确
 
 ```bash
 git clone https://github.com/gli-sdk/GHand-Python-SDK
-cd GHand-SDK
+cd GHand-Python-SDK
 pip install -r requirements.txt
 pip install -e .
 ```
@@ -105,7 +105,7 @@ hand.close()
 ## 项目结构
 
 ```
-ghand-sdk/
+GHand-Python-SDK/
 ├── src/ghand/              # 核心 SDK 源码
 │   ├── ghand.py            # GHand 主类与公共 API
 │   ├── types.py            # 数据类型、枚举与结构体
@@ -158,4 +158,4 @@ ghand-sdk/
 
 ## 许可证
 
-本项目基于 [MIT 许可证](LICENSE) 开源。
+本项目基于 [Apache License 2.0](LICENSE) 开源。
