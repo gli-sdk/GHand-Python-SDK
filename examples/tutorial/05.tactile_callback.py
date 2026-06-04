@@ -4,13 +4,12 @@ import time
 
 from ghand import ProductType, TactileSensorId
 from ghand.ghand import CommType, GHand
-from ghand.types import GHandError
 
 
 class TactileDisplay:
 
     def __init__(self):
-        self.hand = GHand(product_type=ProductType.G5, comm_type=CommType.RS485)
+        self.hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
         self.connected = False
         self.tactile_opened = False
         self.running = False
@@ -56,91 +55,88 @@ class TactileDisplay:
         self.display_thread.start()
 
     def _display_loop(self):
-        try:
-            while self.running:
-                # Use get_tactile_data to retrieve tactile data
-                tactile_data = self.hand.get_tactile_data()
+        while self.running:
+            # Use get_tactile_data to retrieve tactile data
+            tactile_data = self.hand.get_tactile_data()
 
-                if tactile_data:
-                    # Access resultant force data for each finger via enum
+            if tactile_data:
+                # Access resultant force data for each finger via enum
 
-                    thumb_data = tactile_data[TactileSensorId.THUMB]
-                    ff_data = tactile_data[TactileSensorId.FF]
-                    mf_data = tactile_data[TactileSensorId.MF]
-                    rf_data = tactile_data[TactileSensorId.RF]
-                    lf_data = tactile_data[TactileSensorId.LF]
+                thumb_data = tactile_data[TactileSensorId.THUMB]
+                ff_data = tactile_data[TactileSensorId.FF]
+                mf_data = tactile_data[TactileSensorId.MF]
+                rf_data = tactile_data[TactileSensorId.RF]
+                lf_data = tactile_data[TactileSensorId.LF]
 
-                    # Get resultant force on XYZ axes for each finger
-                    thumb_x, thumb_y, thumb_z = thumb_data.resultant_force
-                    ff_x, ff_y, ff_z = ff_data.resultant_force
-                    mf_x, mf_y, mf_z = mf_data.resultant_force
-                    rf_x, rf_y, rf_z = rf_data.resultant_force
-                    lf_x, lf_y, lf_z = lf_data.resultant_force
+                # Get resultant force on XYZ axes for each finger
+                thumb_x, thumb_y, thumb_z = thumb_data.resultant_force
+                ff_x, ff_y, ff_z = ff_data.resultant_force
+                mf_x, mf_y, mf_z = mf_data.resultant_force
+                rf_x, rf_y, rf_z = rf_data.resultant_force
+                lf_x, lf_y, lf_z = lf_data.resultant_force
 
-                    # Calculate elapsed time
-                    elapsed_time = time.time() - self.start_time if self.start_time else 0
-                    hours = int(elapsed_time // 3600)
-                    minutes = int((elapsed_time % 3600) // 60)
-                    seconds = int(elapsed_time % 60)
-                    runtime_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+                # Calculate elapsed time
+                elapsed_time = time.time() - self.start_time if self.start_time else 0
+                hours = int(elapsed_time // 3600)
+                minutes = int((elapsed_time % 3600) // 60)
+                seconds = int(elapsed_time % 60)
+                runtime_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
-                    # Determine status
-                    status = "Tactile sensor ON" if self.tactile_opened else "Tactile sensor OFF"
+                # Determine status
+                status = "Tactile sensor ON" if self.tactile_opened else "Tactile sensor OFF"
 
-                    # Use ANSI escape sequences to overwrite previous data lines
-                    sys.stdout.write(
-                        "\033[10A"
-                    )  # Move cursor up 8+2 lines (header + 5 fingers + separator + status line + 2 lines to ensure full coverage)
-                    sys.stdout.write("\033[J")  # Clear from cursor position to bottom of screen
+                # Use ANSI escape sequences to overwrite previous data lines
+                sys.stdout.write(
+                    "\033[10A"
+                )  # Move cursor up 8+2 lines (header + 5 fingers + separator + status line + 2 lines to ensure full coverage)
+                sys.stdout.write("\033[J")  # Clear from cursor position to bottom of screen
 
-                    # Update data display
-                    print("Finger   |     X-axis     |     Y-axis     |     Z-axis     |")
-                    sys.stdout.write("\033[K")  # Clear current line
-                    print(f"Thumb    | {thumb_x:8.2f}N   | {thumb_y:8.2f}N   | {thumb_z:8.2f}N")
-                    sys.stdout.write("\033[K")  # Clear current line
-                    print(f"Index    | {ff_x:8.2f}N   | {ff_y:8.2f}N   | {ff_z:8.2f}N")
-                    sys.stdout.write("\033[K")  # Clear current line
-                    print(f"Middle   | {mf_x:8.2f}N   | {mf_y:8.2f}N   | {mf_z:8.2f}N")
-                    sys.stdout.write("\033[K")  # Clear current line
-                    print(f"Ring     | {rf_x:8.2f}N   | {rf_y:8.2f}N   | {rf_z:8.2f}N")
-                    sys.stdout.write("\033[K")  # Clear current line
-                    print(f"Little   | {lf_x:8.2f}N   | {lf_y:8.2f}N   | {lf_z:8.2f}N")
-                    sys.stdout.write("\033[K")  # Clear current line
-                    print("-" * 70)
-                    sys.stdout.write("\033[K")  # Clear current line
-                    print(
-                        f"Live updating... Press Ctrl+C to stop | Runtime: {runtime_str} | Status: {status}"
-                    )
-                    sys.stdout.write("\033[K")  # Clear current line
+                # Update data display
+                print("Finger   |     X-axis     |     Y-axis     |     Z-axis     |")
+                sys.stdout.write("\033[K")  # Clear current line
+                print(f"Thumb    | {thumb_x:8.2f}N   | {thumb_y:8.2f}N   | {thumb_z:8.2f}N")
+                sys.stdout.write("\033[K")  # Clear current line
+                print(f"Index    | {ff_x:8.2f}N   | {ff_y:8.2f}N   | {ff_z:8.2f}N")
+                sys.stdout.write("\033[K")  # Clear current line
+                print(f"Middle   | {mf_x:8.2f}N   | {mf_y:8.2f}N   | {mf_z:8.2f}N")
+                sys.stdout.write("\033[K")  # Clear current line
+                print(f"Ring     | {rf_x:8.2f}N   | {rf_y:8.2f}N   | {rf_z:8.2f}N")
+                sys.stdout.write("\033[K")  # Clear current line
+                print(f"Little   | {lf_x:8.2f}N   | {lf_y:8.2f}N   | {lf_z:8.2f}N")
+                sys.stdout.write("\033[K")  # Clear current line
+                print("-" * 70)
+                sys.stdout.write("\033[K")  # Clear current line
+                print(
+                    f"Live updating... Press Ctrl+C to stop | Runtime: {runtime_str} | Status: {status}"
+                )
+                sys.stdout.write("\033[K")  # Clear current line
 
-                    sys.stdout.flush()
-                else:
-                    # Calculate elapsed time
-                    elapsed_time = time.time() - self.start_time if self.start_time else 0
-                    hours = int(elapsed_time // 3600)
-                    minutes = int((elapsed_time % 3600) // 60)
-                    seconds = int(elapsed_time % 60)
-                    runtime_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+                sys.stdout.flush()
+            else:
+                # Calculate elapsed time
+                elapsed_time = time.time() - self.start_time if self.start_time else 0
+                hours = int(elapsed_time // 3600)
+                minutes = int((elapsed_time % 3600) // 60)
+                seconds = int(elapsed_time % 60)
+                runtime_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
-                    # Determine status
-                    status = "Tactile sensor ON" if self.tactile_opened else "Tactile sensor OFF"
+                # Determine status
+                status = "Tactile sensor ON" if self.tactile_opened else "Tactile sensor OFF"
 
-                    sys.stdout.write("\033[10A")  # Move cursor up 8+2 lines
-                    sys.stdout.write("\033[J")  # Clear from cursor position to bottom of screen
-                    print(f"Tactile data retrieval failed or empty")
-                    sys.stdout.write("\033[K")  # Clear current line
-                    print("-" * 70)
-                    sys.stdout.write("\033[K")  # Clear current line
-                    print(
-                        f"Live updating... Press Ctrl+C to stop | Runtime: {runtime_str} | Status: {status}"
-                    )
-                    sys.stdout.write("\033[K")  # Clear current line
-                    sys.stdout.flush()
+                sys.stdout.write("\033[10A")  # Move cursor up 8+2 lines
+                sys.stdout.write("\033[J")  # Clear from cursor position to bottom of screen
+                print(f"Tactile data retrieval failed or empty")
+                sys.stdout.write("\033[K")  # Clear current line
+                print("-" * 70)
+                sys.stdout.write("\033[K")  # Clear current line
+                print(
+                    f"Live updating... Press Ctrl+C to stop | Runtime: {runtime_str} | Status: {status}"
+                )
+                sys.stdout.write("\033[K")  # Clear current line
+                sys.stdout.flush()
 
-                time.sleep(0.015)  # Refresh every 15 ms
+            time.sleep(0.015)  # Refresh every 15 ms
 
-        except GHandError as e:
-            print(f"\nDisplay thread error: {e}")
 
     def stop_display(self):
         self.running = False

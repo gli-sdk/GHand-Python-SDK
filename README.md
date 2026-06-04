@@ -1,7 +1,7 @@
 # GHand Python SDK
 
-[![Version](https://img.shields.io/badge/version-v1.1.2-blue.svg)](src/ghand/version.py)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-v2.0.0-blue.svg)](src/ghand/version.py)
+[![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 
 [中文](README.zh.md)
@@ -156,4 +156,4 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for gu
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [Apache License 2.0](LICENSE).

@@ -1,6 +1,16 @@
-# Copyright (c) 2026 GLITech
+# Copyright 2026 GLITech
 #
-# Licensed under the MIT License. See LICENSE in the project root for license information.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 """EtherCAT communication implementation.
 
@@ -12,7 +22,6 @@ import math
 
 from .._subscription import SubscriptionManager
 from ..types import (
-    CommunicationError,
     CtrlMode,
     ErrorCode,
     HandState,
@@ -136,9 +145,6 @@ class EthercatComm(IComm):
 
         Returns:
             List of JointData objects.
-
-        Raises:
-            CommunicationError: If the received data is shorter than expected.
         """
         data = self._client.recv_data()
 
@@ -166,9 +172,6 @@ class EthercatComm(IComm):
 
         Returns:
             HandState instance.
-
-        Raises:
-            CommunicationError: If the received data is shorter than expected.
         """
         data = self._client.recv_data()
 
@@ -184,13 +187,10 @@ class EthercatComm(IComm):
 
         Returns:
             Dictionary mapping TactileSensorId to TactileInfo.
-
-        Raises:
-            CommunicationError: If the received data is shorter than expected.
         """
         data = self._client.recv_data()
         if len(data) < self._expected_tpdo_size:
-            raise CommunicationError(
+            raise RuntimeError(
                 "Data length insufficient. Expected %s bytes, got %s bytes",
                 self._expected_tpdo_size,
                 len(data),
@@ -213,40 +213,40 @@ class EthercatComm(IComm):
         """Enable the tactile sensors.
 
         Returns:
-            True on success, False on failure.
+            True on success, False if the device rejected the command.
         """
-        try:
-            self._client.sdo_write(0x2004, 0x01, b'\x01')
-            result = self._client.sdo_read(0x2004, 0x03)
-            return result == b'\x00'
-        except Exception:
+        self._client.sdo_write(0x2004, 0x01, b'\x01')
+        result = self._client.sdo_read(0x2004, 0x03)
+        if result != b'\x00':
+            logger.error("Device rejected open_tactile command")
             return False
+        return True
 
     def close_tactile(self) -> bool:
         """Disable the tactile sensors.
 
         Returns:
-            True on success, False on failure.
+            True on success, False if the device rejected the command.
         """
-        try:
-            self._client.sdo_write(0x2004, 0x01, b'\x02')
-            result = self._client.sdo_read(0x2004, 0x03)
-            return result == b'\x00'
-        except Exception:
+        self._client.sdo_write(0x2004, 0x01, b'\x02')
+        result = self._client.sdo_read(0x2004, 0x03)
+        if result != b'\x00':
+            logger.error("Device rejected close_tactile command")
             return False
+        return True
 
     def zero_tactile(self) -> bool:
         """Zero-calibrate the tactile sensors.
 
         Returns:
-            True on success, False on failure.
+            True on success, False if the device rejected the command.
         """
-        try:
-            self._client.sdo_write(0x2004, 0x01, b'\x04')
-            result = self._client.sdo_read(0x2004, 0x03)
-            return result == b'\x00'
-        except Exception:
+        self._client.sdo_write(0x2004, 0x01, b'\x04')
+        result = self._client.sdo_read(0x2004, 0x03)
+        if result != b'\x00':
+            logger.error("Device rejected zero_tactile command")
             return False
+        return True
 
     # ===== Device operations =====
 
@@ -254,27 +254,21 @@ class EthercatComm(IComm):
         """Clear device faults.
 
         Returns:
-            True on success, False on failure.
+            True on success, False if the device rejected the command.
         """
-        try:
-            self._client.sdo_write(0x2002, 0x01, b'\x01')
-            logger.info("Fault cleared")
-            return True
-        except Exception:
-            return False
+        self._client.sdo_write(0x2002, 0x01, b'\x01')
+        logger.info("Fault cleared")
+        return True
 
     def init_joint(self) -> bool:
         """Initialize joint positions.
 
         Returns:
-            True on success, False on failure.
+            True on success, False if the device rejected the command.
         """
-        try:
-            self._client.sdo_write(0x2003, 0x01, b'\x01')
-            logger.info("Joint initialization completed")
-            return True
-        except Exception:
-            return False
+        self._client.sdo_write(0x2003, 0x01, b'\x01')
+        logger.info("Joint initialization completed")
+        return True
 
     def get_device_name(self) -> str:
         """Retrieve the device name via SDO."""
@@ -306,30 +300,23 @@ class EthercatComm(IComm):
         Returns:
             0 for unknown, 1 for left hand, 2 for right hand.
         """
-        try:
-            return int.from_bytes(self._client.sdo_read(0x2001, 0x00), byteorder="little")
-        except Exception:
-            return 0
+        return int.from_bytes(self._client.sdo_read(0x2001, 0x00), byteorder="little")
 
     # ===== Subscription =====
 
     def subscribe(self, callback, *args, **kwargs) -> int:
         """Subscribe to device data updates.
 
-        Internally parses raw bytes into a Tpdo before invoking the callback.
+        The callback receives raw TPDO bytes.  The caller is responsible for
+        parsing (e.g. via ``Tpdo.from_bytes``).
 
         Args:
-            callback: Callable invoked with a Tpdo instance.
+            callback: Callable invoked with raw ``bytes``.
 
         Returns:
             Subscription ID.
         """
-
-        def wrapper(data_bytes, *args, **kwargs):
-            tpdo = Tpdo.from_bytes(data_bytes, self._config)
-            callback(tpdo, *args, **kwargs)
-
-        return self._sub_manager.subscribe(wrapper, *args, **kwargs)
+        return self._sub_manager.subscribe(callback, *args, **kwargs)
 
     def unsubscribe(self, sub_id) -> bool:
         """Remove a previously registered subscription.

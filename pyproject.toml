@@ -7,7 +7,7 @@ name = "ghand"
 version = "2.0.0"
 description = "GHand Python SDK"
 readme = "README.md"
-license = {text = "MIT"}
+license = {text = "Apache-2.0"}
 authors = [
     {name = "GLITECH"},
 ]

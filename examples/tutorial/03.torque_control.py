@@ -3,14 +3,14 @@ import time
 
 from ghand import ProductType, configure_logging
 from ghand.ghand import CommType, CtrlMode, GHand, JointCommand, JointId
-from ghand.types import ErrorCode, GHandError, HandStateError, State
+from ghand.types import ErrorCode, State
 
 # Configure SDK logging (shows connection state, warnings, errors)
 configure_logging(level=logging.DEBUG)
 
 
 def main():
-    hand = GHand(product_type=ProductType.G5, comm_type=CommType.RS485)
+    hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
     connected = hand.open("auto")
 
     try:
@@ -37,18 +37,18 @@ def main():
             print("\nStep 1: Applying torque to close fingers (torque=10)")
             joints = []
             for joint_id in [
-                    # JointId.THUMB_PIP,
-                    # JointId.THUMB_MCP,
+                    JointId.THUMB_PIP,
+                    JointId.THUMB_MCP,
                     JointId.FF_PIP,
-                    # JointId.FF_MCP,
-                    # JointId.MF_PIP,
-                    # JointId.MF_MCP,
-                    # JointId.RF_PIP,
-                    # JointId.RF_MCP,
-                    # JointId.LF_PIP,
-                    # JointId.LF_MCP,
+                    JointId.FF_MCP,
+                    JointId.MF_PIP,
+                    JointId.MF_MCP,
+                    JointId.RF_PIP,
+                    JointId.RF_MCP,
+                    JointId.LF_PIP,
+                    JointId.LF_MCP,
             ]:
-                joints.append(JointCommand(id=joint_id, torque=-50))
+                joints.append(JointCommand(id=joint_id, torque=10))
 
             result = hand.move_joints(joints, mode=CtrlMode.TORQUE)
             if result:
@@ -69,16 +69,16 @@ def main():
             print("\nStep 2: Opening fingers (torque=-10)")
             joints = []
             for joint_id in [
-                    # JointId.THUMB_PIP,
-                    # JointId.THUMB_MCP,
+                    JointId.THUMB_PIP,
+                    JointId.THUMB_MCP,
                     JointId.FF_PIP,
-                    # JointId.FF_MCP,
-                    # JointId.MF_PIP,
-                    # JointId.MF_MCP,
-                    # JointId.RF_PIP,
-                    # JointId.RF_MCP,
-                    # JointId.LF_PIP,
-                    # JointId.LF_MCP,
+                    JointId.FF_MCP,
+                    JointId.MF_PIP,
+                    JointId.MF_MCP,
+                    JointId.RF_PIP,
+                    JointId.RF_MCP,
+                    JointId.LF_PIP,
+                    JointId.LF_MCP,
             ]:
                 joints.append(JointCommand(id=joint_id, torque=-10))
 
@@ -103,10 +103,6 @@ def main():
 
     except KeyboardInterrupt:
         print("\nProgram interrupted by user.")
-    except HandStateError as e:
-        print(f"\n[Hand State Error] {e}")
-    except GHandError as e:
-        print(f"\n[Unexpected Error] {type(e).__name__}: {e}")
     finally:
         hand.close()
         time.sleep(0.5)

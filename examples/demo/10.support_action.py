@@ -3,7 +3,6 @@ import time
 
 from ghand import ProductType, configure_logging
 from ghand.ghand import CommType, GHand, JointCommand, JointId
-from ghand.types import GHandError
 
 # Configure SDK logging (shows connection state, warnings, errors)
 configure_logging(level=logging.INFO)
@@ -92,8 +91,6 @@ def main():
                 print("Press Ctrl+C to stop demo and exit program\n")
     except KeyboardInterrupt:
         print("\n\nProgram interrupted by user.")
-    except GHandError as e:
-        print(f"\n[Critical Error] {e}")
     finally:
         hand.close()
         time.sleep(0.5)
