@@ -2,7 +2,6 @@ import logging
 import time
 
 from ghand import ProductType, CommType, GestureType, GHand, configure_logging, execute_gesture
-from ghand.types import GHandError
 
 # Configure SDK logging (shows connection state, warnings, errors)
 # configure_logging(level=logging.INFO)
@@ -59,8 +58,6 @@ def main():
 
     except KeyboardInterrupt:
         print("Program interrupted by user.")
-    except GHandError as e:
-        print(f"[Critical Error] {e}")
     finally:
         hand.close()
         time.sleep(0.5)

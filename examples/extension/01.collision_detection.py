@@ -20,7 +20,6 @@ from ghand import (
     joints_to_nparray,
     nparray_to_joints,
 )
-from ghand.types import GHandError
 
 # Configure logging
 configure_logging(level=logging.INFO)
@@ -141,8 +140,6 @@ def main():
 
         print("\n===== Demo complete =====")
 
-    except GHandError as e:
-        print(f"\n[ERROR] Error: {type(e).__name__}: {e}")
 
     finally:
         hand.close()

@@ -5,26 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] - 2026-06-04
 
 ### Added
-- Added MIT License and improved project configuration.
-- Added community governance files: CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md.
-- Added pre-commit hooks configuration.
-- Added mypy static type checking configuration.
+- Apache License 2.0 and community governance files.
+- CANFD and RS485 protocol support.
+- Unified `DeviceData` dataclass for cross-protocol subscription callbacks.
+- Support for different products via JSON configuration.
 
 ### Changed
-- Refactored DexHand to GHand class to unify naming conventions.
-- Renamed project from XiaoYao SDK to GHand SDK and refactored project structure.
-- All Chinese text in source code and examples translated to English.
-- Improved data structure definitions and joint limit management.
-- `TactileRegionConfig.name` changed to `TactileRegionConfig.id` using `TactileSensorId` enum.
-- Dynamic PDO sizing and configuration-driven product behavior via JSON config.
-
-### Fixed
-- Fixed f-string usage in logging calls to comply with Google Python Style Guide.
-- Fixed import ordering and type annotations across the codebase.
-- Fixed module-level docstrings and line length issues.
+- **Project**: Renamed from XiaoYao SDK to GHand SDK; `DexHand` refactored to `GHand`.
+- **Dependencies**: Deferred `numpy` and `collision_sdk` loading to first use.
+- **API**: `move_joints()` no longer mutates input objects; `get_joints()` / `get_hand_info()` are pure getters.
+- **Subscription**: Unified callback signature to `Callable[[DeviceData], None]` across all protocols.
 
 ## [1.1.2] - 2025-05-20
 

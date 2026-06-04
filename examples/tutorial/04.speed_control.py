@@ -3,7 +3,7 @@ import time
 
 from ghand import ProductType, configure_logging
 from ghand.ghand import CommType, CtrlMode, GHand, JointCommand, JointId
-from ghand.types import ErrorCode, GHandError, HandStateError, State
+from ghand.types import ErrorCode, State
 
 # Configure SDK logging (shows connection state, warnings, errors)
 configure_logging(level=logging.INFO)
@@ -80,7 +80,7 @@ def main():
                     JointId.LF_PIP,
                     JointId.LF_MCP,
             ]:
-                joints.append(JointCommand(id=joint_id, angle=0.0, speed=-100, torque=100))
+                joints.append(JointCommand(id=joint_id,speed=-100, torque=100))
 
             result = hand.move_joints(joints, mode=CtrlMode.SPEED)
             if result:
@@ -102,10 +102,6 @@ def main():
                 print("Press Ctrl+C to stop the demo and exit\n")
     except KeyboardInterrupt:
         print("\nProgram interrupted by user.")
-    except HandStateError as e:
-        print(f"\n[Hand State Error] {e}")
-    except GHandError as e:
-        print(f"\n[Unexpected Error] {type(e).__name__}: {e}")
     finally:
         hand.close()
         time.sleep(0.5)

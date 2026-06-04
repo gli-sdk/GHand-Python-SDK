@@ -1,6 +1,16 @@
-# Copyright (c) 2026 GLITech
+# Copyright 2026 GLITech
 #
-# Licensed under the MIT License. See LICENSE in the project root for license information.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 """GHand SDK type definitions.
 
@@ -94,7 +104,6 @@ class TactileSensorId(enum.IntEnum):
 
 
 class ProductType(enum.Enum):
-    AUTO = "auto"
     G5 = "G5"
 
 
@@ -129,6 +138,7 @@ class ProductConfig:
     joint_limits: dict[JointId, tuple[float, float]] = field(default_factory=dict)
     has_tactile: bool = False
     tactile_regions: list[TactileRegionConfig] = field(default_factory=list)
+    slave_id: int = 0x01
 
 
 @dataclass
@@ -221,6 +231,21 @@ class TactileInfo:
     distributed_force: list[float] | None = None
 
 
+@dataclass
+class DeviceData:
+    """Unified data carrier for subscription callbacks across all protocols."""
+
+    hand: HandState
+    joints: list[JointData]
+    tactile: dict[TactileSensorId, TactileInfo] | None = None
+    timestamp: float | None = None
+
+    def __post_init__(self):
+        for joint in self.joints:
+            jid = JointId(joint.id)
+            setattr(self, jid.name.lower(), joint)
+
+
 # ============================================================================
 # Exceptions
 # ============================================================================
@@ -251,13 +276,3 @@ _STATE_MESSAGES = {
 }
 
 
-class GHandError(Exception):
-    """Base exception for the GHand SDK."""
-
-
-class CommunicationError(GHandError):
-    """Raised when communication with the device fails."""
-
-
-class HandStateError(GHandError):
-    """Raised when the device or joints report an abnormal state."""

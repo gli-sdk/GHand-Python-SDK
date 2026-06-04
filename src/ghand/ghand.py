@@ -1,51 +1,59 @@
-# Copyright (c) 2026 GLITech
+# Copyright 2026 GLITech
 #
-# Licensed under the MIT License. See LICENSE in the project root for license information.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 """High-level API for the GHand dexterous hand."""
 
+from __future__ import annotations
+
 import logging
 
-from collision_sdk import CollisionCheckResult, CollisionSDK
-import numpy as np
-
-from ._config import find_config_by_name, load_product_config
-from ._converter import joints_to_nparray, nparray_to_joints
+from ._config import load_product_config
 from .comm.canfd_comm import CanfdComm
 from .comm.ethercat_comm import EthercatComm
+from .comm.ethercat_protocol import Tpdo
 from .comm.rs485_comm import Rs485Comm
 from .types import (
     CommType,
-    CommunicationError,
     CtrlMode,
+    DeviceData,
     ErrorCode,
-    HandFaultInfo,
     HandState,
-    HandStateError,
     HandType,
     JointCommand,
     JointData,
-    JointFaultInfo,
     JointId,
     ProductConfig,
     ProductType,
     State,
+    TactileInfo,
+    TactileSensorId,
 )
 
 logger = logging.getLogger("ghand.ghand")
 
 
-class GHand(object):
+class GHand:
     """High-level API for the GHand dexterous hand."""
 
     def __init__(
-        self, product_type: ProductType = ProductType.AUTO, comm_type: CommType = CommType.ETHERCAT
+        self, product_type: ProductType, comm_type: CommType
     ):
         """Initialize the GHand instance.
 
         Args:
-            product_type: Product model. Defaults to AUTO for auto-detection.
-            comm_type: Communication protocol. Defaults to ETHERCAT.
+            product_type: Product model (e.g. ``ProductType.G5``).
+            comm_type: Communication protocol (e.g. ``CommType.CANFD``).
         """
         self._product_type = product_type
         self._comm_type = comm_type
@@ -203,44 +211,34 @@ class GHand(object):
         id_list = self._comm.search_adapters()
 
         if id_list:
-            logger.info("Available adapters:\n" + "\n".join([f"{id}" for id in id_list]))
+            logger.info("Available adapters:\n%s", "\n".join(str(id) for id in id_list))
         else:
             logger.warning("No adapters found")
 
         return id_list
 
     def _resolve_product_type(self) -> bool:
-        """Auto-detect or verify the product type and apply configuration.
-
-        If ``product_type`` is ``AUTO``, queries the device name and reloads
-        the comm layer with the matched config. Otherwise, verifies the
-        connected device matches the configured product type.
+        """Verify the connected device matches the configured product type.
 
         Returns:
-            True if the product type is resolved or verified successfully.
+            True if the device name matches the expected product name.
         """
         try:
             device_name = self.get_device_name()
         except Exception:
-            logger.error("Failed to get device name for auto-detection", exc_info=True)
+            logger.error("Failed to get device name for verification", exc_info=True)
             return False
 
-        if self._product_type == ProductType.AUTO:
-            matched = find_config_by_name(device_name)
-            if matched:
-                self._apply_product_config(matched)
-            return True
-        else:
-            expected_name = self._product_config.name
-            if device_name != expected_name:  
-                self._comm.disconnect()
-                logger.error(
-                    "Product type mismatch: expected %s, got %s",
-                    expected_name,
-                    device_name,
-                )
-                return False
-            return True
+        expected_name = self._product_config.name
+        if device_name != expected_name:
+            self._comm.disconnect()
+            logger.error(
+                "Product type mismatch: expected %s, got %s",
+                expected_name,
+                device_name,
+            )
+            return False
+        return True
 
     def open(self, id: str = "auto") -> bool:
         """Open the device connection.
@@ -250,16 +248,13 @@ class GHand(object):
 
         Returns:
             True if the connection is established successfully.
-
-        Raises:
-            CommunicationError: If a specific device ID is provided but connection fails.
         """
         if self._opened:
             return True
 
         if id == "auto":
             id_list = self._comm.search_adapters()
-            logger.info("Found IDs:\n" + "\n".join([f"\t{id}" for id in id_list]))
+            logger.info("Found IDs:\n\t%s", "\n\t".join(str(id) for id in id_list))
             for aid in id_list:
                 if self._comm.connect(aid):
                     self._opened = True
@@ -269,7 +264,8 @@ class GHand(object):
                     logger.error("Failed to open device (ID: %s)", aid)
         else:
             if not self._comm.connect(id):
-                raise CommunicationError(f"Failed to open device (ID: {id})")
+                logger.error("Failed to open device (ID: %s)", id)
+                return False
             self._opened = True
             logger.info("Device opened successfully (ID: %s)", id)
 
@@ -298,13 +294,64 @@ class GHand(object):
     def subscribe(self, callback):
         """Subscribe to device data updates.
 
+        The callback receives a unified `DeviceData` object regardless of the
+        underlying communication protocol.
+
         Args:
-            callback: Callable invoked with a Tpdo object when new data arrives.
+            callback: Callable invoked with a `DeviceData` instance.
 
         Returns:
             Subscription ID.
         """
-        return self._comm.subscribe(callback)
+        if isinstance(self._comm, EthercatComm):
+            def adapter(data_bytes, *args, **kwargs):
+                tpdo = Tpdo.from_bytes(data_bytes, self._product_config)
+                device_data = self._tpdo_to_device_data(tpdo)
+                callback(device_data, *args, **kwargs)
+        elif isinstance(self._comm, (CanfdComm, Rs485Comm)):
+            def adapter(hand_state, joints, *args, **kwargs):
+                tactile = self._comm.get_tactile_data()
+                if not tactile:
+                    tactile = None
+                device_data = DeviceData(
+                    hand=hand_state, joints=joints, tactile=tactile
+                )
+                callback(device_data, *args, **kwargs)
+        else:
+            raise TypeError(f"Unsupported comm type: {type(self._comm)}")
+        return self._comm.subscribe(adapter)
+
+    def _tpdo_to_device_data(self, tpdo) -> DeviceData:
+        """Convert an EtherCAT Tpdo to a protocol-agnostic DeviceData."""
+        hand = HandState(
+            state=State(tpdo.hand.state),
+            error=ErrorCode(tpdo.hand.error),
+            temperature=tpdo.hand.temperature,
+        )
+        joints = [
+            JointData(
+                id=jid.value,
+                state=State(jtpdo.state),
+                error=ErrorCode(jtpdo.error),
+                angle=jtpdo.angle,
+                speed=jtpdo.speed,
+                torque=jtpdo.torque,
+            )
+            for jid, jtpdo in tpdo.joints.items()
+        ]
+        tactile = None
+        if self._product_config.has_tactile:
+            tactile = {}
+            for region in self._product_config.tactile_regions:
+                attr = f"{region.id.name.lower()}_tactile"
+                tdata = getattr(tpdo, attr, None)
+                if tdata is not None:
+                    tactile[region.id] = TactileInfo(
+                        state=bool(tpdo.tactile_state.state & (1 << region.id.value)),
+                        resultant_force=tdata.resultant_force,
+                        distributed_force=tdata.sample_force,
+                    )
+        return DeviceData(hand=hand, joints=joints, tactile=tactile)
 
     def unsubscribe(self, sub_id):
         """Unsubscribe from data updates.
@@ -467,11 +514,18 @@ class GHand(object):
             if joint.id in self._passive_joints:
                 logger.warning("Passive joint %s will be ignored", JointId(joint.id).name)
                 continue
-            self._check_speed_limit(joint, mode)
-            self._check_torque_limit(joint, mode)
+            # Create a copy so the caller's original object is not mutated.
+            joint_cmd = JointCommand(
+                id=joint.id,
+                angle=joint.angle,
+                speed=joint.speed,
+                torque=joint.torque,
+            )
+            self._check_speed_limit(joint_cmd, mode)
+            self._check_torque_limit(joint_cmd, mode)
             if mode == CtrlMode.POSITION and joint.id in self._joint_limits:
-                self._check_joint_limit(joint, self._joint_limits[joint.id])
-            active_joints.append(joint)
+                self._check_joint_limit(joint_cmd, self._joint_limits[joint.id])
+            active_joints.append(joint_cmd)
 
         if not active_joints:
             logger.warning("No active joints to move after filtering passive joints")
@@ -502,40 +556,9 @@ class GHand(object):
 
         Returns:
             List of JointData objects.
-
-        Raises:
-            CommunicationError: If data length is insufficient.
-            CommunicationError: If the device is disconnected.
-            HandStateError: If any joint reports a fault.
         """
-        try:
-            joints = self._comm.get_joints()
-        except CommunicationError:
-            raise
-        except RuntimeError as e:
-            raise CommunicationError(f"Failed to communicate with device: {e}") from e
-
+        joints = self._comm.get_joints()
         logger.info("Joint data received successfully")
-
-        faulty_joints = []
-        for joint in joints:
-            if joint.error != ErrorCode.NORMAL or joint.state in [
-                State.ABNORMAL_RUNNING,
-                State.PROTECTIVE_STOPPED,
-            ]:
-                faulty_joints.append(
-                    JointFaultInfo(
-                        joint_id=JointId(joint.id).name,
-                        state=joint.state,
-                        error_code=joint.error,
-                    )
-                )
-
-        if faulty_joints:
-            error_msg = f"Detected {len(faulty_joints)} faulty joint(s)"
-            logger.error(error_msg)
-            raise HandStateError(error_msg)
-
         return joints
 
     def get_hand_info(self) -> HandState:
@@ -543,59 +566,21 @@ class GHand(object):
 
         Returns:
             HandState instance.
-
-        Raises:
-            CommunicationError: If data length is insufficient.
-            CommunicationError: If the device is disconnected.
-            HandStateError: If the device reports a fault.
         """
-        try:
-            hand_info = self._comm.get_hand_info()
-        except CommunicationError:
-            raise
-        except RuntimeError as e:
-            logger.error("Communication failed: %s", e)
-            raise CommunicationError(f"Failed to communicate with device: {e}") from e
-
-        if hand_info.error != ErrorCode.NORMAL:
-            fault_info = HandFaultInfo(
-                error_code=hand_info.error,
-                state=hand_info.state,
-                temperature=hand_info.temperature,
-            )
-            raise HandStateError(f"Device fault detected - {fault_info}")
-
-        if hand_info.state in [State.ABNORMAL_RUNNING, State.PROTECTIVE_STOPPED]:
-            if hand_info.error == ErrorCode.NORMAL:
-                fault_info = HandFaultInfo(
-                    error_code=ErrorCode.NORMAL,
-                    state=hand_info.state,
-                )
-                raise HandStateError(f"Abnormal device state - {fault_info}")
-
-        return hand_info
+        return self._comm.get_hand_info()
 
     def get_tactile_data(self) -> dict:
         """Retrieve tactile sensor data.
 
         Returns:
             Dictionary mapping TactileSensorId to TactileInfo.
-
-        Raises:
-            CommunicationError: If the device is disconnected.
-            CommunicationError: If data length is insufficient.
         """
         if not self._has_tactile:
             logger.warning("This product does not support tactile sensors")
             return {}
-        try:
-            data = self._comm.get_tactile_data()
-            logger.info("Tactile data received successfully")
-            return data
-        except CommunicationError:
-            raise
-        except RuntimeError as e:
-            raise CommunicationError(f"Failed to communicate with device: {e}") from e
+        data = self._comm.get_tactile_data()
+        logger.info("Tactile data received successfully")
+        return data
 
     def set_safety_margin(self, margin: float) -> None:
         """Set the collision detection safety margin.
@@ -625,6 +610,8 @@ class GHand(object):
 
     def _ensure_collision_checker(self) -> CollisionSDK:
         """Lazy initialization of the collision checker."""
+        from collision_sdk import CollisionSDK
+
         if self._collision_checker is None:
             self._collision_checker = CollisionSDK()
         return self._collision_checker
@@ -650,6 +637,10 @@ class GHand(object):
             ...     print("Collision detected, using safe angles")
             ...     joints = hand._angles_to_joints(result.safe_angles)
         """
+        import numpy as np
+        from collision_sdk import CollisionCheckResult
+        from ._converter import joints_to_nparray
+
         collision_checker = self._ensure_collision_checker()
 
         current_joints = None
@@ -685,6 +676,8 @@ class GHand(object):
         Returns:
             18-element numpy array of joint angles in degrees.
         """
+        from ._converter import joints_to_nparray
+
         return joints_to_nparray(joints, current_joints)
 
     def _angles_to_joints(
@@ -700,4 +693,6 @@ class GHand(object):
         Returns:
             List of 18 JointCommand objects.
         """
+        from ._converter import nparray_to_joints
+
         return nparray_to_joints(angles, speed, torque)

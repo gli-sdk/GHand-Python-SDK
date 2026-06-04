@@ -10,7 +10,6 @@ import time
 
 from ghand import ProductType, configure_logging
 from ghand.ghand import CommType, GHand, JointCommand, JointId
-from ghand.types import GHandError
 
 # Configure SDK logging
 configure_logging(level=logging.INFO)
@@ -48,7 +47,7 @@ def main():
         print(f"First hand - Name: {name1}, HW: {hw_ver1}, "
               f"FW: {ver1}, Type: {type1.value}, "
               f"SN: {serial1}")
-    except GHandError as e:
+    except Exception as e:
         print(f"Failed to get first hand info: {e}")
 
     # Get info for second hand
@@ -61,7 +60,7 @@ def main():
         print(f"Second hand - Name: {name2}, HW: {hw_ver2}, "
               f"FW: {ver2}, Type: {type2.value}, "
               f"SN: {serial2}")
-    except GHandError as e:
+    except Exception as e:
         print(f"Failed to get second hand info: {e}")
 
     print("Dexterous hands ready, control operations can begin")
