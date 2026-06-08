@@ -14,6 +14,9 @@ package.bat
 .vscode/settings.json
 .gitignore
 CLAUDE.md
+.github
+.pre-commit-config.yaml
+.style.yapfrc
 # ZLG CANFD driver binaries (not redistributable)
 drivers/zlgcan/*.dll
 drivers/zlgcan/kerneldlls/
