@@ -14,7 +14,7 @@ You can obtain the GHand Python SDK in the following ways:
 
    # Clone the repository
    git clone https://github.com/gli-sdk/GHand-Python-SDK
-   cd ghand-sdk
+   cd GHand-Python-SDK
 
    # Install SDK
    python setup.py install

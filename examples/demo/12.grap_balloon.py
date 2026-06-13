@@ -12,7 +12,7 @@ from ghand import (
     configure_logging,
     execute_gesture,
 )
-from ghand.types import ErrorCode, GHandError, HandStateError, State
+from ghand.types import ErrorCode, State
 
 # Configure SDK logging (shows connection state, warnings, errors)
 configure_logging(level=logging.DEBUG)
@@ -71,10 +71,6 @@ def main():
 
     except KeyboardInterrupt:
         print("\nProgram interrupted by user.")
-    except HandStateError as e:
-        print(f"\n[Hand State Error] {e}")
-    except GHandError as e:
-        print(f"\n[Unexpected Error] {type(e).__name__}: {e}")
     finally:
         hand.close()
         time.sleep(0.5)

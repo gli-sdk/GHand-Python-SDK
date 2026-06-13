@@ -3,27 +3,34 @@ import time
 
 from ghand import ProductType, configure_logging
 from ghand.ghand import CommType, GHand
-from ghand.types import ErrorCode, State
+from ghand.types import ErrorCode, State, JointId
 
 # Configure SDK logging (shows connection state, warnings, errors)
 configure_logging(level=logging.INFO)
 
 
-def data_callback(tpdo):
+def data_callback(data):
     """
     Data callback function
 
     Args:
-        tpdo: Parsed TPDO data object
+        data: DeviceData instance containing hand state, joints and tactile info.
     """
-    print("Received TPDO data:")
-    print(f"  Hand state: {tpdo.hand}")
-    print(
-        f"  Thumb DIP: angle={tpdo.thumb_dip.angle:.1f}°, state={State(tpdo.thumb_dip.state).name}, error={ErrorCode(tpdo.thumb_dip.error).name}"
-    )
-    print(
-        f"  FF MCP: angle={tpdo.ff_mcp.angle:.1f}°, state={State(tpdo.ff_mcp.state).name}, error={ErrorCode(tpdo.ff_mcp.error).name}"
-    )
+    print("Received device data:")
+    print(f"  Hand state: {data.hand}")
+    for joint in data.joints:
+        print(
+            f"  {JointId(joint.id).name}: angle={joint.angle:.1f}°, "
+            f"speed={joint.speed}, torque={joint.torque}, "
+            f"state={State(joint.state).name}, error={ErrorCode(joint.error).name}"
+        )
+    if data.tactile:
+        for sensor_id, tactile in data.tactile.items():
+            print(
+                f"  Tactile {sensor_id.name}: state={tactile.state}, "
+                f"resultant_force={tactile.resultant_force}, "
+                f"distributed_force={tactile.distributed_force}"
+            )
     # Process received data here
 
 
@@ -35,6 +42,8 @@ def main():
     if not hand.open():
         print("Failed to open hand connection")
         return
+
+    hand.tactile_open()
 
     # Subscribe to data updates
     sub_id = hand.subscribe(data_callback)
@@ -50,6 +59,7 @@ def main():
     finally:
         # Unsubscribe and close connection
         hand.unsubscribe(sub_id)
+        hand.tactile_close()
         hand.close()
 
 

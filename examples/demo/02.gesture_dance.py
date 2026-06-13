@@ -3,7 +3,6 @@ import time
 
 from ghand import ProductType, CommType, GHand, JointCommand, JointId, configure_logging
 from ghand.gestures import GestureType, execute_gesture
-from ghand.types import GHandError
 
 # Configure logging output to console
 configure_logging(level=logging.INFO)
@@ -325,7 +324,7 @@ def execute_joint_positions(hand, joint_positions, description):
             return False
         time.sleep(ACTION_DELAY)
         return True
-    except GHandError as e:
+    except Exception as e:
         logger.error("%s execution failed: %s", description, e)
         return False
 
@@ -346,7 +345,7 @@ def handle_action_error(description):
         def wrapper(*args, **kwargs):
             try:
                 return func(*args, **kwargs)
-            except GHandError as e:
+            except Exception as e:
                 logger.error("%s execution failed: %s", description, e)
                 return False
 
@@ -683,7 +682,7 @@ def main():
 
     except KeyboardInterrupt:
         logger.info("\n\nProgram interrupted by user.")
-    except GHandError as e:
+    except Exception as e:
         logger.error("\n[Critical Error] %s", e)
     finally:
         hand.close()
