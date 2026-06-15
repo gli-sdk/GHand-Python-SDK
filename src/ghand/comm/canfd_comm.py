@@ -95,8 +95,10 @@ class CanfdComm(IComm):
             dll_path = CanfdTransport._resolve_dll_path("./drivers/zlgcan/zlgcan.dll")
             if Path(dll_path).exists():
                 adapters.append("zlg-USBCANFD-100U-0")
-        except Exception:
-            pass
+            else:
+                logger.warning("ZLG CANFD driver not found: %s", dll_path)
+        except Exception as e:
+            logger.error("Failed to detect ZLG CANFD adapter: %s", e)
         return adapters
 
     def connect(self, device_name: str) -> bool:
