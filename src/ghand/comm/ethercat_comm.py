@@ -19,6 +19,7 @@ Wraps EthercatClient and handles PDO encoding/decoding.
 
 import logging
 import math
+import time
 
 from .._subscription import SubscriptionManager
 from ..types import (
@@ -29,6 +30,7 @@ from ..types import (
     JointData,
     ProductConfig,
     State,
+    TactileRegionConfig,
     TactileInfo,
 )
 from .ethercat_client import EthercatClient
@@ -48,20 +50,69 @@ logger = logging.getLogger("ghand.ethercat_comm")
 class EthercatComm(IComm):
     """IComm implementation for EtherCAT."""
 
+    _CONNECT_RETRIES = 3
+    _CONNECT_RETRY_DELAY_SEC = 0.5
+    _COMPAT_THUMB_TACTILE_COUNT = 28
+
     def __init__(self, config: ProductConfig):
         self._client = EthercatClient()
-        self._config = config
-        self._expected_tpdo_size = compute_tpdo_size(
-            len(config.valid_joints),
-            [r.count for r in config.tactile_regions] if config.has_tactile else None,
-        )
-        self._controlled_joints = [j for j in config.valid_joints if j in config.joint_limits]
-        self._expected_rpdo_size = 2 + len(self._controlled_joints) * 6
         self._sub_manager = SubscriptionManager(self._client)
+        self.update_config(config)
+
+    @property
+    def config(self) -> ProductConfig:
+        """Return the active product config selected for the mapped PDO layout."""
+        return self._config
+
+    def _clone_config_with_tactile_counts(
+        self, config: ProductConfig, tactile_counts: list[int]
+    ) -> ProductConfig:
+        """Clone product config while replacing tactile region sample counts."""
+        tactile_regions = [
+            TactileRegionConfig(id=region.id, count=count)
+            for region, count in zip(config.tactile_regions, tactile_counts)
+        ]
+        return ProductConfig(
+            name=config.name,
+            model=config.model,
+            valid_joints=list(config.valid_joints),
+            joint_limits=config.joint_limits.copy(),
+            has_tactile=config.has_tactile,
+            tactile_regions=tactile_regions,
+            slave_id=config.slave_id,
+        )
+
+    def _build_tpdo_layouts(self, config: ProductConfig) -> dict[int, ProductConfig]:
+        """Build supported TPDO layouts keyed by mapped input size."""
+        tactile_counts = [r.count for r in config.tactile_regions] if config.has_tactile else None
+        layouts = {
+            compute_tpdo_size(len(config.valid_joints), tactile_counts): config
+        }
+        if config.has_tactile and tactile_counts and tactile_counts[0] > self._COMPAT_THUMB_TACTILE_COUNT:
+            compat_counts = list(tactile_counts)
+            compat_counts[0] = self._COMPAT_THUMB_TACTILE_COUNT
+            compat_config = self._clone_config_with_tactile_counts(config, compat_counts)
+            layouts[compute_tpdo_size(len(config.valid_joints), compat_counts)] = compat_config
+        return layouts
+
+    def _select_tpdo_layout(self, input_size: int) -> None:
+        """Select the active parser layout from the actual mapped input size."""
+        layout = self._tpdo_layouts.get(input_size)
+        if layout is None:
+            return
+        self._config = layout
+        self._expected_tpdo_size = input_size
+        logger.info(
+            "Selected EtherCAT TPDO layout: input=%s, tactile_counts=%s",
+            input_size,
+            [r.count for r in self._config.tactile_regions] if self._config.has_tactile else [],
+        )
 
     def update_config(self, config: ProductConfig) -> None:
         """Update the cached product configuration and derived constants."""
         self._config = config
+        self._tpdo_layouts = self._build_tpdo_layouts(config)
+        self._expected_tpdo_sizes = tuple(sorted(self._tpdo_layouts))
         self._expected_tpdo_size = compute_tpdo_size(
             len(config.valid_joints),
             [r.count for r in config.tactile_regions] if config.has_tactile else None,
@@ -88,14 +139,24 @@ class EthercatComm(IComm):
         Returns:
             True if the connection and SOEM startup succeed.
         """
-        connected = self._client.connect(device_name)
-        if not connected:
-            return False
-        if not self._client.run(self._expected_tpdo_size, self._expected_rpdo_size):
+        for attempt in range(1, self._CONNECT_RETRIES + 1):
+            connected = self._client.connect(device_name)
+            if connected and self._client.run(self._expected_tpdo_sizes, self._expected_rpdo_size):
+                self._select_tpdo_layout(self._client.input_size)
+                logger.info("Device connected via EtherCAT (%s)", device_name)
+                return True
+
+            logger.error(
+                "Failed to connect EtherCAT device %s (attempt %s/%s)",
+                device_name,
+                attempt,
+                self._CONNECT_RETRIES,
+            )
             self._client.disconnect()
-            return False
-        logger.info("Device connected via EtherCAT (%s)", device_name)
-        return True
+            if attempt < self._CONNECT_RETRIES:
+                time.sleep(self._CONNECT_RETRY_DELAY_SEC)
+
+        return False
 
     def disconnect(self) -> bool:
         """Disconnect from the EtherCAT device and stop subscriptions."""
