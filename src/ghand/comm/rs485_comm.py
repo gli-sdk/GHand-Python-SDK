@@ -121,9 +121,13 @@ class Rs485Comm(IComm):
                 return False
             # Verify device by polling slave IDs 0x31 and 0x32
             for slave_id in (0x31, 0x32):
-                result = self._client.read_holding_registers(
-                    0x0000, count=1, device_id=slave_id
-                )
+                try:
+                    result = self._client.read_holding_registers(
+                        0x0000, count=1, device_id=slave_id
+                    )
+                except ModbusException:
+                    logger.debug("No response from RS485 slave 0x%02X", slave_id)
+                    continue
                 if result is not None and not result.isError():
                     self._slave_id = result.registers[0]
                     break
