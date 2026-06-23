@@ -57,7 +57,7 @@ def main():
     # Step 4: Control each hand individually
     print("\n=== Individual control ===")
     test_joints = [
-        JointCommand(id=JointId.THUMB_PIP, angle=30, speed=100, torque=100),
+        JointCommand(id=JointId.THUMB_MCP, angle=30, speed=100, torque=100),
         JointCommand(id=JointId.FF_PIP, angle=45, speed=100, torque=100),
         JointCommand(id=JointId.FF_MCP, angle=30, speed=100, torque=100),
     ]
@@ -75,7 +75,7 @@ def main():
     # Step 5: Control all hands simultaneously
     print("\n=== Simultaneous control ===")
     reset_joints = [
-        JointCommand(id=JointId.THUMB_PIP, angle=0, speed=100, torque=100),
+        JointCommand(id=JointId.THUMB_MCP, angle=0, speed=100, torque=100),
         JointCommand(id=JointId.FF_PIP, angle=0, speed=100, torque=100),
         JointCommand(id=JointId.FF_MCP, angle=0, speed=100, torque=100),
     ]

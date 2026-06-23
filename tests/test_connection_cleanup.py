@@ -225,13 +225,13 @@ class FakeEthercatClientForComm:
 def make_g5_like_config() -> ProductConfig:
     valid_joints = list(JointId)
     joint_limits = {
-        JointId.THUMB_PIP: (0.0, 66.0),
-        JointId.THUMB_MCP: (0.0, 50.0),
-        JointId.THUMB_SWING: (20.0, 90.0),
-        JointId.THUMB_ROTATION: (-10.0, 60.0),
+        JointId.THUMB_MCP: (0.0, 66.0),
+        JointId.THUMB_TMC_FE: (0.0, 50.0),
+        JointId.THUMB_TMC_AA: (20.0, 90.0),
+        JointId.THUMB_TMC_PS: (-10.0, 60.0),
         JointId.FF_PIP: (0.0, 80.0),
         JointId.FF_MCP: (0.0, 90.0),
-        JointId.FF_SWING: (-10.0, 10.0),
+        JointId.FF_MCP_AA: (-10.0, 10.0),
         JointId.MF_PIP: (0.0, 90.0),
         JointId.MF_MCP: (0.0, 90.0),
         JointId.RF_PIP: (0.0, 90.0),

@@ -41,8 +41,8 @@ def main():
             # Step 1: Apply torque to close fingers
             print("\nStep 1: Applying torque to close fingers (torque=10)")
             torque_joints = [
-                JointCommand(id=JointId.THUMB_SWING, torque=5),
-                JointCommand(id=JointId.THUMB_PIP, torque=8),
+                JointCommand(id=JointId.THUMB_TMC_AA, torque=5),
+                JointCommand(id=JointId.THUMB_MCP, torque=8),
                 JointCommand(id=JointId.FF_PIP, torque=8),
                 JointCommand(id=JointId.MF_PIP, torque=8),
             ]
@@ -55,8 +55,8 @@ def main():
                     print("Current joint states:")
                     for joint in current_joints:
                         if joint.id in [
-                                JointId.THUMB_SWING,
-                                JointId.THUMB_PIP,
+                                JointId.THUMB_TMC_AA,
+                                JointId.THUMB_MCP,
                                 JointId.FF_PIP,
                                 JointId.MF_PIP,
                         ]:

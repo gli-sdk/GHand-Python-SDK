@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Product configuration loader — JSON search and parsing."""
+"""Product configuration loader and JSON search/parsing."""
 
 import glob
 import json
@@ -36,15 +36,15 @@ _PRODUCT_TYPE_TO_FILE = {
 }
 
 _JOINT_NAME_TO_ID = {
-    "THUMB_DIP": JointId.THUMB_DIP,
-    "THUMB_PIP": JointId.THUMB_PIP,
+    "THUMB_IP": JointId.THUMB_IP,
     "THUMB_MCP": JointId.THUMB_MCP,
-    "THUMB_SWING": JointId.THUMB_SWING,
-    "THUMB_ROTATION": JointId.THUMB_ROTATION,
+    "THUMB_TMC_FE": JointId.THUMB_TMC_FE,
+    "THUMB_TMC_AA": JointId.THUMB_TMC_AA,
+    "THUMB_TMC_PS": JointId.THUMB_TMC_PS,
     "FF_DIP": JointId.FF_DIP,
     "FF_PIP": JointId.FF_PIP,
     "FF_MCP": JointId.FF_MCP,
-    "FF_SWING": JointId.FF_SWING,
+    "FF_MCP_AA": JointId.FF_MCP_AA,
     "MF_DIP": JointId.MF_DIP,
     "MF_PIP": JointId.MF_PIP,
     "MF_MCP": JointId.MF_MCP,
