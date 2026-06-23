@@ -43,15 +43,16 @@ from ..types import (
 )
 from .icomm import IComm
 from .modbus_codec import (
-    HOLDING_REG_MAP,
     build_tactile_info,
     encode_joint_command,
+    get_joint_input_span,
+    get_modbus_profile,
     parse_device_name,
     parse_firmware_version,
     parse_hand_info,
     parse_hand_type,
     parse_hardware_version,
-    parse_joint_data,
+    parse_joints,
     parse_serial_number,
     parse_tactile_distributed,
     parse_tactile_resultant,
@@ -67,7 +68,8 @@ class Rs485Comm(IComm):
 
     def __init__(self, config: ProductConfig):
         self._config = config
-        self._slave_id = 0x31
+        self._profile = get_modbus_profile(config)
+        self._slave_id = getattr(config, "slave_id", 0x31) or 0x31
         self._client: Any = None
         self._connected = False
         self._poll_thread: threading.Thread | None = None
@@ -79,6 +81,9 @@ class Rs485Comm(IComm):
     def update_config(self, config: ProductConfig) -> None:
         """Update the cached product configuration."""
         self._config = config
+        self._profile = get_modbus_profile(config)
+        if not self._connected:
+            self._slave_id = getattr(config, "slave_id", 0x31) or 0x31
 
     # ===== Connection management =====
 
@@ -125,7 +130,7 @@ class Rs485Comm(IComm):
                     0x0000, count=1, device_id=slave_id
                 )
                 if result is not None and not result.isError():
-                    self._slave_id = result.registers[0]
+                    self._slave_id = result.registers[0] or slave_id
                     break
             else:
                 self._client.close()
@@ -172,21 +177,28 @@ class Rs485Comm(IComm):
             True if all commands are sent successfully.
         """
         client = self._ensure_client()
-        # Write mode register (high byte = mode, low byte = 0)
-        mode_value = (mode.value << 8) & 0xFF00
-        result = client.write_register(0x0010, mode_value, device_id=self._slave_id)
-        if result is None or result.isError():
-            raise RuntimeError("Failed to write mode register")
+        if self._profile.mode_register is not None:
+            mode_value = (mode.value << 8) & 0xFF00
+            result = client.write_register(
+                self._profile.mode_register, mode_value, device_id=self._slave_id
+            )
+            if result is None or result.isError():
+                raise RuntimeError("Failed to write mode register")
 
         for joint in joints:
             joint_id = JointId(joint.id)
-            if joint_id not in HOLDING_REG_MAP:
+            base_addr = self._profile.joint_control_addresses.get(joint_id)
+            if base_addr is None:
                 continue
-            base_addr = HOLDING_REG_MAP[joint_id]
-            reg0, reg1 = encode_joint_command(joint)
+            position, speed_torque = encode_joint_command(joint)
+            if self._profile.control_layout == "per_joint_mode_3reg":
+                mode_stop = ((mode.value & 0xFF) << 8) | 0x00
+                registers = [mode_stop, position, speed_torque]
+            else:
+                registers = [position, speed_torque]
 
             result = client.write_registers(
-                base_addr, [reg0, reg1], device_id=self._slave_id
+                base_addr, registers, device_id=self._slave_id
             )
             if result is None or result.isError():
                 raise RuntimeError(
@@ -198,8 +210,22 @@ class Rs485Comm(IComm):
     def stop(self) -> bool:
         """Send an immediate stop command."""
         client = self._ensure_client()
-        result = client.write_register(0x0010, 0x0001, device_id=self._slave_id)
-        return result is not None and not result.isError()
+        if self._profile.stop_register is not None:
+            result = client.write_register(
+                self._profile.stop_register, 0x0001, device_id=self._slave_id
+            )
+            return result is not None and not result.isError()
+
+        success = False
+        for joint_id in self._config.valid_joints:
+            base_addr = self._profile.joint_control_addresses.get(joint_id)
+            if base_addr is None:
+                continue
+            result = client.write_register(base_addr, 0x0001, device_id=self._slave_id)
+            success = result is not None and not result.isError()
+            if not success:
+                return False
+        return success
 
     # ===== State retrieval (batch read) =====
 
@@ -213,23 +239,21 @@ class Rs485Comm(IComm):
         if not self._config.valid_joints:
             return []
 
-        max_id = max(j.value for j in self._config.valid_joints)
-        count = (max_id + 1) * 3
+        start, count = get_joint_input_span(self._config.valid_joints, self._profile)
+        if count == 0:
+            return []
         result = client.read_input_registers(
-            0x1023, count=count, device_id=self._slave_id
+            start, count=count, device_id=self._slave_id
         )
         if result is None or result.isError():
             raise RuntimeError("Failed to read joint registers")
 
-        raw = result.registers
-        joints = []
-        for joint_id in self._config.valid_joints:
-            offset = joint_id.value * 3
-            if offset + 2 >= len(raw):
-                continue
-            joint = parse_joint_data(raw, offset, joint_id.value)
-            joints.append(joint)
-        return joints
+        return parse_joints(
+            list(result.registers),
+            self._config.valid_joints,
+            self._profile,
+            start,
+        )
 
     def get_hand_info(self) -> HandState:
         """Retrieve high-level hand status.
@@ -239,7 +263,7 @@ class Rs485Comm(IComm):
         """
         client = self._ensure_client()
         result = client.read_input_registers(
-            0x1021, count=2, device_id=self._slave_id
+            self._profile.hand_info_address, count=2, device_id=self._slave_id
         )
         if result is None or result.isError():
             raise RuntimeError("Failed to read hand info registers")
@@ -259,18 +283,23 @@ class Rs485Comm(IComm):
 
         client = self._ensure_client()
         result = client.read_input_registers(
-            0x1080, count=16, device_id=self._slave_id
+            self._profile.tactile_state_address,
+            count=self._profile.tactile_resultant_register_count,
+            device_id=self._slave_id,
         )
         if result is None or result.isError():
             raise RuntimeError("Failed to read tactile input registers")
         data = result.registers
-        if len(data) < 16:
+        if len(data) < self._profile.tactile_resultant_register_count:
             raise RuntimeError("Tactile data insufficient")
 
         result = {}
         tactile_state, _ = parse_tactile_state_error(data)
 
-        current_addr = 0x1080 + 16
+        current_addr = (
+            self._profile.tactile_state_address
+            + self._profile.tactile_resultant_register_count
+        )
 
         for region in self._config.tactile_regions:
             idx = region.id.value
@@ -360,14 +389,14 @@ class Rs485Comm(IComm):
         return self._write_tactile_control(0x0400)
 
     def _write_tactile_control(self, command: int) -> bool:
-        """Write tactile control command to holding register 0x002B.
+        """Write tactile control command to the product-specific register.
 
         Args:
             command: High byte command value.
         """
         client = self._ensure_client()
         result = client.write_register(
-            0x002B, command, device_id=self._slave_id
+            self._profile.tactile_control_address, command, device_id=self._slave_id
         )
         return result is not None and not result.isError()
 
@@ -461,26 +490,34 @@ class Rs485Comm(IComm):
                     time.sleep(0.01)
                     continue
 
-                max_id = max(j.value for j in self._config.valid_joints)
-                count = 2 + (max_id + 1) * 3  # hand info (2) + joints
+                joint_start, joint_count = get_joint_input_span(
+                    self._config.valid_joints, self._profile
+                )
+                if joint_count == 0:
+                    time.sleep(0.01)
+                    continue
+                start = min(self._profile.hand_info_address, joint_start)
+                end = max(
+                    self._profile.hand_info_address + 1,
+                    joint_start + joint_count - 1,
+                )
+                count = end - start + 1
                 result = self._client.read_input_registers(
-                    0x1021, count=count, device_id=self._slave_id
+                    start, count=count, device_id=self._slave_id
                 )
                 if result is None or result.isError():
                     time.sleep(0.01)
                     continue
 
-                raw = result.registers
-                hand_state = parse_hand_info(raw[:2])
-
-                joints = []
-                for joint_id in self._config.valid_joints:
-                    offset = 2 + joint_id.value * 3
-                    if offset + 2 >= len(raw):
-                        continue
-                    joints.append(
-                        parse_joint_data(raw, offset, joint_id.value)
-                    )
+                raw = list(result.registers)
+                hand_offset = self._profile.hand_info_address - start
+                hand_state = parse_hand_info(raw[hand_offset:hand_offset + 2])
+                joints = parse_joints(
+                    raw,
+                    self._config.valid_joints,
+                    self._profile,
+                    start,
+                )
 
                 with self._lock:
                     callbacks = list(self._callbacks.values())

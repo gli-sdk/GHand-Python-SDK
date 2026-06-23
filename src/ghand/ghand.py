@@ -239,11 +239,11 @@ class GHand:
             logger.error("Failed to get device name for verification", exc_info=True)
             return False
 
-        expected_name = self._product_config.name
-        if device_name != expected_name:
+        expected_names = [self._product_config.name, *self._product_config.aliases]
+        if device_name.lower() not in {name.lower() for name in expected_names if name}:
             logger.error(
-                "Product type mismatch: expected %s, got %s",
-                expected_name,
+                "Product type mismatch: expected one of %s, got %s",
+                expected_names,
                 device_name,
             )
             return False

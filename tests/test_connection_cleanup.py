@@ -10,10 +10,103 @@ if str(SRC) not in sys.path:
 sys.modules.setdefault("pysoem", types.ModuleType("pysoem"))
 sys.modules.setdefault("netifaces", types.ModuleType("netifaces"))
 
+from ghand.comm import canfd_comm
 from ghand.comm import ethercat_client
+from ghand._config import load_product_config
+from ghand.comm.canfd_comm import CanfdComm
 from ghand.comm.ethercat_comm import EthercatComm
 from ghand.ghand import GHand
-from ghand.types import JointId, ProductConfig, TactileRegionConfig, TactileSensorId
+from ghand.types import (
+    CtrlMode,
+    ErrorCode,
+    JointCommand,
+    JointData,
+    JointId,
+    ProductConfig,
+    ProductType,
+    State,
+    TactileRegionConfig,
+    TactileSensorId,
+)
+
+
+class FakeTransport:
+    def __init__(self):
+        self._dev_handle = 0
+        self._chn_handle = 0
+        self.closed = False
+        self.open_calls = 0
+
+    def open(self):
+        self.open_calls += 1
+        self._dev_handle = 111
+        self._chn_handle = 222
+        self.closed = False
+        return True
+
+    def close(self):
+        self.closed = True
+        self._dev_handle = 0
+        self._chn_handle = 0
+        return True
+
+
+def test_canfd_connect_closes_transport_when_handshake_fails(monkeypatch):
+    monkeypatch.setattr(canfd_comm, "CanfdTransport", FakeTransport)
+    comm = CanfdComm(config=object())
+    comm._CONNECT_RETRIES = 1
+    monkeypatch.setattr(comm, "_establish_connection", lambda: False)
+
+    assert comm.connect("fake-adapter") is False
+
+    assert comm._connected is False
+    assert comm._transport.closed is True
+    assert comm._transport._dev_handle == 0
+    assert comm._transport._chn_handle == 0
+
+
+def test_canfd_connect_retries_after_handshake_failure(monkeypatch):
+    monkeypatch.setattr(canfd_comm, "CanfdTransport", FakeTransport)
+    comm = CanfdComm(config=object())
+    comm._CONNECT_RETRIES = 2
+    comm._CONNECT_RETRY_DELAY_SEC = 0
+    comm._MIN_REOPEN_INTERVAL_SEC = 0
+
+    handshake_results = iter([False, True])
+    monkeypatch.setattr(comm, "_establish_connection", lambda: next(handshake_results))
+
+    assert comm.connect("fake-adapter") is True
+
+    assert comm._connected is True
+    assert comm._transport.open_calls == 2
+
+
+def test_canfd_disconnect_waits_after_delete_before_close(monkeypatch):
+    comm = CanfdComm(config=object())
+    comm._transport = FakeTransport()
+    comm._transport.open()
+    comm._connected = True
+    comm._DELETE_CONNECTION_SETTLE_SEC = 0.123
+    events = []
+
+    monkeypatch.setattr(comm, "_delete_connection", lambda: events.append("delete"))
+    monkeypatch.setattr(
+        canfd_comm.time,
+        "sleep",
+        lambda delay: events.append(("sleep", delay)),
+    )
+
+    close = comm._transport.close
+
+    def close_with_event():
+        events.append("close")
+        return close()
+
+    comm._transport.close = close_with_event
+
+    assert comm.disconnect() is True
+
+    assert events == ["delete", ("sleep", 0.123), "close"]
 
 
 class FakeComm:
@@ -163,7 +256,7 @@ def make_g5_like_config() -> ProductConfig:
     )
 
 
-def test_ethercat_comm_retries_full_connect_when_run_fails():
+def test_ethercat_comm_retries_full_connect_when_run_fails(monkeypatch):
     comm = EthercatComm.__new__(EthercatComm)
     comm._client = FakeEthercatClientForComm()
     comm._expected_tpdo_size = 10
@@ -199,6 +292,22 @@ class FakeEthercatClientWithInputSize:
         return None
 
 
+class FakeEthercatClientForSend:
+    def __init__(self):
+        self.sent = []
+
+    def send_data(self, data):
+        self.sent.append(data)
+
+
+class FakeEthercatClientForRecv:
+    def __init__(self, data):
+        self.data = data
+
+    def recv_data(self):
+        return self.data
+
+
 def test_ethercat_comm_selects_compat_636_tpdo_layout():
     config = make_g5_like_config()
     comm = EthercatComm.__new__(EthercatComm)
@@ -227,6 +336,55 @@ def test_ethercat_comm_keeps_default_708_tpdo_layout():
 
     assert comm._expected_tpdo_size == 708
     assert [region.count for region in comm.config.tactile_regions] == [52, 31, 31, 31, 31]
+
+
+def test_ethercat_l1_accepts_extended_pdo_sizes_and_packs_per_joint_commands():
+    config = load_product_config(ProductType.L1)
+    comm = EthercatComm.__new__(EthercatComm)
+    comm._client = FakeEthercatClientForSend()
+    comm.update_config(config)
+
+    assert comm._expected_tpdo_sizes == (92, 1302)
+    assert comm._expected_rpdo_size == 36
+
+    comm.move_joints(
+        [JointCommand(id=JointId.FF_MCP, angle=12.3, speed=-4, torque=5)],
+        CtrlMode.SPEED,
+    )
+
+    data = comm._client.sent[-1]
+    assert len(data) == 36
+    assert data[0:6] == bytes.fromhex("02 00 00 00 00 00")
+    assert data[12:18] == bytes.fromhex("02 00 7b 00 fc 05")
+
+    comm.stop()
+    assert comm._client.sent[-1][0:6] == bytes.fromhex("00 01 00 00 00 00")
+
+
+def test_ethercat_l1_extended_tpdo_parses_joint_prefix():
+    config = load_product_config(ProductType.L1)
+    data = bytearray(1302)
+    offset = 4
+    for joint_id in config.valid_joints:
+        if joint_id == JointId.FF_MCP:
+            data[offset:offset + 6] = bytes.fromhex("01 00 78 00 fc 05")
+        else:
+            data[offset:offset + 6] = bytes.fromhex("00 00 00 00 00 00")
+        offset += 6
+
+    comm = EthercatComm.__new__(EthercatComm)
+    comm._client = FakeEthercatClientForRecv(bytes(data))
+    comm.update_config(config)
+
+    joints = comm.get_joints()
+    ff_mcp = next(joint for joint in joints if joint.id == JointId.FF_MCP)
+
+    assert isinstance(ff_mcp, JointData)
+    assert ff_mcp.state == State.RUNNING
+    assert ff_mcp.error == ErrorCode.NORMAL
+    assert ff_mcp.angle == 12.0
+    assert ff_mcp.speed == -4
+    assert ff_mcp.torque == 5
 
 
 class FakeMasterOpenRaises:
