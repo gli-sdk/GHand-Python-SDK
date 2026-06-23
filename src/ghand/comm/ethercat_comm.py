@@ -19,6 +19,8 @@ Wraps EthercatClient and handles PDO encoding/decoding.
 
 import logging
 import math
+import struct
+import time
 
 from .._subscription import SubscriptionManager
 from ..types import (
@@ -29,6 +31,7 @@ from ..types import (
     JointData,
     ProductConfig,
     State,
+    TactileRegionConfig,
     TactileInfo,
 )
 from .ethercat_client import EthercatClient
@@ -48,26 +51,89 @@ logger = logging.getLogger("ghand.ethercat_comm")
 class EthercatComm(IComm):
     """IComm implementation for EtherCAT."""
 
+    _CONNECT_RETRIES = 3
+    _CONNECT_RETRY_DELAY_SEC = 0.5
+    _COMPAT_THUMB_TACTILE_COUNT = 28
+
     def __init__(self, config: ProductConfig):
         self._client = EthercatClient()
-        self._config = config
-        self._expected_tpdo_size = compute_tpdo_size(
-            len(config.valid_joints),
-            [r.count for r in config.tactile_regions] if config.has_tactile else None,
-        )
-        self._controlled_joints = [j for j in config.valid_joints if j in config.joint_limits]
-        self._expected_rpdo_size = 2 + len(self._controlled_joints) * 6
         self._sub_manager = SubscriptionManager(self._client)
+        self.update_config(config)
+
+    @property
+    def config(self) -> ProductConfig:
+        """Return the active product config selected for the mapped PDO layout."""
+        return self._config
+
+    def _clone_config_with_tactile_counts(
+        self, config: ProductConfig, tactile_counts: list[int]
+    ) -> ProductConfig:
+        """Clone product config while replacing tactile region sample counts."""
+        tactile_regions = [
+            TactileRegionConfig(id=region.id, count=count)
+            for region, count in zip(config.tactile_regions, tactile_counts)
+        ]
+        return ProductConfig(
+            name=config.name,
+            model=config.model,
+            aliases=list(config.aliases),
+            valid_joints=list(config.valid_joints),
+            joint_limits=config.joint_limits.copy(),
+            has_tactile=config.has_tactile,
+            tactile_regions=tactile_regions,
+            slave_id=config.slave_id,
+            modbus_profile=config.modbus_profile,
+            ethercat_input_sizes=config.ethercat_input_sizes,
+            ethercat_output_size=config.ethercat_output_size,
+            ethercat_rpdo_layout=config.ethercat_rpdo_layout,
+            ethercat_tpdo_layout=config.ethercat_tpdo_layout,
+        )
+
+    def _build_tpdo_layouts(self, config: ProductConfig) -> dict[int, ProductConfig]:
+        """Build supported TPDO layouts keyed by mapped input size."""
+        tactile_counts = [r.count for r in config.tactile_regions] if config.has_tactile else None
+        layouts = {
+            compute_tpdo_size(len(config.valid_joints), tactile_counts): config
+        }
+        for input_size in config.ethercat_input_sizes:
+            layouts[input_size] = config
+        if config.has_tactile and tactile_counts and tactile_counts[0] > self._COMPAT_THUMB_TACTILE_COUNT:
+            compat_counts = list(tactile_counts)
+            compat_counts[0] = self._COMPAT_THUMB_TACTILE_COUNT
+            compat_config = self._clone_config_with_tactile_counts(config, compat_counts)
+            layouts[compute_tpdo_size(len(config.valid_joints), compat_counts)] = compat_config
+        return layouts
+
+    def _select_tpdo_layout(self, input_size: int) -> None:
+        """Select the active parser layout from the actual mapped input size."""
+        layout = self._tpdo_layouts.get(input_size)
+        if layout is None:
+            return
+        self._config = layout
+        self._expected_tpdo_size = input_size
+        logger.info(
+            "Selected EtherCAT TPDO layout: input=%s, tactile_counts=%s",
+            input_size,
+            [r.count for r in self._config.tactile_regions] if self._config.has_tactile else [],
+        )
 
     def update_config(self, config: ProductConfig) -> None:
         """Update the cached product configuration and derived constants."""
         self._config = config
+        self._tpdo_layouts = self._build_tpdo_layouts(config)
+        self._expected_tpdo_sizes = tuple(sorted(self._tpdo_layouts))
         self._expected_tpdo_size = compute_tpdo_size(
             len(config.valid_joints),
             [r.count for r in config.tactile_regions] if config.has_tactile else None,
         )
         self._controlled_joints = [j for j in config.valid_joints if j in config.joint_limits]
-        self._expected_rpdo_size = 2 + len(self._controlled_joints) * 6
+        self._expected_rpdo_size = (
+            config.ethercat_output_size
+            if config.ethercat_output_size is not None
+            else 2 + len(self._controlled_joints) * 6
+        )
+        self._rpdo_layout = config.ethercat_rpdo_layout
+        self._tpdo_layout = config.ethercat_tpdo_layout
 
     # ===== Connection management =====
 
@@ -88,14 +154,24 @@ class EthercatComm(IComm):
         Returns:
             True if the connection and SOEM startup succeed.
         """
-        connected = self._client.connect(device_name)
-        if not connected:
-            return False
-        if not self._client.run(self._expected_tpdo_size, self._expected_rpdo_size):
+        for attempt in range(1, self._CONNECT_RETRIES + 1):
+            connected = self._client.connect(device_name)
+            if connected and self._client.run(self._expected_tpdo_sizes, self._expected_rpdo_size):
+                self._select_tpdo_layout(self._client.input_size)
+                logger.info("Device connected via EtherCAT (%s)", device_name)
+                return True
+
+            logger.error(
+                "Failed to connect EtherCAT device %s (attempt %s/%s)",
+                device_name,
+                attempt,
+                self._CONNECT_RETRIES,
+            )
             self._client.disconnect()
-            return False
-        logger.info("Device connected via EtherCAT (%s)", device_name)
-        return True
+            if attempt < self._CONNECT_RETRIES:
+                time.sleep(self._CONNECT_RETRY_DELAY_SEC)
+
+        return False
 
     def disconnect(self) -> bool:
         """Disconnect from the EtherCAT device and stop subscriptions."""
@@ -120,23 +196,60 @@ class EthercatComm(IComm):
         Returns:
             True if the command is sent successfully.
         """
-        rpdo = Rpdo(self._controlled_joints)
-        rpdo.mode = mode.value
-        rpdo.stop = 0
+        if self._rpdo_layout == "per_joint_mode_3reg":
+            self._client.send_data(self._build_l1_rpdo(joints, mode, stop=0))
+        else:
+            rpdo = Rpdo(self._controlled_joints)
+            rpdo.mode = mode.value
+            rpdo.stop = 0
 
-        for joint in joints:
-            rpdo.joints[joint.id] = (math.radians(joint.angle), joint.speed, joint.torque)
+            for joint in joints:
+                rpdo.joints[joint.id] = (math.radians(joint.angle), joint.speed, joint.torque)
 
-        self._client.send_data(rpdo.to_bytes())
+            self._client.send_data(rpdo.to_bytes())
         return True
 
     def stop(self) -> bool:
         """Send an immediate stop command to all joints."""
-        rpdo = Rpdo(self._controlled_joints)
-        rpdo.mode = 0
-        rpdo.stop = 1
-        self._client.send_data(rpdo.to_bytes())
+        if self._rpdo_layout == "per_joint_mode_3reg":
+            self._client.send_data(self._build_l1_rpdo([], CtrlMode.POSITION, stop=1))
+        else:
+            rpdo = Rpdo(self._controlled_joints)
+            rpdo.mode = 0
+            rpdo.stop = 1
+            self._client.send_data(rpdo.to_bytes())
         return True
+
+    def _build_l1_rpdo(
+        self,
+        joints: list[JointCommand],
+        mode: CtrlMode,
+        stop: int,
+    ) -> bytes:
+        """Build the L1 EtherCAT 6-byte-per-joint RPDO."""
+        by_id = {joint.id: joint for joint in joints}
+        data = bytearray()
+        for joint_id in self._controlled_joints:
+            joint = by_id.get(joint_id)
+            if joint is None:
+                position = 0
+                speed = 0
+                torque = 0
+            else:
+                position = int(joint.angle * 10) & 0xFFFF
+                speed = int(joint.speed)
+                torque = int(joint.torque)
+            data.extend(
+                struct.pack(
+                    "<BBHbb",
+                    mode.value & 0xFF,
+                    stop & 0xFF,
+                    position,
+                    speed,
+                    torque,
+                )
+            )
+        return bytes(data)
 
     # ===== State retrieval =====
 
@@ -147,6 +260,9 @@ class EthercatComm(IComm):
             List of JointData objects.
         """
         data = self._client.recv_data()
+
+        if self._tpdo_layout == "l1_extended":
+            return self._parse_l1_extended_joints(data)
 
         tpdo = Tpdo.from_bytes(data, self._config)
 
@@ -161,11 +277,48 @@ class EthercatComm(IComm):
                     angle=angle,
                     speed=joint_tpdo.speed,
                     torque=joint_tpdo.torque,
-                    state=State(joint_tpdo.state),
-                    error=ErrorCode(joint_tpdo.error),
+                    state=self._parse_state(joint_tpdo.state),
+                    error=self._parse_error_code(joint_tpdo.error),
                 )
             )
         return joints
+
+    def _parse_l1_extended_joints(self, data: bytes) -> list[JointData]:
+        """Parse the L1 extended EtherCAT TPDO joint prefix."""
+        offset = 4
+        joints = []
+        for joint_id in self._config.valid_joints:
+            if len(data) < offset + 6:
+                break
+            state, error, angle_raw, speed, torque = struct.unpack_from(
+                "<BBHbb", data, offset
+            )
+            joints.append(
+                JointData(
+                    id=joint_id,
+                    angle=angle_raw / 10.0,
+                    speed=speed,
+                    torque=torque,
+                    state=self._parse_state(state),
+                    error=self._parse_error_code(error),
+                )
+            )
+            offset += 6
+        return joints
+
+    @staticmethod
+    def _parse_state(value: int) -> State:
+        try:
+            return State(value)
+        except ValueError:
+            return State.ABNORMAL_RUNNING
+
+    @staticmethod
+    def _parse_error_code(value: int) -> ErrorCode:
+        try:
+            return ErrorCode(value)
+        except ValueError:
+            return ErrorCode.UNKNOWN_ERROR
 
     def get_hand_info(self) -> HandState:
         """Retrieve high-level hand status from TPDO.
@@ -177,8 +330,8 @@ class EthercatComm(IComm):
 
         hand_tpdo = HandTpdo.from_bytes(data)
         return HandState(
-            state=State(hand_tpdo.state),
-            error=ErrorCode(hand_tpdo.error),
+            state=self._parse_state(hand_tpdo.state),
+            error=self._parse_error_code(hand_tpdo.error),
             temperature=hand_tpdo.temperature,
         )
 
@@ -272,15 +425,15 @@ class EthercatComm(IComm):
 
     def get_device_name(self) -> str:
         """Retrieve the device name via SDO."""
-        return self._client.sdo_read(0x1008, 0x00).decode("utf-8")
+        return self._client.sdo_read(0x1008, 0x00).decode("utf-8").strip("\x00")
 
     def get_hardware_version(self) -> str:
         """Retrieve the hardware version via SDO."""
-        return self._client.sdo_read(0x1009, 0x00).decode("utf-8")
+        return self._client.sdo_read(0x1009, 0x00).decode("utf-8").strip("\x00")
 
     def get_firmware_version(self) -> str:
         """Retrieve the firmware version via SDO."""
-        return self._client.sdo_read(0x100A, 0x00).decode("utf-8")
+        return self._client.sdo_read(0x100A, 0x00).decode("utf-8").strip("\x00")
 
     def get_serial_number(self) -> int:
         """Retrieve the product serial number via SDO."""
@@ -288,11 +441,15 @@ class EthercatComm(IComm):
 
     def get_motor_driver_version(self) -> tuple:
         """Retrieve the motor driver version via SDO."""
-        return (
-            int.from_bytes(self._client.sdo_read(0x2007, 0x01), byteorder="little"),
-            int.from_bytes(self._client.sdo_read(0x2007, 0x02), byteorder="little"),
-            int.from_bytes(self._client.sdo_read(0x2007, 0x03), byteorder="little"),
-        )
+        try:
+            return (
+                int.from_bytes(self._client.sdo_read(0x2007, 0x01), byteorder="little"),
+                int.from_bytes(self._client.sdo_read(0x2007, 0x02), byteorder="little"),
+                int.from_bytes(self._client.sdo_read(0x2007, 0x03), byteorder="little"),
+            )
+        except Exception as exc:
+            logger.warning("Motor driver version is unavailable: %s", exc)
+            return (0, 0, 0)
 
     def get_hand_type(self) -> int:
         """Retrieve the hand type via SDO.

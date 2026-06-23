@@ -425,7 +425,8 @@ class CanfdTransport:
 
                 # Single-frame response (strip Modbus byte-count prefix)
                 if arb["start"] == 1 and arb["end"] == 1:
-                    return resp_data[1:] if resp_data else resp_data
+                    payload = resp_data[1:] if resp_data else resp_data
+                    return payload[: count * 2]
 
                 # Multi-frame response: first segment carries byte-count prefix
                 seg_num = arb["seg_num"]
@@ -437,7 +438,7 @@ class CanfdTransport:
 
             # Reassemble
             assembled = b"".join(segments[i] for i in sorted(segments))
-            return assembled
+            return assembled[: count * 2]
 
     def write_registers(
         self,

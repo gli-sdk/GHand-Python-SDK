@@ -105,6 +105,7 @@ class TactileSensorId(enum.IntEnum):
 
 class ProductType(enum.Enum):
     G5 = "G5"
+    L1 = "L1"
 
 
 class GestureType(enum.Enum):
@@ -134,11 +135,17 @@ class ProductConfig:
 
     name: str = ""
     model: str = ""
+    aliases: list[str] = field(default_factory=list)
     valid_joints: list[JointId] = field(default_factory=list)
     joint_limits: dict[JointId, tuple[float, float]] = field(default_factory=dict)
     has_tactile: bool = False
     tactile_regions: list[TactileRegionConfig] = field(default_factory=list)
-    slave_id: int = 0x01
+    slave_id: int = 0x31
+    modbus_profile: str = "g5"
+    ethercat_input_sizes: tuple[int, ...] = field(default_factory=tuple)
+    ethercat_output_size: int | None = None
+    ethercat_rpdo_layout: str = "shared_mode_float"
+    ethercat_tpdo_layout: str = "default"
 
 
 @dataclass
