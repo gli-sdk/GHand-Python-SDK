@@ -9,9 +9,9 @@
   "ethercat_rpdo_layout": "per_joint_mode_3reg",
   "ethercat_tpdo_layout": "l1_extended",
   "joints": [
-    { "id": "THUMB_MCP" },
-    { "id": "THUMB_SWING", "min": 0.0, "max": 30.0 },
-    { "id": "THUMB_ROTATION", "min": 0.0, "max": 90.0 },
+    { "id": "THUMB_TMC_FE" },
+    { "id": "THUMB_TMC_AA", "min": 0.0, "max": 30.0 },
+    { "id": "THUMB_TMC_PS", "min": 0.0, "max": 90.0 },
     { "id": "FF_PIP" },
     { "id": "FF_MCP",      "min": 0.0, "max": 90.0 },
     { "id": "MF_PIP" },

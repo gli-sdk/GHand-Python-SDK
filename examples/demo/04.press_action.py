@@ -8,13 +8,13 @@ from ghand.ghand import CommType, GHand, JointCommand, JointId
 configure_logging(level=logging.INFO)
 
 thumb_press = {
-    JointId.THUMB_PIP: 0,
     JointId.THUMB_MCP: 0,
-    JointId.THUMB_SWING: 30,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_TMC_FE: 0,
+    JointId.THUMB_TMC_AA: 30,
+    JointId.THUMB_TMC_PS: 0,
     JointId.FF_PIP: 75,
     JointId.FF_MCP: 70,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     JointId.MF_PIP: 75,
     JointId.MF_MCP: 70,
     JointId.RF_PIP: 75,
@@ -24,13 +24,13 @@ thumb_press = {
 }
 
 ff_press = {
-    JointId.THUMB_PIP: 30,
-    JointId.THUMB_MCP: 20,
-    JointId.THUMB_SWING: 20,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_MCP: 30,
+    JointId.THUMB_TMC_FE: 20,
+    JointId.THUMB_TMC_AA: 20,
+    JointId.THUMB_TMC_PS: 0,
     JointId.FF_PIP: 0,
     JointId.FF_MCP: 0,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     JointId.MF_PIP: 75,
     JointId.MF_MCP: 70,
     JointId.RF_PIP: 75,
@@ -40,13 +40,13 @@ ff_press = {
 }
 
 mf_press = {
-    JointId.THUMB_PIP: 60,
-    JointId.THUMB_MCP: 0,
-    JointId.THUMB_SWING: 20,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_MCP: 60,
+    JointId.THUMB_TMC_FE: 0,
+    JointId.THUMB_TMC_AA: 20,
+    JointId.THUMB_TMC_PS: 0,
     JointId.FF_PIP: 75,
     JointId.FF_MCP: 70,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     JointId.MF_PIP: 0,
     JointId.MF_MCP: 0,
     JointId.RF_PIP: 75,
@@ -56,13 +56,13 @@ mf_press = {
 }
 
 rf_press = {
-    JointId.THUMB_PIP: 66,
-    JointId.THUMB_MCP: 0,
-    JointId.THUMB_SWING: 20,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_MCP: 66,
+    JointId.THUMB_TMC_FE: 0,
+    JointId.THUMB_TMC_AA: 20,
+    JointId.THUMB_TMC_PS: 0,
     JointId.FF_PIP: 75,
     JointId.FF_MCP: 70,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     JointId.MF_PIP: 75,
     JointId.MF_MCP: 70,
     JointId.RF_PIP: 0,
@@ -72,13 +72,13 @@ rf_press = {
 }
 
 lf_press = {
-    JointId.THUMB_PIP: 66,
-    JointId.THUMB_MCP: 0,
-    JointId.THUMB_SWING: 20,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_MCP: 66,
+    JointId.THUMB_TMC_FE: 0,
+    JointId.THUMB_TMC_AA: 20,
+    JointId.THUMB_TMC_PS: 0,
     JointId.FF_PIP: 75,
     JointId.FF_MCP: 70,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     JointId.MF_PIP: 75,
     JointId.MF_MCP: 70,
     JointId.RF_PIP: 75,
@@ -89,13 +89,13 @@ lf_press = {
 
 open_hand = {
     # All fingers at zero position
-    JointId.THUMB_PIP: 0,
     JointId.THUMB_MCP: 0,
-    JointId.THUMB_SWING: 20,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_TMC_FE: 0,
+    JointId.THUMB_TMC_AA: 20,
+    JointId.THUMB_TMC_PS: 0,
     JointId.FF_PIP: 0,
     JointId.FF_MCP: 0,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     JointId.MF_PIP: 0,
     JointId.MF_MCP: 0,
     JointId.RF_PIP: 0,

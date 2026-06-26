@@ -62,13 +62,13 @@ G5_JOINT_INPUT_REG_MAP = {
 
 # Mapping from controlled G5 joint ID to holding-register base address.
 G5_HOLDING_REG_MAP = {
-    JointId.THUMB_PIP: 0x0011,
-    JointId.THUMB_MCP: 0x0013,
-    JointId.THUMB_SWING: 0x0015,
-    JointId.THUMB_ROTATION: 0x0017,
+    JointId.THUMB_MCP: 0x0011,
+    JointId.THUMB_TMC_FE: 0x0013,
+    JointId.THUMB_TMC_AA: 0x0015,
+    JointId.THUMB_TMC_PS: 0x0017,
     JointId.FF_PIP: 0x0019,
     JointId.FF_MCP: 0x001B,
-    JointId.FF_SWING: 0x001D,
+    JointId.FF_MCP_AA: 0x001D,
     JointId.MF_PIP: 0x001F,
     JointId.MF_MCP: 0x0021,
     JointId.RF_PIP: 0x0023,
@@ -83,9 +83,9 @@ HOLDING_REG_MAP = G5_HOLDING_REG_MAP
 
 # L1 protocol V1.2: only these 11 joints are present in the Modbus table.
 L1_JOINT_INPUT_REG_MAP = {
-    JointId.THUMB_MCP: 0x1023,
-    JointId.THUMB_SWING: 0x1026,  # Thumb TMC F-E
-    JointId.THUMB_ROTATION: 0x1029,  # Thumb TMC A-A
+    JointId.THUMB_TMC_FE: 0x1023,
+    JointId.THUMB_TMC_AA: 0x1026,
+    JointId.THUMB_TMC_PS: 0x1029,
     JointId.FF_PIP: 0x102C,
     JointId.FF_MCP: 0x102F,
     JointId.MF_PIP: 0x1032,
@@ -97,9 +97,9 @@ L1_JOINT_INPUT_REG_MAP = {
 }
 
 L1_HOLDING_REG_MAP = {
-    JointId.THUMB_MCP: 0x0010,
-    JointId.THUMB_SWING: 0x0013,  # Thumb TMC F-E
-    JointId.THUMB_ROTATION: 0x0016,  # Thumb TMC A-A
+    JointId.THUMB_TMC_FE: 0x0010,
+    JointId.THUMB_TMC_AA: 0x0013,
+    JointId.THUMB_TMC_PS: 0x0016,
     JointId.FF_PIP: 0x0019,
     JointId.FF_MCP: 0x001C,
     JointId.MF_PIP: 0x001F,

@@ -52,19 +52,19 @@ def main():
         print("--- Test: Detect collision and avoid ---")
         target_joints = [
             JointCommand(
-                id=JointId.THUMB_PIP,
+                id=JointId.THUMB_MCP,
                 angle=66,
                 speed=DEFAULT_SPEED,
                 torque=DEFAULT_TORQUE,
             ),
             JointCommand(
-                id=JointId.THUMB_SWING,
+                id=JointId.THUMB_TMC_AA,
                 angle=52,
                 speed=DEFAULT_SPEED,
                 torque=DEFAULT_TORQUE,
             ),
             JointCommand(
-                id=JointId.THUMB_ROTATION,
+                id=JointId.THUMB_TMC_PS,
                 angle=-10,
                 speed=DEFAULT_SPEED,
                 torque=DEFAULT_TORQUE,
@@ -99,7 +99,7 @@ def main():
             print("-" * 70)
             for i in range(18):
                 if JointId(i) in (
-                        JointId.THUMB_DIP,
+                        JointId.THUMB_IP,
                         JointId.FF_DIP,
                         JointId.MF_DIP,
                         JointId.RF_DIP,
@@ -130,10 +130,10 @@ def main():
 
         # Get current joint states and print
         current_joints = hand.get_joints()
-        print(f"Current angle: Thumb PIP={current_joints[JointId.THUMB_PIP.value].angle:.1f}°")
-        print(f"Current angle: Thumb SWING={current_joints[JointId.THUMB_SWING.value].angle:.1f}°")
+        print(f"Current angle: Thumb MCP={current_joints[JointId.THUMB_MCP.value].angle:.1f}°")
+        print(f"Current angle: Thumb TMC A-A={current_joints[JointId.THUMB_TMC_AA.value].angle:.1f}°")
         print(
-            f"Current angle: Thumb ROTATION={current_joints[JointId.THUMB_ROTATION.value].angle:.1f}°"
+            f"Current angle: Thumb TMC P-S={current_joints[JointId.THUMB_TMC_PS.value].angle:.1f}°"
         )
         print(f"Current angle: Index PIP={current_joints[JointId.FF_PIP.value].angle:.1f}°")
         print(f"Current angle: Index MCP={current_joints[JointId.FF_MCP.value].angle:.1f}°")

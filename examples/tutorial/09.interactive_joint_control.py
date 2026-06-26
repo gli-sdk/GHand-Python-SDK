@@ -13,22 +13,22 @@ def main():
 
     # Create independent parameter dictionary for each joint
     joint_params = {
-        JointId.THUMB_PIP: {
-            "angle": 0,
-            "speed": 0,
-            "torque": 0
-        },
         JointId.THUMB_MCP: {
             "angle": 0,
             "speed": 0,
             "torque": 0
         },
-        JointId.THUMB_SWING: {
+        JointId.THUMB_TMC_FE: {
             "angle": 0,
             "speed": 0,
             "torque": 0
         },
-        JointId.THUMB_ROTATION: {
+        JointId.THUMB_TMC_AA: {
+            "angle": 0,
+            "speed": 0,
+            "torque": 0
+        },
+        JointId.THUMB_TMC_PS: {
             "angle": 0,
             "speed": 0,
             "torque": 0
@@ -43,7 +43,7 @@ def main():
             "speed": 0,
             "torque": 0
         },
-        JointId.FF_SWING: {
+        JointId.FF_MCP_AA: {
             "angle": 0,
             "speed": 0,
             "torque": 0
@@ -106,8 +106,8 @@ def main():
             # Get user input
             print("\nSet parameters for joints (enter empty line to finish):")
             print("Joint ID list:")
-            print("1:THUMB_PIP, 2:THUMB_MCP, 3:THUMB_SWING, 4:THUMB_ROTATION")
-            print("6:FF_PIP, 7:FF_MCP, 8:FF_SWING")
+            print("1:THUMB_MCP, 2:THUMB_TMC_FE, 3:THUMB_TMC_AA, 4:THUMB_TMC_PS")
+            print("6:FF_PIP, 7:FF_MCP, 8:FF_MCP_AA")
             print("10:MF_PIP, 11:MF_MCP")
             print("13:RF_PIP, 14:RF_MCP")
             print("16:LF_PIP, 17:LF_MCP")

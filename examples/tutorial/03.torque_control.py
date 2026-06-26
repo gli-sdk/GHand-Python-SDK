@@ -37,8 +37,8 @@ def main():
             print("\nStep 1: Applying torque to close fingers (torque=10)")
             joints = []
             for joint_id in [
-                    JointId.THUMB_PIP,
                     JointId.THUMB_MCP,
+                    JointId.THUMB_TMC_FE,
                     JointId.FF_PIP,
                     JointId.FF_MCP,
                     JointId.MF_PIP,
@@ -56,7 +56,7 @@ def main():
                 current_joints = hand.get_joints()
                 print("Current joint states:")
                 for joint in current_joints:
-                    if joint.id in [JointId.THUMB_PIP, JointId.FF_PIP, JointId.MF_PIP]:
+                    if joint.id in [JointId.THUMB_MCP, JointId.FF_PIP, JointId.MF_PIP]:
                         print(f"  {JointId(joint.id).name:<15}- state:{State(joint.state).name},\t"
                               f"error:{ErrorCode(joint.error).name},\t"
                               f"angle: {joint.angle:.2f}°,\t"
@@ -69,8 +69,8 @@ def main():
             print("\nStep 2: Opening fingers (torque=-10)")
             joints = []
             for joint_id in [
-                    JointId.THUMB_PIP,
                     JointId.THUMB_MCP,
+                    JointId.THUMB_TMC_FE,
                     JointId.FF_PIP,
                     JointId.FF_MCP,
                     JointId.MF_PIP,
@@ -88,7 +88,7 @@ def main():
                 current_joints = hand.get_joints()
                 print("Current joint states (released):")
                 for joint in current_joints:
-                    if joint.id in [JointId.THUMB_PIP, JointId.FF_PIP, JointId.MF_PIP]:
+                    if joint.id in [JointId.THUMB_MCP, JointId.FF_PIP, JointId.MF_PIP]:
                         print(f"  {JointId(joint.id).name:<15}- state:{State(joint.state).name},\t"
                               f"error:{ErrorCode(joint.error).name},\t"
                               f"angle: {joint.angle:.2f}°,\t"

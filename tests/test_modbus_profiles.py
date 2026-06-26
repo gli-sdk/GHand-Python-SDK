@@ -74,7 +74,7 @@ def test_g5_profile_keeps_existing_register_map():
     profile = get_modbus_profile(config)
 
     assert profile.name == "g5"
-    assert profile.joint_control_addresses[JointId.THUMB_PIP] == 0x0011
+    assert profile.joint_control_addresses[JointId.THUMB_MCP] == 0x0011
     assert profile.joint_control_addresses[JointId.FF_MCP] == 0x001B
     assert profile.tactile_control_address == 0x002B
     assert get_joint_input_span(config.valid_joints, profile) == (0x1023, 54)
@@ -87,26 +87,26 @@ def test_l1_profile_loads_protocol_register_map():
     assert config.name == "L1-Hand-V1"
     assert config.modbus_profile == "l1"
     assert profile.name == "l1"
-    assert profile.joint_input_addresses[JointId.THUMB_MCP] == 0x1023
-    assert profile.joint_input_addresses[JointId.THUMB_SWING] == 0x1026
-    assert profile.joint_input_addresses[JointId.THUMB_ROTATION] == 0x1029
+    assert profile.joint_input_addresses[JointId.THUMB_TMC_FE] == 0x1023
+    assert profile.joint_input_addresses[JointId.THUMB_TMC_AA] == 0x1026
+    assert profile.joint_input_addresses[JointId.THUMB_TMC_PS] == 0x1029
     assert profile.joint_input_addresses[JointId.LF_MCP] == 0x1041
-    assert profile.joint_control_addresses[JointId.THUMB_MCP] == 0x0010
-    assert profile.joint_control_addresses[JointId.THUMB_SWING] == 0x0013
-    assert profile.joint_control_addresses[JointId.THUMB_ROTATION] == 0x0016
+    assert profile.joint_control_addresses[JointId.THUMB_TMC_FE] == 0x0010
+    assert profile.joint_control_addresses[JointId.THUMB_TMC_AA] == 0x0013
+    assert profile.joint_control_addresses[JointId.THUMB_TMC_PS] == 0x0016
     assert profile.joint_control_addresses[JointId.LF_MCP] == 0x002E
     assert profile.tactile_control_address == 0x0031
     assert profile.canfd_connection_timer_address == 0x0037
     assert profile.canfd_connection_timer_registers == 2
     assert get_joint_input_span(config.valid_joints, profile) == (0x1023, 33)
-    assert config.joint_limits[JointId.THUMB_SWING] == (0.0, 30.0)
-    assert config.joint_limits[JointId.THUMB_ROTATION] == (0.0, 90.0)
+    assert config.joint_limits[JointId.THUMB_TMC_AA] == (0.0, 30.0)
+    assert config.joint_limits[JointId.THUMB_TMC_PS] == (0.0, 90.0)
     assert config.joint_limits[JointId.FF_MCP] == (0.0, 90.0)
     assert config.joint_limits[JointId.MF_MCP] == (0.0, 90.0)
     assert config.joint_limits[JointId.RF_MCP] == (0.0, 90.0)
     assert config.joint_limits[JointId.LF_MCP] == (0.0, 90.0)
-    assert JointId.THUMB_MCP not in config.joint_limits
-    assert JointId.THUMB_PIP not in config.valid_joints
+    assert JointId.THUMB_TMC_FE not in config.joint_limits
+    assert JointId.THUMB_MCP not in config.valid_joints
     assert JointId.FF_PIP not in config.joint_limits
     assert JointId.MF_PIP not in config.joint_limits
     assert JointId.RF_PIP not in config.joint_limits
@@ -168,7 +168,7 @@ def test_l1_parse_joints_uses_l1_register_order():
     start, count = get_joint_input_span(config.valid_joints, profile)
     registers = [0] * count
 
-    thumb_offset = profile.joint_input_addresses[JointId.THUMB_MCP] - start
+    thumb_offset = profile.joint_input_addresses[JointId.THUMB_TMC_FE] - start
     registers[thumb_offset] = 0x0100
     registers[thumb_offset + 1] = 1234
     registers[thumb_offset + 2] = 0xFB07
@@ -180,7 +180,7 @@ def test_l1_parse_joints_uses_l1_register_order():
 
     joints = parse_joints(registers, config.valid_joints, profile, start)
 
-    assert joints[0].id == JointId.THUMB_MCP
+    assert joints[0].id == JointId.THUMB_TMC_FE
     assert joints[0].state == State.RUNNING
     assert joints[0].angle == 123.4
     assert joints[0].speed == -5
@@ -195,7 +195,7 @@ def test_parse_joints_tolerates_unknown_state_and_error_values():
     start, count = get_joint_input_span(config.valid_joints, profile)
     registers = [0] * count
 
-    offset = profile.joint_input_addresses[JointId.THUMB_MCP] - start
+    offset = profile.joint_input_addresses[JointId.THUMB_TMC_FE] - start
     registers[offset] = 0x1111
     registers[offset + 1] = 123
     registers[offset + 2] = 0x0405

@@ -283,21 +283,21 @@ def main():
                 torque = 100
                 joints.append(
                     JointCommand(
-                        id=JointId.THUMB_PIP,
+                        id=JointId.THUMB_MCP,
                         angle=clip_angle_degrees(left_hand.thumb.pip_bend, 0, 75),
                         speed=speed,
                         torque=torque,
                     ))  # PIP bend: rotation around x-axis in MCP sensor coordinate system
                 joints.append(
                     JointCommand(
-                        id=JointId.THUMB_MCP,
+                        id=JointId.THUMB_TMC_FE,
                         angle=clip_angle_degrees(left_hand.thumb.mcp_bend - 40, 0, 55),
                         speed=speed,
                         torque=torque,
                     ))  # MCP bend: rotation around z-axis in back of hand sensor coordinate system
                 joints.append(
                     JointCommand(
-                        id=JointId.THUMB_SWING,
+                        id=JointId.THUMB_TMC_AA,
                         angle=clip_angle_degrees(
                             -(left_hand.thumb.mcp_roll + left_hand.thumb.pip_roll +
                               left_hand.thumb.dip_roll) - 85,
@@ -310,7 +310,7 @@ def main():
                 )  # MCP abduction: in back of hand sensor coordinate system, DIP sensor rotates around y-axis
                 joints.append(
                     JointCommand(
-                        id=JointId.THUMB_ROTATION,
+                        id=JointId.THUMB_TMC_PS,
                         angle=clip_angle_degrees(-left_hand.thumb.dip_sway, -30, 60),
                         speed=speed,
                         torque=90,
@@ -332,7 +332,7 @@ def main():
                     ))
                 joints.append(
                     JointCommand(
-                        id=JointId.FF_SWING,
+                        id=JointId.FF_MCP_AA,
                         angle=clip_angle_degrees(
                             left_hand.index.mcp_sway + left_hand.index.pip_sway, -15, 15),
                         speed=speed,
