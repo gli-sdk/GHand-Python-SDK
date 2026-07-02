@@ -287,12 +287,23 @@ class EthercatComm(IComm):
         return int.from_bytes(self._client.sdo_read(0x1018, 0x04), byteorder="little")
 
     def get_motor_driver_version(self) -> tuple:
-        """Retrieve the motor driver version via SDO."""
-        return (
-            int.from_bytes(self._client.sdo_read(0x2007, 0x01), byteorder="little"),
-            int.from_bytes(self._client.sdo_read(0x2007, 0x02), byteorder="little"),
-            int.from_bytes(self._client.sdo_read(0x2007, 0x03), byteorder="little"),
+        """Retrieve the motor driver version via SDO.
+
+        Writes the motor driver MCU id (0x04) to index 0x2007 sub-index 0x01,
+        then reads version high/low from sub-indices 0x02/0x03 and parses the
+        semantic version as (major, minor, patch).
+        """
+        self._client.sdo_write(0x2007, 0x01, b"\x04")
+        version_high = int.from_bytes(
+            self._client.sdo_read(0x2007, 0x02), byteorder="little"
         )
+        version_low = int.from_bytes(
+            self._client.sdo_read(0x2007, 0x03), byteorder="little"
+        )
+        major = (version_high >> 5) & 0x07
+        minor = version_high & 0x1F
+        patch = (version_low >> 4) & 0x0F
+        return (major, minor, patch)
 
     def get_hand_type(self) -> int:
         """Retrieve the hand type via SDO.

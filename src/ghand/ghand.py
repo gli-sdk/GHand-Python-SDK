@@ -23,6 +23,11 @@ from .comm.canfd_comm import CanfdComm
 from .comm.ethercat_comm import EthercatComm
 from .comm.ethercat_protocol import Tpdo
 from .comm.rs485_comm import Rs485Comm
+from collision_sdk import CollisionSDK
+import numpy as np
+from collision_sdk import CollisionCheckResult
+from ._converter import joints_to_nparray
+from ._converter import nparray_to_joints
 from .types import (
     CommType,
     CtrlMode,
@@ -411,7 +416,7 @@ class GHand:
         """Retrieve the motor driver version.
 
         Returns:
-            Tuple of (main, sub1, sub2) version numbers.
+            Tuple of (major, minor, patch) version numbers.
 
         Raises:
             RuntimeError: If communication fails.
@@ -610,7 +615,6 @@ class GHand:
 
     def _ensure_collision_checker(self) -> CollisionSDK:
         """Lazy initialization of the collision checker."""
-        from collision_sdk import CollisionSDK
 
         if self._collision_checker is None:
             self._collision_checker = CollisionSDK()
@@ -637,9 +641,6 @@ class GHand:
             ...     print("Collision detected, using safe angles")
             ...     joints = hand._angles_to_joints(result.safe_angles)
         """
-        import numpy as np
-        from collision_sdk import CollisionCheckResult
-        from ._converter import joints_to_nparray
 
         collision_checker = self._ensure_collision_checker()
 
@@ -676,7 +677,6 @@ class GHand:
         Returns:
             18-element numpy array of joint angles in degrees.
         """
-        from ._converter import joints_to_nparray
 
         return joints_to_nparray(joints, current_joints)
 
@@ -693,6 +693,5 @@ class GHand:
         Returns:
             List of 18 JointCommand objects.
         """
-        from ._converter import nparray_to_joints
 
         return nparray_to_joints(angles, speed, torque)
