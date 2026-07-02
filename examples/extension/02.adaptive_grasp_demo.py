@@ -13,9 +13,7 @@ from adaptive_grasp import AdaptiveGrasper
 from adaptive_grasp.demo_config import build_demo_runtime_config
 from ghand import (
     CommType,
-    CommunicationError,
     GHand,
-    HandStateError,
     ProductType,
     configure_logging,
 )
@@ -69,10 +67,6 @@ def main() -> None:
         if grasper is not None:
             print("Sending quick release command...")
             grasper.emergency_release(wait_s=runtime_config.interrupt_release_wait_s)
-    except CommunicationError as exc:
-        print(f"\n[Communication Error] {exc}")
-    except HandStateError as exc:
-        print(f"\n[Hand State Error] {exc}")
     except Exception as exc:
         print(f"\n[Unexpected Error] {type(exc).__name__}: {exc}")
     finally:
