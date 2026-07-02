@@ -7,11 +7,14 @@ dist
 docs/build/
 nul
 .claude/
+.venv/
+.pytest_cache/
+.vscode/
+.worktrees/
 openspec/
 scan_code.py
 package.sh
 package.bat
-.vscode/settings.json
 .gitignore
 CLAUDE.md
 .github
