@@ -1,6 +1,16 @@
-# Copyright (c) 2026 GLITech
+# Copyright 2026 GLITech
 #
-# Licensed under the MIT License. See LICENSE in the project root for license information.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 """GHand SDK type definitions.
 
@@ -18,15 +28,15 @@ from typing import Optional
 
 
 class JointId(enum.IntEnum):
-    THUMB_DIP = 0
-    THUMB_PIP = 1
-    THUMB_MCP = 2
-    THUMB_SWING = 3
-    THUMB_ROTATION = 4
+    THUMB_IP = 0
+    THUMB_MCP = 1
+    THUMB_TMC_FE = 2
+    THUMB_TMC_AA = 3
+    THUMB_TMC_PS = 4
     FF_DIP = 5
     FF_PIP = 6
     FF_MCP = 7
-    FF_SWING = 8
+    FF_MCP_AA = 8
     MF_DIP = 9
     MF_PIP = 10
     MF_MCP = 11
@@ -94,8 +104,8 @@ class TactileSensorId(enum.IntEnum):
 
 
 class ProductType(enum.Enum):
-    AUTO = "auto"
     G5 = "G5"
+    L1 = "L1"
 
 
 class GestureType(enum.Enum):
@@ -125,10 +135,17 @@ class ProductConfig:
 
     name: str = ""
     model: str = ""
+    aliases: list[str] = field(default_factory=list)
     valid_joints: list[JointId] = field(default_factory=list)
     joint_limits: dict[JointId, tuple[float, float]] = field(default_factory=dict)
     has_tactile: bool = False
     tactile_regions: list[TactileRegionConfig] = field(default_factory=list)
+    slave_id: int = 0x31
+    modbus_profile: str = "g5"
+    ethercat_input_sizes: tuple[int, ...] = field(default_factory=tuple)
+    ethercat_output_size: int | None = None
+    ethercat_rpdo_layout: str = "shared_mode_float"
+    ethercat_tpdo_layout: str = "default"
 
 
 @dataclass
@@ -194,7 +211,7 @@ class HandState:
 class JointCommand:
     """Single joint command sent to the device."""
 
-    id: int = JointId.THUMB_DIP
+    id: int = JointId.THUMB_IP
     angle: float = 0.0  # degrees
     speed: int = 0
     torque: int = 0
@@ -204,7 +221,7 @@ class JointCommand:
 class JointData:
     """Single joint state received from the device."""
 
-    id: int = JointId.THUMB_DIP
+    id: int = JointId.THUMB_IP
     state: State = State.STOPPED
     error: ErrorCode = ErrorCode.NORMAL
     angle: float = 0.0  # degrees
@@ -219,6 +236,21 @@ class TactileInfo:
     state: bool = False
     resultant_force: list[float] | None = None
     distributed_force: list[float] | None = None
+
+
+@dataclass
+class DeviceData:
+    """Unified data carrier for subscription callbacks across all protocols."""
+
+    hand: HandState
+    joints: list[JointData]
+    tactile: dict[TactileSensorId, TactileInfo] | None = None
+    timestamp: float | None = None
+
+    def __post_init__(self):
+        for joint in self.joints:
+            jid = JointId(joint.id)
+            setattr(self, jid.name.lower(), joint)
 
 
 # ============================================================================
@@ -251,13 +283,3 @@ _STATE_MESSAGES = {
 }
 
 
-class GHandError(Exception):
-    """Base exception for the GHand SDK."""
-
-
-class CommunicationError(GHandError):
-    """Raised when communication with the device fails."""
-
-
-class HandStateError(GHandError):
-    """Raised when the device or joints report an abnormal state."""

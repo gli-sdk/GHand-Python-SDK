@@ -3,7 +3,7 @@ import time
 
 from ghand import ProductType, configure_logging
 from ghand.ghand import CommType, CtrlMode, GHand, JointCommand, JointId
-from ghand.types import ErrorCode, GHandError, HandStateError, State
+from ghand.types import ErrorCode, State
 
 # Configure SDK logging (shows connection state, warnings, errors)
 configure_logging(level=logging.DEBUG)
@@ -24,7 +24,7 @@ def main():
 
         # Torque control cycle
         cycle_count = 0
-        max_cycles = 1  # Set to 0 for infinite loop
+        max_cycles = 0  # Set to 0 for infinite loop
 
         while True:
             cycle_count += 1
@@ -37,8 +37,8 @@ def main():
             print("\nStep 1: Applying torque to close fingers (torque=10)")
             joints = []
             for joint_id in [
-                    JointId.THUMB_PIP,
                     JointId.THUMB_MCP,
+                    JointId.THUMB_TMC_FE,
                     JointId.FF_PIP,
                     JointId.FF_MCP,
                     JointId.MF_PIP,
@@ -56,7 +56,7 @@ def main():
                 current_joints = hand.get_joints()
                 print("Current joint states:")
                 for joint in current_joints:
-                    if joint.id in [JointId.THUMB_PIP, JointId.FF_PIP, JointId.MF_PIP]:
+                    if joint.id in [JointId.THUMB_MCP, JointId.FF_PIP, JointId.MF_PIP]:
                         print(f"  {JointId(joint.id).name:<15}- state:{State(joint.state).name},\t"
                               f"error:{ErrorCode(joint.error).name},\t"
                               f"angle: {joint.angle:.2f}°,\t"
@@ -69,8 +69,8 @@ def main():
             print("\nStep 2: Opening fingers (torque=-10)")
             joints = []
             for joint_id in [
-                    JointId.THUMB_PIP,
                     JointId.THUMB_MCP,
+                    JointId.THUMB_TMC_FE,
                     JointId.FF_PIP,
                     JointId.FF_MCP,
                     JointId.MF_PIP,
@@ -88,7 +88,7 @@ def main():
                 current_joints = hand.get_joints()
                 print("Current joint states (released):")
                 for joint in current_joints:
-                    if joint.id in [JointId.THUMB_PIP, JointId.FF_PIP, JointId.MF_PIP]:
+                    if joint.id in [JointId.THUMB_MCP, JointId.FF_PIP, JointId.MF_PIP]:
                         print(f"  {JointId(joint.id).name:<15}- state:{State(joint.state).name},\t"
                               f"error:{ErrorCode(joint.error).name},\t"
                               f"angle: {joint.angle:.2f}°,\t"
@@ -103,10 +103,6 @@ def main():
 
     except KeyboardInterrupt:
         print("\nProgram interrupted by user.")
-    except HandStateError as e:
-        print(f"\n[Hand State Error] {e}")
-    except GHandError as e:
-        print(f"\n[Unexpected Error] {type(e).__name__}: {e}")
     finally:
         hand.close()
         time.sleep(0.5)

@@ -47,7 +47,7 @@ Enhancement suggestions are welcome. Please provide:
 ```bash
 # Clone your fork
 git clone https://github.com/gli-sdk/GHand-Python-SDK
-cd GHand-SDK
+cd GHand-Python-SDK
 
 # Create a virtual environment
 python -m venv venv
@@ -62,4 +62,4 @@ pip install yapf mypy pytest pre-commit
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+By contributing, you agree that your contributions will be licensed under the Apache License 2.0.

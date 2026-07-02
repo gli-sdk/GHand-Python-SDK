@@ -10,7 +10,6 @@ import time
 
 from ghand import ProductType, configure_logging
 from ghand.ghand import CommType, GHand, JointCommand, JointId
-from ghand.types import GHandError
 
 # Configure SDK logging
 configure_logging(level=logging.INFO)
@@ -48,7 +47,7 @@ def main():
         print(f"First hand - Name: {name1}, HW: {hw_ver1}, "
               f"FW: {ver1}, Type: {type1.value}, "
               f"SN: {serial1}")
-    except GHandError as e:
+    except Exception as e:
         print(f"Failed to get first hand info: {e}")
 
     # Get info for second hand
@@ -61,7 +60,7 @@ def main():
         print(f"Second hand - Name: {name2}, HW: {hw_ver2}, "
               f"FW: {ver2}, Type: {type2.value}, "
               f"SN: {serial2}")
-    except GHandError as e:
+    except Exception as e:
         print(f"Failed to get second hand info: {e}")
 
     print("Dexterous hands ready, control operations can begin")
@@ -72,13 +71,13 @@ def main():
     # hand2.move_joints([...])
     joints1 = []
 
-    joints1.append(JointCommand(id=JointId.THUMB_PIP, angle=0, speed=100,
+    joints1.append(JointCommand(id=JointId.THUMB_MCP, angle=0, speed=100,
                                 torque=100))  # Angle range: 0~75 (degrees)
-    joints1.append(JointCommand(id=JointId.THUMB_MCP, angle=50, speed=100,
+    joints1.append(JointCommand(id=JointId.THUMB_TMC_FE, angle=50, speed=100,
                                 torque=100))  # Angle range: 0~55 (degrees)
-    joints1.append(JointCommand(id=JointId.THUMB_SWING, angle=20, speed=100,
+    joints1.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=20, speed=100,
                                 torque=100))  # Angle range: 0~90 (degrees)
-    joints1.append(JointCommand(id=JointId.THUMB_ROTATION, angle=0, speed=100,
+    joints1.append(JointCommand(id=JointId.THUMB_TMC_PS, angle=0, speed=100,
                                 torque=100))  # Angle range: 0~90 (degrees)
     joints1.append(JointCommand(id=JointId.FF_PIP, angle=0, speed=100,
                                 torque=100))  # Angle range: 0~75 (degrees)
@@ -96,13 +95,13 @@ def main():
                 f"  {JointId(joint.id).name:<15}- Angle: {joint.angle:.2f} deg,\tSpeed: {joint.speed},\tTorque: {joint.torque}"
             )
 
-    joints1.append(JointCommand(id=JointId.THUMB_PIP, angle=0, speed=100,
-                                torque=100))  # Angle range: 0~75 (degrees)
     joints1.append(JointCommand(id=JointId.THUMB_MCP, angle=0, speed=100,
+                                torque=100))  # Angle range: 0~75 (degrees)
+    joints1.append(JointCommand(id=JointId.THUMB_TMC_FE, angle=0, speed=100,
                                 torque=100))  # Angle range: 0~55 (degrees)
-    joints1.append(JointCommand(id=JointId.THUMB_SWING, angle=20, speed=100,
+    joints1.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=20, speed=100,
                                 torque=100))  # Angle range: 0~90 (degrees)
-    joints1.append(JointCommand(id=JointId.THUMB_ROTATION, angle=0, speed=100,
+    joints1.append(JointCommand(id=JointId.THUMB_TMC_PS, angle=0, speed=100,
                                 torque=100))  # Angle range: 0~90 (degrees)
     joints1.append(JointCommand(id=JointId.FF_PIP, angle=50, speed=100,
                                 torque=100))  # Angle range: 0~75 (degrees)

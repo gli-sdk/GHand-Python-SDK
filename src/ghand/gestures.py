@@ -1,6 +1,16 @@
-# Copyright (c) 2026 GLITech
+# Copyright 2026 GLITech
 #
-# Licensed under the MIT License. See LICENSE in the project root for license information.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 """Predefined gesture module.
 
@@ -22,13 +32,13 @@ logger = logging.getLogger("ghand.gestures")
 # Key is GestureType, value is a dict of {JointId: angle(degrees)}.
 GESTURE_DEFINITIONS: Dict[GestureType, Dict[JointId, float]] = {
     GestureType.OPEN_HAND: {
-        JointId.THUMB_PIP: 0,
         JointId.THUMB_MCP: 0,
-        JointId.THUMB_SWING: 20,
-        JointId.THUMB_ROTATION: 0,
+        JointId.THUMB_TMC_FE: 0,
+        JointId.THUMB_TMC_AA: 20,
+        JointId.THUMB_TMC_PS: 0,
         JointId.FF_PIP: 0,
         JointId.FF_MCP: 0,
-        JointId.FF_SWING: 0,
+        JointId.FF_MCP_AA: 0,
         JointId.MF_PIP: 0,
         JointId.MF_MCP: 0,
         JointId.RF_PIP: 0,
@@ -37,13 +47,13 @@ GESTURE_DEFINITIONS: Dict[GestureType, Dict[JointId, float]] = {
         JointId.LF_MCP: 0,
     },
     GestureType.FIST: {
-        JointId.THUMB_PIP: 30,
-        JointId.THUMB_MCP: 20,
-        JointId.THUMB_SWING: 20,
-        JointId.THUMB_ROTATION: 0,
+        JointId.THUMB_MCP: 30,
+        JointId.THUMB_TMC_FE: 20,
+        JointId.THUMB_TMC_AA: 20,
+        JointId.THUMB_TMC_PS: 0,
         JointId.FF_PIP: 75,
         JointId.FF_MCP: 80,
-        JointId.FF_SWING: 0,
+        JointId.FF_MCP_AA: 0,
         JointId.MF_PIP: 85,
         JointId.MF_MCP: 85,
         JointId.RF_PIP: 85,
@@ -52,13 +62,13 @@ GESTURE_DEFINITIONS: Dict[GestureType, Dict[JointId, float]] = {
         JointId.LF_MCP: 85,
     },
     GestureType.OK: {
-        JointId.THUMB_PIP: 20,
         JointId.THUMB_MCP: 20,
-        JointId.THUMB_SWING: 20,
-        JointId.THUMB_ROTATION: 0,
+        JointId.THUMB_TMC_FE: 20,
+        JointId.THUMB_TMC_AA: 20,
+        JointId.THUMB_TMC_PS: 0,
         JointId.FF_PIP: 67,
         JointId.FF_MCP: 35,
-        JointId.FF_SWING: 0,
+        JointId.FF_MCP_AA: 0,
         JointId.MF_PIP: 0,
         JointId.MF_MCP: 0,
         JointId.RF_PIP: 0,
@@ -67,13 +77,13 @@ GESTURE_DEFINITIONS: Dict[GestureType, Dict[JointId, float]] = {
         JointId.LF_MCP: 0,
     },
     GestureType.THUMBS_UP: {
-        JointId.THUMB_PIP: 0,
         JointId.THUMB_MCP: 0,
-        JointId.THUMB_SWING: 20,
-        JointId.THUMB_ROTATION: -10,
+        JointId.THUMB_TMC_FE: 0,
+        JointId.THUMB_TMC_AA: 20,
+        JointId.THUMB_TMC_PS: -10,
         JointId.FF_PIP: 75,
         JointId.FF_MCP: 80,
-        JointId.FF_SWING: 0,
+        JointId.FF_MCP_AA: 0,
         JointId.MF_PIP: 85,
         JointId.MF_MCP: 85,
         JointId.RF_PIP: 85,
@@ -82,13 +92,13 @@ GESTURE_DEFINITIONS: Dict[GestureType, Dict[JointId, float]] = {
         JointId.LF_MCP: 85,
     },
     GestureType.SIX_SIGN: {
-        JointId.THUMB_PIP: 0,
         JointId.THUMB_MCP: 0,
-        JointId.THUMB_SWING: 20,
-        JointId.THUMB_ROTATION: -10,
+        JointId.THUMB_TMC_FE: 0,
+        JointId.THUMB_TMC_AA: 20,
+        JointId.THUMB_TMC_PS: -10,
         JointId.FF_PIP: 75,
         JointId.FF_MCP: 80,
-        JointId.FF_SWING: 0,
+        JointId.FF_MCP_AA: 0,
         JointId.MF_PIP: 85,
         JointId.MF_MCP: 85,
         JointId.RF_PIP: 85,

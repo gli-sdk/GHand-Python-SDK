@@ -3,7 +3,6 @@ import time
 
 from ghand import ProductType, CommType, GHand, JointCommand, JointId, configure_logging
 from ghand.gestures import GestureType, execute_gesture
-from ghand.types import GHandError
 
 # Configure logging output to console
 configure_logging(level=logging.INFO)
@@ -15,16 +14,16 @@ FLEX_CYCLE_COUNT = 4
 
 # Thumb touches other fingers gestures
 thumb_touch_little_finger = {
-    JointId.THUMB_PIP: 20,
-    JointId.THUMB_MCP: 50,
-    JointId.THUMB_SWING: 60,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_MCP: 20,
+    JointId.THUMB_TMC_FE: 50,
+    JointId.THUMB_TMC_AA: 60,
+    JointId.THUMB_TMC_PS: 0,
     JointId.LF_PIP: 56,
     JointId.LF_MCP: 28,
     # Other joints stay at zero
     JointId.FF_PIP: 0,
     JointId.FF_MCP: 0,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     JointId.MF_PIP: 0,
     JointId.MF_MCP: 0,
     JointId.RF_PIP: 0,
@@ -32,10 +31,10 @@ thumb_touch_little_finger = {
 }
 
 thumb_touch_ring_finger = {
-    JointId.THUMB_PIP: 19,
-    JointId.THUMB_MCP: 38,
-    JointId.THUMB_SWING: 45,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_MCP: 19,
+    JointId.THUMB_TMC_FE: 38,
+    JointId.THUMB_TMC_AA: 45,
+    JointId.THUMB_TMC_PS: 0,
     JointId.RF_PIP: 67,
     JointId.RF_MCP: 39,
     JointId.LF_PIP: 0,
@@ -43,16 +42,16 @@ thumb_touch_ring_finger = {
     # Other joints stay at zero
     JointId.FF_PIP: 0,
     JointId.FF_MCP: 0,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     JointId.MF_PIP: 0,
     JointId.MF_MCP: 0,
 }
 
 thumb_touch_middle_finger = {
-    JointId.THUMB_PIP: 17,
-    JointId.THUMB_MCP: 27,
-    JointId.THUMB_SWING: 30,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_MCP: 17,
+    JointId.THUMB_TMC_FE: 27,
+    JointId.THUMB_TMC_AA: 30,
+    JointId.THUMB_TMC_PS: 0,
     JointId.MF_PIP: 40,
     JointId.MF_MCP: 57,
     JointId.RF_PIP: 0,
@@ -60,19 +59,19 @@ thumb_touch_middle_finger = {
     # Other joints stay at zero
     JointId.FF_PIP: 0,
     JointId.FF_MCP: 0,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     JointId.LF_PIP: 0,
     JointId.LF_MCP: 0,
 }
 
 thumb_touch_index_finger = {
-    JointId.THUMB_PIP: 13,
-    JointId.THUMB_MCP: 14,
-    JointId.THUMB_SWING: 20,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_MCP: 13,
+    JointId.THUMB_TMC_FE: 14,
+    JointId.THUMB_TMC_AA: 20,
+    JointId.THUMB_TMC_PS: 0,
     JointId.FF_PIP: 51,
     JointId.FF_MCP: 46,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     JointId.MF_PIP: 0,
     JointId.MF_MCP: 0,
     # Other joints stay at zero
@@ -84,14 +83,14 @@ thumb_touch_index_finger = {
 
 # Individual finger opening gestures
 open_index_finger = {
-    JointId.THUMB_PIP: 30,
-    JointId.THUMB_MCP: 20,
-    JointId.THUMB_SWING: 20,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_MCP: 30,
+    JointId.THUMB_TMC_FE: 20,
+    JointId.THUMB_TMC_AA: 20,
+    JointId.THUMB_TMC_PS: 0,
     # Open index finger
     JointId.FF_PIP: 0,
     JointId.FF_MCP: 0,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     # Other joints stay at zero
     JointId.MF_PIP: 75,
     JointId.MF_MCP: 70,
@@ -102,14 +101,14 @@ open_index_finger = {
 }
 
 open_middle_finger = {
-    JointId.THUMB_PIP: 30,
-    JointId.THUMB_MCP: 20,
-    JointId.THUMB_SWING: 20,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_MCP: 30,
+    JointId.THUMB_TMC_FE: 20,
+    JointId.THUMB_TMC_AA: 20,
+    JointId.THUMB_TMC_PS: 0,
     # Open index finger
     JointId.FF_PIP: 0,
     JointId.FF_MCP: 0,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     JointId.MF_PIP: 0,
     JointId.MF_MCP: 0,
     # Other joints stay at zero
@@ -120,14 +119,14 @@ open_middle_finger = {
 }
 
 open_ring_finger = {
-    JointId.THUMB_PIP: 30,
-    JointId.THUMB_MCP: 20,
-    JointId.THUMB_SWING: 20,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_MCP: 30,
+    JointId.THUMB_TMC_FE: 20,
+    JointId.THUMB_TMC_AA: 20,
+    JointId.THUMB_TMC_PS: 0,
     # Open ring finger
     JointId.FF_PIP: 0,
     JointId.FF_MCP: 0,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     JointId.MF_PIP: 0,
     JointId.MF_MCP: 0,
     JointId.RF_PIP: 0,
@@ -138,14 +137,14 @@ open_ring_finger = {
 }
 
 open_little_finger = {
-    JointId.THUMB_PIP: 30,
-    JointId.THUMB_MCP: 20,
-    JointId.THUMB_SWING: 20,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_MCP: 30,
+    JointId.THUMB_TMC_FE: 20,
+    JointId.THUMB_TMC_AA: 20,
+    JointId.THUMB_TMC_PS: 0,
     # Open little finger
     JointId.FF_PIP: 0,
     JointId.FF_MCP: 0,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     JointId.MF_PIP: 0,
     JointId.MF_MCP: 0,
     JointId.RF_PIP: 0,
@@ -156,14 +155,14 @@ open_little_finger = {
 
 # Index finger swing gestures
 index_finger_swing_neg = {
-    JointId.THUMB_PIP: 30,
-    JointId.THUMB_MCP: 20,
-    JointId.THUMB_SWING: 20,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_MCP: 30,
+    JointId.THUMB_TMC_FE: 20,
+    JointId.THUMB_TMC_AA: 20,
+    JointId.THUMB_TMC_PS: 0,
     # Swing -10 degrees
     JointId.FF_PIP: 0,
     JointId.FF_MCP: 0,
-    JointId.FF_SWING: -10,
+    JointId.FF_MCP_AA: -10,
     JointId.MF_PIP: 75,
     JointId.MF_MCP: 70,
     JointId.RF_PIP: 75,
@@ -173,14 +172,14 @@ index_finger_swing_neg = {
 }
 
 index_finger_swing_pos = {
-    JointId.THUMB_PIP: 30,
-    JointId.THUMB_MCP: 20,
-    JointId.THUMB_SWING: 20,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_MCP: 30,
+    JointId.THUMB_TMC_FE: 20,
+    JointId.THUMB_TMC_AA: 20,
+    JointId.THUMB_TMC_PS: 0,
     # Swing 10 degrees
     JointId.FF_PIP: 0,
     JointId.FF_MCP: 0,
-    JointId.FF_SWING: 10,
+    JointId.FF_MCP_AA: 10,
     JointId.MF_PIP: 75,
     JointId.MF_MCP: 70,
     JointId.RF_PIP: 75,
@@ -191,13 +190,13 @@ index_finger_swing_pos = {
 
 # Finger flexing gestures
 flex_all_fingers = {
-    JointId.THUMB_PIP: 0,
     JointId.THUMB_MCP: 0,
-    JointId.THUMB_SWING: 20,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_TMC_FE: 0,
+    JointId.THUMB_TMC_AA: 20,
+    JointId.THUMB_TMC_PS: 0,
     JointId.FF_PIP: 75,
     JointId.FF_MCP: 70,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     JointId.MF_PIP: 75,
     JointId.MF_MCP: 70,
     JointId.RF_PIP: 75,
@@ -207,13 +206,13 @@ flex_all_fingers = {
 }
 
 flex_ring_and_little_fingers = {
-    JointId.THUMB_PIP: 0,
     JointId.THUMB_MCP: 0,
-    JointId.THUMB_SWING: 20,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_TMC_FE: 0,
+    JointId.THUMB_TMC_AA: 20,
+    JointId.THUMB_TMC_PS: 0,
     JointId.FF_PIP: 0,
     JointId.FF_MCP: 0,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     JointId.MF_PIP: 0,
     JointId.MF_MCP: 0,
     JointId.RF_PIP: 75,
@@ -223,13 +222,13 @@ flex_ring_and_little_fingers = {
 }
 
 flex_middle_ring_little_fingers = {
-    JointId.THUMB_PIP: 0,
     JointId.THUMB_MCP: 0,
-    JointId.THUMB_SWING: 20,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_TMC_FE: 0,
+    JointId.THUMB_TMC_AA: 20,
+    JointId.THUMB_TMC_PS: 0,
     JointId.FF_PIP: 0,
     JointId.FF_MCP: 0,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     JointId.MF_PIP: 75,
     JointId.MF_MCP: 70,
     JointId.RF_PIP: 75,
@@ -239,13 +238,13 @@ flex_middle_ring_little_fingers = {
 }
 
 flex_little_finger = {
-    JointId.THUMB_PIP: 0,
     JointId.THUMB_MCP: 0,
-    JointId.THUMB_SWING: 20,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_TMC_FE: 0,
+    JointId.THUMB_TMC_AA: 20,
+    JointId.THUMB_TMC_PS: 0,
     JointId.FF_PIP: 0,
     JointId.FF_MCP: 0,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     JointId.MF_PIP: 0,
     JointId.MF_MCP: 0,
     JointId.RF_PIP: 0,
@@ -255,13 +254,13 @@ flex_little_finger = {
 }
 
 flex_index_finger = {
-    JointId.THUMB_PIP: 0,
     JointId.THUMB_MCP: 0,
-    JointId.THUMB_SWING: 20,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_TMC_FE: 0,
+    JointId.THUMB_TMC_AA: 20,
+    JointId.THUMB_TMC_PS: 0,
     JointId.FF_PIP: 75,
     JointId.FF_MCP: 70,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     JointId.MF_PIP: 0,
     JointId.MF_MCP: 0,
     JointId.RF_PIP: 0,
@@ -271,13 +270,13 @@ flex_index_finger = {
 }
 
 flex_middle_finger = {
-    JointId.THUMB_PIP: 0,
     JointId.THUMB_MCP: 0,
-    JointId.THUMB_SWING: 20,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_TMC_FE: 0,
+    JointId.THUMB_TMC_AA: 20,
+    JointId.THUMB_TMC_PS: 0,
     JointId.FF_PIP: 0,
     JointId.FF_MCP: 0,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     JointId.MF_PIP: 75,
     JointId.MF_MCP: 70,
     JointId.RF_PIP: 0,
@@ -287,13 +286,13 @@ flex_middle_finger = {
 }
 
 flex_index_middle_and_ring_fingers = {
-    JointId.THUMB_PIP: 0,
     JointId.THUMB_MCP: 0,
-    JointId.THUMB_SWING: 20,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_TMC_FE: 0,
+    JointId.THUMB_TMC_AA: 20,
+    JointId.THUMB_TMC_PS: 0,
     JointId.FF_PIP: 75,
     JointId.FF_MCP: 70,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     JointId.MF_PIP: 75,
     JointId.MF_MCP: 70,
     JointId.RF_PIP: 75,
@@ -325,7 +324,7 @@ def execute_joint_positions(hand, joint_positions, description):
             return False
         time.sleep(ACTION_DELAY)
         return True
-    except GHandError as e:
+    except Exception as e:
         logger.error("%s execution failed: %s", description, e)
         return False
 
@@ -346,7 +345,7 @@ def handle_action_error(description):
         def wrapper(*args, **kwargs):
             try:
                 return func(*args, **kwargs)
-            except GHandError as e:
+            except Exception as e:
                 logger.error("%s execution failed: %s", description, e)
                 return False
 
@@ -683,7 +682,7 @@ def main():
 
     except KeyboardInterrupt:
         logger.info("\n\nProgram interrupted by user.")
-    except GHandError as e:
+    except Exception as e:
         logger.error("\n[Critical Error] %s", e)
     finally:
         hand.close()

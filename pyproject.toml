@@ -7,17 +7,19 @@ name = "ghand"
 version = "2.0.0"
 description = "GHand Python SDK"
 readme = "README.md"
-license = {text = "MIT"}
+license = {text = "Apache-2.0"}
 authors = [
     {name = "GLITECH"},
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "collision_sdk @ git+https://gitee.com/glitech/collision-collisions-detection.git",
+    "collision_sdk @ git+https://gitee.com/glitech/collision-detection.git",
     "pysoem>=0.2.0",
     "netifaces>=0.11.0",
     "numpy>=1.24.0",
     "matplotlib",
+    "pymodbus>=3.0.0",
+    "pyserial>=3.5",
 ]
 
 [project.optional-dependencies]

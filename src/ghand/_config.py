@@ -1,8 +1,18 @@
-# Copyright (c) 2026 GLITech
+# Copyright 2026 GLITech
 #
-# Licensed under the MIT License. See LICENSE in the project root for license information.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-"""Product configuration loader — JSON search and parsing."""
+"""Product configuration loader and JSON search/parsing."""
 
 import glob
 import json
@@ -10,7 +20,6 @@ import logging
 import os
 
 from .types import (
-    GHandError,
     JointId,
     ProductConfig,
     ProductType,
@@ -23,18 +32,19 @@ logger = logging.getLogger("ghand.config")
 
 _PRODUCT_TYPE_TO_FILE = {
     ProductType.G5: "xiaoyao_hand.json",
+    ProductType.L1: "l1_hand.json",
 }
 
 _JOINT_NAME_TO_ID = {
-    "THUMB_DIP": JointId.THUMB_DIP,
-    "THUMB_PIP": JointId.THUMB_PIP,
+    "THUMB_IP": JointId.THUMB_IP,
     "THUMB_MCP": JointId.THUMB_MCP,
-    "THUMB_SWING": JointId.THUMB_SWING,
-    "THUMB_ROTATION": JointId.THUMB_ROTATION,
+    "THUMB_TMC_FE": JointId.THUMB_TMC_FE,
+    "THUMB_TMC_AA": JointId.THUMB_TMC_AA,
+    "THUMB_TMC_PS": JointId.THUMB_TMC_PS,
     "FF_DIP": JointId.FF_DIP,
     "FF_PIP": JointId.FF_PIP,
     "FF_MCP": JointId.FF_MCP,
-    "FF_SWING": JointId.FF_SWING,
+    "FF_MCP_AA": JointId.FF_MCP_AA,
     "MF_DIP": JointId.MF_DIP,
     "MF_PIP": JointId.MF_PIP,
     "MF_MCP": JointId.MF_MCP,
@@ -63,7 +73,7 @@ def _get_config_search_paths() -> list[str]:
     paths.append("." + os.sep + "config" + os.sep)
 
     home = os.path.expanduser("~")
-    paths.append(os.path.join(home, ".ghand-sdk", "config") + os.sep)
+    paths.append(os.path.join(home, ".ghand", "config") + os.sep)
 
     return paths
 
@@ -141,6 +151,19 @@ def _parse_tactile_regions(json_array: list[dict]) -> list[TactileRegionConfig]:
     return regions
 
 
+def _parse_int_tuple(values) -> tuple[int, ...]:
+    """Parse an optional JSON integer list into a tuple."""
+    if not values:
+        return ()
+    result = []
+    for value in values:
+        try:
+            result.append(int(value))
+        except (TypeError, ValueError):
+            logger.warning("Invalid integer value in config: %s", value)
+    return tuple(result)
+
+
 def load_product_config(product_type: ProductType) -> ProductConfig:
     """Load the product configuration for the given product type.
 
@@ -148,20 +171,17 @@ def load_product_config(product_type: ProductType) -> ProductConfig:
         product_type: Product type enum value.
 
     Returns:
-        Populated ``ProductConfig`` instance.
-
-    Raises:
-        GHandError: If the product type is unknown or the config file is missing.
+        Populated ``ProductConfig``, or empty ``ProductConfig`` on failure (error is logged).
     """
-    if product_type == ProductType.AUTO:
-        return ProductConfig()
     file_name = _PRODUCT_TYPE_TO_FILE.get(product_type)
     if not file_name:
-        raise GHandError(f"Unknown product type: {product_type}")
+        logger.error("Unknown product type: %s", product_type)
+        return ProductConfig()
 
     file_path = _find_config_file(file_name)
     if not file_path:
-        raise GHandError(f"Config file '{file_name}' not found")
+        logger.error("Config file '%s' not found", file_name)
+        return ProductConfig()
 
     return _load_config_from_file(file_path)
 
@@ -173,16 +193,14 @@ def _load_config_from_file(file_path: str) -> ProductConfig:
         file_path: Absolute path to the JSON config file.
 
     Returns:
-        Parsed ``ProductConfig``.
-
-    Raises:
-        GHandError: If the file cannot be read or parsed.
+        Parsed ``ProductConfig``, or empty ``ProductConfig`` on failure (error is logged).
     """
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (json.JSONDecodeError, OSError) as e:
-        raise GHandError(f"Failed to parse {file_path}: {e}") from e
+        logger.error("Failed to parse %s: %s", file_path, e)
+        return ProductConfig()
 
     valid_joints, joint_limits = _parse_joints(data.get("joints", []))
     tactile_regions = _parse_tactile_regions(data.get("tactile_regions", []))
@@ -190,14 +208,26 @@ def _load_config_from_file(file_path: str) -> ProductConfig:
     config = ProductConfig(
         name=data.get("name", ""),
         model=data.get("model", ""),
+        aliases=list(data.get("aliases", [])),
         valid_joints=valid_joints,
         joint_limits=joint_limits,
         has_tactile=data.get("has_tactile", False),
         tactile_regions=tactile_regions,
+        slave_id=int(data.get("slave_id", 0x31)),
+        modbus_profile=data.get("modbus_profile", "g5"),
+        ethercat_input_sizes=_parse_int_tuple(data.get("ethercat_input_sizes", [])),
+        ethercat_output_size=(
+            int(data["ethercat_output_size"])
+            if data.get("ethercat_output_size") is not None
+            else None
+        ),
+        ethercat_rpdo_layout=data.get("ethercat_rpdo_layout", "shared_mode_float"),
+        ethercat_tpdo_layout=data.get("ethercat_tpdo_layout", "default"),
     )
 
     if not config.name or not config.valid_joints:
-        raise GHandError(f"Product config in {file_path} is missing required fields")
+        logger.error("Product config in %s is missing required fields", file_path)
+        return ProductConfig()
 
     logger.info("Loaded product config: %s from %s", config.name, file_path)
     return config
@@ -224,8 +254,8 @@ def find_config_by_name(device_name: str) -> ProductConfig | None:
             except (json.JSONDecodeError, OSError):
                 continue
 
-            cfg_name = data.get("name", "")
-            if len(cfg_name) == len(device_name) and cfg_name.lower() == device_name.lower():
+            names = [data.get("name", ""), *data.get("aliases", [])]
+            if any(name.lower() == device_name.lower() for name in names if name):
                 logger.info("Auto-detected product config: %s -> %s", device_name, file_path)
                 return _load_config_from_file(file_path)
 
