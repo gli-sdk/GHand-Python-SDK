@@ -1,0 +1,26 @@
+{
+  "model": "L1-Hand-V1",
+  "name": "L1-Hand-V1",
+  "aliases": ["XiaoShun-Hand"],
+  "slave_id": 49,
+  "modbus_profile": "l1",
+  "ethercat_input_sizes": [1302],
+  "ethercat_output_size": 36,
+  "ethercat_rpdo_layout": "per_joint_mode_3reg",
+  "ethercat_tpdo_layout": "l1_extended",
+  "joints": [
+    { "id": "THUMB_TMC_FE" },
+    { "id": "THUMB_TMC_AA", "min": 0.0, "max": 30.0 },
+    { "id": "THUMB_TMC_PS", "min": 0.0, "max": 90.0 },
+    { "id": "FF_PIP" },
+    { "id": "FF_MCP",      "min": 0.0, "max": 90.0 },
+    { "id": "MF_PIP" },
+    { "id": "MF_MCP",      "min": 0.0, "max": 90.0 },
+    { "id": "RF_PIP" },
+    { "id": "RF_MCP",      "min": 0.0, "max": 90.0 },
+    { "id": "LF_PIP" },
+    { "id": "LF_MCP",      "min": 0.0, "max": 90.0 }
+  ],
+  "has_tactile": false,
+  "tactile_regions": []
+}

@@ -8,13 +8,13 @@ from ghand.ghand import CommType, GHand, JointCommand, JointId
 configure_logging(level=logging.INFO)
 
 grab_tightly = {
-    JointId.THUMB_PIP: 50,
-    JointId.THUMB_MCP: 40,
-    JointId.THUMB_SWING: 30,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_MCP: 50,
+    JointId.THUMB_TMC_FE: 40,
+    JointId.THUMB_TMC_AA: 30,
+    JointId.THUMB_TMC_PS: 0,
     JointId.FF_PIP: 59,
     JointId.FF_MCP: 69,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     JointId.MF_PIP: 60,
     JointId.MF_MCP: 56,
     JointId.RF_PIP: 60,
@@ -24,13 +24,13 @@ grab_tightly = {
 }
 
 grab_loosely = {
-    JointId.THUMB_PIP: 22,
-    JointId.THUMB_MCP: 32,
-    JointId.THUMB_SWING: 30,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_MCP: 22,
+    JointId.THUMB_TMC_FE: 32,
+    JointId.THUMB_TMC_AA: 30,
+    JointId.THUMB_TMC_PS: 0,
     JointId.FF_PIP: 19,
     JointId.FF_MCP: 32,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     JointId.MF_PIP: 27,
     JointId.MF_MCP: 29,
     JointId.RF_PIP: 37,
@@ -41,13 +41,13 @@ grab_loosely = {
 
 open_hand = {
     # All fingers at zero position
-    JointId.THUMB_PIP: 0,
     JointId.THUMB_MCP: 0,
-    JointId.THUMB_SWING: 20,
-    JointId.THUMB_ROTATION: 0,
+    JointId.THUMB_TMC_FE: 0,
+    JointId.THUMB_TMC_AA: 20,
+    JointId.THUMB_TMC_PS: 0,
     JointId.FF_PIP: 0,
     JointId.FF_MCP: 0,
-    JointId.FF_SWING: 0,
+    JointId.FF_MCP_AA: 0,
     JointId.MF_PIP: 0,
     JointId.MF_MCP: 0,
     JointId.RF_PIP: 0,

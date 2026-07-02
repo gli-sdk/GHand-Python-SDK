@@ -111,6 +111,16 @@ class GHand:
         self._has_tactile = config.has_tactile
         self._comm.update_config(config)
 
+    def _sync_product_config_from_comm(self) -> None:
+        """Sync high-level cached config with protocol-selected runtime layout."""
+        config = getattr(self._comm, "config", None)
+        if config is None or config is self._product_config:
+            return
+        self._product_config = config
+        self._joint_limits = config.joint_limits.copy()
+        self._passive_joints = set(config.valid_joints) - set(self._joint_limits.keys())
+        self._has_tactile = config.has_tactile
+
     def _check_joint_limit(self, joint: JointCommand, limit):
         """Clamp the joint angle to its configured limits.
 
@@ -234,12 +244,11 @@ class GHand:
             logger.error("Failed to get device name for verification", exc_info=True)
             return False
 
-        expected_name = self._product_config.name
-        if device_name != expected_name:
-            self._comm.disconnect()
+        expected_names = [self._product_config.name, *self._product_config.aliases]
+        if device_name.lower() not in {name.lower() for name in expected_names if name}:
             logger.error(
-                "Product type mismatch: expected %s, got %s",
-                expected_name,
+                "Product type mismatch: expected one of %s, got %s",
+                expected_names,
                 device_name,
             )
             return False
@@ -255,18 +264,33 @@ class GHand:
             True if the connection is established successfully.
         """
         if self._opened:
-            return True
+            try:
+                if self._comm.is_connected():
+                    return True
+            except Exception:
+                logger.exception("Failed to query connection state before reopen")
+            logger.warning("Connection state is stale; resetting before reopening")
+            self._opened = False
 
         if id == "auto":
             id_list = self._comm.search_adapters()
             logger.info("Found IDs:\n\t%s", "\n\t".join(str(id) for id in id_list))
             for aid in id_list:
-                if self._comm.connect(aid):
-                    self._opened = True
-                    logger.info("Device opened successfully (ID: %s)", aid)
-                    break
-                else:
+                if not self._comm.connect(aid):
                     logger.error("Failed to open device (ID: %s)", aid)
+                    continue
+
+                self._opened = True
+                if self._resolve_product_type():
+                    self._sync_product_config_from_comm()
+                    logger.info("Device opened successfully (ID: %s)", aid)
+                    return True
+
+                logger.error("Device verification failed (ID: %s)", aid)
+                self._comm.disconnect()
+                self._opened = False
+
+            return False
         else:
             if not self._comm.connect(id):
                 logger.error("Failed to open device (ID: %s)", id)
@@ -276,9 +300,13 @@ class GHand:
 
         if not self._opened:
             return False
-        self._opened = self._resolve_product_type()
+        if not self._resolve_product_type():
+            self._comm.disconnect()
+            self._opened = False
+            return False
 
-        return self._opened
+        self._sync_product_config_from_comm()
+        return True
 
     def close(self) -> bool:
         """Close the device connection.
@@ -286,15 +314,29 @@ class GHand:
         Returns:
             True.
         """
-        if self._opened:
+        connected = self._opened
+        try:
+            connected = connected or self._comm.is_connected()
+        except Exception:
+            logger.exception("Failed to query connection state before close")
+
+        if connected:
             self._comm.disconnect()
             logger.info("Disconnected from device")
-            self._opened = False
+        self._opened = False
         return True
 
     def is_connected(self) -> bool:
         """Return whether the device is currently connected."""
-        return self._opened
+        if not self._opened:
+            return False
+        try:
+            if self._comm.is_connected():
+                return True
+        except Exception:
+            logger.exception("Failed to query connection state")
+        self._opened = False
+        return False
 
     def subscribe(self, callback):
         """Subscribe to device data updates.

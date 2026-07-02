@@ -34,11 +34,29 @@ class EthercatClient:
     multiple adapters can drive different hands concurrently.
     """
 
+    _DISCONNECT_SETTLE_SEC = 0.1
+
+    @staticmethod
+    def _matches_expected_size(actual_size: int, expected_size) -> bool:
+        """Return whether an actual PDO size satisfies the expected size spec."""
+        if expected_size is None:
+            return True
+        if isinstance(expected_size, int):
+            return actual_size == expected_size
+        return actual_size in expected_size
+
+    @staticmethod
+    def _format_expected_size(expected_size) -> str:
+        """Format a scalar or collection of expected PDO sizes for logging."""
+        if expected_size is None:
+            return "any"
+        if isinstance(expected_size, int):
+            return str(expected_size)
+        return ", ".join(str(size) for size in expected_size)
+
     def __init__(self):
         """Initialize a new EthercatClient instance."""
-        self._master = pysoem.Master()
-        self._master.in_op = False
-        self._master.do_check_state = False
+        self._master = self._create_master()
         self._actual_wkc = 0
         self._pd_thread_stop_event = threading.Event()
         self._ch_thread_stop_event = threading.Event()
@@ -52,10 +70,27 @@ class EthercatClient:
         self._lock_file = None
         self._lock_file_path = None
 
+    def _create_master(self):
+        """Create a fresh SOEM master with SDK-owned runtime flags."""
+        master = pysoem.Master()
+        master.in_op = False
+        master.do_check_state = False
+        return master
+
+    @property
+    def input_size(self) -> int:
+        """Return the mapped input PDO size in bytes."""
+        return len(self._slave.input) if self._slave is not None else 0
+
+    @property
+    def output_size(self) -> int:
+        """Return the mapped output PDO size in bytes."""
+        return len(self._slave.output) if self._slave is not None else 0
+
     def __del__(self):
         """Destructor — ensures the adapter lock is released."""
         try:
-            self._release_lock()
+            self._cleanup_connection(switch_to_init=False)
         except Exception:
             pass  # ignore errors during destruction
 
@@ -143,6 +178,58 @@ class EthercatClient:
             finally:
                 self._lock_file = None
                 self._lock_file_path = None
+
+    def _stop_threads(self) -> None:
+        """Stop process-data and state-check threads if they are running."""
+        self._pd_thread_stop_event.set()
+        self._ch_thread_stop_event.set()
+        thread_join_timeout = 5.0
+        current = threading.current_thread()
+
+        if (
+            hasattr(self, 'proc_thread')
+            and self.proc_thread.is_alive()
+            and self.proc_thread is not current
+        ):
+            self.proc_thread.join(timeout=thread_join_timeout)
+        if (
+            hasattr(self, 'check_thread')
+            and self.check_thread.is_alive()
+            and self.check_thread is not current
+        ):
+            self.check_thread.join(timeout=thread_join_timeout)
+
+        self._pd_thread_stop_event.clear()
+        self._ch_thread_stop_event.clear()
+
+    def _cleanup_connection(self, switch_to_init: bool = True) -> None:
+        """Close SOEM resources, release the adapter lock, and reset state."""
+        self._stop_threads()
+
+        with self._data_lock:
+            if switch_to_init:
+                try:
+                    if self._slave:
+                        self._slave.state = pysoem.INIT_STATE
+                        self._slave.write_state()
+                        time.sleep(0.01)
+                except Exception as e:
+                    logger.warning("Failed to switch slave to INIT state: %s", e)
+
+            if self._master:
+                try:
+                    self._master.close()
+                    logger.info("Master closed")
+                except Exception as e:
+                    logger.warning("Failed to close master: %s", e)
+
+            self._slave = None
+            self._connected = False
+            self._actual_wkc = 0
+            self._connection_lost = False
+
+        self._release_lock()
+        self._master = self._create_master()
 
     @staticmethod
     def _check_slave(slave):
@@ -295,17 +382,16 @@ class EthercatClient:
             self._master.open(id)
 
             if not self._master.config_init() > 0:
-                self._master.close()
-                self._release_lock()
+                self._cleanup_connection(switch_to_init=False)
                 return False
             self._connected = True
             self._slave = self._master.slaves[0]
             self._slave.is_lost = False
             self._master.read_state()
             return True
-        except Exception:
-            logger.error("Error connecting to device %s", id)
-            self._release_lock()
+        except Exception as e:
+            logger.error("Error connecting to device %s: %s", id, e)
+            self._cleanup_connection(switch_to_init=False)
             return False
 
     def run(
@@ -338,43 +424,43 @@ class EthercatClient:
                     slave.write_state()
                     if slave.state_check(pysoem.INIT_STATE, timeout=100_000) != pysoem.INIT_STATE:
                         logger.error("Failed to enter INIT state. Current state: %s", slave.state)
-                        self._master.close()
+                        self._cleanup_connection(switch_to_init=False)
                         return False
 
                 config_result = self._master.config_init()
                 if config_result <= 0:
                     logger.error("Config init failed with result: %s", config_result)
-                    self._master.close()
+                    self._cleanup_connection(switch_to_init=False)
                     return False
 
                 self._master.config_map()
 
-                if expected_input_size is not None and len(slave.input) != expected_input_size:
+                if not self._matches_expected_size(len(slave.input), expected_input_size):
                     logger.error("Expected input size error!")
                     logger.error(
-                        "Expected input size: %s, actual input size: %s",
-                        expected_input_size,
+                        "Expected input size(s): %s, actual input size: %s",
+                        self._format_expected_size(expected_input_size),
                         len(slave.input),
                     )
-                    self._master.close()
+                    self._cleanup_connection(switch_to_init=False)
                     return False
 
-                if expected_output_size is not None and len(slave.output) != expected_output_size:
+                if not self._matches_expected_size(len(slave.output), expected_output_size):
                     logger.error("Expected output size error!")
                     logger.error(
-                        "Expected output size: %s, actual output size: %s",
-                        expected_output_size,
+                        "Expected output size(s): %s, actual output size: %s",
+                        self._format_expected_size(expected_output_size),
                         len(slave.output),
                     )
-                    self._master.close()
+                    self._cleanup_connection(switch_to_init=False)
                     return False
             else:
                 logger.warning("No slaves found")
-                self._master.close()
+                self._cleanup_connection(switch_to_init=False)
                 return False
         except Exception as e:
             logger.error("Failed to configure PDO mapping: %s", e)
-            self._master.close()
+            self._cleanup_connection(switch_to_init=False)
             return False
 
         if self._master.state_check(pysoem.SAFEOP_STATE, timeout=500_000) != pysoem.SAFEOP_STATE:
@@ -391,7 +477,7 @@ class EthercatClient:
                 )
                 logger.error("  Input size: %s bytes", len(slave.input))
                 logger.error("  Output size: %s bytes", len(slave.output))
-            self._master.close()
+            self._cleanup_connection(switch_to_init=False)
             return False
 
         self._master.state = pysoem.OP_STATE
@@ -407,14 +493,7 @@ class EthercatClient:
         self._master.read_state()
         if self._master.state_check(pysoem.OP_STATE, timeout=500_000) != pysoem.OP_STATE:
             logger.error("Failed to reach OP state")
-            self._pd_thread_stop_event.set()
-            self._ch_thread_stop_event.set()
-            thread_join_timeout = 5.0
-            if hasattr(self, 'proc_thread') and self.proc_thread.is_alive():
-                self.proc_thread.join(timeout=thread_join_timeout)
-            if hasattr(self, 'check_thread') and self.check_thread.is_alive():
-                self.check_thread.join(timeout=thread_join_timeout)
-            self._master.close()
+            self._cleanup_connection(switch_to_init=True)
             return False
 
         self._master.in_op = True
@@ -423,39 +502,9 @@ class EthercatClient:
 
     def disconnect(self):
         """Stop cyclic threads, set the slave to INIT, and close the master."""
-        if self._connected:
-            self._pd_thread_stop_event.set()
-            self._ch_thread_stop_event.set()
-            thread_join_timeout = 5.0
-            if hasattr(self, 'proc_thread') and self.proc_thread.is_alive():
-                self.proc_thread.join(timeout=thread_join_timeout)
-            if hasattr(self, 'check_thread') and self.check_thread.is_alive():
-                self.check_thread.join(timeout=thread_join_timeout)
-
-            self._pd_thread_stop_event.clear()
-            self._ch_thread_stop_event.clear()
-
-            with self._data_lock:
-                try:
-                    if self._slave:
-                        self._slave.state = pysoem.INIT_STATE
-                        self._slave.write_state()
-                        time.sleep(0.01)
-                except Exception as e:
-                    logger.warning("Failed to switch slave to INIT state: %s", e)
-
-                if self._master:
-                    self._master.close()
-                    logger.info("Master closed")
-                self._slave = None
-                self._connected = False
-
-            self._release_lock()
-
-            self._actual_wkc = 0
-            self._connection_lost = False
-            self._master.in_op = False
-            self._master.do_check_state = False
+        if self._connected or self._slave is not None or self._lock_file is not None:
+            self._cleanup_connection(switch_to_init=True)
+            time.sleep(self._DISCONNECT_SETTLE_SEC)
 
     def sdo_read(self, index, subindex=0):
         """Read a value from the slave's object dictionary via SDO.
