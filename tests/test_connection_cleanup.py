@@ -1,3 +1,5 @@
+import math
+import struct
 import sys
 import types
 from pathlib import Path
@@ -338,14 +340,14 @@ def test_ethercat_comm_keeps_default_708_tpdo_layout():
     assert [region.count for region in comm.config.tactile_regions] == [52, 31, 31, 31, 31]
 
 
-def test_ethercat_l1_accepts_extended_pdo_sizes_and_packs_per_joint_commands():
+def test_ethercat_l1_uses_configured_tactile_pdo_sizes_and_default_rpdo():
     config = load_product_config(ProductType.L1)
     comm = EthercatComm.__new__(EthercatComm)
     comm._client = FakeEthercatClientForSend()
     comm.update_config(config)
 
-    assert comm._expected_tpdo_sizes == (92, 1302)
-    assert comm._expected_rpdo_size == 36
+    assert comm._expected_tpdo_sizes == (1168, 1324)
+    assert comm._expected_rpdo_size == 38
 
     comm.move_joints(
         [JointCommand(id=JointId.FF_MCP, angle=12.3, speed=-4, torque=5)],
@@ -353,24 +355,29 @@ def test_ethercat_l1_accepts_extended_pdo_sizes_and_packs_per_joint_commands():
     )
 
     data = comm._client.sent[-1]
-    assert len(data) == 36
-    assert data[0:6] == bytes.fromhex("02 00 00 00 00 00")
-    assert data[12:18] == bytes.fromhex("02 00 7b 00 fc 05")
+    assert len(data) == 38
+    assert data[0:2] == bytes.fromhex("02 00")
+    angle, speed, torque = struct.unpack_from("<fbb", data, 14)
+    assert math.isclose(angle, math.radians(12.3), rel_tol=1e-6)
+    assert speed == -4
+    assert torque == 5
 
     comm.stop()
-    assert comm._client.sent[-1][0:6] == bytes.fromhex("00 01 00 00 00 00")
+    assert comm._client.sent[-1][0:2] == bytes.fromhex("00 01")
 
 
-def test_ethercat_l1_extended_tpdo_parses_joint_prefix():
+def test_ethercat_l1_tpdo_parses_joint_prefix_with_configured_tactile_size():
     config = load_product_config(ProductType.L1)
-    data = bytearray(1302)
+    data = bytearray(1324)
     offset = 4
     for joint_id in config.valid_joints:
         if joint_id == JointId.FF_MCP:
-            data[offset:offset + 6] = bytes.fromhex("01 00 78 00 fc 05")
+            data[offset:offset + 8] = struct.pack(
+                "<BBfbb", 1, 0, math.radians(12.0), -4, 5
+            )
         else:
-            data[offset:offset + 6] = bytes.fromhex("00 00 00 00 00 00")
-        offset += 6
+            data[offset:offset + 8] = bytes(8)
+        offset += 8
 
     comm = EthercatComm.__new__(EthercatComm)
     comm._client = FakeEthercatClientForRecv(bytes(data))
@@ -382,7 +389,7 @@ def test_ethercat_l1_extended_tpdo_parses_joint_prefix():
     assert isinstance(ff_mcp, JointData)
     assert ff_mcp.state == State.RUNNING
     assert ff_mcp.error == ErrorCode.NORMAL
-    assert ff_mcp.angle == 12.0
+    assert math.isclose(ff_mcp.angle, 12.0, rel_tol=1e-6)
     assert ff_mcp.speed == -4
     assert ff_mcp.torque == 5
 
