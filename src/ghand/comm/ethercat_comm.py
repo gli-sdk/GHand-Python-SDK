@@ -44,6 +44,7 @@ from .ethercat_protocol import (
 from .icomm import IComm
 
 logger = logging.getLogger("ghand.ethercat_comm")
+_reported_unknown_error_codes: set[int] = set()
 
 
 
@@ -111,6 +112,7 @@ class EthercatComm(IComm):
             return
         self._config = layout
         self._expected_tpdo_size = input_size
+        self._tpdo_size_selected = True
         logger.info(
             "Selected EtherCAT TPDO layout: input=%s, tactile_counts=%s",
             input_size,
@@ -126,6 +128,7 @@ class EthercatComm(IComm):
             len(config.valid_joints),
             [r.count for r in config.tactile_regions] if config.has_tactile else None,
         )
+        self._tpdo_size_selected = False
         self._controlled_joints = [j for j in config.valid_joints if j in config.joint_limits]
         self._expected_rpdo_size = (
             config.ethercat_output_size
@@ -182,7 +185,7 @@ class EthercatComm(IComm):
 
     def is_connected(self) -> bool:
         """Return whether the EtherCAT client is connected."""
-        return self._client._connected
+        return self._client._connected and not self._client._connection_lost
 
     # ===== Joint control =====
 
@@ -253,13 +256,31 @@ class EthercatComm(IComm):
 
     # ===== State retrieval =====
 
+    def _validate_tpdo_data(self, data: bytes) -> bytes:
+        """Validate a TPDO frame before any protocol fields are decoded."""
+        expected_sizes = (
+            (self._expected_tpdo_size,)
+            if self._tpdo_size_selected
+            else self._expected_tpdo_sizes
+        )
+        if len(data) not in expected_sizes:
+            raise RuntimeError(
+                "Invalid EtherCAT TPDO length: "
+                f"expected one of {expected_sizes}, got {len(data)}"
+            )
+        return data
+
+    def _recv_tpdo_data(self) -> bytes:
+        """Return one valid TPDO frame with the configured mapped size."""
+        return self._validate_tpdo_data(self._client.recv_data())
+
     def get_joints(self) -> list[JointData]:
         """Retrieve the current state of all joints from TPDO.
 
         Returns:
             List of JointData objects.
         """
-        data = self._client.recv_data()
+        data = self._recv_tpdo_data()
 
         if self._tpdo_layout == "l1_extended":
             return self._parse_l1_extended_joints(data)
@@ -279,6 +300,7 @@ class EthercatComm(IComm):
                     torque=joint_tpdo.torque,
                     state=self._parse_state(joint_tpdo.state),
                     error=self._parse_error_code(joint_tpdo.error),
+                    raw_error=self._raw_unknown_error(joint_tpdo.error),
                 )
             )
         return joints
@@ -301,6 +323,7 @@ class EthercatComm(IComm):
                     torque=torque,
                     state=self._parse_state(state),
                     error=self._parse_error_code(error),
+                    raw_error=self._raw_unknown_error(error),
                 )
             )
             offset += 6
@@ -320,18 +343,30 @@ class EthercatComm(IComm):
         except ValueError:
             return ErrorCode.UNKNOWN_ERROR
 
+    @staticmethod
+    def _raw_unknown_error(value: int) -> int | None:
+        try:
+            ErrorCode(value)
+        except ValueError:
+            if value not in _reported_unknown_error_codes:
+                logger.warning("Unknown device error code %s (0x%02X)", value, value)
+                _reported_unknown_error_codes.add(value)
+            return value
+        return None
+
     def get_hand_info(self) -> HandState:
         """Retrieve high-level hand status from TPDO.
 
         Returns:
             HandState instance.
         """
-        data = self._client.recv_data()
+        data = self._recv_tpdo_data()
 
         hand_tpdo = HandTpdo.from_bytes(data)
         return HandState(
             state=self._parse_state(hand_tpdo.state),
             error=self._parse_error_code(hand_tpdo.error),
+            raw_error=self._raw_unknown_error(hand_tpdo.error),
             temperature=hand_tpdo.temperature,
         )
 
@@ -341,7 +376,7 @@ class EthercatComm(IComm):
         Returns:
             Dictionary mapping TactileSensorId to TactileInfo.
         """
-        data = self._client.recv_data()
+        data = self._recv_tpdo_data()
         if len(data) < self._expected_tpdo_size:
             raise RuntimeError(
                 "Data length insufficient. Expected %s bytes, got %s bytes",
@@ -480,7 +515,14 @@ class EthercatComm(IComm):
         Returns:
             Subscription ID.
         """
-        return self._sub_manager.subscribe(callback, *args, **kwargs)
+        def validated_callback(data, *callback_args, **callback_kwargs):
+            callback(
+                self._validate_tpdo_data(data),
+                *callback_args,
+                **callback_kwargs,
+            )
+
+        return self._sub_manager.subscribe(validated_callback, *args, **kwargs)
 
     def unsubscribe(self, sub_id) -> bool:
         """Remove a previously registered subscription.

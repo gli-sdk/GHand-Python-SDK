@@ -205,6 +205,7 @@ class HandState:
     state: State = State.STOPPED
     error: ErrorCode = ErrorCode.NORMAL
     temperature: int = 0
+    raw_error: int | None = None
 
 
 @dataclass
@@ -227,6 +228,7 @@ class JointData:
     angle: float = 0.0  # degrees
     speed: int = 0
     torque: int = 0
+    raw_error: int | None = None
 
 
 @dataclass

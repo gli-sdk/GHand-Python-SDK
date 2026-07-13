@@ -19,6 +19,7 @@ import platform
 import tempfile
 import threading
 import time
+from collections import deque
 
 import netifaces
 import pysoem
@@ -35,6 +36,11 @@ class EthercatClient:
     """
 
     _DISCONNECT_SETTLE_SEC = 0.1
+    _MAX_CONSECUTIVE_INVALID_WKC = 30
+    _WKC_WINDOW_SIZE = 100
+    _WKC_WINDOW_MIN_SAMPLES = 30
+    _MAX_INVALID_WKC_RATIO = 0.5
+    _MAX_PROCESS_DATA_AGE_SEC = 0.25
 
     @staticmethod
     def _matches_expected_size(actual_size: int, expected_size) -> bool:
@@ -44,6 +50,16 @@ class EthercatClient:
         if isinstance(expected_size, int):
             return actual_size == expected_size
         return actual_size in expected_size
+
+    @classmethod
+    def _wkc_is_unhealthy(cls, consecutive_invalid: int, validity_window) -> bool:
+        """Evaluate sustained WKC failure without letting sporadic success hide it."""
+        if consecutive_invalid >= cls._MAX_CONSECUTIVE_INVALID_WKC:
+            return True
+        if len(validity_window) < cls._WKC_WINDOW_MIN_SAMPLES:
+            return False
+        valid_ratio = sum(validity_window) / len(validity_window)
+        return valid_ratio <= 1.0 - cls._MAX_INVALID_WKC_RATIO
 
     @staticmethod
     def _format_expected_size(expected_size) -> str:
@@ -64,6 +80,10 @@ class EthercatClient:
         self._slave = None
         # Connection health flag
         self._connection_lost = False
+        self._process_data_valid = False
+        self._last_valid_process_data_time = None
+        self._consecutive_invalid_wkc = 0
+        self._wkc_validity_window = deque(maxlen=self._WKC_WINDOW_SIZE)
         # Thread-safety lock
         self._data_lock = threading.RLock()
         # Exclusive adapter lock
@@ -227,6 +247,10 @@ class EthercatClient:
             self._connected = False
             self._actual_wkc = 0
             self._connection_lost = False
+            self._process_data_valid = False
+            self._last_valid_process_data_time = None
+            self._consecutive_invalid_wkc = 0
+            self._wkc_validity_window.clear()
 
         self._release_lock()
         self._master = self._create_master()
@@ -262,29 +286,37 @@ class EthercatClient:
 
     def _processdata_thread(self):
         """Background thread that sends and receives cyclic process data."""
-        invalid_wkc_count = 0
-        max_invalid_wkc_count = 30
-
         while not self._pd_thread_stop_event.is_set():
             try:
                 with self._data_lock:
                     self._master.send_processdata()
                     self._actual_wkc = self._master.receive_processdata(15_000)
-                if self._actual_wkc < 1:
+                    valid = self._actual_wkc >= 1
+                    self._process_data_valid = valid
+                    self._wkc_validity_window.append(valid)
+                    if valid:
+                        self._last_valid_process_data_time = time.monotonic()
+                        self._consecutive_invalid_wkc = 0
+                    else:
+                        self._consecutive_invalid_wkc += 1
+                if not valid:
                     logger.warning("Invalid working counter (WKC): %s", self._actual_wkc)
-                    invalid_wkc_count += 1
-                    if invalid_wkc_count >= max_invalid_wkc_count:
+                    if self._master.in_op and self._wkc_is_unhealthy(
+                        self._consecutive_invalid_wkc,
+                        self._wkc_validity_window,
+                    ):
                         logger.error(
-                            "Too many invalid WKC counts (%s), disconnecting...",
-                            invalid_wkc_count,
+                            "Unhealthy EtherCAT process data: consecutive_invalid=%s, "
+                            "valid_window=%s/%s; disconnecting",
+                            self._consecutive_invalid_wkc,
+                            sum(self._wkc_validity_window),
+                            len(self._wkc_validity_window),
                         )
                         self._connection_lost = True
                         # Spawn a detached thread to avoid dead-lock
                         threading.Thread(target=self.disconnect).start()
                         self._pd_thread_stop_event.set()
                         break
-                else:
-                    invalid_wkc_count = 0
             except Exception as e:
                 logger.error("Error in process data thread: %s", e)
             time.sleep(0.01)
@@ -324,8 +356,18 @@ class EthercatClient:
         with self._data_lock:
             if self._connection_lost:
                 raise RuntimeError("Device disconnected")
+            if not self._process_data_valid:
+                raise RuntimeError(
+                    f"No valid EtherCAT process data (WKC={self._actual_wkc})"
+                )
+            if (
+                self._last_valid_process_data_time is None
+                or time.monotonic() - self._last_valid_process_data_time
+                > self._MAX_PROCESS_DATA_AGE_SEC
+            ):
+                raise RuntimeError("EtherCAT process data is stale")
             if self._slave is not None:
-                return self._slave.input
+                return bytes(self._slave.input)
             else:
                 raise RuntimeError("Device disconnected")
 
@@ -341,6 +383,11 @@ class EthercatClient:
         with self._data_lock:
             if self._connection_lost:
                 raise RuntimeError("Device disconnected")
+            if not self._process_data_valid:
+                raise RuntimeError(
+                    f"Cannot send command without valid EtherCAT process data "
+                    f"(WKC={self._actual_wkc})"
+                )
             if self._slave is not None:
                 hex_str = ' '.join(f'{b:02x}' for b in data)
                 logger.debug("Sending %d bytes:\n%s", len(data), hex_str)
