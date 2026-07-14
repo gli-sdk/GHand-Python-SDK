@@ -195,7 +195,7 @@ def test_start_adaptive_control_uses_hold_runner_thread(monkeypatch):
         position_hold_speed=5,
     )
     grasper._runtime.last_contact_snapshot = ContactSnapshot(
-        joint_angles={JointId.THUMB_PIP: 0.12},
+        joint_angles={JointId.THUMB_MCP: 0.12},
         finger_fz={TactileSensorId.THUMB: 0.5},
         total_fz=0.5,
         torque=30,
@@ -615,7 +615,7 @@ def test_grasp_core_exposes_empty_grasp_joint_report(monkeypatch):
         lambda self, pose, **_kwargs: True,
     )
 
-    g._sensor._latest_joint_feedback = [JointCommand(id=JointId.THUMB_MCP, angle=0.0)]
+    g._sensor._latest_joint_feedback = [JointCommand(id=JointId.THUMB_TMC_FE, angle=0.0)]
     g._sensor._latest_tactile_data = {
         TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 0.0),
     }
@@ -625,7 +625,7 @@ def test_grasp_core_exposes_empty_grasp_joint_report(monkeypatch):
         hand.calls.append({"mode": mode, "joints": list(joints)})
         if mode == CtrlMode.TORQUE:
             g._sensor._latest_joint_feedback = [
-                JointCommand(id=JointId.THUMB_MCP, angle=math.radians(35.0))
+                JointCommand(id=JointId.THUMB_TMC_FE, angle=math.radians(35.0))
             ]
         return True
 
@@ -634,7 +634,7 @@ def test_grasp_core_exposes_empty_grasp_joint_report(monkeypatch):
     assert g.grasp_core() is False
     assert g.last_safety_report is not None
     assert g.last_safety_report.fault_type == "empty_grasp"
-    assert g.last_safety_report.details["empty_grasp_joints"][0]["joint"] == "THUMB_MCP"
+    assert g.last_safety_report.details["empty_grasp_joints"][0]["joint"] == "THUMB_TMC_FE"
     assert g.last_safety_report.details["empty_grasp_joints"][0]["delta_deg"] == pytest.approx(35.0)
 
 
@@ -924,15 +924,15 @@ def test_sensor_subscription_callback_updates_cache():
         lf_tactile=make_tactile(0.9),
     )
     tpdo.joints = {
-        JointId.THUMB_DIP: make_joint(10.0),
-        JointId.THUMB_PIP: make_joint(20.0),
-        JointId.THUMB_MCP: make_joint(30.0),
-        JointId.THUMB_SWING: make_joint(40.0),
-        JointId.THUMB_ROTATION: make_joint(50.0),
+        JointId.THUMB_IP: make_joint(10.0),
+        JointId.THUMB_MCP: make_joint(20.0),
+        JointId.THUMB_TMC_FE: make_joint(30.0),
+        JointId.THUMB_TMC_AA: make_joint(40.0),
+        JointId.THUMB_TMC_PS: make_joint(50.0),
         JointId.FF_DIP: make_joint(60.0),
         JointId.FF_PIP: make_joint(70.0),
         JointId.FF_MCP: make_joint(80.0),
-        JointId.FF_SWING: make_joint(90.0),
+        JointId.FF_MCP_AA: make_joint(90.0),
         JointId.MF_DIP: make_joint(100.0),
         JointId.MF_PIP: make_joint(110.0),
         JointId.MF_MCP: make_joint(120.0),
@@ -956,8 +956,8 @@ def test_sensor_subscription_callback_updates_cache():
 
     assert grasper._sensor._latest_joint_feedback is not None
     joint_map = {j.id: j for j in grasper._sensor._latest_joint_feedback}
-    assert JointId.THUMB_PIP in joint_map
-    assert joint_map[JointId.THUMB_PIP].angle == pytest.approx(math.radians(20.0))
+    assert JointId.THUMB_MCP in joint_map
+    assert joint_map[JointId.THUMB_MCP].angle == pytest.approx(math.radians(20.0))
     assert JointId.LF_MCP in joint_map
     assert joint_map[JointId.LF_MCP].angle == pytest.approx(math.radians(180.0))
 
@@ -1082,7 +1082,7 @@ def test_grasp_core_stores_contact_snapshot_for_adaptive_hold(monkeypatch):
     from adaptive_grasp.grasp_sequence import ContactSnapshot, PhaseResult
 
     snapshot = ContactSnapshot(
-        joint_angles={JointId.THUMB_PIP: 0.12},
+        joint_angles={JointId.THUMB_MCP: 0.12},
         finger_fz={TactileSensorId.THUMB: 1.2},
         total_fz=1.2,
         torque=closing_torque,
@@ -1119,7 +1119,7 @@ def test_grasp_sequence_run_receives_only_is_running_callback(monkeypatch):
     from adaptive_grasp.grasp_sequence import ContactSnapshot, PhaseResult
 
     snapshot = ContactSnapshot(
-        joint_angles={JointId.THUMB_PIP: 0.12},
+        joint_angles={JointId.THUMB_MCP: 0.12},
         finger_fz={TactileSensorId.THUMB: 1.2},
         total_fz=1.2,
         torque=closing_torque,
@@ -1166,7 +1166,7 @@ def test_torque_mode_creates_hold_planners_from_contact_snapshot(monkeypatch):
         position_hold_speed=5,
     )
     grasper._runtime.last_contact_snapshot = ContactSnapshot(
-        joint_angles={JointId.THUMB_PIP: 0.12},
+        joint_angles={JointId.THUMB_MCP: 0.12},
         finger_fz={TactileSensorId.THUMB: 0.5},
         total_fz=0.5,
         torque=30,
@@ -1201,7 +1201,7 @@ def test_position_mode_creates_position_hold_planner_from_contact_snapshot(monke
         position_hold_speed=5,
     )
     grasper._runtime.last_contact_snapshot = ContactSnapshot(
-        joint_angles={JointId.THUMB_PIP: 0.12},
+        joint_angles={JointId.THUMB_MCP: 0.12},
         finger_fz={TactileSensorId.THUMB: 0.5},
         total_fz=0.5,
         torque=30,
