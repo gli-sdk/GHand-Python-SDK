@@ -158,7 +158,6 @@ class SensorClient:
                     id=joint_id,
                     state=EthercatComm._parse_state(joint_tpdo.state),
                     error=EthercatComm._parse_error_code(joint_tpdo.error),
-                    raw_error=EthercatComm._raw_unknown_error(joint_tpdo.error),
                     angle=math.radians(joint_tpdo.angle),
                     speed=joint_tpdo.speed,
                     torque=joint_tpdo.torque,

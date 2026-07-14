@@ -374,14 +374,12 @@ class GHand:
             state=EthercatComm._parse_state(tpdo.hand.state),
             error=EthercatComm._parse_error_code(tpdo.hand.error),
             temperature=tpdo.hand.temperature,
-            raw_error=EthercatComm._raw_unknown_error(tpdo.hand.error),
         )
         joints = [
             JointData(
                 id=jid.value,
                 state=EthercatComm._parse_state(jtpdo.state),
                 error=EthercatComm._parse_error_code(jtpdo.error),
-                raw_error=EthercatComm._raw_unknown_error(jtpdo.error),
                 angle=jtpdo.angle,
                 speed=jtpdo.speed,
                 torque=jtpdo.torque,

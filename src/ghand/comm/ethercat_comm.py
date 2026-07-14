@@ -44,11 +44,6 @@ from .ethercat_protocol import (
 from .icomm import IComm
 
 logger = logging.getLogger("ghand.ethercat_comm")
-_reported_unknown_error_codes: set[int] = set()
-
-
-
-
 class EthercatComm(IComm):
     """IComm implementation for EtherCAT."""
 
@@ -300,7 +295,6 @@ class EthercatComm(IComm):
                     torque=joint_tpdo.torque,
                     state=self._parse_state(joint_tpdo.state),
                     error=self._parse_error_code(joint_tpdo.error),
-                    raw_error=self._raw_unknown_error(joint_tpdo.error),
                 )
             )
         return joints
@@ -323,7 +317,6 @@ class EthercatComm(IComm):
                     torque=torque,
                     state=self._parse_state(state),
                     error=self._parse_error_code(error),
-                    raw_error=self._raw_unknown_error(error),
                 )
             )
             offset += 6
@@ -337,22 +330,11 @@ class EthercatComm(IComm):
             return State.ABNORMAL_RUNNING
 
     @staticmethod
-    def _parse_error_code(value: int) -> ErrorCode:
+    def _parse_error_code(value: int) -> ErrorCode | int:
         try:
             return ErrorCode(value)
         except ValueError:
-            return ErrorCode.UNKNOWN_ERROR
-
-    @staticmethod
-    def _raw_unknown_error(value: int) -> int | None:
-        try:
-            ErrorCode(value)
-        except ValueError:
-            if value not in _reported_unknown_error_codes:
-                logger.warning("Unknown device error code %s (0x%02X)", value, value)
-                _reported_unknown_error_codes.add(value)
             return value
-        return None
 
     def get_hand_info(self) -> HandState:
         """Retrieve high-level hand status from TPDO.
@@ -366,7 +348,6 @@ class EthercatComm(IComm):
         return HandState(
             state=self._parse_state(hand_tpdo.state),
             error=self._parse_error_code(hand_tpdo.error),
-            raw_error=self._raw_unknown_error(hand_tpdo.error),
             temperature=hand_tpdo.temperature,
         )
 

@@ -203,9 +203,8 @@ class HandState:
     """High-level status of the dexterous hand."""
 
     state: State = State.STOPPED
-    error: ErrorCode = ErrorCode.NORMAL
+    error: ErrorCode | int = ErrorCode.NORMAL
     temperature: int = 0
-    raw_error: int | None = None
 
 
 @dataclass
@@ -224,11 +223,10 @@ class JointData:
 
     id: int = JointId.THUMB_IP
     state: State = State.STOPPED
-    error: ErrorCode = ErrorCode.NORMAL
+    error: ErrorCode | int = ErrorCode.NORMAL
     angle: float = 0.0  # degrees
     speed: int = 0
     torque: int = 0
-    raw_error: int | None = None
 
 
 @dataclass
