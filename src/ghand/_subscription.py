@@ -23,12 +23,13 @@ logger = logging.getLogger("ghand")
 class SubscriptionManager:
     """Manages background threads for receiving and dispatching device data."""
 
-    def __init__(self, client):
+    def __init__(self, client, is_connected=None):
         self._lock = threading.Lock()
         self._running = False
         self._thread = None
         self._dispatcher_thread = None
         self._client = client
+        self._is_connected = is_connected
         self._data = None
         self._sub_id_counter = 0
         self._subscribers = {}
@@ -43,36 +44,49 @@ class SubscriptionManager:
             self._dispatcher_thread.start()
 
     def stop(self):
-        """Stop the background threads and clear pending data."""
+        """Stop the background threads and clear subscription state."""
         self._running = False
-        if self._thread:
+        current = threading.current_thread()
+        if self._thread and self._thread is not current:
             self._thread.join(timeout=1)
-            self._thread = None
-        if self._dispatcher_thread:
+        self._thread = None
+        if self._dispatcher_thread and self._dispatcher_thread is not current:
             self._dispatcher_thread.join(timeout=1)
-            self._dispatcher_thread = None
-        self._data = None
+        self._dispatcher_thread = None
+        with self._lock:
+            self._data = None
+            self._subscribers.clear()
 
     def _data_producer(self):
         """Background thread that continuously receives data from the device."""
         while self._running:
             try:
                 data = self._client.recv_data()
-                self._data = data
+                with self._lock:
+                    self._data = data
             except Exception as e:
+                with self._lock:
+                    self._data = None
+                if self._is_connected is not None and not self._is_connected():
+                    logger.error("Subscription stopped: %s", e)
+                    self.stop()
+                    break
                 logger.error("Error receiving data: %s", e)
             time.sleep(0.1)
 
     def _data_dispatcher(self):
         """Background thread that dispatches received data to all subscribers."""
         while self._running:
-            if self._data:
-                with self._lock:
-                    subscribers_copy = self._subscribers.copy()
+            with self._lock:
+                data = self._data
+                subscribers_copy = self._subscribers.copy()
+            if data:
                 for sub_id, (callback, args, kwargs) in subscribers_copy.items():
+                    if not self._running:
+                        break
                     if callback:
                         try:
-                            callback(self._data, *args, **kwargs)
+                            callback(data, *args, **kwargs)
                         except Exception as e:
                             logger.error("Error in callback %s: %s", sub_id, e)
             time.sleep(0.1)
@@ -86,6 +100,9 @@ class SubscriptionManager:
         Returns:
             Subscription ID.
         """
+        if self._is_connected is not None and not self._is_connected():
+            raise RuntimeError("Device is not connected")
+
         with self._lock:
             self._sub_id_counter += 1
             sub_id = self._sub_id_counter
@@ -104,9 +121,10 @@ class SubscriptionManager:
             True if the subscription existed and was removed.
         """
         with self._lock:
-            if sub_id in self._subscribers:
-                del self._subscribers[sub_id]
-                if not self._subscribers:
-                    self.stop()
-                return True
-            return False
+            if sub_id not in self._subscribers:
+                return False
+            del self._subscribers[sub_id]
+            should_stop = not self._subscribers
+        if should_stop:
+            self.stop()
+        return True

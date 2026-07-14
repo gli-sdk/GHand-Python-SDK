@@ -350,6 +350,9 @@ class GHand:
         Returns:
             Subscription ID.
         """
+        if not self.is_connected():
+            raise RuntimeError("Device is not connected")
+
         if isinstance(self._comm, EthercatComm):
             def adapter(data_bytes, *args, **kwargs):
                 tpdo = Tpdo.from_bytes(data_bytes, self._product_config)
