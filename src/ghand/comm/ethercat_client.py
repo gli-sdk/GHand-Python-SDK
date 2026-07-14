@@ -199,14 +199,16 @@ class EthercatClient:
         ):
             self.check_thread.join(timeout=thread_join_timeout)
 
-        self._pd_thread_stop_event.clear()
-        self._ch_thread_stop_event.clear()
-
     def _cleanup_connection(self, switch_to_init: bool = True) -> None:
         """Close SOEM resources, release the adapter lock, and reset state."""
         self._stop_threads()
 
         with self._data_lock:
+            old_master = self._master
+            if old_master:
+                old_master.in_op = False
+                old_master.do_check_state = False
+
             if switch_to_init:
                 try:
                     if self._slave:
@@ -216,9 +218,9 @@ class EthercatClient:
                 except Exception as e:
                     logger.warning("Failed to switch slave to INIT state: %s", e)
 
-            if self._master:
+            if old_master:
                 try:
-                    self._master.close()
+                    old_master.close()
                     logger.info("Master closed")
                 except Exception as e:
                     logger.warning("Failed to close master: %s", e)
@@ -412,6 +414,12 @@ class EthercatClient:
             logger.error("Not connected or no slave configured")
             return False
 
+        for thread_name in ('proc_thread', 'check_thread'):
+            thread = getattr(self, thread_name, None)
+            if thread is not None and thread.is_alive():
+                logger.error("Previous EtherCAT worker thread is still running")
+                return False
+
         if self._master.state != pysoem.INIT_STATE:
             self._master.state = pysoem.INIT_STATE
 
@@ -483,6 +491,8 @@ class EthercatClient:
         self._master.state = pysoem.OP_STATE
         self._master.write_state()
 
+        self._pd_thread_stop_event.clear()
+        self._ch_thread_stop_event.clear()
         self.check_thread = threading.Thread(target=self._check_thread)
         self.check_thread.daemon = True
         self.check_thread.start()
