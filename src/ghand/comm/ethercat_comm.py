@@ -20,7 +20,6 @@ Wraps EthercatClient and handles PDO encoding/decoding.
 import logging
 import math
 import struct
-import time
 
 from .._subscription import SubscriptionManager
 from ..types import (
@@ -47,13 +46,11 @@ logger = logging.getLogger("ghand.ethercat_comm")
 class EthercatComm(IComm):
     """IComm implementation for EtherCAT."""
 
-    _CONNECT_RETRIES = 3
-    _CONNECT_RETRY_DELAY_SEC = 0.5
     _COMPAT_THUMB_TACTILE_COUNT = 28
 
     def __init__(self, config: ProductConfig):
         self._client = EthercatClient()
-        self._sub_manager = SubscriptionManager(self._client)
+        self._sub_manager = SubscriptionManager(self._client, self.is_connected)
         self.update_config(config)
 
     @property
@@ -152,23 +149,14 @@ class EthercatComm(IComm):
         Returns:
             True if the connection and SOEM startup succeed.
         """
-        for attempt in range(1, self._CONNECT_RETRIES + 1):
-            connected = self._client.connect(device_name)
-            if connected and self._client.run(self._expected_tpdo_sizes, self._expected_rpdo_size):
-                self._select_tpdo_layout(self._client.input_size)
-                logger.info("Device connected via EtherCAT (%s)", device_name)
-                return True
+        connected = self._client.connect(device_name)
+        if connected and self._client.run(self._expected_tpdo_sizes, self._expected_rpdo_size):
+            self._select_tpdo_layout(self._client.input_size)
+            logger.info("Device connected via EtherCAT (%s)", device_name)
+            return True
 
-            logger.error(
-                "Failed to connect EtherCAT device %s (attempt %s/%s)",
-                device_name,
-                attempt,
-                self._CONNECT_RETRIES,
-            )
-            self._client.disconnect()
-            if attempt < self._CONNECT_RETRIES:
-                time.sleep(self._CONNECT_RETRY_DELAY_SEC)
-
+        logger.error("Failed to connect EtherCAT device %s", device_name)
+        self._client.disconnect()
         return False
 
     def disconnect(self) -> bool:
@@ -496,14 +484,10 @@ class EthercatComm(IComm):
         Returns:
             Subscription ID.
         """
-        def validated_callback(data, *callback_args, **callback_kwargs):
-            callback(
-                self._validate_tpdo_data(data),
-                *callback_args,
-                **callback_kwargs,
-            )
+        if not self.is_connected():
+            raise RuntimeError("Device is not connected")
 
-        return self._sub_manager.subscribe(validated_callback, *args, **kwargs)
+        return self._sub_manager.subscribe(callback, *args, **kwargs)
 
     def unsubscribe(self, sub_id) -> bool:
         """Remove a previously registered subscription.

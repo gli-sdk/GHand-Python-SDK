@@ -52,7 +52,7 @@ class _Clock:
 
 def _snapshot():
     return ContactSnapshot(
-        joint_angles={JointId.THUMB_PIP: 0.1},
+        joint_angles={JointId.THUMB_MCP: 0.1},
         finger_fz={TactileSensorId.THUMB: 0.5},
         total_fz=0.5,
         torque=5,

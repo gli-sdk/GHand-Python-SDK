@@ -47,6 +47,27 @@ from .types import (
 
 logger = logging.getLogger("ghand.ghand")
 
+_COLLISION_JOINT_ORDER = (
+    JointId.LF_MCP,
+    JointId.LF_PIP,
+    JointId.LF_DIP,
+    JointId.RF_MCP,
+    JointId.RF_PIP,
+    JointId.RF_DIP,
+    JointId.MF_MCP,
+    JointId.MF_PIP,
+    JointId.MF_DIP,
+    JointId.FF_MCP_AA,
+    JointId.FF_MCP,
+    JointId.FF_PIP,
+    JointId.FF_DIP,
+    JointId.THUMB_TMC_PS,
+    JointId.THUMB_TMC_AA,
+    JointId.THUMB_TMC_FE,
+    JointId.THUMB_MCP,
+    JointId.THUMB_IP,
+)
+
 
 class GHand:
     """High-level API for the GHand dexterous hand."""
@@ -148,37 +169,20 @@ class GHand:
             joint: Joint to check and modify in place.
             mode: Current control mode.
         """
-        if mode == CtrlMode.POSITION:
-            if joint.speed < 0:
-                joint.speed = abs(joint.speed)
-                logger.warning(
-                    "[Joint] ID: %s speed is negative in POSITION mode, "
-                    "converted to absolute value %s",
-                    JointId(joint.id).name,
-                    joint.speed,
-                )
-            if joint.speed > 100:
-                original_speed = joint.speed
-                joint.speed = 100
-                logger.warning(
-                    "[Joint] ID: %s speed %s exceeds limit in POSITION mode, clamped to 100",
-                    JointId(joint.id).name, original_speed
-                )
-        elif mode == CtrlMode.SPEED:
-            if joint.speed < -100:
-                original_speed = joint.speed
-                joint.speed = -100
-                logger.warning(
-                    "[Joint] ID: %s speed %s below limit in SPEED mode, clamped to -100",
-                    JointId(joint.id).name, original_speed
-                )
-            elif joint.speed > 100:
-                original_speed = joint.speed
-                joint.speed = 100
-                logger.warning(
-                    "[Joint] ID: %s speed %s exceeds limit in SPEED mode, clamped to 100",
-                    JointId(joint.id).name, original_speed
-                )
+        original_speed = joint.speed
+        if mode in (CtrlMode.POSITION, CtrlMode.SPEED):
+            joint.speed = max(-100, min(100, joint.speed))
+        elif mode == CtrlMode.TORQUE:
+            joint.speed = min(100, abs(joint.speed))
+
+        if joint.speed != original_speed:
+            logger.warning(
+                "[Joint] ID: %s speed %s adjusted to %s in %s mode",
+                JointId(joint.id).name,
+                original_speed,
+                joint.speed,
+                mode.name,
+            )
 
     def _check_torque_limit(self, joint: JointCommand, mode: CtrlMode):
         """Validate and clamp joint torque based on the control mode.
@@ -187,35 +191,20 @@ class GHand:
             joint: Joint to check and modify in place.
             mode: Current control mode.
         """
-        if mode in [CtrlMode.POSITION, CtrlMode.SPEED]:
-            if joint.torque < 0:
-                joint.torque = abs(joint.torque)
-                logger.warning(
-                    "[Joint] ID: %s torque is negative in %s mode, converted to absolute value %s",
-                    JointId(joint.id).name, mode.name, joint.torque
-                )
-            if joint.torque > 100:
-                original_torque = joint.torque
-                joint.torque = 100
-                logger.warning(
-                    "[Joint] ID: %s torque %s exceeds limit in %s mode, clamped to 100",
-                    JointId(joint.id).name, original_torque, mode.name
-                )
-        elif mode == CtrlMode.TORQUE:
-            if joint.torque < -100:
-                original_torque = joint.torque
-                joint.torque = -100
-                logger.warning(
-                    "[Joint] ID: %s torque %s below limit in TORQUE mode, clamped to -100",
-                    JointId(joint.id).name, original_torque
-                )
-            elif joint.torque > 100:
-                original_torque = joint.torque
-                joint.torque = 100
-                logger.warning(
-                    "[Joint] ID: %s torque %s exceeds limit in TORQUE mode, clamped to 100",
-                    JointId(joint.id).name, original_torque
-                )
+        original_torque = joint.torque
+        if mode in (CtrlMode.POSITION, CtrlMode.TORQUE):
+            joint.torque = max(-100, min(100, joint.torque))
+        elif mode == CtrlMode.SPEED and abs(joint.torque) > 100:
+            joint.torque = 100
+
+        if joint.torque != original_torque:
+            logger.warning(
+                "[Joint] ID: %s torque %s adjusted to %s in %s mode",
+                JointId(joint.id).name,
+                original_torque,
+                joint.torque,
+                mode.name,
+            )
 
     def search_adapters(self) -> list[str]:
         """Search for available device adapters.
@@ -350,6 +339,9 @@ class GHand:
         Returns:
             Subscription ID.
         """
+        if not self.is_connected():
+            raise RuntimeError("Device is not connected")
+
         if isinstance(self._comm, EthercatComm):
             def adapter(data_bytes, *args, **kwargs):
                 tpdo = Tpdo.from_bytes(data_bytes, self._product_config)
@@ -570,7 +562,7 @@ class GHand:
             )
             self._check_speed_limit(joint_cmd, mode)
             self._check_torque_limit(joint_cmd, mode)
-            if mode == CtrlMode.POSITION and joint.id in self._joint_limits:
+            if joint.id in self._joint_limits:
                 self._check_joint_limit(joint_cmd, self._joint_limits[joint.id])
             active_joints.append(joint_cmd)
 
@@ -694,17 +686,22 @@ class GHand:
                 logger.debug("Unable to get current joint state, using defaults (0 degrees)")
 
         target_angles = joints_to_nparray(joints, current_joints)
-
-        result = collision_checker.collision_check(
-            target_angles=np.radians(target_angles), safety_margin=self._safety_margin
+        collision_angles = np.asarray(
+            [target_angles[int(joint_id)] for joint_id in _COLLISION_JOINT_ORDER]
         )
 
-        if not result.has_collision:
-            result = CollisionCheckResult(
-                has_collision=False,
-                safe_angles=target_angles.copy(),
-                collision_pairs=None,
-            )
+        result = collision_checker.collision_check(
+            target_angles=collision_angles, safety_margin=self._safety_margin
+        )
+
+        if result.has_collision:
+            safe_angles = target_angles.copy()
+            for index, joint_id in enumerate(_COLLISION_JOINT_ORDER):
+                safe_angles[int(joint_id)] = result.safe_angles[index]
+            result.safe_angles = safe_angles
+        else:
+            result.safe_angles = target_angles.copy()
+            result.collision_pairs = None
         return result
 
     def _joints_to_angles(

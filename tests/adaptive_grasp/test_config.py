@@ -272,11 +272,11 @@ def test_default_pre_grasp_preset_is_explicit_balloon_pinch():
     assert cfg.pre_grasp_pose[JointId.FF_PIP] == pytest.approx(
         math.radians(_preset_degrees(expected_preset, JointId.FF_PIP))
     )
-    assert cfg.pre_grasp_pose[JointId.THUMB_SWING] == pytest.approx(
-        math.radians(_preset_degrees(expected_preset, JointId.THUMB_SWING))
+    assert cfg.pre_grasp_pose[JointId.THUMB_TMC_AA] == pytest.approx(
+        math.radians(_preset_degrees(expected_preset, JointId.THUMB_TMC_AA))
     )
-    assert cfg.pre_grasp_pose[JointId.THUMB_PIP] == pytest.approx(
-        math.radians(_preset_degrees(expected_preset, JointId.THUMB_PIP))
+    assert cfg.pre_grasp_pose[JointId.THUMB_MCP] == pytest.approx(
+        math.radians(_preset_degrees(expected_preset, JointId.THUMB_MCP))
     )
 
 
@@ -295,8 +295,8 @@ def test_object_specific_pre_grasp_preset_is_config_driven():
     assert cfg.pre_grasp_pose[JointId.MF_MCP] == pytest.approx(
         math.radians(_preset_degrees(preset, JointId.MF_MCP))
     )
-    assert cfg.pre_grasp_pose[JointId.THUMB_SWING] == pytest.approx(
-        math.radians(_preset_degrees(preset, JointId.THUMB_SWING))
+    assert cfg.pre_grasp_pose[JointId.THUMB_TMC_AA] == pytest.approx(
+        math.radians(_preset_degrees(preset, JointId.THUMB_TMC_AA))
     )
 
 

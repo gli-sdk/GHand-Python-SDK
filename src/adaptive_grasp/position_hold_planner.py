@@ -8,7 +8,7 @@ from .force_reference_planner import ForceReferenceDecision
 from .object_profile import ObjectProfile
 from .pid_controller import LowPassFilter
 from .tactility import TactileAnalysis
-from .utils import JOINT_TO_FINGER, clip
+from .utils import FINGER_TO_MCP_PIP, JOINT_TO_FINGER, clip
 
 
 JointAngles = dict[JointId, float]
@@ -231,8 +231,9 @@ class PositionHoldPlanner:
         mcp_delta: float,
         pip_delta: float,
     ) -> float:
-        if "MCP" in joint_id.name:
-            return angle + mcp_delta
-        if "PIP" in joint_id.name:
-            return angle + pip_delta
+        for mcp_joint, pip_joint in FINGER_TO_MCP_PIP.values():
+            if joint_id == mcp_joint:
+                return angle + mcp_delta
+            if joint_id == pip_joint:
+                return angle + pip_delta
         return angle

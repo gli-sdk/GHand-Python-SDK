@@ -7,7 +7,7 @@ from .utils import FINGER_TO_MCP_PIP, clip
 
 
 TORQUE_CONTROL_JOINTS = (
-    JointId.THUMB_PIP, JointId.THUMB_MCP,
+    JointId.THUMB_MCP, JointId.THUMB_TMC_FE,
     JointId.FF_PIP, JointId.FF_MCP,
     JointId.MF_PIP, JointId.MF_MCP,
     JointId.RF_PIP, JointId.RF_MCP,
@@ -27,13 +27,13 @@ class JointCommandBuilder:
 
     def open_pose(self) -> dict[JointId, float]:
         return {
-            JointId.THUMB_PIP: math.radians(0),
             JointId.THUMB_MCP: math.radians(0),
-            JointId.THUMB_SWING: math.radians(80),
-            JointId.THUMB_ROTATION: math.radians(0),
+            JointId.THUMB_TMC_FE: math.radians(0),
+            JointId.THUMB_TMC_AA: math.radians(80),
+            JointId.THUMB_TMC_PS: math.radians(0),
             JointId.FF_PIP: math.radians(0),
             JointId.FF_MCP: math.radians(0),
-            JointId.FF_SWING: math.radians(0),
+            JointId.FF_MCP_AA: math.radians(0),
             JointId.MF_PIP: math.radians(0),
             JointId.MF_MCP: math.radians(0),
             JointId.RF_PIP: math.radians(0),
@@ -64,8 +64,8 @@ class JointCommandBuilder:
             for joint_id in TORQUE_CONTROL_JOINTS
         ]
         joints += [
-            JointCommand(id=JointId.THUMB_ROTATION, angle=0.0, speed=0, torque=thumb_aux_torque),
-            JointCommand(id=JointId.THUMB_SWING, angle=0.0, speed=0, torque=thumb_aux_torque),
+            JointCommand(id=JointId.THUMB_TMC_PS, angle=0.0, speed=0, torque=thumb_aux_torque),
+            JointCommand(id=JointId.THUMB_TMC_AA, angle=0.0, speed=0, torque=thumb_aux_torque),
         ]
         return joints
 
@@ -93,8 +93,8 @@ class JointCommandBuilder:
             for joint_id in TORQUE_CONTROL_JOINTS
         ]
         joints += [
-            JointCommand(id=JointId.THUMB_ROTATION, angle=0.0, speed=0, torque=self._config.thumb_aux_torque),
-            JointCommand(id=JointId.THUMB_SWING, angle=0.0, speed=0, torque=self._config.thumb_aux_torque),
+            JointCommand(id=JointId.THUMB_TMC_PS, angle=0.0, speed=0, torque=self._config.thumb_aux_torque),
+            JointCommand(id=JointId.THUMB_TMC_AA, angle=0.0, speed=0, torque=self._config.thumb_aux_torque),
         ]
         return joints
 

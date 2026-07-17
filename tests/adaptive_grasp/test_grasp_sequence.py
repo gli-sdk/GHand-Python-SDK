@@ -72,7 +72,7 @@ def test_phase_closing_contact_by_force(monkeypatch):
     safety = MagicMock()
     from adaptive_grasp.safety import SafetyStatus
     safety.is_grasp_empty.return_value = MagicMock(status=SafetyStatus.OK)
-    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP, JointId.FF_PIP))
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_MCP, JointId.FF_PIP))
     states = []
     controller = PhaseController(
         hand, sensor, safety, joint_builder, cfg, time.monotonic,
@@ -118,7 +118,7 @@ def test_phase_closing_uses_phase_closing_torque(monkeypatch):
     safety = MagicMock()
     from adaptive_grasp.safety import SafetyStatus
     safety.is_grasp_empty.return_value = MagicMock(status=SafetyStatus.OK)
-    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP, JointId.FF_PIP))
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_MCP, JointId.FF_PIP))
     controller = PhaseController(
         hand, sensor, safety, joint_builder, cfg, time.monotonic,
         on_state_change=lambda _state: None,
@@ -139,7 +139,7 @@ def test_phase_closing_uses_phase_closing_torque(monkeypatch):
     assert result.success is True
     closing_call = next(call for call in hand.calls if call["mode"] == CtrlMode.TORQUE)
     torque_by_joint = {JointCommand.id: JointCommand.torque for JointCommand in closing_call["joints"]}
-    assert torque_by_joint[JointId.THUMB_PIP] == 4
+    assert torque_by_joint[JointId.THUMB_MCP] == 4
     assert torque_by_joint[JointId.FF_PIP] == 4
     assert result.final_torque == 4
 
@@ -168,7 +168,7 @@ def test_phase_closing_records_contact_joint_snapshot_by_force(monkeypatch):
     safety = MagicMock()
     from adaptive_grasp.safety import SafetyStatus
     safety.is_grasp_empty.return_value = MagicMock(status=SafetyStatus.OK)
-    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP, JointId.FF_PIP))
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_MCP, JointId.FF_PIP))
     controller = PhaseController(
         hand, sensor, safety, joint_builder, cfg, lambda: 10.0,
         on_state_change=lambda _state: None,
@@ -182,8 +182,8 @@ def test_phase_closing_records_contact_joint_snapshot_by_force(monkeypatch):
         TactileSensorId.FF: _FakeTactileInfo(0.0, 0.0, 2.0),
     }
     sensor.joint_feedback = [
-        JointCommand(id=JointId.THUMB_PIP, angle=0.11),
-        JointCommand(id=JointId.THUMB_MCP, angle=0.22),
+        JointCommand(id=JointId.THUMB_MCP, angle=0.11),
+        JointCommand(id=JointId.THUMB_TMC_FE, angle=0.22),
         JointCommand(id=JointId.FF_PIP, angle=0.33),
     ]
     sensor.sum_active_finger_normal_force.return_value = 4.0
@@ -196,7 +196,7 @@ def test_phase_closing_records_contact_joint_snapshot_by_force(monkeypatch):
     assert result.contact_snapshot.torque == 12
     assert result.contact_snapshot.timestamp_s == pytest.approx(10.0)
     assert result.contact_snapshot.joint_angles == {
-        JointId.THUMB_PIP: pytest.approx(0.11),
+        JointId.THUMB_MCP: pytest.approx(0.11),
         JointId.FF_PIP: pytest.approx(0.33),
     }
 
@@ -213,7 +213,7 @@ def test_phase_closing_records_contact_finger_force_snapshot_by_force(monkeypatc
     safety = MagicMock()
     from adaptive_grasp.safety import SafetyStatus
     safety.is_grasp_empty.return_value = MagicMock(status=SafetyStatus.OK)
-    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP, JointId.FF_PIP))
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_MCP, JointId.FF_PIP))
     controller = PhaseController(
         hand, sensor, safety, joint_builder, cfg, lambda: 10.0,
         on_state_change=lambda _state: None,
@@ -225,7 +225,7 @@ def test_phase_closing_records_contact_finger_force_snapshot_by_force(monkeypatc
         TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 1.2),
         TactileSensorId.FF: _FakeTactileInfo(0.0, 0.0, -0.8),
     }
-    sensor.joint_feedback = [JointCommand(id=JointId.THUMB_PIP, angle=0.11)]
+    sensor.joint_feedback = [JointCommand(id=JointId.THUMB_MCP, angle=0.11)]
     sensor.sum_active_finger_normal_force.return_value = 2.0
 
     result = controller.run(is_running=lambda: True)
@@ -251,7 +251,7 @@ def test_phase_open_and_pre_grasp(monkeypatch):
     safety = MagicMock()
     from adaptive_grasp.safety import SafetyStatus
     safety.is_grasp_empty.return_value = MagicMock(status=SafetyStatus.OK)
-    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP, JointId.FF_PIP))
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_MCP, JointId.FF_PIP))
     states = []
     controller = PhaseController(
         hand, sensor, safety, joint_builder, cfg, time.monotonic,
@@ -290,17 +290,17 @@ def test_wait_until_position_reached_requires_all_pose_joints(monkeypatch):
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(pre_grasp_preset="two_finger_pinch")
     pose = {
-        JointId.THUMB_PIP: math.radians(30.0),
+        JointId.THUMB_MCP: math.radians(30.0),
         JointId.FF_PIP: math.radians(20.0),
     }
     sensor = _PositionFeedbackSensor(
         [
-            JointCommand(id=JointId.THUMB_PIP, angle=math.radians(28.6)),
+            JointCommand(id=JointId.THUMB_MCP, angle=math.radians(28.6)),
             JointCommand(id=JointId.FF_PIP, angle=math.radians(17.0)),
         ]
     )
     safety = MagicMock()
-    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP, JointId.FF_PIP))
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_MCP, JointId.FF_PIP))
     now = {"value": 0.0}
     sleeps = []
     controller = PhaseController(
@@ -317,7 +317,7 @@ def test_wait_until_position_reached_requires_all_pose_joints(monkeypatch):
         sleeps.append(duration)
         now["value"] += duration
         sensor.joint_feedback = [
-            JointCommand(id=JointId.THUMB_PIP, angle=math.radians(28.6)),
+            JointCommand(id=JointId.THUMB_MCP, angle=math.radians(28.6)),
             JointCommand(id=JointId.FF_PIP, angle=math.radians(18.6)),
         ]
 
@@ -330,12 +330,12 @@ def test_wait_until_position_reached_requires_all_pose_joints(monkeypatch):
 def test_wait_until_position_reached_times_out(monkeypatch):
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(pre_grasp_preset="two_finger_pinch")
-    pose = {JointId.THUMB_PIP: math.radians(30.0)}
+    pose = {JointId.THUMB_MCP: math.radians(30.0)}
     sensor = _PositionFeedbackSensor(
-        [JointCommand(id=JointId.THUMB_PIP, angle=math.radians(20.0))]
+        [JointCommand(id=JointId.THUMB_MCP, angle=math.radians(20.0))]
     )
     safety = MagicMock()
-    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP,))
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_MCP,))
     now = {"value": 0.0}
     sleeps = []
     controller = PhaseController(
@@ -361,7 +361,7 @@ def test_wait_until_position_reached_times_out(monkeypatch):
 def test_position_phase_stops_waiting_when_run_is_cancelled(monkeypatch):
     hand = _MockHand()
     cfg = AdaptiveGraspConfig(pre_grasp_preset="two_finger_pinch")
-    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP, JointId.FF_PIP))
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_MCP, JointId.FF_PIP))
     sensor = _PositionFeedbackSensor(
         [
             JointCommand(id=joint_id, angle=angle)
@@ -409,7 +409,7 @@ def test_phase_failure_sets_error_state(monkeypatch):
     cfg = AdaptiveGraspConfig(pre_grasp_preset="two_finger_pinch")
     sensor = MagicMock()
     safety = MagicMock()
-    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP, JointId.FF_PIP))
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_MCP, JointId.FF_PIP))
     states = []
     controller = PhaseController(
         hand, sensor, safety, joint_builder, cfg, time.monotonic,
@@ -435,7 +435,7 @@ def test_phase_closing_empty_grasp_requests_release(monkeypatch):
     safety = MagicMock()
     from adaptive_grasp.safety import SafetyStatus
     safety.is_grasp_empty.return_value = MagicMock(status=SafetyStatus.FAULT)
-    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP, JointId.FF_PIP))
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_MCP, JointId.FF_PIP))
     states = []
     controller = PhaseController(
         hand, sensor, safety, joint_builder, cfg, time.monotonic,
@@ -448,7 +448,7 @@ def test_phase_closing_empty_grasp_requests_release(monkeypatch):
         TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 0.0),
         TactileSensorId.FF: _FakeTactileInfo(0.0, 0.0, 0.0),
     }
-    sensor.joint_feedback = [JointCommand(id=JointId.THUMB_MCP, angle=0.0)]
+    sensor.joint_feedback = [JointCommand(id=JointId.THUMB_TMC_FE, angle=0.0)]
     sensor.sum_active_finger_normal_force.return_value = 0.0
 
     result = controller.run(is_running=lambda: True)
@@ -474,7 +474,7 @@ def test_phase_closing_empty_grasp_returns_safety_report(monkeypatch):
         details={"empty_grasp_joints": [{"joint": "THUMB_MCP"}]},
     )
     safety.is_grasp_empty.return_value = empty_report
-    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP, JointId.FF_PIP))
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_MCP, JointId.FF_PIP))
     controller = PhaseController(
         hand, sensor, safety, joint_builder, cfg, time.monotonic,
         on_state_change=lambda _state: None,
@@ -486,7 +486,7 @@ def test_phase_closing_empty_grasp_returns_safety_report(monkeypatch):
         TactileSensorId.THUMB: _FakeTactileInfo(0.0, 0.0, 0.0),
         TactileSensorId.FF: _FakeTactileInfo(0.0, 0.0, 0.0),
     }
-    sensor.joint_feedback = [JointCommand(id=JointId.THUMB_MCP, angle=0.0)]
+    sensor.joint_feedback = [JointCommand(id=JointId.THUMB_TMC_FE, angle=0.0)]
     sensor.sum_active_finger_normal_force.return_value = 0.0
 
     result = controller.run(is_running=lambda: True)
