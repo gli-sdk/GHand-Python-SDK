@@ -47,6 +47,27 @@ from .types import (
 
 logger = logging.getLogger("ghand.ghand")
 
+_COLLISION_JOINT_ORDER = (
+    JointId.LF_MCP,
+    JointId.LF_PIP,
+    JointId.LF_DIP,
+    JointId.RF_MCP,
+    JointId.RF_PIP,
+    JointId.RF_DIP,
+    JointId.MF_MCP,
+    JointId.MF_PIP,
+    JointId.MF_DIP,
+    JointId.FF_MCP_AA,
+    JointId.FF_MCP,
+    JointId.FF_PIP,
+    JointId.FF_DIP,
+    JointId.THUMB_TMC_PS,
+    JointId.THUMB_TMC_AA,
+    JointId.THUMB_TMC_FE,
+    JointId.THUMB_MCP,
+    JointId.THUMB_IP,
+)
+
 
 class GHand:
     """High-level API for the GHand dexterous hand."""
@@ -694,17 +715,22 @@ class GHand:
                 logger.debug("Unable to get current joint state, using defaults (0 degrees)")
 
         target_angles = joints_to_nparray(joints, current_joints)
-
-        result = collision_checker.collision_check(
-            target_angles=np.radians(target_angles), safety_margin=self._safety_margin
+        collision_angles = np.asarray(
+            [target_angles[int(joint_id)] for joint_id in _COLLISION_JOINT_ORDER]
         )
 
-        if not result.has_collision:
-            result = CollisionCheckResult(
-                has_collision=False,
-                safe_angles=target_angles.copy(),
-                collision_pairs=None,
-            )
+        result = collision_checker.collision_check(
+            target_angles=collision_angles, safety_margin=self._safety_margin
+        )
+
+        if result.has_collision:
+            safe_angles = target_angles.copy()
+            for index, joint_id in enumerate(_COLLISION_JOINT_ORDER):
+                safe_angles[int(joint_id)] = result.safe_angles[index]
+            result.safe_angles = safe_angles
+        else:
+            result.safe_angles = target_angles.copy()
+            result.collision_pairs = None
         return result
 
     def _joints_to_angles(
