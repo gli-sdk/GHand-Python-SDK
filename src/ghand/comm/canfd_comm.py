@@ -511,6 +511,9 @@ class CanfdComm(IComm):
         Returns:
             Subscription ID.
         """
+        if not self.is_connected():
+            raise RuntimeError("Device is not connected")
+
         with self._lock:
             sub_id = self._next_sub_id
             self._next_sub_id += 1
@@ -520,12 +523,13 @@ class CanfdComm(IComm):
 
     def unsubscribe(self, sub_id) -> bool:
         with self._lock:
-            if sub_id in self._callbacks:
-                del self._callbacks[sub_id]
-                if not self._callbacks:
-                    self._stop_poll()
-                return True
-            return False
+            if sub_id not in self._callbacks:
+                return False
+            del self._callbacks[sub_id]
+            should_stop = not self._callbacks
+        if should_stop:
+            self._stop_poll()
+        return True
 
     def _ensure_poll_started(self) -> None:
         if self._poll_thread is None or not self._poll_thread.is_alive():
@@ -537,7 +541,11 @@ class CanfdComm(IComm):
 
     def _stop_poll(self) -> None:
         self._poll_stop.set()
-        if self._poll_thread and self._poll_thread.is_alive():
+        if (
+            self._poll_thread
+            and self._poll_thread.is_alive()
+            and self._poll_thread is not threading.current_thread()
+        ):
             self._poll_thread.join(timeout=0.5)
         self._poll_thread = None
 
@@ -545,8 +553,7 @@ class CanfdComm(IComm):
         while not self._poll_stop.is_set():
             try:
                 if not self._connected:
-                    time.sleep(0.01)
-                    continue
+                    break
 
                 if not self._config.valid_joints:
                     time.sleep(0.01)
@@ -585,7 +592,9 @@ class CanfdComm(IComm):
                         cb(hand_state, joints, *cb_args, **cb_kwargs)
                     except Exception:
                         logger.exception("Subscription callback error")
-            except Exception:
-                logger.exception("Poll loop error")
+            except Exception as e:
+                logger.error("Subscription stopped: %s", e)
+                self.disconnect()
+                break
 
             time.sleep(0.01)

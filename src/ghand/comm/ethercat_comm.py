@@ -54,7 +54,7 @@ class EthercatComm(IComm):
 
     def __init__(self, config: ProductConfig):
         self._client = EthercatClient()
-        self._sub_manager = SubscriptionManager(self._client)
+        self._sub_manager = SubscriptionManager(self._client, self.is_connected)
         self.update_config(config)
 
     @property
@@ -468,6 +468,9 @@ class EthercatComm(IComm):
         Returns:
             Subscription ID.
         """
+        if not self.is_connected():
+            raise RuntimeError("Device is not connected")
+
         return self._sub_manager.subscribe(callback, *args, **kwargs)
 
     def unsubscribe(self, sub_id) -> bool:
