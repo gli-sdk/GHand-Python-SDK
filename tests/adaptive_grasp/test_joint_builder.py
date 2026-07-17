@@ -19,15 +19,15 @@ class TestJointCommandBuilder:
         cfg = AdaptiveGraspConfig()
         builder = JointCommandBuilder(cfg, tuple())
         pose = builder.open_pose()
-        assert JointId.THUMB_PIP in pose
-        assert JointId.THUMB_SWING in pose
+        assert JointId.THUMB_MCP in pose
+        assert JointId.THUMB_TMC_AA in pose
         assert JointId.FF_PIP in pose
-        assert pose[JointId.THUMB_SWING] == math.radians(80)
+        assert pose[JointId.THUMB_TMC_AA] == math.radians(80)
 
     def test_torque_command_sets_inactive_to_zero(self):
         cfg = AdaptiveGraspConfig(pre_grasp_preset="two_finger_pinch")
         torque_joints = (
-            JointId.THUMB_PIP, JointId.THUMB_MCP,
+            JointId.THUMB_MCP, JointId.THUMB_TMC_FE,
             JointId.FF_PIP, JointId.FF_MCP,
         )
         builder = JointCommandBuilder(cfg, torque_joints)
@@ -44,20 +44,20 @@ class TestJointCommandBuilder:
             assert j.angle == 0.0
             assert j.speed == 0
 
-        assert joints[-2].id == JointId.THUMB_ROTATION
-        assert joints[-1].id == JointId.THUMB_SWING
+        assert joints[-2].id == JointId.THUMB_TMC_PS
+        assert joints[-1].id == JointId.THUMB_TMC_AA
         assert joints[-2].torque == cfg.thumb_aux_torque
         assert joints[-1].torque == cfg.thumb_aux_torque
 
     def test_torque_command_uses_configured_thumb_aux_torque(self):
         cfg = AdaptiveGraspConfig(thumb_aux_torque=7)
-        builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP,))
+        builder = JointCommandBuilder(cfg, (JointId.THUMB_MCP,))
 
         joints = builder.torque_command(42)
 
         joint_map = {JointCommand.id: JointCommand for JointCommand in joints}
-        assert joint_map[JointId.THUMB_ROTATION].torque == 7
-        assert joint_map[JointId.THUMB_SWING].torque == 7
+        assert joint_map[JointId.THUMB_TMC_PS].torque == 7
+        assert joint_map[JointId.THUMB_TMC_AA].torque == 7
 
     def test_torque_command_all_active_for_five_finger(self):
         cfg = AdaptiveGraspConfig(pre_grasp_preset="five_finger_grasp")
@@ -70,25 +70,25 @@ class TestJointCommandBuilder:
 
     def test_init_hold_angles_uses_pre_grasp_pose(self):
         cfg = AdaptiveGraspConfig(pre_grasp_preset="two_finger_pinch")
-        torque_joints = (JointId.THUMB_PIP, JointId.FF_PIP)
+        torque_joints = (JointId.THUMB_MCP, JointId.FF_PIP)
         builder = JointCommandBuilder(cfg, torque_joints)
         angles = builder.init_hold_angles()
-        assert angles[JointId.THUMB_PIP] == cfg.pre_grasp_pose[JointId.THUMB_PIP]
+        assert angles[JointId.THUMB_MCP] == cfg.pre_grasp_pose[JointId.THUMB_MCP]
         assert angles[JointId.FF_PIP] == cfg.pre_grasp_pose[JointId.FF_PIP]
 
     def test_position_command_builds_joints(self):
         cfg = AdaptiveGraspConfig()
         builder = JointCommandBuilder(cfg, tuple())
-        angles = {JointId.THUMB_PIP: 0.5, JointId.FF_PIP: 0.3}
+        angles = {JointId.THUMB_MCP: 0.5, JointId.FF_PIP: 0.3}
         joints = builder.position_command(angles, speed=50, torque=60)
         joint_map = {j.id: j for j in joints}
-        assert joint_map[JointId.THUMB_PIP].angle == 0.5
-        assert joint_map[JointId.THUMB_PIP].speed == 50
-        assert joint_map[JointId.THUMB_PIP].torque == 60
+        assert joint_map[JointId.THUMB_MCP].angle == 0.5
+        assert joint_map[JointId.THUMB_MCP].speed == 50
+        assert joint_map[JointId.THUMB_MCP].torque == 60
 
     def test_hold_position_command_clips_to_hardware_ranges(self):
         cfg = AdaptiveGraspConfig(max_torque=30)
-        torque_joints = (JointId.THUMB_PIP,)
+        torque_joints = (JointId.THUMB_MCP,)
         builder = JointCommandBuilder(cfg, torque_joints)
         joints = builder.hold_position_command(torque=50, speed=120)
         assert joints[0].torque == 30
@@ -105,8 +105,8 @@ class TestJointCommandBuilder:
         builder = JointCommandBuilder(
             cfg,
             (
-                JointId.THUMB_PIP,
                 JointId.THUMB_MCP,
+                JointId.THUMB_TMC_FE,
                 JointId.FF_PIP,
                 JointId.FF_MCP,
                 JointId.MF_PIP,
@@ -121,8 +121,8 @@ class TestJointCommandBuilder:
         })
 
         joint_map = {JointCommand.id: JointCommand for JointCommand in joints}
-        assert joint_map[JointId.THUMB_PIP].torque == 5
         assert joint_map[JointId.THUMB_MCP].torque == 5
+        assert joint_map[JointId.THUMB_TMC_FE].torque == 5
         assert joint_map[JointId.FF_PIP].torque == 7
         assert joint_map[JointId.FF_MCP].torque == 7
         assert joint_map[JointId.MF_PIP].torque == 9

@@ -17,9 +17,9 @@ def test_sensor_fault_on_joint_feedback_missing():
 def test_empty_grasp_when_closing_with_no_contact():
     cfg = AdaptiveGraspConfig(closing_total_contact_threshold_n=1.0)
     monitor = SafetyMonitor(cfg)
-    monitor.set_closing_baseline([JointCommand(id=JointId.THUMB_MCP, angle=0.0)])
+    monitor.set_closing_baseline([JointCommand(id=JointId.THUMB_TMC_FE, angle=0.0)])
 
-    joints = [JointCommand(id=JointId.THUMB_MCP, angle=math.radians(35.0))]
+    joints = [JointCommand(id=JointId.THUMB_TMC_FE, angle=math.radians(35.0))]
     report = monitor.is_grasp_empty(joint_feedback=joints, state=GraspState.CLOSING_TO_CONTACT)
     assert report.status == SafetyStatus.FAULT
     assert report.fault_type == "empty_grasp"
@@ -30,13 +30,13 @@ def test_empty_grasp_reports_joints_exceeding_angle_threshold():
     monitor = SafetyMonitor(cfg)
     monitor.set_closing_baseline(
         [
-            JointCommand(id=JointId.THUMB_MCP, angle=math.radians(5.0)),
+            JointCommand(id=JointId.THUMB_TMC_FE, angle=math.radians(5.0)),
             JointCommand(id=JointId.FF_MCP, angle=math.radians(10.0)),
         ]
     )
 
     joints = [
-        JointCommand(id=JointId.THUMB_MCP, angle=math.radians(36.0)),
+        JointCommand(id=JointId.THUMB_TMC_FE, angle=math.radians(36.0)),
         JointCommand(id=JointId.FF_MCP, angle=math.radians(55.0)),
     ]
     report = monitor.is_grasp_empty(
@@ -46,11 +46,11 @@ def test_empty_grasp_reports_joints_exceeding_angle_threshold():
 
     assert report.status == SafetyStatus.FAULT
     assert report.message == (
-        "No contact while joints moved: THUMB_MCP=31.0deg, FF_MCP=45.0deg"
+        "No contact while joints moved: THUMB_TMC_FE=31.0deg, FF_MCP=45.0deg"
     )
     assert report.details["empty_grasp_joints"] == [
         {
-            "joint": "THUMB_MCP",
+            "joint": "THUMB_TMC_FE",
             "delta_rad": pytest.approx(math.radians(31.0)),
             "delta_deg": pytest.approx(31.0),
             "threshold_deg": pytest.approx(30.0),
@@ -67,7 +67,7 @@ def test_empty_grasp_reports_joints_exceeding_angle_threshold():
 def test_tactile_missing_fault_cycles_are_configurable():
     cfg = AdaptiveGraspConfig(sensor_missing_fault_cycles=2)
     monitor = SafetyMonitor(cfg)
-    joints = [JointCommand(id=JointId.THUMB_MCP, angle=0.0)]
+    joints = [JointCommand(id=JointId.THUMB_TMC_FE, angle=0.0)]
 
     report = monitor.check(tactile_data=None, joint_feedback=joints, state=GraspState.ADAPTIVE_HOLD)
     assert report.status == SafetyStatus.WARN
@@ -80,9 +80,9 @@ def test_tactile_missing_fault_cycles_are_configurable():
 def test_empty_grasp_angle_threshold_is_configurable():
     cfg = AdaptiveGraspConfig(empty_grasp_angle_threshold=math.radians(10.0))
     monitor = SafetyMonitor(cfg)
-    monitor.set_closing_baseline([JointCommand(id=JointId.THUMB_MCP, angle=0.0)])
+    monitor.set_closing_baseline([JointCommand(id=JointId.THUMB_TMC_FE, angle=0.0)])
 
-    joints = [JointCommand(id=JointId.THUMB_MCP, angle=math.radians(11.0))]
+    joints = [JointCommand(id=JointId.THUMB_TMC_FE, angle=math.radians(11.0))]
     report = monitor.is_grasp_empty(joint_feedback=joints, state=GraspState.CLOSING_TO_CONTACT)
 
     assert report.status == SafetyStatus.FAULT
@@ -112,7 +112,7 @@ def test_object_dropped_after_three_low_force_cycles(caplog):
     )
     monitor = SafetyMonitor(cfg)
 
-    baseline_joints = [JointCommand(id=JointId.THUMB_MCP, angle=0.0)]
+    baseline_joints = [JointCommand(id=JointId.THUMB_TMC_FE, angle=0.0)]
     tactile_before = _tactile_data(2.0)
     monitor.check(tactile_data=tactile_before, joint_feedback=baseline_joints, state=GraspState.ADAPTIVE_HOLD)
 
@@ -136,7 +136,7 @@ def test_object_dropped_logs_active_finger_last_and_current_fz(caplog):
         drop_detect_debounce_cycles=3,
     )
     monitor = SafetyMonitor(cfg)
-    joints = [JointCommand(id=JointId.THUMB_MCP, angle=0.0)]
+    joints = [JointCommand(id=JointId.THUMB_TMC_FE, angle=0.0)]
 
     monitor.check(
         tactile_data={
@@ -175,7 +175,7 @@ def test_object_drop_counter_resets_when_force_recovers():
         drop_detect_debounce_cycles=3,
     )
     monitor = SafetyMonitor(cfg)
-    joints = [JointCommand(id=JointId.THUMB_MCP, angle=0.0)]
+    joints = [JointCommand(id=JointId.THUMB_TMC_FE, angle=0.0)]
 
     monitor.check(tactile_data=_tactile_data(2.0), joint_feedback=joints, state=GraspState.ADAPTIVE_HOLD)
     monitor.check(tactile_data=_tactile_data(0.19), joint_feedback=joints, state=GraspState.ADAPTIVE_HOLD)
@@ -193,7 +193,7 @@ def test_object_drop_threshold_is_configurable():
         drop_detect_debounce_cycles=1,
     )
     monitor = SafetyMonitor(cfg)
-    joints = [JointCommand(id=JointId.THUMB_MCP, angle=0.0)]
+    joints = [JointCommand(id=JointId.THUMB_TMC_FE, angle=0.0)]
 
     monitor.check(tactile_data=_tactile_data(1.0), joint_feedback=joints, state=GraspState.ADAPTIVE_HOLD)
     report = monitor.check(tactile_data=_tactile_data(0.39), joint_feedback=joints, state=GraspState.ADAPTIVE_HOLD)
@@ -208,9 +208,9 @@ def test_empty_grasp_respects_baseline():
     monitor = SafetyMonitor(cfg)
 
     # baseline 15°，当前 20°，变化量 5° < 30° 阈值
-    monitor.set_closing_baseline([JointCommand(id=JointId.THUMB_MCP, angle=math.radians(15.0))])
+    monitor.set_closing_baseline([JointCommand(id=JointId.THUMB_TMC_FE, angle=math.radians(15.0))])
 
     tactile = {"thumb": type("T", (), {"get_force_z": lambda self: 0.1})()}
-    joints = [JointCommand(id=JointId.THUMB_MCP, angle=math.radians(20.0))]
+    joints = [JointCommand(id=JointId.THUMB_TMC_FE, angle=math.radians(20.0))]
     report = monitor.is_grasp_empty(joint_feedback=joints, state=GraspState.CLOSING_TO_CONTACT)
     assert report.status == SafetyStatus.OK

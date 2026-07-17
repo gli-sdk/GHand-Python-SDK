@@ -60,11 +60,11 @@ def tactile_distributed_force(info) -> list[float]:
 
 
 JOINT_TO_FINGER: dict[JointId, TactileSensorId] = {
-    JointId.THUMB_PIP: TactileSensorId.THUMB,
     JointId.THUMB_MCP: TactileSensorId.THUMB,
+    JointId.THUMB_TMC_FE: TactileSensorId.THUMB,
     JointId.FF_PIP: TactileSensorId.FF,
     JointId.FF_MCP: TactileSensorId.FF,
-    JointId.FF_SWING: TactileSensorId.FF,
+    JointId.FF_MCP_AA: TactileSensorId.FF,
     JointId.MF_PIP: TactileSensorId.MF,
     JointId.MF_MCP: TactileSensorId.MF,
     JointId.RF_PIP: TactileSensorId.RF,
@@ -74,7 +74,7 @@ JOINT_TO_FINGER: dict[JointId, TactileSensorId] = {
 }
 
 FINGER_TO_MCP_PIP: dict[TactileSensorId, tuple[JointId, JointId]] = {
-    TactileSensorId.THUMB: (JointId.THUMB_MCP, JointId.THUMB_PIP),
+    TactileSensorId.THUMB: (JointId.THUMB_TMC_FE, JointId.THUMB_MCP),
     TactileSensorId.FF: (JointId.FF_MCP, JointId.FF_PIP),
     TactileSensorId.MF: (JointId.MF_MCP, JointId.MF_PIP),
     TactileSensorId.RF: (JointId.RF_MCP, JointId.RF_PIP),
