@@ -3,7 +3,8 @@ import math
 import time
 from typing import Any, Optional
 
-from ghand import ErrorCode, JointData, State, TactileInfo, TactileSensorId
+from ghand import JointData, TactileInfo, TactileSensorId
+from ghand.comm.ethercat_comm import EthercatComm
 from .utils import active_finger_normal_forces, normal_force_z
 
 _logger = logging.getLogger("ghand.sensor")
@@ -155,8 +156,8 @@ class SensorClient:
             joints.append(
                 JointData(
                     id=joint_id,
-                    state=State(joint_tpdo.state),
-                    error=ErrorCode(joint_tpdo.error),
+                    state=EthercatComm._parse_state(joint_tpdo.state),
+                    error=EthercatComm._parse_error_code(joint_tpdo.error),
                     angle=math.radians(joint_tpdo.angle),
                     speed=joint_tpdo.speed,
                     torque=joint_tpdo.torque,
