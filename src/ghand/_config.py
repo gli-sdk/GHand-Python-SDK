@@ -254,7 +254,11 @@ def find_config_by_name(device_name: str) -> ProductConfig | None:
             except (json.JSONDecodeError, OSError):
                 continue
 
-            names = [data.get("name", ""), *data.get("aliases", [])]
+            names = [
+                data.get("model", ""),
+                data.get("name", ""),
+                *data.get("aliases", []),
+            ]
             if any(name.lower() == device_name.lower() for name in names if name):
                 logger.info("Auto-detected product config: %s -> %s", device_name, file_path)
                 return _load_config_from_file(file_path)
