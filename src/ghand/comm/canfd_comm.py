@@ -64,8 +64,6 @@ logger = logging.getLogger("ghand.canfd_comm")
 class CanfdComm(IComm):
     """IComm implementation for CANFD."""
 
-    _CONNECT_RETRIES = 3
-    _CONNECT_RETRY_DELAY_SEC = 0.1
     _DELETE_CONNECTION_SETTLE_SEC = 0.1
     _MIN_REOPEN_INTERVAL_SEC = 0.5
 
@@ -149,50 +147,29 @@ class CanfdComm(IComm):
         if self._connected:
             return True
 
-        for attempt in range(1, self._CONNECT_RETRIES + 1):
-            try:
-                self._wait_for_reopen_window()
-                if self._transport is None:
-                    self._transport = CanfdTransport()
+        try:
+            self._wait_for_reopen_window()
+            if self._transport is None:
+                self._transport = CanfdTransport()
 
-                if not self._transport.open():
-                    logger.error(
-                        "Failed to open CANFD transport (attempt %s/%s)",
-                        attempt,
-                        self._CONNECT_RETRIES,
-                    )
-                    self._cleanup_failed_connect()
-                else:
-                    # # Listen for slave-initiated Node ID detection before establishing connection.
-                    # if not self._node_id_detection():
-                    #     logger.error("Node ID detection timeout for dst_id=0x%02X", self._dst_id)
-                    #     return False
-
-                    # Establish connection: function code 0x02, write connection timer=0.
-                    if self._establish_connection():
-                        self._connected = True
-                        logger.info("CANFD device connected (%s)", device_name)
-                        return True
-
-                    logger.error(
-                        "Failed to establish CANFD connection (attempt %s/%s)",
-                        attempt,
-                        self._CONNECT_RETRIES,
-                    )
-                    self._cleanup_failed_connect()
-            except Exception as exc:
-                logger.error(
-                    "CANFD connect failed (attempt %s/%s): %s",
-                    attempt,
-                    self._CONNECT_RETRIES,
-                    exc,
-                )
+            if not self._transport.open():
+                logger.error("Failed to open CANFD transport")
                 self._cleanup_failed_connect()
+                return False
 
-            if attempt < self._CONNECT_RETRIES:
-                time.sleep(self._CONNECT_RETRY_DELAY_SEC)
+            # Establish connection: function code 0x02, write connection timer=0.
+            if not self._establish_connection():
+                logger.error("Failed to establish CANFD connection")
+                self._cleanup_failed_connect()
+                return False
 
-        return False
+            self._connected = True
+            logger.info("CANFD device connected (%s)", device_name)
+            return True
+        except Exception as exc:
+            logger.error("CANFD connect failed: %s", exc)
+            self._cleanup_failed_connect()
+            return False
 
     def disconnect(self) -> bool:
         """Disconnect from the CANFD device."""
