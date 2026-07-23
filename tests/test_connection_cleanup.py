@@ -65,20 +65,17 @@ def test_canfd_connect_closes_transport_when_handshake_fails(monkeypatch):
     assert comm._transport._chn_handle == 0
 
 
-def test_canfd_connect_retries_after_handshake_failure(monkeypatch):
+def test_canfd_connect_does_not_retry_after_handshake_failure(monkeypatch):
     monkeypatch.setattr(canfd_comm, "CanfdTransport", FakeTransport)
     comm = CanfdComm(config=object())
-    comm._CONNECT_RETRIES = 2
-    comm._CONNECT_RETRY_DELAY_SEC = 0
     comm._MIN_REOPEN_INTERVAL_SEC = 0
 
-    handshake_results = iter([False, True])
-    monkeypatch.setattr(comm, "_establish_connection", lambda: next(handshake_results))
+    monkeypatch.setattr(comm, "_establish_connection", lambda: False)
 
-    assert comm.connect("fake-adapter") is True
+    assert comm.connect("fake-adapter") is False
 
-    assert comm._connected is True
-    assert comm._transport.open_calls == 2
+    assert comm._connected is False
+    assert comm._transport.open_calls == 1
 
 
 def test_canfd_disconnect_waits_after_delete_before_close(monkeypatch):
@@ -256,20 +253,18 @@ def make_g5_like_config() -> ProductConfig:
     )
 
 
-def test_ethercat_comm_retries_full_connect_when_run_fails(monkeypatch):
+def test_ethercat_comm_does_not_retry_when_run_fails(monkeypatch):
     comm = EthercatComm.__new__(EthercatComm)
     comm._client = FakeEthercatClientForComm()
     comm._expected_tpdo_size = 10
     comm._expected_tpdo_sizes = (10,)
     comm._expected_rpdo_size = 8
     comm._tpdo_layouts = {10: make_g5_like_config()}
-    comm._CONNECT_RETRIES = 2
-    comm._CONNECT_RETRY_DELAY_SEC = 0
 
-    assert comm.connect("fake-adapter") is True
+    assert comm.connect("fake-adapter") is False
 
-    assert comm._client.connect_calls == 2
-    assert comm._client.run_calls == 2
+    assert comm._client.connect_calls == 1
+    assert comm._client.run_calls == 1
     assert comm._client.disconnect_calls == 1
 
 

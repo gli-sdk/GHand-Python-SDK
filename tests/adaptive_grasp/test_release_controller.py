@@ -59,7 +59,7 @@ def _controller(move_result=True, config=None):
     hand = _HandStub(move_result=move_result)
     sensor = _SensorStub()
     sleep = _SleepRecorder()
-    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_PIP, JointId.FF_PIP))
+    joint_builder = JointCommandBuilder(cfg, (JointId.THUMB_MCP, JointId.FF_PIP))
     controller = ReleaseController(
         hand=hand,
         sensor=sensor,

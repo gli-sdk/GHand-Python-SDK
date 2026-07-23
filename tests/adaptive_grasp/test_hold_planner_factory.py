@@ -24,7 +24,7 @@ def _profile() -> ObjectProfile:
 
 def _snapshot() -> ContactSnapshot:
     return ContactSnapshot(
-        joint_angles={JointId.THUMB_PIP: 0.12},
+        joint_angles={JointId.THUMB_MCP: 0.12},
         finger_fz={TactileSensorId.THUMB: 0.5},
         total_fz=0.5,
         torque=5,

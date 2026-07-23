@@ -24,7 +24,7 @@ if sys.version_info < (3, 10):
     sys.exit("GHand SDK requires Python 3.10 or higher")
 
 from . import logging_config  # auto-initialize logging handlers
-from ._converter import joints_to_nparray, nparray_to_joints
+from ._converter import JointConverter, joints_to_nparray, nparray_to_joints
 from .gestures import execute_gesture, get_all_gestures
 from .ghand import GHand
 from .types import (
@@ -69,6 +69,7 @@ __all__ = [
     "execute_gesture",
     "get_all_gestures",
     # Utilities
+    "JointConverter",
     "joints_to_nparray",
     "nparray_to_joints",
     # Logging helpers

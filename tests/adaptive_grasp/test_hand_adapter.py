@@ -84,14 +84,14 @@ def test_ghand_command_port_converts_radian_joint_commands_to_degrees():
     hand = _FakeGHand()
     port = GHandCommandPort(hand)
     joints = [
-        JointCommand(id=JointId.THUMB_PIP, angle=1.5707963267948966, speed=20, torque=30)
+        JointCommand(id=JointId.THUMB_MCP, angle=1.5707963267948966, speed=20, torque=30)
     ]
 
     assert port.move_joints(joints, CtrlMode.POSITION) is True
 
     sent_joints, sent_mode = hand.move_calls[0]
     assert sent_mode.value == CtrlMode.POSITION.value
-    assert sent_joints[0].id == JointId.THUMB_PIP
+    assert sent_joints[0].id == JointId.THUMB_MCP
     assert sent_joints[0].angle == pytest.approx(90.0)
     assert sent_joints[0].speed == 20
     assert sent_joints[0].torque == 30

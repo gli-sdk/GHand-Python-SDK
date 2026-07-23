@@ -84,8 +84,8 @@ def test_build_components_filters_torque_joints_to_active_fingers():
     )
 
     assert components.joint_builder.torque_joints == (
-        JointId.THUMB_PIP,
         JointId.THUMB_MCP,
+        JointId.THUMB_TMC_FE,
     )
     assert JointId.FF_PIP not in components.joint_builder.torque_joints
     assert JointId.MF_PIP not in components.joint_builder.torque_joints

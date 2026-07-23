@@ -84,7 +84,7 @@ def test_l1_profile_loads_protocol_register_map():
     config = load_product_config(ProductType.L1)
     profile = get_modbus_profile(config)
 
-    assert config.name == "L1-Hand-V1"
+    assert config.name == "GHand Lite 1"
     assert config.modbus_profile == "l1"
     assert profile.name == "l1"
     assert profile.joint_input_addresses[JointId.THUMB_TMC_FE] == 0x1023
@@ -146,15 +146,15 @@ def test_canfd_l1_connection_accepts_existing_usable_connection():
 
 
 def test_l1_config_can_be_found_by_device_name():
-    config = find_config_by_name("L1-Hand-V1")
+    config = find_config_by_name("GHand Lite 1")
 
     assert config is not None
-    assert config.name == "L1-Hand-V1"
+    assert config.name == "GHand Lite 1"
     assert config.modbus_profile == "l1"
 
-    alias_config = find_config_by_name("XiaoShun-Hand")
+    alias_config = find_config_by_name("GHand Lite 1")
     assert alias_config is not None
-    assert alias_config.name == "L1-Hand-V1"
+    assert alias_config.name == "GHand Lite 1"
 
 
 def test_l1_hand_type_uses_low_byte():

@@ -5,7 +5,7 @@ from ghand import JointId, TactileSensorId
 
 
 PASSIVE_DIP_JOINTS = {
-    JointId.THUMB_DIP,
+    JointId.THUMB_IP,
     JointId.FF_DIP,
     JointId.MF_DIP,
     JointId.RF_DIP,
@@ -19,13 +19,13 @@ ACTIVE_PRE_GRASP_JOINTS = (
     JointId.RF_PIP,
     JointId.MF_MCP,
     JointId.MF_PIP,
-    JointId.FF_SWING,
+    JointId.FF_MCP_AA,
     JointId.FF_MCP,
     JointId.FF_PIP,
-    JointId.THUMB_ROTATION,
-    JointId.THUMB_SWING,
+    JointId.THUMB_TMC_PS,
+    JointId.THUMB_TMC_AA,
+    JointId.THUMB_TMC_FE,
     JointId.THUMB_MCP,
-    JointId.THUMB_PIP,
 )
 
 PRESET_ACTIVE_FINGERS: dict[str, set[TactileSensorId]] = {
@@ -111,13 +111,13 @@ def pose_degrees(
         JointId.RF_PIP: rf_pip,
         JointId.MF_MCP: mf_mcp,
         JointId.MF_PIP: mf_pip,
-        JointId.FF_SWING: ff_swing,
+        JointId.FF_MCP_AA: ff_swing,
         JointId.FF_MCP: ff_mcp,
         JointId.FF_PIP: ff_pip,
-        JointId.THUMB_ROTATION: thumb_rotation,
-        JointId.THUMB_SWING: thumb_swing,
-        JointId.THUMB_MCP: thumb_mcp,
-        JointId.THUMB_PIP: thumb_pip,
+        JointId.THUMB_TMC_PS: thumb_rotation,
+        JointId.THUMB_TMC_AA: thumb_swing,
+        JointId.THUMB_TMC_FE: thumb_mcp,
+        JointId.THUMB_MCP: thumb_pip,
     }
 
 

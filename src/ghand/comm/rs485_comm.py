@@ -448,6 +448,9 @@ class Rs485Comm(IComm):
         Returns:
             Subscription ID.
         """
+        if not self.is_connected():
+            raise RuntimeError("Device is not connected")
+
         with self._lock:
             if interval_ms is not None:
                 self._poll_interval_sec = interval_ms / 1000.0
@@ -467,12 +470,13 @@ class Rs485Comm(IComm):
             True if the subscription was removed successfully.
         """
         with self._lock:
-            if sub_id in self._callbacks:
-                del self._callbacks[sub_id]
-                if not self._callbacks:
-                    self._stop_poll()
-                return True
-            return False
+            if sub_id not in self._callbacks:
+                return False
+            del self._callbacks[sub_id]
+            should_stop = not self._callbacks
+        if should_stop:
+            self._stop_poll()
+        return True
 
     def _ensure_poll_started(self) -> None:
         """Start the polling thread if not already running."""
@@ -486,7 +490,11 @@ class Rs485Comm(IComm):
     def _stop_poll(self) -> None:
         """Signal the polling thread to stop."""
         self._poll_stop.set()
-        if self._poll_thread and self._poll_thread.is_alive():
+        if (
+            self._poll_thread
+            and self._poll_thread.is_alive()
+            and self._poll_thread is not threading.current_thread()
+        ):
             self._poll_thread.join(timeout=0.5)
         self._poll_thread = None
 
@@ -495,8 +503,7 @@ class Rs485Comm(IComm):
         while not self._poll_stop.is_set():
             try:
                 if not self._connected or self._client is None:
-                    time.sleep(self._poll_interval_sec)
-                    continue
+                    break
 
                 # Read hand info + joints in one batch
                 if not self._config.valid_joints:
@@ -517,8 +524,7 @@ class Rs485Comm(IComm):
                 count = end - start + 1
                 result = self._read_input_registers(start, count=count)
                 if result is None or result.isError():
-                    time.sleep(self._poll_interval_sec)
-                    continue
+                    raise ConnectionError("RS485 device did not respond")
 
                 raw = list(result.registers)
                 hand_offset = self._profile.hand_info_address - start
@@ -539,7 +545,9 @@ class Rs485Comm(IComm):
                     except Exception:
                         logger.exception("Subscription callback error")
 
-            except Exception:
-                logger.exception("Poll loop error")
+            except Exception as e:
+                logger.error("Subscription stopped: %s", e)
+                self.disconnect()
+                break
 
             time.sleep(self._poll_interval_sec)
