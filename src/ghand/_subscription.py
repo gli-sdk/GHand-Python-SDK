@@ -23,6 +23,8 @@ logger = logging.getLogger("ghand")
 class SubscriptionManager:
     """Manages background threads for receiving and dispatching device data."""
 
+    _DEFAULT_INTERVAL_SEC = 0.01
+
     def __init__(self, client):
         self._lock = threading.Lock()
         self._running = False
@@ -32,6 +34,7 @@ class SubscriptionManager:
         self._data = None
         self._sub_id_counter = 0
         self._subscribers = {}
+        self._interval_sec = self._DEFAULT_INTERVAL_SEC
 
     def start(self):
         """Start the background producer and dispatcher threads."""
@@ -61,7 +64,7 @@ class SubscriptionManager:
                 self._data = data
             except Exception as e:
                 logger.error("Error receiving data: %s", e)
-            time.sleep(0.1)
+            time.sleep(self._interval_sec)
 
     def _data_dispatcher(self):
         """Background thread that dispatches received data to all subscribers."""
@@ -75,18 +78,27 @@ class SubscriptionManager:
                             callback(self._data, *args, **kwargs)
                         except Exception as e:
                             logger.error("Error in callback %s: %s", sub_id, e)
-            time.sleep(0.1)
+            time.sleep(self._interval_sec)
 
-    def subscribe(self, callback: Optional[Callable] = None, *args, **kwargs):
+    def subscribe(
+        self,
+        callback: Optional[Callable] = None,
+        *args,
+        interval_ms: int | None = None,
+        **kwargs,
+    ):
         """Register a callback to receive device data updates.
 
         Args:
             callback: Callable invoked with received data.
+            interval_ms: Optional polling interval in milliseconds.
 
         Returns:
             Subscription ID.
         """
         with self._lock:
+            if interval_ms is not None:
+                self._interval_sec = interval_ms / 1000.0
             self._sub_id_counter += 1
             sub_id = self._sub_id_counter
             self._subscribers[sub_id] = (callback, args, kwargs)

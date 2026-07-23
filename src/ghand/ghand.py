@@ -72,6 +72,7 @@ class GHand:
         self._hand_type = HandType.UNKNOWN
         self._firmware_version = ""
         self._opened = False
+        self._tactile_opened = False
         self._safety_margin = 0.0
         self._collision_checker = None
 
@@ -109,6 +110,7 @@ class GHand:
         self._joint_limits = config.joint_limits.copy()
         self._passive_joints = set(config.valid_joints) - set(self._joint_limits.keys())
         self._has_tactile = config.has_tactile
+        self._tactile_opened = False
         self._comm.update_config(config)
 
     def _sync_product_config_from_comm(self) -> None:
@@ -120,8 +122,10 @@ class GHand:
         self._joint_limits = config.joint_limits.copy()
         self._passive_joints = set(config.valid_joints) - set(self._joint_limits.keys())
         self._has_tactile = config.has_tactile
+        self._tactile_opened = False
 
-    def _check_joint_limit(self, joint: JointCommand, limit):
+    @staticmethod
+    def _check_joint_limit(joint: JointCommand, limit):
         """Clamp the joint angle to its configured limits.
 
         Args:
@@ -141,7 +145,8 @@ class GHand:
                 JointId(joint.id).name, limit[1]
             )
 
-    def _check_speed_limit(self, joint: JointCommand, mode: CtrlMode):
+    @staticmethod
+    def _check_speed_limit(joint: JointCommand, mode: CtrlMode):
         """Validate and clamp joint speed based on the control mode.
 
         Args:
@@ -180,7 +185,8 @@ class GHand:
                     JointId(joint.id).name, original_speed
                 )
 
-    def _check_torque_limit(self, joint: JointCommand, mode: CtrlMode):
+    @staticmethod
+    def _check_torque_limit(joint: JointCommand, mode: CtrlMode):
         """Validate and clamp joint torque based on the control mode.
 
         Args:
@@ -324,6 +330,7 @@ class GHand:
             self._comm.disconnect()
             logger.info("Disconnected from device")
         self._opened = False
+        self._tactile_opened = False
         return True
 
     def is_connected(self) -> bool:
@@ -338,7 +345,7 @@ class GHand:
         self._opened = False
         return False
 
-    def subscribe(self, callback):
+    def subscribe(self, callback, interval_ms: int | None = None):
         """Subscribe to device data updates.
 
         The callback receives a unified `DeviceData` object regardless of the
@@ -346,6 +353,7 @@ class GHand:
 
         Args:
             callback: Callable invoked with a `DeviceData` instance.
+            interval_ms: Optional protocol-specific polling interval in milliseconds.
 
         Returns:
             Subscription ID.
@@ -357,16 +365,18 @@ class GHand:
                 callback(device_data, *args, **kwargs)
         elif isinstance(self._comm, (CanfdComm, Rs485Comm)):
             def adapter(hand_state, joints, *args, **kwargs):
-                tactile = self._comm.get_tactile_data()
-                if not tactile:
-                    tactile = None
+                tactile = None
+                if self._tactile_opened:
+                    tactile = self._comm.get_tactile_data()
+                    if not tactile:
+                        tactile = None
                 device_data = DeviceData(
                     hand=hand_state, joints=joints, tactile=tactile
                 )
                 callback(device_data, *args, **kwargs)
         else:
             raise TypeError(f"Unsupported comm type: {type(self._comm)}")
-        return self._comm.subscribe(adapter)
+        return self._comm.subscribe(adapter, interval_ms=interval_ms)
 
     def _tpdo_to_device_data(self, tpdo) -> DeviceData:
         """Convert an EtherCAT Tpdo to a protocol-agnostic DeviceData."""
@@ -500,7 +510,10 @@ class GHand:
         if not self._has_tactile:
             logger.warning("This product does not support tactile sensors")
             return False
-        return self._comm.open_tactile()
+        result = self._comm.open_tactile()
+        if result:
+            self._tactile_opened = True
+        return result
 
     def tactile_close(self) -> bool:
         """Disable the tactile sensors.
@@ -511,7 +524,10 @@ class GHand:
         if not self._has_tactile:
             logger.warning("This product does not support tactile sensors")
             return False
-        return self._comm.close_tactile()
+        result = self._comm.close_tactile()
+        if result:
+            self._tactile_opened = False
+        return result
 
     def tactile_zero(self) -> bool:
         """Zero-calibrate the tactile sensors.
@@ -563,7 +579,7 @@ class GHand:
                 continue
             # Create a copy so the caller's original object is not mutated.
             joint_cmd = JointCommand(
-                id=joint.id,
+                id=int(joint.id),
                 angle=joint.angle,
                 speed=joint.speed,
                 torque=joint.torque,
@@ -707,8 +723,9 @@ class GHand:
             )
         return result
 
+    @staticmethod
     def _joints_to_angles(
-        self, joints: list[JointCommand], current_joints: list[JointData] | None = None
+        joints: list[JointCommand], current_joints: list[JointData] | None = None
     ) -> np.ndarray:
         """Convert a list of Joints to a numpy array.
 
@@ -722,8 +739,9 @@ class GHand:
 
         return joints_to_nparray(joints, current_joints)
 
+    @staticmethod
     def _angles_to_joints(
-        self, angles: np.ndarray, speed: int = 100, torque: int = 100
+        angles: np.ndarray, speed: int = 100, torque: int = 100
     ) -> list[JointCommand]:
         """Convert a numpy array to a list of JointCommand objects.
 

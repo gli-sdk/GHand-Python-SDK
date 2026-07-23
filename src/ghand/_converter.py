@@ -66,6 +66,11 @@ def nparray_to_joints(
     import numpy as np
 
     return [
-        JointCommand(id=JointId(i), angle=float(angles[i]), speed=speed, torque=torque)
+        JointCommand(
+            id=int(JointId(i)),
+            angle=float(angles[i]),
+            speed=speed,
+            torque=torque,
+        )
         for i in range(18)
     ]

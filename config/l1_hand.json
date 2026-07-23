@@ -1,7 +1,7 @@
 {
   "model": "L1-Hand-V1",
-  "name": "L1-Hand-V1",
-  "aliases": ["XiaoShun-Hand"],
+  "name": "GHand Lite 1",
+  "aliases": ["GHand Lite 1"],
   "slave_id": 49,
   "modbus_profile": "l1",
   "ethercat_input_sizes": [1302],

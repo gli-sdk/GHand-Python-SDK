@@ -68,6 +68,7 @@ class CanfdComm(IComm):
     _CONNECT_RETRY_DELAY_SEC = 0.1
     _DELETE_CONNECTION_SETTLE_SEC = 0.1
     _MIN_REOPEN_INTERVAL_SEC = 0.5
+    _DEFAULT_POLL_INTERVAL_SEC = 0.03
 
     def __init__(self, config: ProductConfig):
         self._config = config
@@ -82,6 +83,7 @@ class CanfdComm(IComm):
         self._next_sub_id = 1
         self._lock = threading.Lock()
         self._last_disconnect_at = 0.0
+        self._poll_interval_sec = self._DEFAULT_POLL_INTERVAL_SEC
 
     def update_config(self, config: ProductConfig) -> None:
         """Update the cached product configuration."""
@@ -125,7 +127,7 @@ class CanfdComm(IComm):
         """
         adapters: list[str] = []
         try:
-            dll_path = CanfdTransport._resolve_dll_path("./drivers/zlgcan/zlgcan.dll")
+            dll_path = CanfdTransport._resolve_dll_path(None)
             if Path(dll_path).exists():
                 adapters.append("zlg-USBCANFD-100U-0")
             else:
@@ -523,18 +525,21 @@ class CanfdComm(IComm):
     # Subscription (polling-based)
     # ------------------------------------------------------------------
 
-    def subscribe(self, callback, *args, **kwargs) -> int:
+    def subscribe(self, callback, *args, interval_ms: int | None = None, **kwargs) -> int:
         """Subscribe to device data updates.
 
         The callback receives ``(hand_state, joints, *args, **kwargs)``.
 
         Args:
             callback: Callable invoked with ``(hand_state, joints)``.
+            interval_ms: Optional polling interval in milliseconds.
 
         Returns:
             Subscription ID.
         """
         with self._lock:
+            if interval_ms is not None:
+                self._poll_interval_sec = interval_ms / 1000.0
             sub_id = self._next_sub_id
             self._next_sub_id += 1
             self._callbacks[sub_id] = (callback, args, kwargs)
@@ -568,18 +573,18 @@ class CanfdComm(IComm):
         while not self._poll_stop.is_set():
             try:
                 if not self._connected:
-                    time.sleep(0.01)
+                    time.sleep(self._poll_interval_sec)
                     continue
 
                 if not self._config.valid_joints:
-                    time.sleep(0.01)
+                    time.sleep(self._poll_interval_sec)
                     continue
 
                 joint_start, joint_count = get_joint_input_span(
                     self._config.valid_joints, self._profile
                 )
                 if joint_count == 0:
-                    time.sleep(0.01)
+                    time.sleep(self._poll_interval_sec)
                     continue
                 start = min(self._profile.hand_info_address, joint_start)
                 end = max(
@@ -611,4 +616,4 @@ class CanfdComm(IComm):
             except Exception:
                 logger.exception("Poll loop error")
 
-            time.sleep(0.01)
+            time.sleep(self._poll_interval_sec)

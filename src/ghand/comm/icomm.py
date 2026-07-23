@@ -217,11 +217,12 @@ class IComm(ABC):
     # ===== Subscription =====
 
     @abstractmethod
-    def subscribe(self, callback, *args, **kwargs) -> int:
+    def subscribe(self, callback, *args, interval_ms: int | None = None, **kwargs) -> int:
         """Subscribe to device data updates.
 
         Args:
             callback: Callable invoked when new data arrives.
+            interval_ms: Optional polling interval in milliseconds.
 
         Returns:
             Subscription ID that can be used to unsubscribe.
