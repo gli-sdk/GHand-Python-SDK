@@ -54,8 +54,7 @@ For detailed technical specifications and API references, visit the [Python SDK 
 | Platform | Requirement |
 |----------|-------------|
 | Python   | 3.10 ~ 3.13 |
-| Linux    | Ubuntu 20.04/22.04 LTS (x86_64 / aarch64), glibc >= 2.31 |
-| macOS    | 10.15+ |
+| Linux    | Ubuntu 22.04/24.04 LTS (x86_64), glibc >= 2.35 |
 | Windows  | 10 / 11 |
 
 ## Installation

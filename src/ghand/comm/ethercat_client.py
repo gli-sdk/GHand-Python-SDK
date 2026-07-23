@@ -110,7 +110,8 @@ class EthercatClient:
     def __del__(self):
         """Destructor — ensures the adapter lock is released."""
         try:
-            self._cleanup_connection(switch_to_init=False)
+            if self._connected or self._slave is not None or self._lock_file is not None:
+                self._cleanup_connection(switch_to_init=False)
         except Exception:
             pass  # ignore errors during destruction
 
