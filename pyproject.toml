@@ -3,8 +3,8 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ghand"
-version = "2.0.1"
+name = "ghand_python_sdk"
+version = "2.0.2"
 description = "GHand Python SDK"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -32,6 +32,7 @@ dev = [
 
 [project.urls]
 Homepage = "https://github.com/gli-sdk/GHand-Python-SDK"
+Gitee = "https://gitee.com/glitech/GHand-Python-SDK"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -16,6 +16,6 @@
 
 SDK_VERSION_MAJOR = 2
 SDK_VERSION_MINOR = 0
-SDK_VERSION_REVISION = 1
+SDK_VERSION_REVISION = 2
 
-__version__ = "2.0.1"
+__version__ = "2.0.2"

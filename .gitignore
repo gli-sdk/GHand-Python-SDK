@@ -17,7 +17,7 @@ package.sh
 package.bat
 .gitignore
 CLAUDE.md
-.github
+.github/
 .pre-commit-config.yaml
 .style.yapfrc
 # ZLG CANFD driver binaries (not redistributable)
@@ -25,7 +25,5 @@ drivers/zlgcan/*.dll
 drivers/zlgcan/kerneldlls/
 licenses_guide.md
 .agents/skills/
-
 .codex/
 tests/
-

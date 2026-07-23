@@ -1,6 +1,6 @@
 # GHand Python SDK
 
-[![Version](https://img.shields.io/badge/version-v2.0.0-blue.svg)](src/ghand/version.py)
+[![Version](https://img.shields.io/badge/version-v2.0.2-blue.svg)](src/ghand/version.py)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 
@@ -66,10 +66,31 @@ For detailed technical specifications and API references, visit the [Python SDK 
 - **Windows**: [Npcap](https://npcap.com/) (required for EtherCAT)
 - **Linux**: `build-essential` and `python3-dev` (for compiling native extensions)
 
+### Install a Specific Version
+
+Install version `v2.0.2` directly from either repository:
+
+```bash
+pip install "ghand_python_sdk @ git+https://github.com/gli-sdk/GHand-Python-SDK.git@v2.0.2"
+```
+
+```bash
+pip install "ghand_python_sdk @ git+https://gitee.com/glitech/GHand-Python-SDK.git@v2.0.2"
+```
+
 ### Install from Source
 
 ```bash
-git clone https://github.com/gli-sdk/GHand-Python-SDK
+git clone -b v2.0.2 https://github.com/gli-sdk/GHand-Python-SDK.git
+cd GHand-Python-SDK
+pip install -r requirements.txt
+pip install -e .
+```
+
+Gitee mirror:
+
+```bash
+git clone -b v2.0.2 https://gitee.com/glitech/GHand-Python-SDK.git
 cd GHand-Python-SDK
 pip install -r requirements.txt
 pip install -e .
@@ -137,7 +158,7 @@ GHand-Python-SDK/
 
 ## Open Source & Ecosystem Resources
 
-- **GLI Open Source Hub**: [GLI GitHub Organization](https://github.com/gli-sdk)
+- **GLI Open Source Hub**: [GitHub](https://github.com/gli-sdk) / [Gitee](https://gitee.com/glitech)
 - **Official Documentation**: [GHand Dexterous Hand Docs](https://fcnzogxju7xr.feishu.cn/docx/AhZ6ds2iCoguaAxIzBxciYHinNo)
 - **C++ SDK**: [GHand SDK C++](https://github.com/gli-sdk/GHand-Cpp-SDK)
 

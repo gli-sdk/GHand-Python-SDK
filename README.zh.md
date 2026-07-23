@@ -1,7 +1,7 @@
 # GHand Python SDK
 
-[![Version](https://img.shields.io/badge/version-v1.1.2-blue.svg)](src/ghand/version.py)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-v2.0.2-blue.svg)](src/ghand/version.py)
+[![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 
 [English](README.md)
@@ -51,12 +51,12 @@ GHand 灵巧手官方 Python SDK，为机器人操作研究与开发提供精确
 
 ## 系统要求
 
-| 平台   | 要求                                          |
-|--------|-----------------------------------------------|
-| Python | 3.10 ~ 3.13                                   |
-| Linux  | Ubuntu 20.04/22.04 LTS (x86_64 / aarch64), glibc >= 2.31 |
-| macOS  | 10.15+                                        |
-| Windows| 10 / 11                                       |
+| 平台 | 要求 |
+|---|---|
+| Python | 3.10 ~ 3.13 |
+| Linux | Ubuntu 20.04/22.04 LTS (x86_64 / aarch64), glibc >= 2.31 |
+| macOS | 10.15+ |
+| Windows | 10 / 11 |
 
 ## 安装
 
@@ -66,16 +66,40 @@ GHand 灵巧手官方 Python SDK，为机器人操作研究与开发提供精确
 - **Windows**：[Npcap](https://npcap.com/)（使用 EtherCAT 时需要）
 - **Linux**：`build-essential` 和 `python3-dev`（用于编译原生扩展）
 
-### 从源码安装（推荐用于开发）
+### 安装指定版本
+
+可以从 GitHub 或 Gitee 直接安装 `v2.0.2`：
 
 ```bash
-git clone https://github.com/gli-sdk/GHand-Python-SDK
+pip install "ghand_python_sdk @ git+https://github.com/gli-sdk/GHand-Python-SDK.git@v2.0.2"
+```
+
+```bash
+pip install "ghand_python_sdk @ git+https://gitee.com/glitech/GHand-Python-SDK.git@v2.0.2"
+```
+
+### 从源码安装（推荐用于开发）
+
+GitHub：
+
+```bash
+git clone -b v2.0.2 https://github.com/gli-sdk/GHand-Python-SDK.git
+cd GHand-Python-SDK
+pip install -r requirements.txt
+pip install -e .
+```
+
+Gitee：
+
+```bash
+git clone -b v2.0.2 https://gitee.com/glitech/GHand-Python-SDK.git
 cd GHand-Python-SDK
 pip install -r requirements.txt
 pip install -e .
 ```
 
 > **Linux 说明：** EtherCAT 需要原始套接字权限。如果遇到权限错误，请为 Python 解释器授予该能力：
+>
 > ```bash
 > sudo setcap cap_net_raw+ep $(which python3)
 > ```
@@ -104,7 +128,7 @@ hand.close()
 
 ## 项目结构
 
-```
+```text
 GHand-Python-SDK/
 ├── src/ghand/              # 核心 SDK 源码
 │   ├── ghand.py            # GHand 主类与公共 API
@@ -127,19 +151,19 @@ GHand-Python-SDK/
 │   ├── demo/               # 动作演示脚本
 │   └── extension/          # 高级功能示例
 ├── docs/                   # Sphinx 文档源码
-├── tests/                  # 单元测试（待补充）
 ├── requirements.txt        # 运行时依赖
 ├── pyproject.toml          # 构建配置
 ├── setup.py                # 包安装配置
-├── LICENSE                 # MIT 许可证
+├── LICENSE                 # Apache License 2.0
 ├── README.md               # 英文说明
+├── README.zh.md            # 中文说明
 ├── CONTRIBUTING.md         # 贡献指南
 └── CHANGELOG.md            # 版本历史
 ```
 
 ## 开源与生态资源
 
-- **GLI 开源中心**：[GLI GitHub 组织](https://github.com/gli-sdk)
+- **GLI 开源中心**：[GitHub](https://github.com/gli-sdk) / [Gitee](https://gitee.com/glitech)
 - **官方文档**：[GHand 灵巧手文档](https://fcnzogxju7xr.feishu.cn/docx/AhZ6ds2iCoguaAxIzBxciYHinNo)
 - **C++ SDK**：[GHand SDK C++](https://github.com/gli-sdk/GHand-Cpp-SDK)
 
