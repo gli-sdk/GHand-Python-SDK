@@ -23,9 +23,8 @@ from .comm.canfd_comm import CanfdComm
 from .comm.ethercat_comm import EthercatComm
 from .comm.ethercat_protocol import Tpdo
 from .comm.rs485_comm import Rs485Comm
-from collision_sdk import CollisionSDK
+from collision_sdk import CollisionCheckResult, CollisionClient
 import numpy as np
-from collision_sdk import CollisionCheckResult
 from ._converter import joints_to_nparray
 from ._converter import nparray_to_joints
 from .types import (
@@ -663,11 +662,11 @@ class GHand:
         self._safety_margin = margin
         logger.info("Collision safety margin set to %s (%.1f mm)", margin, margin * 2)
 
-    def _ensure_collision_checker(self) -> CollisionSDK:
+    def _ensure_collision_checker(self) -> CollisionClient:
         """Lazy initialization of the collision checker."""
 
         if self._collision_checker is None:
-            self._collision_checker = CollisionSDK()
+            self._collision_checker = CollisionClient()
         return self._collision_checker
 
     def check_collision(self, joints: list[JointCommand]) -> CollisionCheckResult:
