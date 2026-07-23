@@ -24,3 +24,8 @@ CLAUDE.md
 drivers/zlgcan/*.dll
 drivers/zlgcan/kerneldlls/
 licenses_guide.md
+.agents/skills/
+
+.codex/
+tests/
+
