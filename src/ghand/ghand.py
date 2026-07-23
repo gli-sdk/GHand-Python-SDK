@@ -174,9 +174,9 @@ class GHand:
             mode: Current control mode.
         """
         original_speed = joint.speed
-        if mode in (CtrlMode.POSITION, CtrlMode.SPEED):
+        if mode == CtrlMode.SPEED:
             joint.speed = max(-100, min(100, joint.speed))
-        elif mode == CtrlMode.TORQUE:
+        else:
             joint.speed = min(100, abs(joint.speed))
 
         if joint.speed != original_speed:
@@ -197,10 +197,10 @@ class GHand:
             mode: Current control mode.
         """
         original_torque = joint.torque
-        if mode in (CtrlMode.POSITION, CtrlMode.TORQUE):
+        if mode ==CtrlMode.TORQUE:
             joint.torque = max(-100, min(100, joint.torque))
-        elif mode == CtrlMode.SPEED and abs(joint.torque) > 100:
-            joint.torque = 100
+        else:
+            joint.torque = min(100, abs(joint.torque))
 
         if joint.torque != original_torque:
             logger.warning(
