@@ -101,7 +101,7 @@ pip install -e .
 > **Linux 说明：** EtherCAT 需要原始套接字权限。如果遇到权限错误，请为 Python 解释器授予该能力：
 >
 > ```bash
-> sudo setcap cap_net_raw+ep $(which python3)
+> sudo setcap 'cap_net_raw,cap_net_admin=eip' $(which python3)
 > ```
 
 ## 快速开始

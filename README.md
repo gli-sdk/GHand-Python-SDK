@@ -98,7 +98,7 @@ pip install -e .
 
 > **Linux Note:** EtherCAT needs raw socket access. If you see permission errors, grant the capability to your Python interpreter:
 > ```bash
-> sudo setcap cap_net_raw+ep $(which python3)
+> sudo setcap 'cap_net_raw,cap_net_admin=eip' $(which python3)
 > ```
 
 ## Quick Start
