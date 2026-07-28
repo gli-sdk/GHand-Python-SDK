@@ -95,10 +95,72 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-> **Linux Note:** EtherCAT needs raw socket access. If you see permission errors, grant the capability to your Python interpreter:
-> ```bash
-> sudo setcap 'cap_net_raw,cap_net_admin=eip' $(which python3)
-> ```
+### Linux EtherCAT Notes
+
+EtherCAT needs raw socket access. If you see permission errors, grant the capability to your Python interpreter:
+
+```bash
+sudo setcap 'cap_net_raw,cap_net_admin=eip' $(which python3)
+```
+
+### Linux RS485 Serial Ports
+
+When using a USB-RS485 adapter on Linux, the SDK auto-discovery prefers `/dev/serial/by-id/*`, `/dev/ttyUSB*`, `/dev/ttyACM*`, and `/dev/ttyAMA*`. It does not auto-scan `/dev/ttyS*` because those are usually built-in motherboard serial ports. If you really use a built-in serial port, pass the device path explicitly to `open()`.
+
+Useful checks:
+
+```bash
+lsusb
+ls -l /dev/ttyUSB* /dev/ttyACM* /dev/serial/by-id/ 2>/dev/null
+python3 -m serial.tools.list_ports
+```
+
+CH340/CH341 USB-RS485 adapters usually appear as `1a86:7523 QinHeng Electronics CH340 serial converter`, and should create `/dev/ttyUSB0` or a `/dev/serial/by-id/...` alias. If `dmesg` shows `brltty` claiming the interface and disconnecting `ttyUSB0`, stop or remove `brltty`:
+
+```bash
+sudo systemctl stop brltty
+sudo systemctl disable brltty
+# If you do not use braille terminal devices:
+sudo apt remove brltty
+```
+
+If the serial device exists but cannot be opened, make sure your user belongs to the `dialout` group:
+
+```bash
+groups
+sudo usermod -aG dialout $USER
+```
+
+Log out and back in after changing groups. The default RS485 baud rate is `1000000`; override it with:
+
+```bash
+export GHAND_RS485_BAUDRATE=1000000
+```
+
+### CANFD Adapter Notes
+
+CANFD adapters may use different host-side driver models:
+
+- **SocketCAN adapters**: On Linux these appear as network interfaces such as `can0` or `can1`. Configure CAN FD bitrates before use:
+
+  ```bash
+  sudo ip link set can0 down
+  sudo ip link set can0 up type can bitrate 1000000 dbitrate 5000000 fd on
+  ip -details link show can0
+  ```
+
+- **ZQWL-CANFD CDC serial adapters**: These appear as `3562:0101 ZQWL-CANFD` on USB. On Linux they usually create `/dev/ttyACM0` or a `/dev/serial/by-id/...` alias; on Windows they usually appear as `COMx`. These adapters use the ZQWL serial protocol, so they do not require SocketCAN or an extra vendor DLL.
+
+Useful checks:
+
+```bash
+lsusb
+lsusb -t
+ls -l /dev/ttyACM* /dev/serial/by-id/ 2>/dev/null
+python3 -m serial.tools.list_ports
+```
+
+If `lsusb -t` shows `Driver=cdc_acm`, the adapter is in CDC serial mode and will not appear as `can0` in `ip link`. In CANFD mode, the SDK scans both SocketCAN interfaces and ZQWL CDC serial adapters.
 
 ## Quick Start
 

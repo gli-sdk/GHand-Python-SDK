@@ -97,11 +97,72 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-> **Linux 说明：** EtherCAT 需要原始套接字权限。如果遇到权限错误，请为 Python 解释器授予该能力：
->
-> ```bash
-> sudo setcap 'cap_net_raw,cap_net_admin=eip' $(which python3)
-> ```
+### Linux EtherCAT 说明
+
+EtherCAT 需要原始套接字权限。如果遇到权限错误，请为 Python 解释器授予该能力：
+
+```bash
+sudo setcap 'cap_net_raw,cap_net_admin=eip' $(which python3)
+```
+
+### Linux RS485 串口说明
+
+Linux 下使用 USB-RS485 转接器时，SDK 会优先自动扫描 `/dev/serial/by-id/*`、`/dev/ttyUSB*`、`/dev/ttyACM*` 和 `/dev/ttyAMA*`。不建议自动扫描 `/dev/ttyS*`，这些通常是主板内置串口；如确实使用板载串口，请在 `open()` 中显式传入对应设备名。
+
+常用检查命令：
+
+```bash
+lsusb
+ls -l /dev/ttyUSB* /dev/ttyACM* /dev/serial/by-id/ 2>/dev/null
+python3 -m serial.tools.list_ports
+```
+
+CH340/CH341 USB-RS485 转接器通常会显示为 `1a86:7523 QinHeng Electronics CH340 serial converter`，并映射为 `/dev/ttyUSB0` 或 `/dev/serial/by-id/...`。如果 `dmesg` 中出现 `brltty` 抢占设备并导致 `ttyUSB0` 断开，可停止或卸载 `brltty`：
+
+```bash
+sudo systemctl stop brltty
+sudo systemctl disable brltty
+# 如不使用盲文终端设备，也可卸载：
+sudo apt remove brltty
+```
+
+若串口存在但无法打开，请确认当前用户在 `dialout` 组中：
+
+```bash
+groups
+sudo usermod -aG dialout $USER
+```
+
+修改用户组后需要注销并重新登录。RS485 默认波特率为 `1000000`，如需覆盖可设置：
+
+```bash
+export GHAND_RS485_BAUDRATE=1000000
+```
+
+### CANFD 适配器说明
+
+CANFD 适配器在不同厂商设备上可能采用不同驱动方式：
+
+- **SocketCAN 设备**：Linux 下会注册为 `can0`、`can1` 等网络接口。使用前需要配置 CAN FD 位率：
+
+  ```bash
+  sudo ip link set can0 down
+  sudo ip link set can0 up type can bitrate 1000000 dbitrate 5000000 fd on
+  ip -details link show can0
+  ```
+
+- **ZQWL-CANFD CDC 串口设备**：USB 侧显示为 `3562:0101 ZQWL-CANFD`，Linux 下通常是 `/dev/ttyACM0` 或 `/dev/serial/by-id/...`，Windows 下通常是 `COMx`。这类设备按 ZQWL 二次开发串口协议通信，不需要 SocketCAN，也不需要额外 DLL。
+
+常用检查命令：
+
+```bash
+lsusb
+lsusb -t
+ls -l /dev/ttyACM* /dev/serial/by-id/ 2>/dev/null
+python3 -m serial.tools.list_ports
+```
+
+如果 `lsusb -t` 显示 `Driver=cdc_acm`，说明设备当前是 CDC 串口模式，不会出现在 `ip link` 的 `can0` 列表中。SDK 会在 CANFD 模式下扫描 SocketCAN 接口和 ZQWL CDC 串口设备。
 
 ## 快速开始
 

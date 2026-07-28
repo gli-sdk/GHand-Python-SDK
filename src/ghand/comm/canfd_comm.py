@@ -22,11 +22,17 @@ business APIs.
 from __future__ import annotations
 
 import logging
+import platform
 import struct
 import threading
 import time
 from pathlib import Path
 from typing import Any
+
+try:
+    from serial.tools import list_ports
+except ImportError:
+    list_ports = None  # type: ignore[assignment]
 
 from ..types import (
     CtrlMode,
@@ -118,11 +124,30 @@ class CanfdComm(IComm):
     # ------------------------------------------------------------------
 
     def search_adapters(self) -> list[str]:
-        """Search for available ZLG CANFD adapters.
+        """Search for available CANFD adapters.
 
         Returns:
-            List of adapter identifiers in the form "zlg-<dev_type>-<index>".
+            List of adapter identifiers. Linux returns SocketCAN interfaces
+            such as ``can0`` and ZQWL CDC serial adapters such as
+            ``/dev/ttyACM0``; Windows returns ZLG adapter identifiers.
         """
+        if platform.system() == "Linux":
+            adapters: list[str] = []
+            net_dir = Path("/sys/class/net")
+            if net_dir.exists():
+                adapters.extend(
+                    path.name
+                    for path in net_dir.iterdir()
+                    if path.name.startswith(("can", "vcan"))
+                )
+            if list_ports is not None:
+                for port in list_ports.comports():
+                    if port.vid == 0x3562 and port.pid in (0x0100, 0x0101, 0x0105):
+                        adapters.append(port.device)
+            adapters.extend(str(path) for path in Path("/dev/serial/by-id").glob("*ZQWL*"))
+            adapters.extend(str(path) for path in Path("/dev").glob("ttyACM*"))
+            return sorted(dict.fromkeys(adapters))
+
         adapters: list[str] = []
         try:
             dll_path = CanfdTransport._resolve_dll_path(None)
@@ -133,6 +158,12 @@ class CanfdComm(IComm):
         except Exception as e:
             logger.error("Failed to detect ZLG CANFD adapter: %s", e)
         return adapters
+
+    def _create_transport(self, device_name: str) -> CanfdTransport:
+        """Create the platform-specific CANFD transport for *device_name*."""
+        if platform.system() == "Linux":
+            return CanfdTransport(channel=device_name or "can0")
+        return CanfdTransport()
 
     def connect(self, device_name: str) -> bool:
         """Connect to the specified CANFD device.
@@ -152,7 +183,7 @@ class CanfdComm(IComm):
         try:
             self._wait_for_reopen_window()
             if self._transport is None:
-                self._transport = CanfdTransport()
+                self._transport = self._create_transport(device_name)
 
             if not self._transport.open():
                 logger.error("Failed to open CANFD transport")
