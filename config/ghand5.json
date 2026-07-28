@@ -1,6 +1,6 @@
 {
   "model": "G5-13A23D-S01",
-  "name": "XIAOYAO-Hand",
+  "name": "GHand 5",
   "slave_id": 49,
   "modbus_profile": "g5",
   "joints": [

@@ -31,8 +31,8 @@ logger = logging.getLogger("ghand.config")
 
 
 _PRODUCT_TYPE_TO_FILE = {
-    ProductType.G5: "xiaoyao_hand.json",
-    ProductType.L1: "l1_hand.json",
+    ProductType.G5: "ghand5.json",
+    ProductType.L1: "ghandlite1.json",
 }
 
 _JOINT_NAME_TO_ID = {
