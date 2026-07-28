@@ -15,22 +15,16 @@
 """CANFD transport layer wrapping CANFD devices.
 
 Handles arbitration-field packing, segmented transfer, and register-level
-read/write over CANFD frames. On Windows the ZLG ``zlgcan.dll`` is loaded via
-``ctypes``; on Linux SocketCAN is used directly.
+read/write over CANFD frames. ZQWL CDC adapters use a serial backend.
 """
 
 from __future__ import annotations
 
-import ctypes
 import logging
 import os
-import platform
-import socket
 import struct
 import threading
 import time
-from pathlib import Path
-from typing import Callable, Literal
 
 try:
     import serial
@@ -38,14 +32,6 @@ except ImportError:
     serial = None  # type: ignore[assignment]
 
 logger = logging.getLogger("ghand.canfd_transport")
-
-CAN_EFF_FLAG = 0x80000000
-CAN_RAW_FD_FRAMES = 5
-CANFD_BRS = 0x01
-CAN_FRAME_FORMAT = "=IB3x8s"
-CAN_FRAME_SIZE = struct.calcsize(CAN_FRAME_FORMAT)
-CANFD_FRAME_FORMAT = "=IBB2x64s"
-CANFD_FRAME_SIZE = struct.calcsize(CANFD_FRAME_FORMAT)
 
 ZQWL_CONFIG_HEAD = b"\x49\x3B"
 ZQWL_CONFIG_TAIL = b"\x45\x2E"
@@ -84,60 +70,6 @@ ZQWL_COMMON_DBITRATE_CODES = {
     125_000: 0x9,
     100_000: 0xA,
 }
-
-# ---------------------------------------------------------------------------
-# ZLG ctypes structures (mirrored from zlgcan.py)
-# ---------------------------------------------------------------------------
-
-ZCAN_STATUS_OK = 1
-ZCAN_TYPE_CANFD = ctypes.c_uint(1)
-
-
-class _ZCAN_CHANNEL_CANFD_INIT_CONFIG(ctypes.Structure):
-    _fields_ = [
-        ("acc_code", ctypes.c_uint),
-        ("acc_mask", ctypes.c_uint),
-        ("abit_timing", ctypes.c_uint),
-        ("dbit_timing", ctypes.c_uint),
-        ("brp", ctypes.c_uint),
-        ("filter", ctypes.c_ubyte),
-        ("mode", ctypes.c_ubyte),
-        ("pad", ctypes.c_ushort),
-        ("reserved", ctypes.c_uint),
-    ]
-
-
-class _ZCAN_CHANNEL_INIT_CONFIG(ctypes.Union):
-    _fields_ = [("canfd", _ZCAN_CHANNEL_CANFD_INIT_CONFIG)]
-
-
-class ZCAN_CHANNEL_INIT_CONFIG(ctypes.Structure):
-    _fields_ = [("can_type", ctypes.c_uint), ("config", _ZCAN_CHANNEL_INIT_CONFIG)]
-
-
-class ZCAN_CANFD_FRAME(ctypes.Structure):
-    _fields_ = [
-        ("can_id", ctypes.c_uint, 29),
-        ("err", ctypes.c_uint, 1),
-        ("rtr", ctypes.c_uint, 1),
-        ("eff", ctypes.c_uint, 1),
-        ("len", ctypes.c_ubyte),
-        ("brs", ctypes.c_ubyte, 1),
-        ("esi", ctypes.c_ubyte, 1),
-        ("__res", ctypes.c_ubyte, 6),
-        ("__res0", ctypes.c_ubyte),
-        ("__res1", ctypes.c_ubyte),
-        ("data", ctypes.c_ubyte * 64),
-    ]
-
-
-class ZCAN_TransmitFD_Data(ctypes.Structure):
-    _fields_ = [("frame", ZCAN_CANFD_FRAME), ("transmit_type", ctypes.c_uint)]
-
-
-class ZCAN_ReceiveFD_Data(ctypes.Structure):
-    _fields_ = [("frame", ZCAN_CANFD_FRAME), ("timestamp", ctypes.c_ulonglong)]
-
 
 # ---------------------------------------------------------------------------
 # Arbitration helpers
@@ -181,18 +113,6 @@ def unpack_arbitration(can_id: int) -> dict:
     }
 
 
-def _unpack_socketcan_frame(frame: bytes) -> tuple[int, bytes] | None:
-    """Unpack either a CAN FD or classic CAN frame from a SocketCAN socket."""
-    if len(frame) == CANFD_FRAME_SIZE:
-        can_id, length, _flags, data = struct.unpack(CANFD_FRAME_FORMAT, frame)
-        return can_id & 0x1FFFFFFF, data[:length]
-    if len(frame) == CAN_FRAME_SIZE:
-        can_id, length, data = struct.unpack(CAN_FRAME_FORMAT, frame)
-        return can_id & 0x1FFFFFFF, data[:length]
-    logger.debug("Ignored unexpected SocketCAN frame size: %s", len(frame))
-    return None
-
-
 def _zqwl_dlc_to_length(dlc: int) -> int | None:
     """Translate ZQWL CANFD DLC byte value to payload length."""
     if 0 <= dlc <= 8:
@@ -208,90 +128,17 @@ def _zqwl_dlc_to_length(dlc: int) -> int | None:
 
 
 class CanfdTransport:
-    """Low-level CANFD transport using ZLG on Windows or SocketCAN on Linux."""
-
-    # Common ZLG device types
-    ZCAN_USBCANFD_100U = 42
-    ZCAN_USBCANFD_200U = 41
-    ZCAN_USBCANFD_400U = 201
-    ZCAN_USBCANFD_MINI = 43
-
-    @staticmethod
-    def _resolve_dll_path(user_path: str | None) -> str:
-        """Resolve the path to zlgcan.dll.
-
-        Search order:
-        1. User-provided path
-        2. ``ZLG_DLL_PATH`` environment variable
-        3. Project directory ``drivers/zlgcan/zlgcan.dll``
-        4. Current working directory ``./zlgcan.dll``
-        """
-        if user_path is not None:
-            return user_path
-
-        env_path = os.environ.get("ZLG_DLL_PATH")
-        if env_path:
-            return env_path
-
-        # Project bundled driver path: try importlib.resources first, then fallback
-        try:
-            import importlib.resources as resources
-            with resources.path("ghand.drivers.zlgcan", "zlgcan.dll") as p:
-                if p.exists():
-                    return str(p)
-        except (ImportError, ModuleNotFoundError, FileNotFoundError):
-            pass
-
-        # Fallback: 4 levels up from this file -> project root (source mode)
-        project_dll = (
-            Path(__file__).resolve().parents[3] / "drivers" / "zlgcan" / "zlgcan.dll"
-        )
-        if project_dll.exists():
-            return str(project_dll)
-
-        return "./zlgcan.dll"
+    """Low-level CANFD transport using ZQWL CDC serial."""
 
     def __init__(
         self,
-        device_type: int = ZCAN_USBCANFD_100U,
-        device_index: int = 0,
         can_index: int = 0,
-        dll_path: str | None = None,
-        channel: str = "can0",
+        channel: str = "",
     ):
-        self._device_type = device_type
-        self._device_index = device_index
         self._can_index = can_index
         self._channel = channel
-        self._backend = "zlg" if platform.system() == "Windows" else "socketcan"
-        self._dll: ctypes.CDLL | None = None
-        self._dev_handle = 0
-        self._chn_handle = 0
-        self._sock: socket.socket | None = None
         self._serial: serial.Serial | None = None
         self._lock = threading.Lock()
-        self._dll_path: str | None = None
-        self._user_dll_path: str | None = dll_path
-
-        if platform.system() == "Linux" and channel.startswith("/dev/"):
-            self._backend = "zqwl_serial"
-        if self._backend != "zlg" and platform.system() != "Linux":
-            raise OSError("CANFD is supported on Windows (ZLG) and Linux")
-
-    def _load_dll(self) -> None:
-        """Lazy-load the ZLG CANFD DLL."""
-        if self._dll is not None:
-            return
-        dll = self._resolve_dll_path(self._user_dll_path)
-        try:
-            self._dll = ctypes.windll.LoadLibrary(dll)
-        except OSError as exc:
-            raise OSError(
-                f"Failed to load zlgcan.dll from {dll}. "
-                "Ensure the ZLG CAN driver is installed. "
-                f"Place zlgcan.dll and kerneldlls/ in '{Path(__file__).resolve().parents[3] / 'drivers' / 'zlgcan'}' "
-                "or set the ZLG_DLL_PATH environment variable."
-            ) from exc
 
     # ------------------------------------------------------------------
     # Device lifecycle
@@ -299,112 +146,7 @@ class CanfdTransport:
 
     def open(self, abit_baud: int = 1_000_000, dbit_baud: int = 5_000_000) -> bool:
         """Open the CANFD device and start the CAN channel."""
-        if self._backend == "zqwl_serial":
-            return self._open_zqwl_serial(abit_baud=abit_baud, dbit_baud=dbit_baud)
-        if self._backend == "socketcan":
-            return self._open_socketcan(abit_baud=abit_baud, dbit_baud=dbit_baud)
-
-        if self._dev_handle:
-            return True
-
-        self._load_dll()
-
-        self._dll.ZCAN_OpenDevice.restype = ctypes.c_longlong
-        self._dev_handle = self._dll.ZCAN_OpenDevice(
-            ctypes.c_uint(self._device_type),
-            ctypes.c_uint(self._device_index),
-            ctypes.c_uint(0),
-        )
-        if not self._dev_handle:
-            logger.error("ZCAN_OpenDevice failed")
-            return False
-
-        # Configure baud rates via property interface
-        dev_h = ctypes.c_ulonglong(self._dev_handle)
-        self._dll.ZCAN_SetValue.restype = ctypes.c_longlong
-        self._dll.ZCAN_SetValue(
-            dev_h,
-            ctypes.c_char_p(b"0/canfd_standard"),
-            ctypes.c_char_p(b"0"),
-        )
-        self._dll.ZCAN_SetValue(
-            dev_h,
-            ctypes.c_char_p(b"0/canfd_abit_baud_rate"),
-            ctypes.c_char_p(f"{abit_baud},75".encode()),
-        )
-        self._dll.ZCAN_SetValue(
-            dev_h,
-            ctypes.c_char_p(b"0/canfd_dbit_baud_rate"),
-            ctypes.c_char_p(f"{dbit_baud},75".encode()),
-        )
-        self._dll.ZCAN_SetValue(
-            dev_h,
-            ctypes.c_char_p(b"0/filter_clear"),
-            ctypes.c_char_p(b"0"),
-        )
-
-        cfg = ZCAN_CHANNEL_INIT_CONFIG()
-        cfg.can_type = ZCAN_TYPE_CANFD
-        cfg.config.canfd.filter = 0
-        cfg.config.canfd.acc_code = 0
-        cfg.config.canfd.acc_mask = 0xFFFFFFFF
-        cfg.config.canfd.mode = 0
-
-        self._dll.ZCAN_InitCAN.restype = ctypes.c_longlong
-        self._chn_handle = self._dll.ZCAN_InitCAN(
-            ctypes.c_longlong(self._dev_handle),
-            ctypes.c_uint(self._can_index),
-            ctypes.byref(cfg),
-        )
-        if not self._chn_handle:
-            logger.error("ZCAN_InitCAN failed")
-            self._dll.ZCAN_CloseDevice(ctypes.c_longlong(self._dev_handle))
-            self._dev_handle = 0
-            return False
-
-        self._dll.ZCAN_StartCAN.restype = ctypes.c_longlong
-        ret = self._dll.ZCAN_StartCAN(ctypes.c_ulonglong(self._chn_handle))
-        if ret != ZCAN_STATUS_OK:
-            logger.error("ZCAN_StartCAN failed: %s", ret)
-            self._dll.ZCAN_ResetCAN(ctypes.c_ulonglong(self._chn_handle))
-            self._dll.ZCAN_CloseDevice(ctypes.c_longlong(self._dev_handle))
-            self._chn_handle = 0
-            self._dev_handle = 0
-            return False
-
-        logger.info("CANFD channel opened (abit=%s, dbit=%s)", abit_baud, dbit_baud)
-        return True
-
-    def _open_socketcan(self, abit_baud: int, dbit_baud: int) -> bool:
-        """Open a Linux SocketCAN CAN FD network interface."""
-        if self._sock is not None:
-            return True
-        try:
-            sock = socket.socket(socket.PF_CAN, socket.SOCK_RAW, socket.CAN_RAW)
-            sock.setsockopt(socket.SOL_CAN_RAW, CAN_RAW_FD_FRAMES, 1)
-            sock.settimeout(0.1)
-            sock.bind((self._channel,))
-            self._sock = sock
-            logger.info(
-                "SocketCAN CANFD channel opened (%s, abit=%s, dbit=%s)",
-                self._channel,
-                abit_baud,
-                dbit_baud,
-            )
-            return True
-        except OSError as exc:
-            logger.error(
-                "Failed to open SocketCAN interface %s: %s. "
-                "Ensure the interface exists and is configured for CAN FD, for example: "
-                "ip link set %s up type can bitrate %s dbitrate %s fd on",
-                self._channel,
-                exc,
-                self._channel,
-                abit_baud,
-                dbit_baud,
-            )
-            self._sock = None
-            return False
+        return self._open_zqwl_serial(abit_baud=abit_baud, dbit_baud=dbit_baud)
 
     def _open_zqwl_serial(self, abit_baud: int, dbit_baud: int) -> bool:
         """Open a ZQWL USBCANFD CDC serial adapter."""
@@ -485,27 +227,12 @@ class CanfdTransport:
             self._serial = None
             logger.info("ZQWL CANFD serial channel closed")
             return True
-        if self._sock is not None:
-            self._sock.close()
-            self._sock = None
-            logger.info("SocketCAN CANFD channel closed")
-            return True
-
-        if self._chn_handle:
-            self._dll.ZCAN_ResetCAN(ctypes.c_ulonglong(self._chn_handle))
-            self._chn_handle = 0
-        if self._dev_handle:
-            self._dll.ZCAN_CloseDevice(ctypes.c_longlong(self._dev_handle))
-            self._dev_handle = 0
         logger.info("CANFD channel closed")
         return True
 
     # ------------------------------------------------------------------
     # Raw frame I/O
     # ------------------------------------------------------------------
-
-    # CANFD valid data lengths (DLC mapping)
-    _CANFD_LENGTHS = (0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24, 32, 48, 64)
 
     def send_frame(self, can_id: int, data: bytes) -> bool:
         """Transmit a single CANFD frame."""
@@ -539,73 +266,14 @@ class CanfdTransport:
                 logger.error("ZQWL CANFD serial transmit failed: %s", exc)
                 return False
 
-        if self._sock is not None:
-            if len(data) > 64:
-                raise ValueError("CANFD frame payload cannot exceed 64 bytes")
-            frame = struct.pack(
-                CANFD_FRAME_FORMAT,
-                can_id | CAN_EFF_FLAG,
-                len(data),
-                CANFD_BRS,
-                data.ljust(64, b"\x00"),
-            )
-            try:
-                return self._sock.send(frame) == CANFD_FRAME_SIZE
-            except OSError as exc:
-                logger.error("SocketCAN transmit failed: %s", exc)
-                return False
-
-        if not self._chn_handle:
-            return False
-
-        # Pad data to nearest valid CANFD length
-        length = len(data)
-        for valid_len in self._CANFD_LENGTHS:
-            if valid_len >= length:
-                length = valid_len
-                break
-
-        msg = ZCAN_TransmitFD_Data()
-        msg.transmit_type = 0
-        msg.frame.eff = 1
-        msg.frame.rtr = 0
-        msg.frame.brs = 1
-        msg.frame.can_id = can_id
-        msg.frame.len = length
-        for i in range(length):
-            msg.frame.data[i] = data[i] if i < len(data) else 0
-
-        handle = ctypes.c_ulonglong(self._chn_handle)
-        ret = self._dll.ZCAN_TransmitFD(handle, ctypes.byref(msg), 1)
-        return ret == 1
+        return False
 
     def recv_frame(self, timeout_ms: int = 100) -> tuple[int, bytes] | None:
         """Receive a single CANFD frame (blocking up to *timeout_ms*)."""
         if self._serial is not None:
             return self._recv_zqwl_frame(timeout_ms=timeout_ms)
 
-        if self._sock is not None:
-            self._sock.settimeout(timeout_ms / 1000)
-            try:
-                frame = self._sock.recv(CANFD_FRAME_SIZE)
-            except socket.timeout:
-                return None
-            except OSError as exc:
-                logger.error("SocketCAN receive failed: %s", exc)
-                return None
-            return _unpack_socketcan_frame(frame)
-
-        if not self._chn_handle:
-            return None
-
-        handle = ctypes.c_ulonglong(self._chn_handle)
-        rcv = ZCAN_ReceiveFD_Data()
-        ret = self._dll.ZCAN_ReceiveFD(handle, ctypes.byref(rcv), 1, ctypes.c_int(timeout_ms))
-        if ret <= 0:
-            return None
-
-        data = bytes(rcv.frame.data[: rcv.frame.len])
-        return rcv.frame.can_id, data
+        return None
 
     def recv_frames(self, max_frames: int = 100, timeout_ms: int = 100) -> list[tuple[int, bytes]]:
         """Receive up to *max_frames* CANFD frames."""
@@ -621,41 +289,7 @@ class CanfdTransport:
                     results.append(parsed)
             return results
 
-        if self._sock is not None:
-            results = []
-            deadline = time.time() + timeout_ms / 1000
-            while len(results) < max_frames:
-                remaining = deadline - time.time()
-                if remaining <= 0:
-                    break
-                self._sock.settimeout(remaining)
-                try:
-                    frame = self._sock.recv(CANFD_FRAME_SIZE)
-                except socket.timeout:
-                    break
-                except OSError as exc:
-                    logger.error("SocketCAN receive failed: %s", exc)
-                    break
-                parsed = _unpack_socketcan_frame(frame)
-                if parsed is not None:
-                    results.append(parsed)
-            return results
-
-        if not self._chn_handle:
-            return []
-
-        handle = ctypes.c_ulonglong(self._chn_handle)
-        buf = (ZCAN_ReceiveFD_Data * max_frames)()
-        ret = self._dll.ZCAN_ReceiveFD(handle, ctypes.byref(buf), max_frames, ctypes.c_int(timeout_ms))
-        if ret <= 0:
-            return []
-
-        results = []
-        for i in range(ret):
-            frame = buf[i].frame
-            data = bytes(frame.data[: frame.len])
-            results.append((frame.can_id, data))
-        return results
+        return []
 
     def _recv_zqwl_frame(self, timeout_ms: int = 100) -> tuple[int, bytes] | None:
         """Receive one CANFD data frame from a ZQWL serial adapter."""

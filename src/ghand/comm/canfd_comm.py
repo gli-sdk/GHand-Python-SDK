@@ -22,7 +22,6 @@ business APIs.
 from __future__ import annotations
 
 import logging
-import platform
 import struct
 import threading
 import time
@@ -106,6 +105,7 @@ class CanfdComm(IComm):
         except Exception:
             logger.exception("Error while cleaning up failed CANFD connection")
         finally:
+            self._transport = None
             self._last_disconnect_at = time.monotonic()
 
     def _wait_for_reopen_window(self) -> None:
@@ -127,42 +127,27 @@ class CanfdComm(IComm):
         """Search for available CANFD adapters.
 
         Returns:
-            List of adapter identifiers. Linux returns SocketCAN interfaces
-            such as ``can0`` and ZQWL CDC serial adapters such as
-            ``/dev/ttyACM0``; Windows returns ZLG adapter identifiers.
+            List of adapter identifiers. Linux returns ZQWL CDC serial adapters
+            such as ``/dev/ttyACM0``; Windows returns ZQWL CDC serial ports
+            such as ``COM3``.
         """
-        if platform.system() == "Linux":
-            adapters: list[str] = []
-            net_dir = Path("/sys/class/net")
-            if net_dir.exists():
-                adapters.extend(
-                    path.name
-                    for path in net_dir.iterdir()
-                    if path.name.startswith(("can", "vcan"))
-                )
-            if list_ports is not None:
-                for port in list_ports.comports():
-                    if port.vid == 0x3562 and port.pid in (0x0100, 0x0101, 0x0105):
-                        adapters.append(port.device)
-            adapters.extend(str(path) for path in Path("/dev/serial/by-id").glob("*ZQWL*"))
-            adapters.extend(str(path) for path in Path("/dev").glob("ttyACM*"))
-            return sorted(dict.fromkeys(adapters))
-
         adapters: list[str] = []
-        try:
-            dll_path = CanfdTransport._resolve_dll_path(None)
-            if Path(dll_path).exists():
-                adapters.append("zlg-USBCANFD-100U-0")
-            else:
-                logger.warning("ZLG CANFD driver not found: %s", dll_path)
-        except Exception as e:
-            logger.error("Failed to detect ZLG CANFD adapter: %s", e)
-        return adapters
+        if list_ports is not None:
+            for port in list_ports.comports():
+                if port.vid == 0x3562 and port.pid in (0x0100, 0x0101, 0x0105):
+                    adapters.append(port.device)
+
+        adapters.extend(str(path) for path in Path("/dev/serial/by-id").glob("*ZQWL*"))
+        adapters.extend(str(path) for path in Path("/dev").glob("ttyACM*"))
+
+        if not adapters:
+            logger.warning("No ZQWL CANFD CDC serial adapters found")
+        return sorted(dict.fromkeys(adapters))
 
     def _create_transport(self, device_name: str) -> CanfdTransport:
         """Create the platform-specific CANFD transport for *device_name*."""
-        if platform.system() == "Linux":
-            return CanfdTransport(channel=device_name or "can0")
+        if device_name:
+            return CanfdTransport(channel=device_name)
         return CanfdTransport()
 
     def connect(self, device_name: str) -> bool:
@@ -172,7 +157,7 @@ class CanfdComm(IComm):
         open device → init channel → Node ID detection → establish connection.
 
         Args:
-            device_name: Adapter identifier (e.g. "zlg-USBCANFD-100U-0").
+            device_name: ZQWL CDC serial device name (e.g. "COM3" or "/dev/ttyACM0").
 
         Returns:
             True if the connection and handshake succeed.
@@ -223,6 +208,7 @@ class CanfdComm(IComm):
             except Exception:
                 logger.exception("Error while closing CANFD transport")
             finally:
+                self._transport = None
                 self._last_disconnect_at = time.monotonic()
         self._connected = False
         logger.info("CANFD device disconnected")
@@ -266,7 +252,8 @@ class CanfdComm(IComm):
 
     def _establish_connection(self) -> bool:
         """Send connection-establishment frame (FC 0x02), polling node IDs."""
-        for dst_id in (0x31, 0x32):
+        dst_ids = [self._dst_id, 0x31, 0x32]
+        for dst_id in dict.fromkeys(dst_ids):
             timer_values = self._profile.canfd_connection_timer_values
             data = (
                 struct.pack(
@@ -334,6 +321,23 @@ class CanfdComm(IComm):
         )
         self._transport.send_frame(can_id, data)
 
+    def set_slave_id(self, slave_id: int) -> bool:
+        """Write a new CANFD node/slave ID to holding register 0x0000."""
+        if not 0 < slave_id <= 0x3F:
+            raise ValueError("CANFD slave_id must be in range 1..63")
+        try:
+            self._transport.write_registers(
+                self._src_id,
+                self._dst_id,
+                0x0000,
+                struct.pack(">H", slave_id),
+            )
+        except Exception as exc:
+            logger.error("Failed to set CANFD slave ID to 0x%02X: %s", slave_id, exc)
+            return False
+        self._dst_id = slave_id
+        return True
+
     # ------------------------------------------------------------------
     # Joint control
     # ------------------------------------------------------------------
@@ -360,10 +364,13 @@ class CanfdComm(IComm):
                 registers = [mode_stop, position, speed_torque]
             else:
                 registers = [position, speed_torque]
-            data = struct.pack(f">{len(registers)}H", *registers)
-            self._transport.write_registers(
-                self._src_id, self._dst_id, base_addr, data
-            )
+            for offset, register in enumerate(registers):
+                self._transport.write_registers(
+                    self._src_id,
+                    self._dst_id,
+                    base_addr + offset,
+                    struct.pack(">H", register),
+                )
         return True
 
     def stop(self) -> bool:
@@ -515,10 +522,33 @@ class CanfdComm(IComm):
     # Device operations
     # ------------------------------------------------------------------
 
+    def _wait_holding_result(
+        self,
+        address: int,
+        timeout_sec: float = 2.0,
+        interval_sec: float = 0.05,
+    ) -> bool:
+        deadline = time.time() + timeout_sec
+        while time.time() < deadline:
+            raw = self._transport.read_registers(
+                self._src_id, self._dst_id, address, 1, func_code=0x03
+            )
+            register = struct.unpack(">H", raw[:2])[0]
+            status = register & 0x00FF
+            if status == 1:
+                return True
+            if status == 2:
+                return False
+            time.sleep(interval_sec)
+        return False
+
     def clear_fault(self) -> bool:
         self._transport.write_registers(
             self._src_id, self._dst_id, 0x0001, struct.pack(">H", 0x0100)
         )
+        if not self._wait_holding_result(0x0001):
+            logger.error("Fault clearance failed or timed out")
+            return False
         logger.info("Fault cleared")
         return True
 

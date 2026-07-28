@@ -141,17 +141,7 @@ export GHAND_RS485_BAUDRATE=1000000
 
 ### CANFD 适配器说明
 
-CANFD 适配器在不同厂商设备上可能采用不同驱动方式：
-
-- **SocketCAN 设备**：Linux 下会注册为 `can0`、`can1` 等网络接口。使用前需要配置 CAN FD 位率：
-
-  ```bash
-  sudo ip link set can0 down
-  sudo ip link set can0 up type can bitrate 1000000 dbitrate 5000000 fd on
-  ip -details link show can0
-  ```
-
-- **ZQWL-CANFD CDC 串口设备**：USB 侧显示为 `3562:0101 ZQWL-CANFD`，Linux 下通常是 `/dev/ttyACM0` 或 `/dev/serial/by-id/...`，Windows 下通常是 `COMx`。这类设备按 ZQWL 二次开发串口协议通信，不需要 SocketCAN，也不需要额外 DLL。
+CANFD 模式支持 ZQWL-CANFD CDC 串口设备。设备 USB 侧显示为 `3562:0101 ZQWL-CANFD`，Linux 下通常是 `/dev/ttyACM0` 或 `/dev/serial/by-id/...`，Windows 下通常是 `COMx`。这类设备按 ZQWL 二次开发串口协议通信。
 
 常用检查命令：
 
@@ -162,7 +152,32 @@ ls -l /dev/ttyACM* /dev/serial/by-id/ 2>/dev/null
 python3 -m serial.tools.list_ports
 ```
 
-如果 `lsusb -t` 显示 `Driver=cdc_acm`，说明设备当前是 CDC 串口模式，不会出现在 `ip link` 的 `can0` 列表中。SDK 会在 CANFD 模式下扫描 SocketCAN 接口和 ZQWL CDC 串口设备。
+如果 `lsusb -t` 显示 `Driver=cdc_acm`，说明设备当前是 CDC 串口模式。SDK 会在 CANFD 模式下扫描 ZQWL CDC 串口设备。
+
+### RS485/CANFD 从站 ID
+
+RS485 和 CANFD 设备使用保持寄存器 `0x0000` 作为从站 ID 寄存器。产品 JSON 配置提供默认 `slave_id`；如果设备已经被设置为其它 ID，可以在 `open()` 中临时覆盖：
+
+```python
+hand = GHand(product_type=ProductType.G5, comm_type=CommType.CANFD)
+hand.open("COM10", slave_id=0x31)
+```
+
+如需修改已连接设备的从站 ID，调用 `set_slave_id()`。修改 ID 时建议总线上只连接一只目标手：
+
+```python
+ok = hand.set_slave_id(0x32)
+hand.close()
+```
+
+修改后使用新 ID 重新连接：
+
+```python
+hand = GHand(product_type=ProductType.G5, comm_type=CommType.CANFD)
+hand.open("COM10", slave_id=0x32)
+```
+
+可以使用 `examples/tutorial/11.set_slave_id.py` 按带确认开关的流程测试从站 ID 修改。
 
 ## 快速开始
 

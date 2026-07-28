@@ -17,7 +17,6 @@
 from __future__ import annotations
 
 import logging
-
 from ._config import load_product_config
 from .comm.canfd_comm import CanfdComm
 from .comm.ethercat_comm import EthercatComm
@@ -248,15 +247,20 @@ class GHand:
             return False
         return True
 
-    def open(self, id: str = "auto") -> bool:
+    def open(self, id: str = "auto", slave_id: int | None = None) -> bool:
         """Open the device connection.
 
         Args:
             id: Device ID. Use "auto" to search automatically.
+            slave_id: Optional RS485/CANFD slave ID override for this connection.
 
         Returns:
             True if the connection is established successfully.
         """
+        if slave_id is not None:
+            self._product_config.slave_id = slave_id
+            self._comm.update_config(self._product_config)
+
         if self._opened:
             try:
                 if self._comm.is_connected():
@@ -301,6 +305,27 @@ class GHand:
 
         self._sync_product_config_from_comm()
         return True
+
+    def set_slave_id(self, slave_id: int) -> bool:
+        """Set the connected RS485/CANFD device slave ID.
+
+        Args:
+            slave_id: New slave ID written to holding register ``0x0000``.
+
+        Returns:
+            True if the device accepted the new ID.
+        """
+        if self._comm_type not in (CommType.CANFD, CommType.RS485):
+            logger.error("set_slave_id is only supported for CANFD and RS485")
+            return False
+        if not self.is_connected():
+            raise RuntimeError("Device is not connected")
+
+        result = self._comm.set_slave_id(slave_id)
+        if result:
+            self._product_config.slave_id = slave_id
+            logger.info("Slave ID set to 0x%02X", slave_id)
+        return result
 
     def close(self) -> bool:
         """Close the device connection.
@@ -590,7 +615,7 @@ class GHand:
             if result:
                 logger.info("Command sent successfully")
             return result
-        except RuntimeError as e:
+        except Exception as e:
             logger.error("Failed to move joints: %s", e)
             return False
 

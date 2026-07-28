@@ -230,8 +230,9 @@ class Rs485Comm(IComm):
                 self._client.close()
                 self._client = None
                 return False
-            # Verify device by polling slave IDs 0x31 and 0x32
-            for slave_id in (0x31, 0x32):
+            # Verify device by polling the configured ID first, then common defaults.
+            slave_ids = [self._slave_id, 0x31, 0x32]
+            for slave_id in dict.fromkeys(slave_ids):
                 try:
                     result = self._read_holding_registers(
                         0x0000, count=1, device_id=slave_id
@@ -283,6 +284,20 @@ class Rs485Comm(IComm):
     def is_connected(self) -> bool:
         """Return whether the RS485 client is connected."""
         return self._connected
+
+    def set_slave_id(self, slave_id: int) -> bool:
+        """Write a new Modbus slave ID to holding register 0x0000."""
+        if not 0 < slave_id <= 0xFF:
+            raise ValueError("slave_id must be in range 1..255")
+        try:
+            result = self._write_register(0x0000, slave_id)
+        except Exception as exc:
+            logger.error("Failed to set RS485 slave ID to 0x%02X: %s", slave_id, exc)
+            return False
+        if result is None or result.isError():
+            return False
+        self._slave_id = slave_id
+        return True
 
     # ===== Joint control (single register write) =====
 
@@ -497,10 +512,32 @@ class Rs485Comm(IComm):
 
     # ===== Device operations =====
 
+    def _wait_holding_result(
+        self,
+        address: int,
+        timeout_sec: float = 2.0,
+        interval_sec: float = 0.05,
+    ) -> bool:
+        deadline = time.time() + timeout_sec
+        while time.time() < deadline:
+            result = self._read_holding_registers(address, count=1)
+            if result is None or result.isError():
+                return False
+            status = result.registers[0] & 0x00FF
+            if status == 1:
+                return True
+            if status == 2:
+                return False
+            time.sleep(interval_sec)
+        return False
+
     def clear_fault(self) -> bool:
         """Clear device faults."""
         result = self._write_register(0x0001, 0x0100)
         if result is None or result.isError():
+            return False
+        if not self._wait_holding_result(0x0001):
+            logger.error("Fault clearance failed or timed out")
             return False
         logger.info("Fault cleared")
         return True

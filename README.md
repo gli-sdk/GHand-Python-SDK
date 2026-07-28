@@ -139,17 +139,9 @@ export GHAND_RS485_BAUDRATE=1000000
 
 ### CANFD Adapter Notes
 
-CANFD adapters may use different host-side driver models:
+CANFD mode supports ZQWL-CANFD CDC serial adapters.
 
-- **SocketCAN adapters**: On Linux these appear as network interfaces such as `can0` or `can1`. Configure CAN FD bitrates before use:
-
-  ```bash
-  sudo ip link set can0 down
-  sudo ip link set can0 up type can bitrate 1000000 dbitrate 5000000 fd on
-  ip -details link show can0
-  ```
-
-- **ZQWL-CANFD CDC serial adapters**: These appear as `3562:0101 ZQWL-CANFD` on USB. On Linux they usually create `/dev/ttyACM0` or a `/dev/serial/by-id/...` alias; on Windows they usually appear as `COMx`. These adapters use the ZQWL serial protocol, so they do not require SocketCAN or an extra vendor DLL.
+ZQWL-CANFD CDC serial adapters appear as `3562:0101 ZQWL-CANFD` on USB. On Linux they usually create `/dev/ttyACM0` or a `/dev/serial/by-id/...` alias; on Windows they usually appear as `COMx`. These adapters use the ZQWL serial protocol.
 
 Useful checks:
 
@@ -160,7 +152,32 @@ ls -l /dev/ttyACM* /dev/serial/by-id/ 2>/dev/null
 python3 -m serial.tools.list_ports
 ```
 
-If `lsusb -t` shows `Driver=cdc_acm`, the adapter is in CDC serial mode and will not appear as `can0` in `ip link`. In CANFD mode, the SDK scans both SocketCAN interfaces and ZQWL CDC serial adapters.
+If `lsusb -t` shows `Driver=cdc_acm`, the adapter is in CDC serial mode. In CANFD mode, the SDK scans ZQWL CDC serial adapters.
+
+### RS485/CANFD Slave IDs
+
+RS485 and CANFD devices use holding register `0x0000` as the slave ID register. The product JSON config provides the default `slave_id`, and `open()` can override it when a device was previously assigned a different ID:
+
+```python
+hand = GHand(product_type=ProductType.G5, comm_type=CommType.CANFD)
+hand.open("COM10", slave_id=0x31)
+```
+
+To change the connected device ID, use `set_slave_id()`. Connect only one target hand on the bus while changing IDs:
+
+```python
+ok = hand.set_slave_id(0x32)
+hand.close()
+```
+
+After changing the ID, reconnect with the new value:
+
+```python
+hand = GHand(product_type=ProductType.G5, comm_type=CommType.CANFD)
+hand.open("COM10", slave_id=0x32)
+```
+
+The helper script `examples/tutorial/11.set_slave_id.py` provides a guarded workflow for testing ID changes.
 
 ## Quick Start
 
