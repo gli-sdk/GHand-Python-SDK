@@ -18,7 +18,7 @@ configure_logging(level=logging.INFO)
 def main():
     # Step 1: Discover available adapters
     print("Searching for devices...")
-    scout = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+    scout = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
     adapters = scout.search_adapters()
     print(f"Found {len(adapters)} adapter(s)")
 
@@ -29,7 +29,7 @@ def main():
     # Step 2: Connect to all devices
     hands = []
     for i, adapter in enumerate(adapters):
-        hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+        hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
         try:
             if hand.open(adapter):
                 hands.append(hand)

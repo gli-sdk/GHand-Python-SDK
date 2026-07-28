@@ -156,10 +156,10 @@ If `lsusb -t` shows `Driver=cdc_acm`, the adapter is in CDC serial mode. In CANF
 
 ### RS485/CANFD Slave IDs
 
-RS485 and CANFD devices use holding register `0x0000` as the slave ID register. The product JSON config provides the default `slave_id`, and `open()` can override it when a device was previously assigned a different ID:
+RS485 and CANFD devices use holding register `0x0000` as the slave ID register. The left hand defaults to `0x31`, and the right hand defaults to `0x32`; `open()` can override the value when a device was previously assigned a different ID:
 
 ```python
-hand = GHand(product_type=ProductType.G5, comm_type=CommType.CANFD)
+hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.CANFD)
 hand.open("COM10", slave_id=0x31)
 ```
 
@@ -173,7 +173,7 @@ hand.close()
 After changing the ID, reconnect with the new value:
 
 ```python
-hand = GHand(product_type=ProductType.G5, comm_type=CommType.CANFD)
+hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.CANFD)
 hand.open("COM10", slave_id=0x32)
 ```
 

@@ -10,7 +10,7 @@ from ghand import ProductType, CommType, GestureType, GHand, configure_logging, 
 def main():
     """Main execution function, demonstrates how to execute preset gestures."""
     print("***** GHand SDK - Preset Gesture Demo *****\n")
-    hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+    hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
     connected = hand.open("auto")
 
     try:

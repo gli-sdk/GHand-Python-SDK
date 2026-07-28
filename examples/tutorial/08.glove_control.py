@@ -247,7 +247,7 @@ def main():
     Main function, responsible for receiving data and processing display
     """
     # Create EtherCAT connection
-    hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+    hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
     connected = hand.open("auto")
     if not connected:
         print("connect failed")

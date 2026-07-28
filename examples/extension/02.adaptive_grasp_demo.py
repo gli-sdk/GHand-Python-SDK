@@ -23,7 +23,7 @@ from ghand import (
 
 
 def main() -> None:
-    hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+    hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
     connected = hand.open("auto")
     grasper: Optional[AdaptiveGrasper] = None
 

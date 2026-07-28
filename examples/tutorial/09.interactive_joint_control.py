@@ -9,7 +9,7 @@ configure_logging(level=logging.INFO)
 
 
 def main():
-    hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+    hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
 
     # Create independent parameter dictionary for each joint
     joint_params = {

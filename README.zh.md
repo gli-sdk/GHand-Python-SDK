@@ -156,10 +156,10 @@ python3 -m serial.tools.list_ports
 
 ### RS485/CANFD 从站 ID
 
-RS485 和 CANFD 设备使用保持寄存器 `0x0000` 作为从站 ID 寄存器。产品 JSON 配置提供默认 `slave_id`；如果设备已经被设置为其它 ID，可以在 `open()` 中临时覆盖：
+RS485 和 CANFD 设备使用保持寄存器 `0x0000` 作为从站 ID 寄存器。左手默认 ID 为 `0x31`，右手默认 ID 为 `0x32`；如果设备已经被设置为其它 ID，可以在 `open()` 中临时覆盖：
 
 ```python
-hand = GHand(product_type=ProductType.G5, comm_type=CommType.CANFD)
+hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.CANFD)
 hand.open("COM10", slave_id=0x31)
 ```
 
@@ -173,7 +173,7 @@ hand.close()
 修改后使用新 ID 重新连接：
 
 ```python
-hand = GHand(product_type=ProductType.G5, comm_type=CommType.CANFD)
+hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.CANFD)
 hand.open("COM10", slave_id=0x32)
 ```
 

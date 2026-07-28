@@ -31,8 +31,8 @@ logger = logging.getLogger("ghand.config")
 
 
 _PRODUCT_TYPE_TO_FILE = {
-    ProductType.G5: "ghand5.json",
-    ProductType.L1: "ghandlite1.json",
+    ProductType.GHand5: "ghand5.json",
+    ProductType.GHandLite1: "ghandlite1.json",
 }
 
 _JOINT_NAME_TO_ID = {
@@ -183,10 +183,13 @@ def load_product_config(product_type: ProductType) -> ProductConfig:
         logger.error("Config file '%s' not found", file_name)
         return ProductConfig()
 
-    return _load_config_from_file(file_path)
+    return _load_config_from_file(file_path, product_type=product_type)
 
 
-def _load_config_from_file(file_path: str) -> ProductConfig:
+def _load_config_from_file(
+    file_path: str,
+    product_type: ProductType | None = None,
+) -> ProductConfig:
     """Parse a product configuration from disk.
 
     Args:
@@ -213,16 +216,7 @@ def _load_config_from_file(file_path: str) -> ProductConfig:
         joint_limits=joint_limits,
         has_tactile=data.get("has_tactile", False),
         tactile_regions=tactile_regions,
-        slave_id=int(data.get("slave_id", 0x31)),
-        modbus_profile=data.get("modbus_profile", "g5"),
-        ethercat_input_sizes=_parse_int_tuple(data.get("ethercat_input_sizes", [])),
-        ethercat_output_size=(
-            int(data["ethercat_output_size"])
-            if data.get("ethercat_output_size") is not None
-            else None
-        ),
-        ethercat_rpdo_layout=data.get("ethercat_rpdo_layout", "shared_mode_float"),
-        ethercat_tpdo_layout=data.get("ethercat_tpdo_layout", "default"),
+        product_type=product_type,
     )
 
     if not config.name or not config.valid_joints:
@@ -257,7 +251,15 @@ def find_config_by_name(device_name: str) -> ProductConfig | None:
             names = [data.get("name", ""), *data.get("aliases", [])]
             if any(name.lower() == device_name.lower() for name in names if name):
                 logger.info("Auto-detected product config: %s -> %s", device_name, file_path)
-                return _load_config_from_file(file_path)
+                product_type = next(
+                    (
+                        candidate
+                        for candidate, file_name in _PRODUCT_TYPE_TO_FILE.items()
+                        if os.path.basename(file_path) == file_name
+                    ),
+                    None,
+                )
+                return _load_config_from_file(file_path, product_type=product_type)
 
     logger.warning("No matching product config found for device: %s", device_name)
     return None

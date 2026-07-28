@@ -76,7 +76,7 @@ class GHand:
         """Initialize the GHand instance.
 
         Args:
-            product_type: Product model (e.g. ``ProductType.G5``).
+            product_type: Product model (e.g. ``ProductType.GHand5``).
             comm_type: Communication protocol (e.g. ``CommType.CANFD``).
         """
         self._product_type = product_type

@@ -27,6 +27,7 @@ from ..types import (
     HandState,
     JointData,
     JointId,
+    ProductType,
     State,
     TactileInfo,
     TactileSensorId,
@@ -37,7 +38,7 @@ from ..types import (
 class ModbusRegisterProfile:
     """Product-specific Modbus register layout."""
 
-    name: str
+    product_type: ProductType
     joint_input_addresses: dict[JointId, int]
     joint_control_addresses: dict[JointId, int]
     control_layout: str
@@ -55,13 +56,13 @@ class ModbusRegisterProfile:
     canfd_connection_delete_values: tuple[int, ...] = (0x0000, 0x0000)
 
 
-# G5 keeps the original SDK mapping: input joint blocks follow JointId values.
-G5_JOINT_INPUT_REG_MAP = {
+# GHand5 keeps the original SDK mapping: input joint blocks follow JointId values.
+GHAND5_JOINT_INPUT_REG_MAP = {
     joint_id: 0x1023 + joint_id.value * 3 for joint_id in JointId
 }
 
-# Mapping from controlled G5 joint ID to holding-register base address.
-G5_HOLDING_REG_MAP = {
+# Mapping from controlled GHand5 joint ID to holding-register base address.
+GHAND5_HOLDING_REG_MAP = {
     JointId.THUMB_MCP: 0x0011,
     JointId.THUMB_TMC_FE: 0x0013,
     JointId.THUMB_TMC_AA: 0x0015,
@@ -78,11 +79,11 @@ G5_HOLDING_REG_MAP = {
 }
 
 # Backwards-compatible alias for existing imports.
-HOLDING_REG_MAP = G5_HOLDING_REG_MAP
+HOLDING_REG_MAP = GHAND5_HOLDING_REG_MAP
 
 
-# L1 protocol V1.2: only these 11 joints are present in the Modbus table.
-L1_JOINT_INPUT_REG_MAP = {
+# GHandLite1 protocol: only these 11 joints are present in the Modbus table.
+GHAND_LITE1_JOINT_INPUT_REG_MAP = {
     JointId.THUMB_TMC_FE: 0x1023,
     JointId.THUMB_TMC_AA: 0x1026,
     JointId.THUMB_TMC_PS: 0x1029,
@@ -96,7 +97,7 @@ L1_JOINT_INPUT_REG_MAP = {
     JointId.LF_MCP: 0x1041,
 }
 
-L1_HOLDING_REG_MAP = {
+GHAND_LITE1_HOLDING_REG_MAP = {
     JointId.THUMB_TMC_FE: 0x0010,
     JointId.THUMB_TMC_AA: 0x0013,
     JointId.THUMB_TMC_PS: 0x0016,
@@ -110,20 +111,20 @@ L1_HOLDING_REG_MAP = {
     JointId.LF_MCP: 0x002E,
 }
 
-MODBUS_REGISTER_PROFILES = {
-    "g5": ModbusRegisterProfile(
-        name="g5",
-        joint_input_addresses=G5_JOINT_INPUT_REG_MAP,
-        joint_control_addresses=G5_HOLDING_REG_MAP,
+PRODUCT_TYPE_TO_MODBUS_PROFILE = {
+    ProductType.GHand5: ModbusRegisterProfile(
+        product_type=ProductType.GHand5,
+        joint_input_addresses=GHAND5_JOINT_INPUT_REG_MAP,
+        joint_control_addresses=GHAND5_HOLDING_REG_MAP,
         control_layout="shared_mode_2reg",
         mode_register=0x0010,
         stop_register=0x0010,
         tactile_control_address=0x002B,
     ),
-    "l1": ModbusRegisterProfile(
-        name="l1",
-        joint_input_addresses=L1_JOINT_INPUT_REG_MAP,
-        joint_control_addresses=L1_HOLDING_REG_MAP,
+    ProductType.GHandLite1: ModbusRegisterProfile(
+        product_type=ProductType.GHandLite1,
+        joint_input_addresses=GHAND_LITE1_JOINT_INPUT_REG_MAP,
+        joint_control_addresses=GHAND_LITE1_HOLDING_REG_MAP,
         control_layout="per_joint_mode_3reg",
         mode_register=None,
         stop_register=None,
@@ -139,9 +140,12 @@ MODBUS_REGISTER_PROFILES = {
 
 
 def get_modbus_profile(config_or_name=None) -> ModbusRegisterProfile:
-    """Return the Modbus register profile for a product config or profile name."""
-    profile_name = getattr(config_or_name, "modbus_profile", config_or_name) or "g5"
-    return MODBUS_REGISTER_PROFILES.get(str(profile_name).lower(), MODBUS_REGISTER_PROFILES["g5"])
+    """Return the Modbus register profile for a product type or config."""
+    product_type = getattr(config_or_name, "product_type", config_or_name)
+    return PRODUCT_TYPE_TO_MODBUS_PROFILE.get(
+        product_type,
+        PRODUCT_TYPE_TO_MODBUS_PROFILE[ProductType.GHand5],
+    )
 
 
 def get_joint_input_span(
@@ -274,7 +278,7 @@ def parse_joints(
     The block starts at ``start_address``.  Each product profile maps logical
     JointId values to its own register addresses.
     """
-    profile = profile or get_modbus_profile("g5")
+    profile = profile or get_modbus_profile(ProductType.GHand5)
     joints = []
     for joint_id in valid_joints:
         address = profile.joint_input_addresses.get(joint_id)
