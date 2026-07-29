@@ -277,7 +277,6 @@ _ERROR_MESSAGES = {
     ErrorCode.TACTILE_DATA_ABNORMAL: "Tactile sensor data abnormal",
     ErrorCode.SELF_TEST_ERROR: "Self-test error",
     ErrorCode.PARAM_ERROR: "Parameter error",
-    ErrorCode.TIMEOUT: "Timeout",
     ErrorCode.UNKNOWN_ERROR: "Unknown error",
 }
 
