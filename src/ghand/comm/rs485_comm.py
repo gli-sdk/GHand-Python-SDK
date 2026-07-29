@@ -169,6 +169,11 @@ class Rs485Comm(IComm):
             device = port.device
             if platform.system() == "Linux" and device.startswith("/dev/ttyS"):
                 continue
+            if platform.system() == "Windows":
+                if port.vid == 0x3562 and port.pid in (0x0100, 0x0101, 0x0105):
+                    continue
+                if not port.vid or not port.pid:
+                    continue
             ports.append(device)
         if platform.system() == "Linux":
             ports.extend(self._linux_serial_candidates())

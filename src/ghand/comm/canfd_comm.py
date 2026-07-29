@@ -22,6 +22,7 @@ business APIs.
 from __future__ import annotations
 
 import logging
+import platform
 import struct
 import threading
 import time
@@ -137,8 +138,9 @@ class CanfdComm(IComm):
                 if port.vid == 0x3562 and port.pid in (0x0100, 0x0101, 0x0105):
                     adapters.append(port.device)
 
-        adapters.extend(str(path) for path in Path("/dev/serial/by-id").glob("*ZQWL*"))
-        adapters.extend(str(path) for path in Path("/dev").glob("ttyACM*"))
+        if platform.system() == "Linux":
+            adapters.extend(str(path) for path in Path("/dev/serial/by-id").glob("*ZQWL*"))
+            adapters.extend(str(path) for path in Path("/dev").glob("ttyACM*"))
 
         if not adapters:
             logger.warning("No ZQWL CANFD CDC serial adapters found")
