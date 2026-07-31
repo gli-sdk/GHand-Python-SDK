@@ -366,13 +366,12 @@ class CanfdComm(IComm):
                 registers = [mode_stop, position, speed_torque]
             else:
                 registers = [position, speed_torque]
-            for offset, register in enumerate(registers):
-                self._transport.write_registers(
-                    self._src_id,
-                    self._dst_id,
-                    base_addr + offset,
-                    struct.pack(">H", register),
-                )
+            result = self._transport.write_registers(
+                self._src_id,
+                self._dst_id,
+                base_addr,
+                struct.pack(f">{len(registers)}H", *registers),
+            )
         return True
 
     def stop(self) -> bool:
