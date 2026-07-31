@@ -8,7 +8,7 @@ from .force_reference_planner import ForceReferenceDecision
 from .object_profile import ObjectProfile
 from .pid_controller import LowPassFilter
 from .tactility import TactileAnalysis
-from .utils import FINGER_TO_MCP_PIP, JOINT_TO_FINGER, clip
+from .utils import FINGER_TO_MCP_PIP, JOINT_TO_FINGER, clip, normalize_joint_id
 
 
 JointAngles = dict[JointId, float]
@@ -116,25 +116,25 @@ class PositionHoldPlanner:
 
     def _compute_slip_control_u(self, slip_risk: float) -> float:
         cfg = self.config
-        denominator = cfg.direct_slip_risk_full - cfg.direct_slip_risk_deadband
+        denominator = cfg.position_hold_slip_risk_full - cfg.position_hold_slip_risk_deadband
         normalized_risk = clip(
-            (slip_risk - cfg.direct_slip_risk_deadband) / denominator,
+            (slip_risk - cfg.position_hold_slip_risk_deadband) / denominator,
             0.0,
             1.0,
         )
-        return cfg.position_hold_max_step_rad * (normalized_risk ** cfg.direct_slip_risk_gamma)
+        return cfg.position_hold_max_step_deg * (normalized_risk ** cfg.position_hold_slip_risk_gamma)
 
     def _compute_confirmed_slip_boost_u(self, slip_confirmed: bool) -> float:
         if not slip_confirmed:
             return 0.0
-        return self.config.position_hold_max_step_rad * self.config.direct_slip_confirmed_boost_ratio
+        return self.config.position_hold_max_step_deg * self.config.position_hold_confirmed_slip_boost_ratio
 
     def _compute_overlimit_control_u(self, fz: float, fz_limit: float) -> float:
         normal_overlimit_error = max(
             0.0,
             (fz - fz_limit) / (fz_limit + self.config.numeric_epsilon),
         )
-        return -self.config.normal_force_release_gain * normal_overlimit_error
+        return -self.config.position_hold_normal_force_release_gain * normal_overlimit_error
 
     def _build_decision(
         self,
@@ -147,7 +147,8 @@ class PositionHoldPlanner:
         mcp_delta, pip_delta = self._joint_deltas(finger, total_delta)
 
         target_angles: JointAngles = {}
-        for joint_id, angle in current_angles.items():
+        for raw_joint_id, angle in current_angles.items():
+            joint_id = normalize_joint_id(raw_joint_id)
             if JOINT_TO_FINGER.get(joint_id) != finger:
                 continue
             target_angles[joint_id] = self._offset_joint_angle(
@@ -173,8 +174,8 @@ class PositionHoldPlanner:
     ) -> tuple[float, float]:
         if finger == TactileSensorId.THUMB:
             return (
+                total_delta * self.config.thumb_tmc_fe_step_ratio,
                 total_delta * self.config.thumb_mcp_step_ratio,
-                total_delta * self.config.thumb_pip_step_ratio,
             )
         return (
             total_delta * self.config.finger_mcp_step_ratio,
@@ -182,11 +183,11 @@ class PositionHoldPlanner:
         )
 
     def _limited_total_delta(self, control_u: float, near_limit: bool) -> float:
-        delta_limit = self.config.position_hold_max_step_rad
+        delta_limit = self.config.position_hold_max_step_deg
         if self.is_fragile_mode:
             delta_limit *= self.config.fragile_step_reduction
         if near_limit:
-            delta_limit *= self.config.force_limit_slowdown_step_scale
+            delta_limit *= self.config.position_hold_force_limit_slowdown_step_scale
         return clip(control_u, -delta_limit, delta_limit)
 
     def _get_effective_contact_count(self, finger_fz: FingerForces) -> int:
@@ -199,7 +200,7 @@ class PositionHoldPlanner:
         return contacting_fingers or active_finger_count
 
     def _is_near_limit(self, finger_fz: FingerForces, finger_count: int) -> bool:
-        threshold = self.config.force_limit_slowdown_ratio * self._get_max_normal_force_per_finger(finger_count)
+        threshold = self.config.position_hold_force_limit_slowdown_ratio * self._get_max_normal_force_per_finger(finger_count)
         return any(
             finger_fz.get(finger, 0.0) >= threshold
             for finger in self.config.active_fingers
@@ -231,9 +232,12 @@ class PositionHoldPlanner:
         mcp_delta: float,
         pip_delta: float,
     ) -> float:
-        for mcp_joint, pip_joint in FINGER_TO_MCP_PIP.values():
-            if joint_id == mcp_joint:
-                return angle + mcp_delta
-            if joint_id == pip_joint:
-                return angle + pip_delta
+        if joint_id == JointId.THUMB_TMC_FE:
+            return angle + mcp_delta
+        if joint_id == JointId.THUMB_MCP:
+            return angle + pip_delta
+        if "MCP" in joint_id.name:
+            return angle + mcp_delta
+        if "PIP" in joint_id.name:
+            return angle + pip_delta
         return angle
