@@ -22,6 +22,19 @@ def join_thread_if_alive(thread: Any, *, timeout: float) -> bool:
     return True
 
 
+def normalize_joint_id(joint_id: Any) -> JointId:
+    if isinstance(joint_id, JointId):
+        return joint_id
+    return JointId(joint_id)
+
+
+def normalize_joint_angles(angles: dict[Any, float]) -> dict[JointId, float]:
+    return {
+        normalize_joint_id(joint_id): angle
+        for joint_id, angle in angles.items()
+    }
+
+
 def tactile_force_xyz(info) -> tuple[float, float, float]:
     force = getattr(info, "resultant_force", None)
     if force is not None:

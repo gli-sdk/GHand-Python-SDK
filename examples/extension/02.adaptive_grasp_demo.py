@@ -1,8 +1,6 @@
 import sys
-# import logging
 import time
 from pathlib import Path
-from typing import Optional
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = str(PROJECT_ROOT / "src")
@@ -15,18 +13,11 @@ from ghand import (
     CommType,
     GHand,
     ProductType,
-    configure_logging,
 )
-
-
-# configure_logging(level=logging.INFO)
-
 
 def main() -> None:
     hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
     connected = hand.open("auto")
-    grasper: Optional[AdaptiveGrasper] = None
-
     runtime_config = build_demo_runtime_config()
     try:
         if connected:
@@ -72,7 +63,7 @@ def main() -> None:
     finally:
         hand.tactile_close()
         hand.close()
-        time.sleep(0.2)  # wait for hardware teardown
+        
 
 if __name__ == "__main__":
     main()

@@ -1,7 +1,6 @@
-import math
 from typing import Any
 
-from ghand import CtrlMode, JointCommand
+from ghand import CtrlMode, JointCommand, JointId
 from ghand.gestures import _wait_for_completion
 
 from .ports import GraspSequenceHandPort
@@ -17,7 +16,7 @@ class GHandCommandPort:
         commands = [
             joint_command_cls(
                 id=joint.id,
-                angle=math.degrees(joint.angle),
+                angle=joint.angle,
                 speed=joint.speed,
                 torque=joint.torque,
             )
@@ -27,6 +26,13 @@ class GHandCommandPort:
 
     def stop(self) -> None:
         self.hand.stop()
+
+    def joint_limits(self) -> dict[JointId, tuple[float, float]]:
+        raw_limits = getattr(self.hand, "_joint_limits", {})
+        return {
+            JointId(joint_id): (float(limit[0]), float(limit[1]))
+            for joint_id, limit in raw_limits.items()
+        }
 
     def wait_for_motion_completion(self) -> bool:
         return _wait_for_completion(self.hand)

@@ -9,13 +9,13 @@ and safety monitoring for the adaptive grasp package.
 """
 
 ADAPTIVE_GRASP_VERSION_MAJOR = 2
-ADAPTIVE_GRASP_VERSION_MINOR = 0
+ADAPTIVE_GRASP_VERSION_MINOR = 1
 ADAPTIVE_GRASP_VERSION_REVISION = 0
 
-GIT_COMMIT_HASH = "36eaa766cc5d77c1af292dd757790a88d0dfd7ae"
+
 MODULE_SUMMARY = (
     "Adaptive grasp module with grasp execution, hold control, tactile analysis, and safety monitoring."
-    "The stage of adaptive holding provides two modes: position hold and torque hold."
+    "The stage of adaptive holding provides two modes: position hold and stiff postion hold."
 )
 
 __version__ = "{}.{}.{}".format(

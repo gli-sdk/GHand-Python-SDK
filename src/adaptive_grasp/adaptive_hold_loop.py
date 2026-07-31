@@ -4,20 +4,28 @@ from enum import Enum, auto
 from typing import Any, Optional, Protocol
 
 from ghand import CtrlMode, JointCommand, JointId, TactileSensorId
-from .config import AdaptiveGraspConfig
+from .config import AdaptiveGraspConfig, HoldCommandMode
 from .force_reference_planner import ForceReferencePlanner
+from .incremental_position_hold_planner import IncrementalPositionHoldPlanner
 from .joint_builder import JointCommandBuilder
 from .position_hold_planner import ForceDecision, PositionHoldPlanner
 from .ports import HandCommandPort, SensorFrameSource
 from .safety import SafetyMonitor, SafetyReport, SafetyStatus
 from .runtime import GraspState
 from .tactility import TactileAnalyzer, TactileAnalysis
-from .torque_hold_planner import TorqueHoldDecision, TorqueHoldPlanner
-from .utils import clip
+from .utils import normalize_joint_angles, normalize_joint_id
 from .visualization import TactileVisualizer
 
 _logger = logging.getLogger("adaptive_grasp.adaptive_hold_loop")
 _MAX_CONTROL_DT_S = 1.0
+_POSITION_HOLD_THUMB_AUX_JOINTS = (
+    JointId.THUMB_TMC_AA,
+    JointId.THUMB_TMC_PS,
+)
+_POSITION_HOLD_MODES_WITH_THUMB_AUX = {
+    HoldCommandMode.POSITION,
+    HoldCommandMode.STIFF_POSITION,
+}
 
 ForceDecisions = dict[TactileSensorId, ForceDecision]
 JointAngles = dict[JointId, float]
@@ -37,7 +45,6 @@ class HoldStepResult:
     tactile_analysis: Optional[TactileAnalysis] = None
     safety_report: Optional[SafetyReport] = None
     force_decisions: Optional[ForceDecisions] = None
-    torque_hold_decision: Optional[TorqueHoldDecision] = None
     current_torque: Optional[int] = None
 
 
@@ -50,16 +57,7 @@ class PositionHoldCommand:
     force_refs: Optional[dict[TactileSensorId, float]] = None
 
 
-@dataclass
-class TorqueHoldCommand:
-    angles: JointAngles
-    torque: int
-    finger_torques: Optional[dict[TactileSensorId, float]] = None
-    torque_hold_decision: Optional[TorqueHoldDecision] = None
-    force_refs: Optional[dict[TactileSensorId, float]] = None
-
-
-HoldCommand = PositionHoldCommand | TorqueHoldCommand
+HoldCommand = PositionHoldCommand
 
 
 @dataclass(frozen=True)
@@ -71,6 +69,7 @@ class _HoldSensorFrame:
 
 
 class HoldObserver(Protocol):
+
     def on_hold_step(
         self,
         *,
@@ -84,6 +83,7 @@ class HoldObserver(Protocol):
 
 
 class _VisualizerHoldObserver:
+
     def __init__(self, visualizer: TactileVisualizer):
         self._visualizer = visualizer
 
@@ -119,10 +119,12 @@ class HoldController:
         config: AdaptiveGraspConfig,
         current_torque: int,
         contact_joint_angles: Optional[JointAngles] = None,
-        torque_hold_planner: Optional[TorqueHoldPlanner] = None,
         force_reference_planner: Optional[ForceReferencePlanner] = None,
         position_hold_planner: Optional[PositionHoldPlanner] = None,
+        stiff_position_hold_planner: Optional[
+            IncrementalPositionHoldPlanner] = None,
         observer: Optional[HoldObserver] = None,
+        hold_target_force_n: Optional[float] = None,
     ):
         self.hand = hand
         self._sensor = sensor
@@ -131,16 +133,17 @@ class HoldController:
         self._joint_builder = joint_builder
         self.config = config
         self._current_torque = current_torque
-        self._contact_joint_angles = dict(contact_joint_angles or {})
-        self._torque_hold_planner = torque_hold_planner
+        self._contact_joint_angles = normalize_joint_angles(
+            contact_joint_angles or {})
         self._force_reference_planner = force_reference_planner
         self._position_hold_planner = position_hold_planner
-        self._observer = observer or (
-            _VisualizerHoldObserver(visualizer) if visualizer is not None else None
-        )
+        self._stiff_position_hold_planner = stiff_position_hold_planner
+        self._hold_target_force_n = hold_target_force_n
+        self._observer = observer or (_VisualizerHoldObserver(visualizer)
+                                      if visualizer is not None else None)
         self._last_sample_time_s: Optional[float] = None
         self._consecutive_move_failures = 0
-        self._max_consecutive_move_failures = self.config.adaptive_hold_move_failure_limit
+        self._max_consecutive_move_failures = self.config.position_hold_move_failure_limit
 
     def run_step(self, current_time: float) -> HoldStepResult:
         frame = self._read_hold_frame()
@@ -178,12 +181,7 @@ class HoldController:
             result=HoldResult.CONTINUE,
             tactile_analysis=analysis,
             safety_report=safety,
-            force_decisions=command.decisions if isinstance(command, PositionHoldCommand) else None,
-            torque_hold_decision=(
-                command.torque_hold_decision
-                if isinstance(command, TorqueHoldCommand)
-                else None
-            ),
+            force_decisions=command.decisions,
             current_torque=self._current_torque,
         )
 
@@ -213,11 +211,9 @@ class HoldController:
         return dt
 
     def _fault_result(self, safety: SafetyReport) -> HoldStepResult:
-        result = (
-            HoldResult.FAULT_RELEASE
-            if self.config.enable_fault_release_fallback
-            else HoldResult.ERROR
-        )
+        result = (HoldResult.FAULT_RELEASE
+                  if self.config.enable_fault_release_fallback else
+                  HoldResult.ERROR)
         return HoldStepResult(
             result=result,
             safety_report=safety,
@@ -248,17 +244,13 @@ class HoldController:
         current_angles: JointAngles,
         dt: float,
     ) -> HoldCommand:
-        if self._can_plan_torque_hold():
-            return self._plan_torque_hold_command(analysis, current_angles, dt)
+        if self._can_plan_stiff_position_hold():
+            return self._plan_stiff_position_hold_command(
+                analysis, current_angles)
 
         if self._can_plan_position_hold():
-            return self._plan_position_hold_command(analysis, current_angles, dt)
-
-        if self.config.hold_command_mode == "torque":
-            return TorqueHoldCommand(
-                angles=current_angles,
-                torque=self._default_hold_torque(),
-            )
+            return self._plan_position_hold_command(analysis, current_angles,
+                                                    dt)
 
         return PositionHoldCommand(
             angles=current_angles,
@@ -267,38 +259,32 @@ class HoldController:
             decisions={},
         )
 
-    def _can_plan_torque_hold(self) -> bool:
-        return (
-            self.config.hold_command_mode == "torque"
-            and self._torque_hold_planner is not None
-            and self._force_reference_planner is not None
-        )
-
     def _can_plan_position_hold(self) -> bool:
-        return (
-            self.config.hold_command_mode == "position"
-            and self._position_hold_planner is not None
-            and self._force_reference_planner is not None
-        )
+        return (self.config.hold_command_mode is HoldCommandMode.POSITION
+                and self._position_hold_planner is not None
+                and self._force_reference_planner is not None)
 
-    def _plan_torque_hold_command(
+    def _can_plan_stiff_position_hold(self) -> bool:
+        return (self.config.hold_command_mode is HoldCommandMode.STIFF_POSITION
+                and self._stiff_position_hold_planner is not None)
+
+    def _plan_stiff_position_hold_command(
         self,
         analysis: TactileAnalysis,
         current_angles: JointAngles,
-        dt: float,
-    ) -> TorqueHoldCommand:
-        force_reference = self._force_reference_planner.compute(analysis, dt=dt)
-        decision = self._torque_hold_planner.compute(
+    ) -> PositionHoldCommand:
+        assert self._stiff_position_hold_planner is not None
+        decisions = self._stiff_position_hold_planner.compute(
             analysis,
-            force_reference,
-            dt=dt,
+            current_angles,
+            target_force_n=self._hold_target_force_n,
         )
-        return TorqueHoldCommand(
-            angles=current_angles,
-            torque=self._max_rounded_torque(decision.finger_torques, self._current_torque),
-            finger_torques=decision.finger_torques,
-            torque_hold_decision=decision,
-            force_refs=force_reference.force_refs,
+        return PositionHoldCommand(
+            angles=self._merge_target_angles(current_angles, decisions),
+            torque=self._next_torque(decisions),
+            speed=self._next_speed(decisions),
+            decisions=decisions,
+            force_refs=None,
         )
 
     def _plan_position_hold_command(
@@ -307,7 +293,8 @@ class HoldController:
         current_angles: JointAngles,
         dt: float,
     ) -> PositionHoldCommand:
-        force_reference = self._force_reference_planner.compute(analysis, dt=dt)
+        force_reference = self._force_reference_planner.compute(analysis,
+                                                                dt=dt)
         decisions = self._position_hold_planner.compute(
             analysis,
             current_angles,
@@ -347,11 +334,6 @@ class HoldController:
         next_speed = next(iter(decisions.values())).next_speed
         return 0 if next_speed is None else next_speed
 
-    def _default_hold_torque(self) -> int:
-        if self.config.hold_command_mode == "torque":
-            return self.config.torque_hold_base_torque
-        return self._current_torque
-
     def _execute_hold_command(
         self,
         command: HoldCommand,
@@ -381,42 +363,44 @@ class HoldController:
             current_torque=self._current_torque,
         )
 
-    def _build_hold_payload(self, command: HoldCommand) -> tuple[list[JointCommand], CtrlMode, int]:
-        if isinstance(command, TorqueHoldCommand):
-            return self._build_torque_hold_payload(command)
-
+    def _build_hold_payload(
+            self,
+            command: HoldCommand) -> tuple[list[JointCommand], CtrlMode, int]:
         angles = self._clamp_to_contact_window(command.angles)
         joints = self._joint_builder.hold_position_command(
             command.torque,
             angles,
             speed=command.speed,
         )
+        self._append_position_hold_thumb_aux_commands(joints)
         return joints, CtrlMode.POSITION, command.torque
 
-    def _build_torque_hold_payload(self, command: TorqueHoldCommand) -> tuple[list[JointCommand], CtrlMode, int]:
-        if command.finger_torques is None:
-            torque = command.torque
-            return self._joint_builder.hold_torque_command(torque), CtrlMode.TORQUE, torque
-
-        next_torque = self._max_rounded_torque(command.finger_torques, command.torque)
-        return (
-            self._joint_builder.hold_per_finger_torque_command(command.finger_torques),
-            CtrlMode.TORQUE,
-            next_torque,
-        )
-
-    def _max_rounded_torque(
+    def _append_position_hold_thumb_aux_commands(
         self,
-        finger_torques: dict[TactileSensorId, float],
-        default_torque: int,
-    ) -> int:
-        return round(
-            clip(
-                max(finger_torques.values(), default=float(default_torque)),
-                -100.0,
-                self.config.max_torque,
-            )
-        )
+        joints: list[JointCommand],
+    ) -> None:
+        if self.config.hold_command_mode not in _POSITION_HOLD_MODES_WITH_THUMB_AUX:
+            return
+
+        command_by_id = {JointId(command.id): command for command in joints}
+        for joint_id in _POSITION_HOLD_THUMB_AUX_JOINTS:
+            if joint_id not in self._contact_joint_angles:
+                continue
+
+            command = command_by_id.get(joint_id)
+            if command is None:
+                joints.append(
+                    JointCommand(
+                        id=joint_id,
+                        angle=self._contact_joint_angles[joint_id],
+                        speed=100,
+                        torque=100,
+                    ))
+                continue
+
+            command.angle = self._contact_joint_angles[joint_id]
+            command.speed = 100
+            command.torque = 100
 
     def _clamp_to_contact_window(self, angles: JointAngles) -> JointAngles:
         if not self._contact_joint_angles:
@@ -426,14 +410,18 @@ class HoldController:
         for joint_id, base_angle in self._contact_joint_angles.items():
             if joint_id not in clamped_angles:
                 continue
-            lower = base_angle - self.config.contact_angle_guard_margin_rad
-            upper = base_angle + self.config.contact_angle_guard_margin_rad
-            clamped_angles[joint_id] = max(lower, min(clamped_angles[joint_id], upper))
+            guard_margin = (
+                self.config.position_hold_contact_angle_guard_margin_deg)
+            lower = base_angle - guard_margin
+            upper = base_angle + guard_margin
+            clamped_angles[joint_id] = max(
+                lower, min(clamped_angles[joint_id], upper))
         return clamped_angles
 
-    def _get_current_angles(self, joint_feedback: Optional[list[JointCommand]]) -> JointAngles:
+    def _get_current_angles(
+            self, joint_feedback: Optional[list[JointCommand]]) -> JointAngles:
         if joint_feedback:
-            return {j.id: j.angle for j in joint_feedback}
+            return {normalize_joint_id(j.id): j.angle for j in joint_feedback}
         if self._contact_joint_angles:
             return dict(self._contact_joint_angles)
         return self._joint_builder.init_hold_angles()
