@@ -1,9 +1,8 @@
-import math
 from typing import Mapping, Optional
 
-from ghand import JointCommand, JointId, TactileSensorId
+from ghand import JointCommand, JointId
 from .config import AdaptiveGraspConfig
-from .utils import FINGER_TO_MCP_PIP, clip
+from .utils import clip
 
 
 TORQUE_CONTROL_JOINTS = (
@@ -27,19 +26,19 @@ class JointCommandBuilder:
 
     def open_pose(self) -> dict[JointId, float]:
         return {
-            JointId.THUMB_MCP: math.radians(0),
-            JointId.THUMB_TMC_FE: math.radians(0),
-            JointId.THUMB_TMC_AA: math.radians(80),
-            JointId.THUMB_TMC_PS: math.radians(0),
-            JointId.FF_PIP: math.radians(0),
-            JointId.FF_MCP: math.radians(0),
-            JointId.FF_MCP_AA: math.radians(0),
-            JointId.MF_PIP: math.radians(0),
-            JointId.MF_MCP: math.radians(0),
-            JointId.RF_PIP: math.radians(0),
-            JointId.RF_MCP: math.radians(0),
-            JointId.LF_PIP: math.radians(0),
-            JointId.LF_MCP: math.radians(0),
+            JointId.THUMB_MCP: 0.0,
+            JointId.THUMB_TMC_FE: 0.0,
+            JointId.THUMB_TMC_AA: 80.0,
+            JointId.THUMB_TMC_PS: 0.0,
+            JointId.FF_PIP: 0.0,
+            JointId.FF_MCP: 0.0,
+            JointId.FF_MCP_AA: 0.0,
+            JointId.MF_PIP: 0.0,
+            JointId.MF_MCP: 0.0,
+            JointId.RF_PIP: 0.0,
+            JointId.RF_MCP: 0.0,
+            JointId.LF_PIP: 0.0,
+            JointId.LF_MCP: 0.0,
         }
 
     def init_hold_angles(self) -> dict[JointId, float]:
@@ -65,36 +64,7 @@ class JointCommandBuilder:
         ]
         joints += [
             JointCommand(id=JointId.THUMB_TMC_PS, angle=0.0, speed=0, torque=thumb_aux_torque),
-            JointCommand(id=JointId.THUMB_TMC_AA, angle=0.0, speed=0, torque=thumb_aux_torque),
-        ]
-        return joints
-
-    def hold_torque_command(self, torque: int) -> list[JointCommand]:
-        return self.torque_command(torque)
-
-    def hold_per_finger_torque_command(
-        self,
-        finger_torques: Mapping[TactileSensorId, float],
-    ) -> list[JointCommand]:
-        active_joints = set(self._torque_joints)
-        joint_torques: dict[JointId, int] = {}
-
-        for finger, torque in finger_torques.items():
-            for joint_id in FINGER_TO_MCP_PIP.get(finger, ()):
-                if joint_id in active_joints:
-                    joint_torques[joint_id] = round(
-                        clip(torque, -100.0, self._config.max_torque)
-                    )
-
-        joints = [
-            JointCommand(id=joint_id, torque=joint_torques[joint_id])
-            if joint_id in joint_torques
-            else JointCommand(id=joint_id, angle=0.0, speed=0, torque=0)
-            for joint_id in TORQUE_CONTROL_JOINTS
-        ]
-        joints += [
-            JointCommand(id=JointId.THUMB_TMC_PS, angle=0.0, speed=0, torque=self._config.thumb_aux_torque),
-            JointCommand(id=JointId.THUMB_TMC_AA, angle=0.0, speed=0, torque=self._config.thumb_aux_torque),
+            JointCommand(id=JointId.THUMB_TMC_AA, angle=20.0, speed=0, torque=thumb_aux_torque),
         ]
         return joints
 

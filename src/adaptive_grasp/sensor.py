@@ -1,11 +1,10 @@
 import logging
-import math
 import time
 from typing import Any, Optional
 
 from ghand import JointData, TactileInfo, TactileSensorId
 from ghand.comm.ethercat_comm import EthercatComm
-from .utils import active_finger_normal_forces, normal_force_z
+from .utils import active_finger_normal_forces, normal_force_z, normalize_joint_id
 
 _logger = logging.getLogger("ghand.sensor")
 _DEFAULT_FINGER_TOUCH_THRESHOLD_N = 0.1
@@ -14,7 +13,7 @@ _DEFAULT_FINGER_TOUCH_THRESHOLD_N = 0.1
 class SensorClient:
     """统一封装灵巧手传感器数据的订阅、提取与缓存。
 
-    通过 ``hand.subscribe()`` 后台接收 Tpdo，解析后缓存触觉数据和关节反馈，
+    通过 ``hand.subscribe()`` 后台接收统一的 ``DeviceData``，缓存触觉数据和关节反馈，
     供控制器或其它模块以只读方式安全访问。
     """
 
@@ -95,6 +94,7 @@ class SensorClient:
             self._active_fingers,
         )
         return sum(normal_forces.values())
+
     def active_finger_touch_flag(self) -> dict[TactileSensorId, bool]:
         # 判断活动手指是否都接触
         if self._latest_tactile_data is None:
@@ -113,54 +113,32 @@ class SensorClient:
     # ------------------------------------------------------------------
     # 内部回调
     # ------------------------------------------------------------------
-    def _on_data(self, tpdo: Any) -> None:
-        tactile_data = {
-            TactileSensorId.THUMB: TactileInfo(
-                state=bool(tpdo.tactile_state.state & (1 << 0)),
-                resultant_force=tpdo.thumb_tactile.resultant_force,
-                distributed_force=tpdo.thumb_tactile.sample_force,
-            ),
-            TactileSensorId.FF: TactileInfo(
-                state=bool(tpdo.tactile_state.state & (1 << 1)),
-                resultant_force=tpdo.ff_tactile.resultant_force,
-                distributed_force=tpdo.ff_tactile.sample_force,
-            ),
-            TactileSensorId.MF: TactileInfo(
-                state=bool(tpdo.tactile_state.state & (1 << 2)),
-                resultant_force=tpdo.mf_tactile.resultant_force,
-                distributed_force=tpdo.mf_tactile.sample_force,
-            ),
-            TactileSensorId.RF: TactileInfo(
-                state=bool(tpdo.tactile_state.state & (1 << 3)),
-                resultant_force=tpdo.rf_tactile.resultant_force,
-                distributed_force=tpdo.rf_tactile.sample_force,
-            ),
-            TactileSensorId.LF: TactileInfo(
-                state=bool(tpdo.tactile_state.state & (1 << 4)),
-                resultant_force=tpdo.lf_tactile.resultant_force,
-                distributed_force=tpdo.lf_tactile.sample_force,
-            ),
-        }
-        self._latest_tactile_data = {
-            finger: info
-            for finger, info in tactile_data.items()
-            if finger in self._active_fingers
-        }
+    def _on_data(self, data: Any) -> None:
+        if not (hasattr(data, "tactile") and hasattr(data, "joints")):
+            raise TypeError(
+                "SensorClient subscription callback expects ghand.DeviceData; "
+                "legacy TPDO parsing is not supported."
+            )
+
+        tactile = getattr(data, "tactile", None)
+        if tactile is None:
+            self._latest_tactile_data = None
+        else:
+            self._latest_tactile_data = {
+                TactileSensorId(finger): info
+                for finger, info in tactile.items()
+                if TactileSensorId(finger) in self._active_fingers
+            }
         self._last_sample_time_s = self._get_monotonic_time()
 
-
-        joint_mappings = list(tpdo.joints.items())
-
-        joints: list[JointData] = []
-        for joint_id, joint_tpdo in joint_mappings:
-            joints.append(
-                JointData(
-                    id=joint_id,
-                    state=EthercatComm._parse_state(joint_tpdo.state),
-                    error=EthercatComm._parse_error_code(joint_tpdo.error),
-                    angle=math.radians(joint_tpdo.angle),
-                    speed=joint_tpdo.speed,
-                    torque=joint_tpdo.torque,
-                )
+        self._latest_joint_feedback = [
+            JointData(
+                id=normalize_joint_id(joint_data.id),
+                state=joint_data.state,
+                error=joint_data.error,
+                angle=joint_data.angle,
+                speed=joint_data.speed,
+                torque=joint_data.torque,
             )
-        self._latest_joint_feedback = joints
+            for joint_data in getattr(data, "joints", ())
+        ]

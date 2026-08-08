@@ -1,5 +1,4 @@
 import logging
-import math
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Optional
@@ -8,7 +7,7 @@ from ghand import TactileSensorId
 
 from .config import AdaptiveGraspConfig
 from .runtime import GraspState
-from .utils import active_finger_normal_forces
+from .utils import active_finger_normal_forces, normalize_joint_id
 
 _logger = logging.getLogger("adaptive_grasp.safety")
 
@@ -38,7 +37,9 @@ class SafetyMonitor:
         self._closing_baseline_angles: dict[Any, float] = {}
 
     def set_closing_baseline(self, joint_feedback: list) -> None:
-        self._closing_baseline_angles = {j.id: j.angle for j in joint_feedback}
+        self._closing_baseline_angles = {
+            normalize_joint_id(j.id): j.angle for j in joint_feedback
+        }
 
     def check(
         self,
@@ -152,14 +153,15 @@ class SafetyMonitor:
         threshold = self.config.empty_grasp_angle_threshold
         exceeded_joints = []
         for joint in joint_feedback:
-            delta = abs(joint.angle - self._closing_baseline_angles.get(joint.id, 0.0))
+            joint_id = normalize_joint_id(joint.id)
+            delta = abs(joint.angle -
+                        self._closing_baseline_angles.get(joint_id, 0.0))
             if delta > threshold:
                 exceeded_joints.append(
                     {
-                        "joint": self._joint_label(joint.id),
-                        "delta_rad": delta,
-                        "delta_deg": math.degrees(delta),
-                        "threshold_deg": math.degrees(threshold),
+                        "joint": self._joint_label(joint_id),
+                        "delta_deg": delta,
+                        "threshold_deg": threshold,
                     }
                 )
 
@@ -168,8 +170,11 @@ class SafetyMonitor:
                 f"{item['joint']}={item['delta_deg']:.1f}deg"
                 for item in exceeded_joints
             )
-            _logger.error("Empty grasp detected: measured angle > empty grasp threshold: %s > %.1f deg", 
-                          summary, math.degrees(threshold))
+            _logger.error(
+                "Empty grasp detected: measured angle > empty grasp threshold: %s > %.1f deg",
+                summary,
+                threshold,
+            )
             return SafetyReport(
                 SafetyStatus.FAULT,
                 "empty_grasp",

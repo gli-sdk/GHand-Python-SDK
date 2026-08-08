@@ -4,11 +4,11 @@ from ghand import ProductType, configure_logging
 from ghand.ghand import CommType, GHand
 
 # Configure SDK logging (shows connection state, errors, etc.)
-configure_logging(level=logging.INFO)
+configure_logging(level=logging.DEBUG)
 
 
 def main():
-    hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+    hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
     connected = hand.open("auto")
     if not connected:
         print("Connection failed")

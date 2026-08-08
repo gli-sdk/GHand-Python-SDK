@@ -20,7 +20,7 @@ def main():
 
     # Create and connect first hand
     print("Connecting first dexterous hand...")
-    hand1 = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+    hand1 = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
     connected1 = hand1.open("\\Device\\NPF_{B1A930DF-53B0-483A-ABB8-6C3146F1FC2D}")
     if not connected1:
         print("First hand connection failed")
@@ -28,7 +28,7 @@ def main():
 
         # Create and connect second hand
     print("Connecting second dexterous hand...")
-    hand2 = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+    hand2 = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
     connected2 = hand2.open("\\Device\\NPF_{5539C758-F9F9-482D-B319-1760CE5958A6}")
     if not connected2:
         print("Second hand connection failed")

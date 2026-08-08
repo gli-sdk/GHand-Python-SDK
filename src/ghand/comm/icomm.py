@@ -65,6 +65,17 @@ class IComm(ABC):
         """
         ...
 
+    def set_slave_id(self, slave_id: int) -> bool:
+        """Set the device slave ID.
+
+        Args:
+            slave_id: New slave ID to write to the device.
+
+        Returns:
+            True if the command succeeds, False otherwise.
+        """
+        return False
+
     # ===== Joint control =====
 
     @abstractmethod

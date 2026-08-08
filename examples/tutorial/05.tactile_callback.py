@@ -9,7 +9,7 @@ from ghand.ghand import CommType, GHand
 class TactileDisplay:
 
     def __init__(self):
-        self.hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+        self.hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
         self.connected = False
         self.tactile_opened = False
         self.running = False

@@ -54,8 +54,7 @@ GHand 灵巧手官方 Python SDK，为机器人操作研究与开发提供精确
 | 平台 | 要求 |
 |---|---|
 | Python | 3.10 ~ 3.13 |
-| Linux | Ubuntu 20.04/22.04 LTS (x86_64 / aarch64), glibc >= 2.31 |
-| macOS | 10.15+ |
+| Linux | Ubuntu 22.04/24.04 LTS (x86_64), glibc >= 2.35 |
 | Windows | 10 / 11 |
 
 ## 安装
@@ -98,11 +97,87 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-> **Linux 说明：** EtherCAT 需要原始套接字权限。如果遇到权限错误，请为 Python 解释器授予该能力：
->
-> ```bash
-> sudo setcap cap_net_raw+ep $(which python3)
-> ```
+### Linux EtherCAT 说明
+
+EtherCAT 需要原始套接字权限。如果遇到权限错误，请为 Python 解释器授予该能力：
+
+```bash
+sudo setcap 'cap_net_raw,cap_net_admin=eip' $(which python3)
+```
+
+### Linux RS485 串口说明
+
+Linux 下使用 USB-RS485 转接器时，SDK 会优先自动扫描 `/dev/serial/by-id/*`、`/dev/ttyUSB*`、`/dev/ttyACM*` 和 `/dev/ttyAMA*`。不建议自动扫描 `/dev/ttyS*`，这些通常是主板内置串口；如确实使用板载串口，请在 `open()` 中显式传入对应设备名。
+
+常用检查命令：
+
+```bash
+lsusb
+ls -l /dev/ttyUSB* /dev/ttyACM* /dev/serial/by-id/ 2>/dev/null
+python3 -m serial.tools.list_ports
+```
+
+CH340/CH341 USB-RS485 转接器通常会显示为 `1a86:7523 QinHeng Electronics CH340 serial converter`，并映射为 `/dev/ttyUSB0` 或 `/dev/serial/by-id/...`。如果 `dmesg` 中出现 `brltty` 抢占设备并导致 `ttyUSB0` 断开，可停止或卸载 `brltty`：
+
+```bash
+sudo systemctl stop brltty
+sudo systemctl disable brltty
+# 如不使用盲文终端设备，也可卸载：
+sudo apt remove brltty
+```
+
+若串口存在但无法打开，请确认当前用户在 `dialout` 组中：
+
+```bash
+groups
+sudo usermod -aG dialout $USER
+```
+
+修改用户组后需要注销并重新登录。RS485 默认波特率为 `1000000`，如需覆盖可设置：
+
+```bash
+export GHAND_RS485_BAUDRATE=1000000
+```
+
+### CANFD 适配器说明
+
+CANFD 模式支持 ZQWL-CANFD CDC 串口设备。设备 USB 侧显示为 `3562:0101 ZQWL-CANFD`，Linux 下通常是 `/dev/ttyACM0` 或 `/dev/serial/by-id/...`，Windows 下通常是 `COMx`。这类设备按 ZQWL 二次开发串口协议通信。
+
+常用检查命令：
+
+```bash
+lsusb
+lsusb -t
+ls -l /dev/ttyACM* /dev/serial/by-id/ 2>/dev/null
+python3 -m serial.tools.list_ports
+```
+
+如果 `lsusb -t` 显示 `Driver=cdc_acm`，说明设备当前是 CDC 串口模式。SDK 会在 CANFD 模式下扫描 ZQWL CDC 串口设备。
+
+### RS485/CANFD 从站 ID
+
+RS485 和 CANFD 设备使用保持寄存器 `0x0000` 作为从站 ID 寄存器。左手默认 ID 为 `0x31`，右手默认 ID 为 `0x32`；如果设备已经被设置为其它 ID，可以在 `open()` 中临时覆盖：
+
+```python
+hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.CANFD)
+hand.open("COM10", slave_id=0x31)
+```
+
+如需修改已连接设备的从站 ID，调用 `set_slave_id()`。修改 ID 时建议总线上只连接一只目标手：
+
+```python
+ok = hand.set_slave_id(0x32)
+hand.close()
+```
+
+修改后使用新 ID 重新连接：
+
+```python
+hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.CANFD)
+hand.open("COM10", slave_id=0x32)
+```
+
+可以使用 `examples/tutorial/11.set_slave_id.py` 按带确认开关的流程测试从站 ID 修改。
 
 ## 快速开始
 

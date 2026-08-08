@@ -34,6 +34,9 @@ dev = [
 Homepage = "https://github.com/gli-sdk/GHand-Python-SDK"
 Gitee = "https://gitee.com/glitech/GHand-Python-SDK"
 
+[tool.setuptools]
+package-dir = {"" = "src"}
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

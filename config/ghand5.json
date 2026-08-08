@@ -1,8 +1,6 @@
 {
-  "model": "G5-13A23D-S01",
-  "name": "XIAOYAO-Hand",
-  "slave_id": 49,
-  "modbus_profile": "g5",
+  "model": "G5-13A18D-S01",
+  "name": "GHand 5",
   "joints": [
     { "id": "THUMB_IP" },
     { "id": "THUMB_MCP",  "min": 0.0,  "max": 66.0 },

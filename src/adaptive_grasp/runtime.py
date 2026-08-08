@@ -38,7 +38,6 @@ class AdaptiveGraspRuntime:
     last_tactile_analysis: Optional[Any] = None
     last_safety_report: Optional[Any] = None
     last_force_decisions: Optional[Any] = None
-    last_torque_hold_decision: Optional[Any] = None
     last_tactile_data_age_s: Optional[float] = None
     last_control_step_start_s: Optional[float] = None
     last_control_cycle_s: Optional[float] = None
@@ -54,7 +53,6 @@ class AdaptiveGraspRuntime:
         self.last_tactile_analysis = None
         self.last_safety_report = None
         self.last_force_decisions = None
-        self.last_torque_hold_decision = None
         self.last_tactile_data_age_s = None
         self.last_control_step_start_s = None
         self.last_control_cycle_s = None
@@ -81,7 +79,6 @@ class AdaptiveGraspRuntime:
         self.last_tactile_analysis = step.tactile_analysis
         self.last_safety_report = step.safety_report
         self.last_force_decisions = step.force_decisions
-        self.last_torque_hold_decision = step.torque_hold_decision
         if step.current_torque is not None:
             self.current_torque = step.current_torque
 

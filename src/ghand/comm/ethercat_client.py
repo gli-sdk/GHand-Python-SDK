@@ -110,7 +110,8 @@ class EthercatClient:
     def __del__(self):
         """Destructor — ensures the adapter lock is released."""
         try:
-            self._cleanup_connection(switch_to_init=False)
+            if self._connected or self._slave is not None or self._lock_file is not None:
+                self._cleanup_connection(switch_to_init=False)
         except Exception:
             pass  # ignore errors during destruction
 
@@ -467,48 +468,48 @@ class EthercatClient:
                 logger.error("Previous EtherCAT worker thread is still running")
                 return False
 
-        if self._master.state != pysoem.INIT_STATE:
-            self._master.state = pysoem.INIT_STATE
+        # if self._master.state != pysoem.INIT_STATE:
+        #     self._master.state = pysoem.INIT_STATE
 
         try:
             if len(self._master.slaves) > 0:
                 slave = self._master.slaves[0]
 
-                if slave.state != pysoem.INIT_STATE:
-                    slave.state = pysoem.INIT_STATE
-                    slave.write_state()
-                    if slave.state_check(pysoem.INIT_STATE, timeout=100_000) != pysoem.INIT_STATE:
-                        logger.error("Failed to enter INIT state. Current state: %s", slave.state)
-                        self._cleanup_connection(switch_to_init=False)
-                        return False
+                # if slave.state != pysoem.INIT_STATE:
+                #     slave.state = pysoem.INIT_STATE
+                #     slave.write_state()
+                #     if slave.state_check(pysoem.INIT_STATE, timeout=100_000) != pysoem.INIT_STATE:
+                #         logger.error("Failed to enter INIT state. Current state: %s", slave.state)
+                #         self._cleanup_connection(switch_to_init=False)
+                #         return False
 
-                config_result = self._master.config_init()
-                if config_result <= 0:
-                    logger.error("Config init failed with result: %s", config_result)
-                    self._cleanup_connection(switch_to_init=False)
-                    return False
+                # config_result = self._master.config_init()
+                # if config_result <= 0:
+                #     logger.error("Config init failed with result: %s", config_result)
+                #     self._cleanup_connection(switch_to_init=False)
+                #     return False
 
                 self._master.config_map()
 
-                if not self._matches_expected_size(len(slave.input), expected_input_size):
-                    logger.error("Expected input size error!")
-                    logger.error(
-                        "Expected input size(s): %s, actual input size: %s",
-                        self._format_expected_size(expected_input_size),
-                        len(slave.input),
-                    )
-                    self._cleanup_connection(switch_to_init=False)
-                    return False
+                # if not self._matches_expected_size(len(slave.input), expected_input_size):
+                #     logger.error("Expected input size error!")
+                #     logger.error(
+                #         "Expected input size(s): %s, actual input size: %s",
+                #         self._format_expected_size(expected_input_size),
+                #         len(slave.input),
+                #     )
+                #     self._cleanup_connection(switch_to_init=False)
+                #     return False
 
-                if not self._matches_expected_size(len(slave.output), expected_output_size):
-                    logger.error("Expected output size error!")
-                    logger.error(
-                        "Expected output size(s): %s, actual output size: %s",
-                        self._format_expected_size(expected_output_size),
-                        len(slave.output),
-                    )
-                    self._cleanup_connection(switch_to_init=False)
-                    return False
+                # if not self._matches_expected_size(len(slave.output), expected_output_size):
+                #     logger.error("Expected output size error!")
+                #     logger.error(
+                #         "Expected output size(s): %s, actual output size: %s",
+                #         self._format_expected_size(expected_output_size),
+                #         len(slave.output),
+                #     )
+                #     self._cleanup_connection(switch_to_init=False)
+                #     return False
             else:
                 logger.warning("No slaves found")
                 self._cleanup_connection(switch_to_init=False)

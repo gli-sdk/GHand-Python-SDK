@@ -17,9 +17,12 @@
 from __future__ import annotations
 
 import logging
+import os
+import platform
 import struct
 import threading
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 try:
     import serial.tools.list_ports
@@ -67,6 +70,13 @@ class Rs485Comm(IComm):
     """IComm implementation for RS485/Modbus RTU."""
 
     _DEFAULT_POLL_INTERVAL_SEC = 0.1
+    _DEFAULT_BAUDRATE = 1_000_000
+    _LINUX_PORT_PATTERNS = (
+        "/dev/serial/by-id/*",
+        "/dev/ttyUSB*",
+        "/dev/ttyACM*",
+        "/dev/ttyAMA*",
+    )
 
     def __init__(self, config: ProductConfig):
         self._config = config
@@ -130,17 +140,67 @@ class Rs485Comm(IComm):
         with self._io_lock:
             return client.write_registers(address, values, device_id=self._slave_id)
 
+    @classmethod
+    def _linux_serial_candidates(cls) -> list[str]:
+        """Return common Linux serial/USB-RS485 device paths."""
+        candidates: list[str] = []
+        for pattern in cls._LINUX_PORT_PATTERNS:
+            candidates.extend(str(path) for path in Path("/").glob(pattern.lstrip("/")))
+        return candidates
+
+    @staticmethod
+    def _dedupe_ports(ports: list[str]) -> list[str]:
+        """Deduplicate ports while preserving stable sorted output."""
+        return sorted(dict.fromkeys(ports))
+
     def search_adapters(self) -> list[str]:
         """Search for available RS485 adapters.
 
         Returns:
-            List of verified serial port names.
+            List of serial port names. On Linux, auto-discovery prefers USB
+            adapters and stable ``/dev/serial/by-id`` aliases; built-in
+            ``/dev/ttyS*`` ports are supported only when passed explicitly.
         """
         if serial is None:
             logger.warning("pyserial not available, cannot search adapters")
             return []
-        ports = serial.tools.list_ports.comports()
-        return [port.device for port in ports]
+        ports = []
+        for port in serial.tools.list_ports.comports():
+            device = port.device
+            if platform.system() == "Linux" and device.startswith("/dev/ttyS"):
+                continue
+            if platform.system() == "Windows":
+                if port.vid == 0x3562 and port.pid in (0x0100, 0x0101, 0x0105):
+                    continue
+                if not port.vid or not port.pid:
+                    continue
+            ports.append(device)
+        if platform.system() == "Linux":
+            ports.extend(self._linux_serial_candidates())
+        return self._dedupe_ports(ports)
+
+    def _resolve_device_name(self, device_name: str) -> str | None:
+        """Resolve an explicit or default RS485 serial device name."""
+        if device_name:
+            return device_name
+        adapters = self.search_adapters()
+        return adapters[0] if adapters else None
+
+    def _log_linux_connect_hint(self, device_name: str, exc: Exception | None = None) -> None:
+        """Log actionable Linux serial-port hints for common failures."""
+        if platform.system() != "Linux":
+            return
+
+        detail = f": {exc}" if exc is not None else ""
+        logger.error(
+            "Failed to open RS485 serial port %s%s. "
+            "On Linux, verify the device exists and your user has permission. "
+            "Common checks: ls -l %s; add the user to the dialout group; "
+            "or set a udev rule for the USB-RS485 adapter.",
+            device_name,
+            detail,
+            device_name,
+        )
 
     def connect(self, device_name: str) -> bool:
         """Connect to the specified RS485 device.
@@ -151,19 +211,33 @@ class Rs485Comm(IComm):
         Returns:
             True if the connection succeeds, False otherwise.
         """
+        if ModbusSerialClient is None:
+            logger.error("pymodbus not available, cannot connect RS485 device")
+            return False
+
+        resolved_device = self._resolve_device_name(device_name)
+        if resolved_device is None:
+            logger.error("No RS485 serial adapters found")
+            return False
+
+        baudrate = int(os.environ.get("GHAND_RS485_BAUDRATE", self._DEFAULT_BAUDRATE))
         try:
             self._client = ModbusSerialClient(
-                port=device_name,
-                baudrate=1000000,
+                port=resolved_device,
+                baudrate=baudrate,
                 bytesize=8,
                 parity="N",
                 stopbits=1,
                 timeout=1.0,
             )
             if not self._client.connect():
+                self._log_linux_connect_hint(resolved_device)
+                self._client.close()
+                self._client = None
                 return False
-            # Verify device by polling slave IDs 0x31 and 0x32
-            for slave_id in (0x31, 0x32):
+            # Verify device by polling the configured ID first, then common defaults.
+            slave_ids = [self._slave_id, 0x31, 0x32]
+            for slave_id in dict.fromkeys(slave_ids):
                 try:
                     result = self._read_holding_registers(
                         0x0000, count=1, device_id=slave_id
@@ -177,12 +251,23 @@ class Rs485Comm(IComm):
             else:
                 self._client.close()
                 self._client = None
+                logger.error("No RS485 device responded on %s", resolved_device)
                 return False
             self._connected = True
-            logger.info("Device connected via RS485 (%s)", device_name)
+            logger.info(
+                "Device connected via RS485 (%s, baudrate=%s)",
+                resolved_device,
+                baudrate,
+            )
             return True
         except ModbusException as e:
             logger.error("Failed to connect to RS485 device: %s", e)
+            if self._client:
+                self._client.close()
+                self._client = None
+            return False
+        except (OSError, ValueError) as e:
+            self._log_linux_connect_hint(resolved_device, e)
             if self._client:
                 self._client.close()
                 self._client = None
@@ -204,6 +289,20 @@ class Rs485Comm(IComm):
     def is_connected(self) -> bool:
         """Return whether the RS485 client is connected."""
         return self._connected
+
+    def set_slave_id(self, slave_id: int) -> bool:
+        """Write a new Modbus slave ID to holding register 0x0000."""
+        if not 0 < slave_id <= 0xFF:
+            raise ValueError("slave_id must be in range 1..255")
+        try:
+            result = self._write_register(0x0000, slave_id)
+        except Exception as exc:
+            logger.error("Failed to set RS485 slave ID to 0x%02X: %s", slave_id, exc)
+            return False
+        if result is None or result.isError():
+            return False
+        self._slave_id = slave_id
+        return True
 
     # ===== Joint control (single register write) =====
 
@@ -418,10 +517,32 @@ class Rs485Comm(IComm):
 
     # ===== Device operations =====
 
+    def _wait_holding_result(
+        self,
+        address: int,
+        timeout_sec: float = 2.0,
+        interval_sec: float = 0.05,
+    ) -> bool:
+        deadline = time.time() + timeout_sec
+        while time.time() < deadline:
+            result = self._read_holding_registers(address, count=1)
+            if result is None or result.isError():
+                return False
+            status = result.registers[0] & 0x00FF
+            if status == 1:
+                return True
+            if status == 2:
+                return False
+            time.sleep(interval_sec)
+        return False
+
     def clear_fault(self) -> bool:
         """Clear device faults."""
         result = self._write_register(0x0001, 0x0100)
         if result is None or result.isError():
+            return False
+        if not self._wait_holding_result(0x0001):
+            logger.error("Fault clearance failed or timed out")
             return False
         logger.info("Fault cleared")
         return True

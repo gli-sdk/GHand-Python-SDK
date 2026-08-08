@@ -32,7 +32,7 @@ DEFAULT_TORQUE = 100
 def main():
     print("===== GHand SDK - Online Collision Detection Demo =====\n")
 
-    hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+    hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
 
     try:
         print("Connecting to device...")

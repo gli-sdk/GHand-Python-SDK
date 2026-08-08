@@ -199,10 +199,10 @@ class TactileVisualizer:
                     mcp_angle = joint_angles.get(mcp_id)
                     pip_angle = joint_angles.get(pip_id)
                     self._data[finger]["mcp_deg"].append(
-                        math.degrees(mcp_angle) if mcp_angle is not None else None
+                        mcp_angle if mcp_angle is not None else None
                     )
                     self._data[finger]["pip_deg"].append(
-                        math.degrees(pip_angle) if pip_angle is not None else None
+                        pip_angle if pip_angle is not None else None
                     )
                 else:
                     self._data[finger]["mcp_deg"].append(None)

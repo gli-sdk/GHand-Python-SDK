@@ -29,6 +29,7 @@ from ..types import (
     JointCommand,
     JointData,
     ProductConfig,
+    ProductType,
     State,
     TactileRegionConfig,
     TactileInfo,
@@ -43,6 +44,8 @@ from .ethercat_protocol import (
 from .icomm import IComm
 
 logger = logging.getLogger("ghand.ethercat_comm")
+
+
 class EthercatComm(IComm):
     """IComm implementation for EtherCAT."""
 
@@ -74,13 +77,20 @@ class EthercatComm(IComm):
             joint_limits=config.joint_limits.copy(),
             has_tactile=config.has_tactile,
             tactile_regions=tactile_regions,
+            product_type=config.product_type,
             slave_id=config.slave_id,
-            modbus_profile=config.modbus_profile,
-            ethercat_input_sizes=config.ethercat_input_sizes,
-            ethercat_output_size=config.ethercat_output_size,
-            ethercat_rpdo_layout=config.ethercat_rpdo_layout,
-            ethercat_tpdo_layout=config.ethercat_tpdo_layout,
         )
+
+    @staticmethod
+    def _uses_per_joint_control_layout(config: ProductConfig) -> bool:
+        """Return whether the product uses per-joint EtherCAT control fields."""
+        return config.product_type == ProductType.GHandLite1
+
+    def _expected_rpdo_bytes(self, config: ProductConfig) -> int:
+        """Return the expected EtherCAT RPDO byte size for the product."""
+        if self._uses_per_joint_control_layout(config):
+            return len(self._controlled_joints) * 6
+        return 2 + len(self._controlled_joints) * 6
 
     def _build_tpdo_layouts(self, config: ProductConfig) -> dict[int, ProductConfig]:
         """Build supported TPDO layouts keyed by mapped input size."""
@@ -88,8 +98,6 @@ class EthercatComm(IComm):
         layouts = {
             compute_tpdo_size(len(config.valid_joints), tactile_counts): config
         }
-        for input_size in config.ethercat_input_sizes:
-            layouts[input_size] = config
         if config.has_tactile and tactile_counts and tactile_counts[0] > self._COMPAT_THUMB_TACTILE_COUNT:
             compat_counts = list(tactile_counts)
             compat_counts[0] = self._COMPAT_THUMB_TACTILE_COUNT
@@ -122,13 +130,8 @@ class EthercatComm(IComm):
         )
         self._tpdo_size_selected = False
         self._controlled_joints = [j for j in config.valid_joints if j in config.joint_limits]
-        self._expected_rpdo_size = (
-            config.ethercat_output_size
-            if config.ethercat_output_size is not None
-            else 2 + len(self._controlled_joints) * 6
-        )
-        self._rpdo_layout = config.ethercat_rpdo_layout
-        self._tpdo_layout = config.ethercat_tpdo_layout
+        self._expected_rpdo_size = self._expected_rpdo_bytes(config)
+        self._uses_per_joint_control_pdo_layout = self._uses_per_joint_control_layout(config)
 
     # ===== Connection management =====
 
@@ -182,8 +185,8 @@ class EthercatComm(IComm):
         Returns:
             True if the command is sent successfully.
         """
-        if self._rpdo_layout == "per_joint_mode_3reg":
-            self._client.send_data(self._build_l1_rpdo(joints, mode, stop=0))
+        if self._uses_per_joint_control_pdo_layout:
+            self._client.send_data(self._build_per_joint_control_rpdo(joints, mode, stop=0))
         else:
             rpdo = Rpdo(self._controlled_joints)
             rpdo.mode = mode.value
@@ -197,8 +200,8 @@ class EthercatComm(IComm):
 
     def stop(self) -> bool:
         """Send an immediate stop command to all joints."""
-        if self._rpdo_layout == "per_joint_mode_3reg":
-            self._client.send_data(self._build_l1_rpdo([], CtrlMode.POSITION, stop=1))
+        if self._uses_per_joint_control_pdo_layout:
+            self._client.send_data(self._build_per_joint_control_rpdo([], CtrlMode.POSITION, stop=1))
         else:
             rpdo = Rpdo(self._controlled_joints)
             rpdo.mode = 0
@@ -206,13 +209,13 @@ class EthercatComm(IComm):
             self._client.send_data(rpdo.to_bytes())
         return True
 
-    def _build_l1_rpdo(
+    def _build_per_joint_control_rpdo(
         self,
         joints: list[JointCommand],
         mode: CtrlMode,
         stop: int,
     ) -> bytes:
-        """Build the L1 EtherCAT 6-byte-per-joint RPDO."""
+        """Build the per-joint-control EtherCAT 6-byte-per-joint RPDO."""
         by_id = {joint.id: joint for joint in joints}
         data = bytearray()
         for joint_id in self._controlled_joints:
@@ -265,8 +268,8 @@ class EthercatComm(IComm):
         """
         data = self._recv_tpdo_data()
 
-        if self._tpdo_layout == "l1_extended":
-            return self._parse_l1_extended_joints(data)
+        if self._uses_per_joint_control_pdo_layout:
+            return self._parse_per_joint_control_joints(data)
 
         tpdo = Tpdo.from_bytes(data, self._config)
 
@@ -287,8 +290,8 @@ class EthercatComm(IComm):
             )
         return joints
 
-    def _parse_l1_extended_joints(self, data: bytes) -> list[JointData]:
-        """Parse the L1 extended EtherCAT TPDO joint prefix."""
+    def _parse_per_joint_control_joints(self, data: bytes) -> list[JointData]:
+        """Parse the per-joint-control EtherCAT TPDO joint prefix."""
         offset = 4
         joints = []
         for joint_id in self._config.valid_joints:

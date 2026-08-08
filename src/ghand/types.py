@@ -64,15 +64,19 @@ class ErrorCode(enum.IntEnum):
     MOTOR_STALLED = 5
     MOTOR_DRIVER_OVERTEMP = 6
     MOTOR_COMM_ERROR = 7
+    MOTOR_OVERTEMP = 8
     JOINT_CONFLICT = 11
     TIP_CONFLICT = 12
+    JOINT_POSITION_ABNORMAL = 13
     LOW_TEMP = 21
     HIGH_TEMP = 22
     LOW_VOLTAGE = 23
     HIGH_VOLTAGE = 24
+    TACTILE_DISCONNECTED = 31
     TACTILE_ERROR = 31
+    TACTILE_DATA_ABNORMAL = 32
+    SELF_TEST_ERROR = 41
     PARAM_ERROR = 101
-    TIMEOUT = 102
     UNKNOWN_ERROR = 201
 
 
@@ -104,8 +108,8 @@ class TactileSensorId(enum.IntEnum):
 
 
 class ProductType(enum.Enum):
-    G5 = "G5"
-    L1 = "L1"
+    GHand5 = "GHand5"
+    GHandLite1 = "GHandLite1"
 
 
 class GestureType(enum.Enum):
@@ -140,12 +144,8 @@ class ProductConfig:
     joint_limits: dict[JointId, tuple[float, float]] = field(default_factory=dict)
     has_tactile: bool = False
     tactile_regions: list[TactileRegionConfig] = field(default_factory=list)
+    product_type: ProductType | None = None
     slave_id: int = 0x31
-    modbus_profile: str = "g5"
-    ethercat_input_sizes: tuple[int, ...] = field(default_factory=tuple)
-    ethercat_output_size: int | None = None
-    ethercat_rpdo_layout: str = "shared_mode_float"
-    ethercat_tpdo_layout: str = "default"
 
 
 @dataclass
@@ -265,15 +265,18 @@ _ERROR_MESSAGES = {
     ErrorCode.MOTOR_STALLED: "Motor stalled",
     ErrorCode.MOTOR_DRIVER_OVERTEMP: "Motor driver overtemperature",
     ErrorCode.MOTOR_COMM_ERROR: "Motor communication error",
+    ErrorCode.MOTOR_OVERTEMP: "Motor temperature too high",
     ErrorCode.JOINT_CONFLICT: "Joint conflict",
     ErrorCode.TIP_CONFLICT: "Tip conflict",
+    ErrorCode.JOINT_POSITION_ABNORMAL: "Joint position abnormal",
     ErrorCode.LOW_TEMP: "Low temperature",
     ErrorCode.HIGH_TEMP: "High temperature",
     ErrorCode.LOW_VOLTAGE: "Low voltage",
     ErrorCode.HIGH_VOLTAGE: "High voltage",
-    ErrorCode.TACTILE_ERROR: "Tactile sensor error",
+    ErrorCode.TACTILE_DISCONNECTED: "Tactile sensor disconnected",
+    ErrorCode.TACTILE_DATA_ABNORMAL: "Tactile sensor data abnormal",
+    ErrorCode.SELF_TEST_ERROR: "Self-test error",
     ErrorCode.PARAM_ERROR: "Parameter error",
-    ErrorCode.TIMEOUT: "Timeout",
     ErrorCode.UNKNOWN_ERROR: "Unknown error",
 }
 
@@ -281,5 +284,3 @@ _STATE_MESSAGES = {
     State.PROTECTIVE_STOPPED: "Device entered protective stop",
     State.ABNORMAL_RUNNING: "Device running abnormally",
 }
-
-

@@ -119,7 +119,7 @@ def hand_zero(hand):
 
 def main():
     print("***** GHand SDK - Press Demo *****\n")
-    hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+    hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
     connected = hand.open("auto")
     try:
         if not connected:

@@ -645,7 +645,7 @@ def second_action(hand, flex_cycles=FLEX_CYCLE_COUNT):
 
 def main():
     logger.info("***** GHand SDK - Gesture Dance Demo *****")
-    hand = GHand(product_type=ProductType.G5, comm_type=CommType.ETHERCAT)
+    hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
     connected = hand.open("auto")
 
     try:

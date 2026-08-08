@@ -54,8 +54,7 @@ For detailed technical specifications and API references, visit the [Python SDK 
 | Platform | Requirement |
 |----------|-------------|
 | Python   | 3.10 ~ 3.13 |
-| Linux    | Ubuntu 20.04/22.04 LTS (x86_64 / aarch64), glibc >= 2.31 |
-| macOS    | 10.15+ |
+| Linux    | Ubuntu 22.04/24.04 LTS (x86_64), glibc >= 2.35 |
 | Windows  | 10 / 11 |
 
 ## Installation
@@ -96,10 +95,89 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-> **Linux Note:** EtherCAT needs raw socket access. If you see permission errors, grant the capability to your Python interpreter:
-> ```bash
-> sudo setcap cap_net_raw+ep $(which python3)
-> ```
+### Linux EtherCAT Notes
+
+EtherCAT needs raw socket access. If you see permission errors, grant the capability to your Python interpreter:
+
+```bash
+sudo setcap 'cap_net_raw,cap_net_admin=eip' $(which python3)
+```
+
+### Linux RS485 Serial Ports
+
+When using a USB-RS485 adapter on Linux, the SDK auto-discovery prefers `/dev/serial/by-id/*`, `/dev/ttyUSB*`, `/dev/ttyACM*`, and `/dev/ttyAMA*`. It does not auto-scan `/dev/ttyS*` because those are usually built-in motherboard serial ports. If you really use a built-in serial port, pass the device path explicitly to `open()`.
+
+Useful checks:
+
+```bash
+lsusb
+ls -l /dev/ttyUSB* /dev/ttyACM* /dev/serial/by-id/ 2>/dev/null
+python3 -m serial.tools.list_ports
+```
+
+CH340/CH341 USB-RS485 adapters usually appear as `1a86:7523 QinHeng Electronics CH340 serial converter`, and should create `/dev/ttyUSB0` or a `/dev/serial/by-id/...` alias. If `dmesg` shows `brltty` claiming the interface and disconnecting `ttyUSB0`, stop or remove `brltty`:
+
+```bash
+sudo systemctl stop brltty
+sudo systemctl disable brltty
+# If you do not use braille terminal devices:
+sudo apt remove brltty
+```
+
+If the serial device exists but cannot be opened, make sure your user belongs to the `dialout` group:
+
+```bash
+groups
+sudo usermod -aG dialout $USER
+```
+
+Log out and back in after changing groups. The default RS485 baud rate is `1000000`; override it with:
+
+```bash
+export GHAND_RS485_BAUDRATE=1000000
+```
+
+### CANFD Adapter Notes
+
+CANFD mode supports ZQWL-CANFD CDC serial adapters.
+
+ZQWL-CANFD CDC serial adapters appear as `3562:0101 ZQWL-CANFD` on USB. On Linux they usually create `/dev/ttyACM0` or a `/dev/serial/by-id/...` alias; on Windows they usually appear as `COMx`. These adapters use the ZQWL serial protocol.
+
+Useful checks:
+
+```bash
+lsusb
+lsusb -t
+ls -l /dev/ttyACM* /dev/serial/by-id/ 2>/dev/null
+python3 -m serial.tools.list_ports
+```
+
+If `lsusb -t` shows `Driver=cdc_acm`, the adapter is in CDC serial mode. In CANFD mode, the SDK scans ZQWL CDC serial adapters.
+
+### RS485/CANFD Slave IDs
+
+RS485 and CANFD devices use holding register `0x0000` as the slave ID register. The left hand defaults to `0x31`, and the right hand defaults to `0x32`; `open()` can override the value when a device was previously assigned a different ID:
+
+```python
+hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.CANFD)
+hand.open("COM10", slave_id=0x31)
+```
+
+To change the connected device ID, use `set_slave_id()`. Connect only one target hand on the bus while changing IDs:
+
+```python
+ok = hand.set_slave_id(0x32)
+hand.close()
+```
+
+After changing the ID, reconnect with the new value:
+
+```python
+hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.CANFD)
+hand.open("COM10", slave_id=0x32)
+```
+
+The helper script `examples/tutorial/11.set_slave_id.py` provides a guarded workflow for testing ID changes.
 
 ## Quick Start
 
