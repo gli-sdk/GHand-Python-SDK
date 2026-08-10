@@ -50,6 +50,14 @@ from .modbus_codec import (
     BAUDRATE_CONFIG_REGISTER,
     BAUDRATE_TO_GEAR_MAP,
     DEFAULT_BAUDRATE_GEAR,
+    REG_CLEAR_FAULT,
+    REG_DEVICE_NAME,
+    REG_FIRMWARE_VERSION,
+    REG_HAND_TYPE,
+    REG_HARDWARE_VERSION,
+    REG_INIT_JOINT,
+    REG_IN_MOTOR_DRV_VER,
+    REG_SERIAL_NUMBER,
     build_tactile_info,
     encode_joint_command,
     get_joint_input_span,
@@ -300,7 +308,7 @@ class CanfdComm(IComm):
             self._transport.read_registers(
                 self._src_id,
                 dst_id,
-                0x1000,
+                REG_DEVICE_NAME,
                 1,
                 func_code=0x04,
                 timeout_ms=500,
@@ -505,23 +513,23 @@ class CanfdComm(IComm):
         )
 
     def get_device_name(self) -> str:
-        return parse_device_name(self._read_input_bytes(0x1000, 8))
+        return parse_device_name(self._read_input_bytes(REG_DEVICE_NAME, 8))
 
     def get_hardware_version(self) -> str:
-        return parse_hardware_version(self._read_input_bytes(0x1008, 8))
+        return parse_hardware_version(self._read_input_bytes(REG_HARDWARE_VERSION, 8))
 
     def get_firmware_version(self) -> str:
-        return parse_firmware_version(self._read_input_bytes(0x1010, 8))
+        return parse_firmware_version(self._read_input_bytes(REG_FIRMWARE_VERSION, 8))
 
     def get_serial_number(self) -> int:
-        return parse_serial_number(self._read_input_bytes(0x1018, 8))
+        return parse_serial_number(self._read_input_bytes(REG_SERIAL_NUMBER, 8))
 
     def get_hand_type(self) -> int:
-        return parse_hand_type(self._read_input_bytes(0x1020, 1))
+        return parse_hand_type(self._read_input_bytes(REG_HAND_TYPE, 1))
 
     def get_motor_driver_version(self) -> tuple:
         try:
-            raw = self._read_input_bytes(0x2007, 3)
+            raw = self._read_input_bytes(REG_IN_MOTOR_DRV_VER, 3)
             regs = list(struct.unpack(">3H", raw[:6]))
             return tuple(regs)
         except Exception:
@@ -575,9 +583,9 @@ class CanfdComm(IComm):
 
     def clear_fault(self) -> bool:
         self._transport.write_registers(
-            self._src_id, self._dst_id, 0x0001, struct.pack(">H", 0x0100)
+            self._src_id, self._dst_id, REG_CLEAR_FAULT, struct.pack(">H", 0x0100)
         )
-        if not self._wait_holding_result(0x0001):
+        if not self._wait_holding_result(REG_CLEAR_FAULT):
             logger.error("Fault clearance failed or timed out")
             return False
         logger.info("Fault cleared")
@@ -585,7 +593,7 @@ class CanfdComm(IComm):
 
     def init_joint(self) -> bool:
         self._transport.write_registers(
-            self._src_id, self._dst_id, 0x0002, struct.pack(">H", 0x0001)
+            self._src_id, self._dst_id, REG_INIT_JOINT, struct.pack(">H", 0x0001)
         )
         logger.info("Joint initialization completed")
         return True

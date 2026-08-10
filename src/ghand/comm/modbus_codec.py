@@ -70,6 +70,19 @@ BAUDRATE_TO_GEAR_MAP: dict[int, int] = {
 }
 DEFAULT_BAUDRATE_GEAR = 0x05
 
+# Common holding register addresses (device configuration / control).
+REG_SLAVE_ID = 0x0000
+REG_CLEAR_FAULT = 0x0001
+REG_INIT_JOINT = 0x0002
+
+# Common input register addresses (device info / status).
+REG_DEVICE_NAME = 0x1000
+REG_HARDWARE_VERSION = 0x1008
+REG_FIRMWARE_VERSION = 0x1010
+REG_SERIAL_NUMBER = 0x1018
+REG_HAND_TYPE = 0x1020
+REG_IN_MOTOR_DRV_VER = 0x1188
+
 
 # GHand5 keeps the original SDK mapping: input joint blocks follow JointId values.
 GHAND5_JOINT_INPUT_REG_MAP = {

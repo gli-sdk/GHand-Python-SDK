@@ -49,6 +49,15 @@ from .modbus_codec import (
     BAUDRATE_CONFIG_REGISTER,
     BAUDRATE_TO_GEAR_MAP,
     DEFAULT_BAUDRATE_GEAR,
+    REG_CLEAR_FAULT,
+    REG_DEVICE_NAME,
+    REG_FIRMWARE_VERSION,
+    REG_HAND_TYPE,
+    REG_HARDWARE_VERSION,
+    REG_INIT_JOINT,
+    REG_IN_MOTOR_DRV_VER,
+    REG_SERIAL_NUMBER,
+    REG_SLAVE_ID,
     build_tactile_info,
     encode_joint_command,
     get_joint_input_span,
@@ -298,7 +307,7 @@ class Rs485Comm(IComm):
         if not 0 < slave_id <= 0xFF:
             raise ValueError("slave_id must be in range 1..255")
         try:
-            result = self._write_register(0x0000, slave_id)
+            result = self._write_register(REG_SLAVE_ID, slave_id)
         except Exception as exc:
             logger.error("Failed to set RS485 slave ID to 0x%02X: %s", slave_id, exc)
             return False
@@ -484,19 +493,19 @@ class Rs485Comm(IComm):
 
     def get_device_name(self) -> str:
         """Retrieve the device name."""
-        return parse_device_name(self._read_input_registers_bytes(0x1000, 8))
+        return parse_device_name(self._read_input_registers_bytes(REG_DEVICE_NAME, 8))
 
     def get_hardware_version(self) -> str:
         """Retrieve the hardware version."""
-        return parse_hardware_version(self._read_input_registers_bytes(0x1008, 8))
+        return parse_hardware_version(self._read_input_registers_bytes(REG_HARDWARE_VERSION, 8))
 
     def get_firmware_version(self) -> str:
         """Retrieve the firmware version."""
-        return parse_firmware_version(self._read_input_registers_bytes(0x1010, 8))
+        return parse_firmware_version(self._read_input_registers_bytes(REG_FIRMWARE_VERSION, 8))
 
     def get_serial_number(self) -> int:
         """Retrieve the product serial number."""
-        return parse_serial_number(self._read_input_registers_bytes(0x1018, 8))
+        return parse_serial_number(self._read_input_registers_bytes(REG_SERIAL_NUMBER, 8))
 
     def get_hand_type(self) -> int:
         """Retrieve the hand type.
@@ -504,12 +513,12 @@ class Rs485Comm(IComm):
         Returns:
             0 for unknown, 1 for left hand, 2 for right hand.
         """
-        return parse_hand_type(self._read_input_registers_bytes(0x1020, 1))
+        return parse_hand_type(self._read_input_registers_bytes(REG_HAND_TYPE, 1))
 
     def get_motor_driver_version(self) -> tuple:
         """Retrieve the motor driver version."""
         try:
-            result = self._read_holding_registers(0x2007, count=3)
+            result = self._read_holding_registers(REG_IN_MOTOR_DRV_VER, count=3)
             if result is None or result.isError():
                 return (0, 0, 0)
             return tuple(result.registers)
@@ -562,7 +571,7 @@ class Rs485Comm(IComm):
 
     def clear_fault(self) -> bool:
         """Clear device faults."""
-        result = self._write_register(0x0001, 0x0100)
+        result = self._write_register(REG_CLEAR_FAULT, 0x0100)
         if result is None or result.isError():
             return False
         if not self._wait_holding_result(0x0001):
@@ -573,7 +582,7 @@ class Rs485Comm(IComm):
 
     def init_joint(self) -> bool:
         """Initialize joint positions."""
-        result = self._write_register(0x0002, 0x0001)
+        result = self._write_register(REG_INIT_JOINT, 0x0001)
         if result is None or result.isError():
             return False
         logger.info("Joint initialization completed")
