@@ -1,6 +1,6 @@
 # GHand Python SDK
 
-[![Version](https://img.shields.io/badge/version-v2.0.2-blue.svg)](src/ghand/version.py)
+[![Version](https://img.shields.io/badge/version-v2.1.0-blue.svg)](src/ghand/version.py)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 
@@ -67,14 +67,14 @@ GHand 灵巧手官方 Python SDK，为机器人操作研究与开发提供精确
 
 ### 安装指定版本
 
-可以从 GitHub 或 Gitee 直接安装 `v2.0.2`：
+可以从 GitHub 或 Gitee 直接安装 `v2.1.0`：
 
 ```bash
-pip install "ghand_python_sdk @ git+https://github.com/gli-sdk/GHand-Python-SDK.git@v2.0.2"
+pip install "ghand_python_sdk @ git+https://github.com/gli-sdk/GHand-Python-SDK.git@v2.1.0"
 ```
 
 ```bash
-pip install "ghand_python_sdk @ git+https://gitee.com/glitech/GHand-Python-SDK.git@v2.0.2"
+pip install "ghand_python_sdk @ git+https://gitee.com/glitech/GHand-Python-SDK.git@v2.1.0"
 ```
 
 ### 从源码安装（推荐用于开发）
@@ -82,7 +82,7 @@ pip install "ghand_python_sdk @ git+https://gitee.com/glitech/GHand-Python-SDK.g
 GitHub：
 
 ```bash
-git clone -b v2.0.2 https://github.com/gli-sdk/GHand-Python-SDK.git
+git clone -b v2.1.0 https://github.com/gli-sdk/GHand-Python-SDK.git
 cd GHand-Python-SDK
 pip install -r requirements.txt
 pip install -e .
@@ -91,7 +91,7 @@ pip install -e .
 Gitee：
 
 ```bash
-git clone -b v2.0.2 https://gitee.com/glitech/GHand-Python-SDK.git
+git clone -b v2.1.0 https://gitee.com/glitech/GHand-Python-SDK.git
 cd GHand-Python-SDK
 pip install -r requirements.txt
 pip install -e .

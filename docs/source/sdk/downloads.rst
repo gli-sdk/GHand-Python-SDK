@@ -21,9 +21,9 @@ You can obtain the GHand Python SDK in the following ways:
 
 **Current Version**
 
-- Latest version: v1.1.2
+- Latest version: v2.1.0
 - Python requirement: 3.10 - 3.13
-- Supported platforms: Windows 10/11, Linux Ubuntu 18.04+
+- Supported platforms: Windows 10/11, Linux Ubuntu 22.04/24.04 LTS
 
 Example Code
 ------------
