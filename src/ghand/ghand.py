@@ -327,6 +327,30 @@ class GHand:
             logger.info("Slave ID set to 0x%02X", slave_id)
         return result
 
+    def set_baudrate_config(self, baudrate: int) -> bool:
+        """Set the RS485/CANFD baud rate gear (holding register 0x002C).
+
+        The gear is stored in Flash and takes effect after the next power-up.
+        Unsupported values fall back to the 1 Mbps default gear on the device.
+
+        Args:
+            baudrate: Target baud rate in bps. Supported values: 57600,
+                115200, 230400, 460800, 921600, 1000000.
+
+        Returns:
+            True if the device accepted the configuration.
+        """
+        if self._comm_type not in (CommType.CANFD, CommType.RS485):
+            logger.error("set_baudrate_config is only supported for CANFD and RS485")
+            return False
+        if not self.is_connected():
+            raise RuntimeError("Device is not connected")
+
+        result = self._comm.set_baudrate_config(baudrate)
+        if result:
+            logger.info("Baud rate config set to %d bps (effective after reboot)", baudrate)
+        return result
+
     def close(self) -> bool:
         """Close the device connection.
 

@@ -76,6 +76,17 @@ class IComm(ABC):
         """
         return False
 
+    def set_baudrate_config(self, baudrate: int) -> bool:
+        """Configure the RS485/CANFD baud rate gear (Flash, effective on reboot).
+
+        Args:
+            baudrate: Target baud rate in bps.
+
+        Returns:
+            True if the command succeeds, False otherwise.
+        """
+        return False
+
     # ===== Joint control =====
 
     @abstractmethod

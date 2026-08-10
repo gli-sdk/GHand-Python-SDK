@@ -46,6 +46,9 @@ from ..types import (
 )
 from .icomm import IComm
 from .modbus_codec import (
+    BAUDRATE_CONFIG_REGISTER,
+    BAUDRATE_TO_GEAR_MAP,
+    DEFAULT_BAUDRATE_GEAR,
     build_tactile_info,
     encode_joint_command,
     get_joint_input_span,
@@ -303,6 +306,27 @@ class Rs485Comm(IComm):
             return False
         self._slave_id = slave_id
         return True
+
+    def set_baudrate_config(self, baudrate: int) -> bool:
+        """Write the baud rate gear to holding register 0x002C.
+
+        The value is saved to Flash and takes effect after the next power-up.
+
+        Args:
+            baudrate: Target baud rate in bps. Supported values are
+                57600, 115200, 230400, 460800, 921600 and 1000000.
+                Invalid values fall back to the default 1 Mbps gear (0x05).
+
+        Returns:
+            True if the device accepted the configuration.
+        """
+        gear = BAUDRATE_TO_GEAR_MAP.get(baudrate, DEFAULT_BAUDRATE_GEAR)
+        try:
+            result = self._write_register(BAUDRATE_CONFIG_REGISTER, gear)
+        except Exception as exc:
+            logger.error("Failed to set RS485 baudrate config to %d bps: %s", baudrate, exc)
+            return False
+        return result is not None and not result.isError()
 
     # ===== Joint control (single register write) =====
 

@@ -56,6 +56,21 @@ class ModbusRegisterProfile:
     canfd_connection_delete_values: tuple[int, ...] = (0x0000, 0x0000)
 
 
+# Baud rate configuration register (REG_HOLD_BAUD_CONFIG).
+# Writing a gear value saves to Flash and takes effect after next power-up.
+BAUDRATE_CONFIG_REGISTER = 0x002C
+
+BAUDRATE_TO_GEAR_MAP: dict[int, int] = {
+    57_600: 0x00,
+    115_200: 0x01,
+    230_400: 0x02,
+    460_800: 0x03,
+    921_600: 0x04,
+    1_000_000: 0x05,
+}
+DEFAULT_BAUDRATE_GEAR = 0x05
+
+
 # GHand5 keeps the original SDK mapping: input joint blocks follow JointId values.
 GHAND5_JOINT_INPUT_REG_MAP = {
     joint_id: 0x1023 + joint_id.value * 3 for joint_id in JointId
