@@ -61,15 +61,10 @@ class HandTpdo:
         return cls(state, error, temperature)
 
     def __str__(self):
-        try:
-            state_name = State(self.state).name
-        except ValueError:
-            state_name = self.state
-        try:
-            error_name = ErrorCode(self.error).name
-        except ValueError:
-            error_name = self.error
-        return f"HandTpdo(state={state_name}, error={error_name}, temperature={self.temperature})"
+        return (
+            f"HandTpdo(state={State(self.state)}, error={ErrorCode(self.error)}, "
+            f"temperature={self.temperature})"
+        )
 
 
 @dataclass
@@ -91,16 +86,8 @@ class JointTpdo:
         return cls(state, error, math.degrees(angle), speed, torque)
 
     def __str__(self):
-        try:
-            state_name = State(self.state).name
-        except ValueError:
-            state_name = self.state
-        try:
-            error_name = ErrorCode(self.error).name
-        except ValueError:
-            error_name = self.error
         return (
-            f"JointTpdo(state={state_name}, error={error_name}, "
+            f"JointTpdo(state={State(self.state)}, error={ErrorCode(self.error)}, "
             f"angle={self.angle:.3f}, speed={self.speed}, "
             f"torque={self.torque})"
         )

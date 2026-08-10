@@ -48,14 +48,63 @@ class JointId(enum.IntEnum):
     LF_MCP = 17
 
 
-class State(enum.IntEnum):
+def _unknown_member(cls, fallback, value):
+    """Build a pseudo-member named after *fallback* but carrying *value*.
+
+    Lets an unrecognized device code stay inside the enum type (so ``.name``
+    and ``.value`` always work) without discarding the number reported by the
+    device: ``ErrorCode(176)`` is ``<ErrorCode.UNKNOWN_ERROR: 176>``.
+    """
+    if type(value) is not int:
+        return None
+    pseudo = int.__new__(cls, value)
+    pseudo._name_ = fallback.name
+    pseudo._value_ = value
+    return pseudo
+
+
+_NUMERIC_FORMAT_TYPES = "bcdeEfFgGnoxX%"
+
+
+class DeviceCode(enum.IntEnum):
+    """IntEnum whose text form is ``NAME(value)`` rather than a bare number.
+
+    Device codes are reported as plain integers, and an unrecognized one is
+    folded into a catch-all member, so the numeric value has to travel
+    alongside the name to stay diagnosable.
+    """
+
+    def __str__(self):
+        return f"{self.name}({self.value})"
+
+    def __format__(self, format_spec):
+        # Numeric specs ("d", "03d") keep int semantics so existing callers
+        # that format these as numbers are unaffected; everything else pads
+        # the NAME(value) text.
+        if format_spec and format_spec[-1] in _NUMERIC_FORMAT_TYPES:
+            return int.__format__(self, format_spec)
+        return str.__format__(str(self), format_spec)
+
+
+class State(DeviceCode):
     STOPPED = 0
     RUNNING = 1
     ABNORMAL_RUNNING = 2
     PROTECTIVE_STOPPED = 3
+    UNKNOWN_STATE = 255
+
+    @classmethod
+    def _missing_(cls, value):
+        """Map any undefined state to UNKNOWN_STATE, keeping the raw value."""
+        return _unknown_member(cls, cls.UNKNOWN_STATE, value)
+
+    @property
+    def is_abnormal(self) -> bool:
+        """True for protective stop, abnormal running, or any undefined state."""
+        return self not in (State.STOPPED, State.RUNNING)
 
 
-class ErrorCode(enum.IntEnum):
+class ErrorCode(DeviceCode):
     NORMAL = 0
     MOTOR_HARDWARE_OVERCURRENT = 1
     MOTOR_SOFTWARE_OVERCURRENT = 2
@@ -78,6 +127,11 @@ class ErrorCode(enum.IntEnum):
     SELF_TEST_ERROR = 41
     PARAM_ERROR = 101
     UNKNOWN_ERROR = 201
+
+    @classmethod
+    def _missing_(cls, value):
+        """Map any undefined code to UNKNOWN_ERROR, keeping the raw value."""
+        return _unknown_member(cls, cls.UNKNOWN_ERROR, value)
 
 
 class HandType(enum.Enum):
@@ -160,13 +214,13 @@ class HandFaultInfo:
         """Return a human-readable fault description."""
         if self.error_code != ErrorCode.NORMAL:
             base_msg = _ERROR_MESSAGES.get(
-                self.error_code, f"Unknown error: {self.error_code.name}"
+                self.error_code, _ERROR_MESSAGES[ErrorCode.UNKNOWN_ERROR]
             )
         else:
             base_msg = "Device operating normally"
 
-        if self.state in [State.PROTECTIVE_STOPPED, State.ABNORMAL_RUNNING]:
-            state_msg = _STATE_MESSAGES.get(self.state, f"Abnormal state: {self.state.name}")
+        if self.state.is_abnormal:
+            state_msg = _STATE_MESSAGES.get(self.state, _STATE_MESSAGES[State.UNKNOWN_STATE])
             if self.error_code == ErrorCode.NORMAL:
                 base_msg = f"{state_msg}, but error code is 0"
             else:
@@ -180,8 +234,7 @@ class HandFaultInfo:
         if parts:
             msg = f"{base_msg} ({', '.join(parts)})"
         return (
-            f"State: {self.state.name}, Error: {self.error_code.name} "
-            f"({self.error_code.value}) - {msg}"
+            f"State: {self.state}, Error: {self.error_code} - {msg}"
         )
 
 
@@ -195,7 +248,7 @@ class JointFaultInfo:
 
     def __str__(self):
         """Return a human-readable joint fault description."""
-        return f"{self.joint_id}: State={self.state.name}, " f"Error={self.error_code.name}"
+        return f"{self.joint_id}: State={self.state}, Error={self.error_code}"
 
 
 @dataclass
@@ -203,7 +256,7 @@ class HandState:
     """High-level status of the dexterous hand."""
 
     state: State = State.STOPPED
-    error: ErrorCode | int = ErrorCode.NORMAL
+    error: ErrorCode = ErrorCode.NORMAL
     temperature: int = 0
 
 
@@ -223,7 +276,7 @@ class JointData:
 
     id: int = JointId.THUMB_IP
     state: State = State.STOPPED
-    error: ErrorCode | int = ErrorCode.NORMAL
+    error: ErrorCode = ErrorCode.NORMAL
     angle: float = 0.0  # degrees
     speed: int = 0
     torque: int = 0
@@ -283,4 +336,5 @@ _ERROR_MESSAGES = {
 _STATE_MESSAGES = {
     State.PROTECTIVE_STOPPED: "Device entered protective stop",
     State.ABNORMAL_RUNNING: "Device running abnormally",
+    State.UNKNOWN_STATE: "Device in unknown state",
 }

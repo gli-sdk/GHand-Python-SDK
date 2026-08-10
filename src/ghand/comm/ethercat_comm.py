@@ -318,14 +318,14 @@ class EthercatComm(IComm):
         try:
             return State(value)
         except ValueError:
-            return State.ABNORMAL_RUNNING
+            return State.UNKNOWN_STATE
 
     @staticmethod
-    def _parse_error_code(value: int) -> ErrorCode | int:
+    def _parse_error_code(value: int) -> ErrorCode:
         try:
             return ErrorCode(value)
         except ValueError:
-            return value
+            return ErrorCode.UNKNOWN_ERROR
 
     def get_hand_info(self) -> HandState:
         """Retrieve high-level hand status from TPDO.

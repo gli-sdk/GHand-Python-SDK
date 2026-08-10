@@ -247,7 +247,7 @@ def _parse_state(value: int) -> State:
     try:
         return State(value)
     except ValueError:
-        return State.ABNORMAL_RUNNING
+        return State.UNKNOWN_STATE
 
 
 def _parse_error_code(value: int) -> ErrorCode:

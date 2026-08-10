@@ -12,7 +12,6 @@ from ghand import (
     configure_logging,
     execute_gesture,
 )
-from ghand.types import ErrorCode, State
 
 # Configure SDK logging (shows connection state, warnings, errors)
 configure_logging(level=logging.DEBUG)
@@ -75,8 +74,8 @@ def main():
                                 JointId.MF_PIP,
                         ]:
                             print(
-                                f"  {JointId(joint.id).name:<15}- state:{State(joint.state).name},\t"
-                                f"error:{ErrorCode(joint.error).name},\t"
+                                f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\t"
+                                f"error:{joint.error:<30},\t"
                                 f"angle: {joint.angle:.2f}°,\t"
                                 f"speed: {joint.speed},\ttorque: {joint.torque}")
             else:

@@ -160,16 +160,13 @@ def _wait_for_completion(hand: GHand) -> bool:
             has_been_running = True
         elif has_been_running and hand_info.state == State.STOPPED:
             break
-        elif hand_info.state in (State.ABNORMAL_RUNNING, State.PROTECTIVE_STOPPED):
+        elif hand_info.state.is_abnormal:
             break
-        elif not has_been_running and time.time() - start_time >= 0.02:
+        elif not has_been_running and time.time() - start_time >= 0.1:
             break
         time.sleep(0.005)
 
-    if (
-        hand_info.state in [State.ABNORMAL_RUNNING, State.PROTECTIVE_STOPPED]
-        or hand_info.error != ErrorCode.NORMAL
-    ):
+    if hand_info.state.is_abnormal or hand_info.error != ErrorCode.NORMAL:
         logger.warning("Action completed with error state. Please clear fault and retry.")
         return False
     return True

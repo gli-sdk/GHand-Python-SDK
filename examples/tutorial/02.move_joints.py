@@ -3,7 +3,6 @@ import time
 
 from ghand import ProductType, configure_logging
 from ghand.ghand import CommType, GHand, JointCommand, JointId
-from ghand.types import ErrorCode, State
 
 # Configure SDK logging (shows connection state, warnings, errors)
 configure_logging(level=logging.INFO)
@@ -54,7 +53,7 @@ def main():
                 current_joints = hand.get_joints()
                 for joint in current_joints:
                     print(
-                        f"  {JointId(joint.id).name:<15}- state:{State(joint.state).name:<15},\terror:{ErrorCode(joint.error).name:<15},\tangle: {joint.angle:.2f}°,\tspeed: {joint.speed},\ttorque: {joint.torque}"
+                        f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\terror:{joint.error:<30},\tangle: {joint.angle:.2f}°,\tspeed: {joint.speed},\ttorque: {joint.torque}"
                     )
             else:
                 break
@@ -84,7 +83,7 @@ def main():
                 current_joints = hand.get_joints()
                 for joint in current_joints:
                     print(
-                        f"  {JointId(joint.id).name:<15}- state:{State(joint.state).name},\terror:{ErrorCode(joint.error).name},\tangle: {joint.angle:.2f}°,\tspeed: {joint.speed},\ttorque: {joint.torque}"
+                        f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\terror:{joint.error:<30},\tangle: {joint.angle:.2f}°,\tspeed: {joint.speed},\ttorque: {joint.torque}"
                     )
             else:
                 break
