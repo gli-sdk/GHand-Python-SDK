@@ -14,7 +14,7 @@ from .utils import active_finger_normal_forces, clip, normalize_joint_id
 
 _logger = logging.getLogger("adaptive_grasp.grasp_sequence")
 
-_POSITION_REACHED_TOLERANCE_DEG = 1.5
+_POSITION_REACHED_TOLERANCE_DEG = 1.0
 _POSITION_REACHED_TIMEOUT_S = 7.0
 _POSITION_REACHED_POLL_S = 1
 _CONTACT_SNAPSHOT_THUMB_AUX_JOINTS = {
