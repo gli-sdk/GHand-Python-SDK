@@ -193,7 +193,7 @@ class AdaptiveGrasper:
 
     def release(self) -> bool:
         """Open the hand and complete the normal release phase."""
-        return self._perform_release(wait_control_thread=True)
+        return self._perform_release(wait_control_thread=True, release_wait_s=2.0)
 
     def release_and_wait_for_visualizer_close(self) -> bool:
         """Release the grasp, then wait for the visualizer window to close."""
