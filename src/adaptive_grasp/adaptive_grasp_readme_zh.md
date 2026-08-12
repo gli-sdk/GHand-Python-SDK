@@ -56,7 +56,7 @@ Demo 使用 `GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
 | `orange` | `fruit` | `four_finger_grasp` | `POSITION` |
 | `cylinder_piece` | `cylinder_piece` | `cylinder_piece_grasp` | `STIFF_POSITION` |
 
-`build_demo_runtime_config()` 会校验场景名和保持时间。`HOLD_TIME_S` 必须大于 `0`；小于等于 `1` 秒会记录警告。Demo 的可视化默认关闭，可通过 `build_demo_runtime_config(enable_visualization=True)` 打开。中断释放等待时间来自 `DemoRuntimeConfig.interrupt_release_wait_s`，默认值是 `3.0` 秒。
+`build_demo_runtime_config()` 会校验场景名和保持时间。`HOLD_TIME_S` 必须大于 `0`；小于等于 `1` 秒会记录警告。中断释放等待时间来自 `DemoRuntimeConfig.interrupt_release_wait_s`，默认值是 `3.0` 秒。
 
 ## 最小示例
 
@@ -119,7 +119,6 @@ config = AdaptiveGraspConfig(
     pre_grasp_preset="paper_cup_grasp",
     hold_command_mode=HoldCommandMode.POSITION,
     release_hold_time_s=20.0,
-    enable_visualization=False,
 )
 grasper = AdaptiveGrasper(hand=hand, config=config)
 ```
@@ -153,7 +152,6 @@ HoldCommandMode.STIFF_POSITION
 | `control_period_s` | 自适应保持控制周期 |
 | `release_hold_time_s` | 自动释放前的保持时长 |
 | `release_open_speed` / `release_open_torque` | 释放张手命令参数 |
-| `enable_visualization` | 是否启用内部触觉诊断可视化 |
 
 完整默认值和校验范围以 [config.py](src/adaptive_grasp/config.py) 为准。
 

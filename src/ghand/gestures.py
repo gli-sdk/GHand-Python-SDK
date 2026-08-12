@@ -162,7 +162,7 @@ def _wait_for_completion(hand: GHand) -> bool:
             break
         elif hand_info.state in (State.ABNORMAL_RUNNING, State.PROTECTIVE_STOPPED):
             break
-        elif not has_been_running and time.time() - start_time >= 0.02:
+        elif not has_been_running and time.time() - start_time >= 0.1:
             break
         time.sleep(0.005)
 

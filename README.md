@@ -1,6 +1,6 @@
 # GHand Python SDK
 
-[![Version](https://img.shields.io/badge/version-v2.0.2-blue.svg)](src/ghand/version.py)
+[![Version](https://img.shields.io/badge/version-v2.1.0-blue.svg)](src/ghand/version.py)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 
@@ -67,20 +67,20 @@ For detailed technical specifications and API references, visit the [Python SDK 
 
 ### Install a Specific Version
 
-Install version `v2.0.2` directly from either repository:
+Install version `v2.1.0` directly from either repository:
 
 ```bash
-pip install "ghand_python_sdk @ git+https://github.com/gli-sdk/GHand-Python-SDK.git@v2.0.2"
+pip install "ghand_python_sdk @ git+https://github.com/gli-sdk/GHand-Python-SDK.git@v2.1.0"
 ```
 
 ```bash
-pip install "ghand_python_sdk @ git+https://gitee.com/glitech/GHand-Python-SDK.git@v2.0.2"
+pip install "ghand_python_sdk @ git+https://gitee.com/glitech/GHand-Python-SDK.git@v2.1.0"
 ```
 
 ### Install from Source
 
 ```bash
-git clone -b v2.0.2 https://github.com/gli-sdk/GHand-Python-SDK.git
+git clone -b v2.1.0 https://github.com/gli-sdk/GHand-Python-SDK.git
 cd GHand-Python-SDK
 pip install -r requirements.txt
 pip install -e .
@@ -89,7 +89,7 @@ pip install -e .
 Gitee mirror:
 
 ```bash
-git clone -b v2.0.2 https://gitee.com/glitech/GHand-Python-SDK.git
+git clone -b v2.1.0 https://gitee.com/glitech/GHand-Python-SDK.git
 cd GHand-Python-SDK
 pip install -r requirements.txt
 pip install -e .

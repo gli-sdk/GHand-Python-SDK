@@ -56,7 +56,7 @@ The demo creates `GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHE
 | `orange` | `fruit` | `four_finger_grasp` | `POSITION` |
 | `cylinder_piece` | `cylinder_piece` | `cylinder_piece_grasp` | `STIFF_POSITION` |
 
-`build_demo_runtime_config()` validates the scene name and hold duration. `HOLD_TIME_S` must be greater than `0`; values less than or equal to `1` second produce a warning. Visualization is disabled by default and can be enabled with `build_demo_runtime_config(enable_visualization=True)`. The interrupted-release wait time comes from `DemoRuntimeConfig.interrupt_release_wait_s`, whose default value is `3.0` seconds.
+`build_demo_runtime_config()` validates the scene name and hold duration. `HOLD_TIME_S` must be greater than `0`; values less than or equal to `1` second produce a warning. The interrupted-release wait time comes from `DemoRuntimeConfig.interrupt_release_wait_s`, whose default value is `3.0` seconds.
 
 ## Minimal Example
 
@@ -119,7 +119,6 @@ config = AdaptiveGraspConfig(
     pre_grasp_preset="paper_cup_grasp",
     hold_command_mode=HoldCommandMode.POSITION,
     release_hold_time_s=20.0,
-    enable_visualization=False,
 )
 grasper = AdaptiveGrasper(hand=hand, config=config)
 ```
@@ -153,7 +152,6 @@ Common configuration fields:
 | `control_period_s` | Adaptive hold control period |
 | `release_hold_time_s` | Hold duration before automatic release |
 | `release_open_speed` / `release_open_torque` | Release opening command parameters |
-| `enable_visualization` | Whether to enable internal tactile diagnostic visualization |
 
 For complete defaults and validation ranges, see [config.py](src/adaptive_grasp/config.py).
 

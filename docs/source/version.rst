@@ -94,3 +94,15 @@ Refer to the version information table below:
 4. Added CtrlMode enum type and modified move_joints method parameters
 5. Added collision detection functionality and examples
 6. Added get_motor_driver_version method and example
+
+2026/8/10 Update:
+
++-------------+------------------+--------------+
+|    doc      | GHand Firmware   |  GHand SDK   |
++=============+==================+==============+
+|   v0.2.4    |      v2.5.11      |    v2.1.0    |
++-------------+------------------+--------------+
+
+1. Released GHand Python SDK v2.1.0
+2. Added Linux support for CANFD communication
+3. Added Linux support for RS485 communication
