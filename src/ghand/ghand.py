@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from ._config import load_product_config
 from .comm.canfd_comm import CanfdComm
 from .comm.ethercat_comm import EthercatComm
@@ -304,6 +305,9 @@ class GHand:
             return False
 
         self._sync_product_config_from_comm()
+        
+        self._comm.stop()
+        time.sleep(0.1)
         return True
 
     def set_slave_id(self, slave_id: int) -> bool:
@@ -341,6 +345,7 @@ class GHand:
 
         if connected:
             self._comm.stop()
+            time.sleep(0.1)
             self._comm.disconnect()
             logger.info("Disconnected from device")
         self._opened = False
