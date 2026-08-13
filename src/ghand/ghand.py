@@ -283,6 +283,8 @@ class GHand:
                 if self._resolve_product_type():
                     self._sync_product_config_from_comm()
                     logger.info("Device opened successfully (ID: %s)", aid)
+                    self._comm.stop()
+                    time.sleep(0.1)
                     return True
 
                 logger.error("Device verification failed (ID: %s)", aid)
@@ -345,7 +347,7 @@ class GHand:
 
         if connected:
             self._comm.stop()
-            time.sleep(0.1)
+            time.sleep(1)
             self._comm.disconnect()
             logger.info("Disconnected from device")
         self._opened = False
