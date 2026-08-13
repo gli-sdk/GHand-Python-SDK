@@ -340,6 +340,7 @@ class GHand:
             logger.exception("Failed to query connection state before close")
 
         if connected:
+            self._comm.stop()
             self._comm.disconnect()
             logger.info("Disconnected from device")
         self._opened = False
