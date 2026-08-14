@@ -145,25 +145,33 @@ class GHand:
         self._tactile_opened = False
 
     @staticmethod
-    def _check_joint_limit(joint: JointCommand, limit):
+    def _check_joint_limit(joint: JointCommand, limit, mode: CtrlMode):
         """Clamp the joint angle to its configured limits.
 
         Args:
             joint: Joint to check and modify in place.
             limit: Tuple of (min, max) in degrees.
+            mode: Current control mode.
         """
+        if mode == CtrlMode.SPEED or mode == CtrlMode.TORQUE:
+            logger.warning(
+                "[Joint] ID: %s angle input is invalid in %s mode and will be ignored",
+                JointId(joint.id).name, mode.name,
+            )
         if joint.angle < limit[0]:
             joint.angle = limit[0]
-            logger.warning(
-                "[Joint] ID: %s angle below limit, clamped to min value %.1f degrees",
-                JointId(joint.id).name, limit[0]
-            )
+            if mode == CtrlMode.POSITION:
+                logger.warning(
+                    "[Joint] ID: %s angle below limit, clamped to min value %.1f degrees",
+                    JointId(joint.id).name, limit[0]
+                )
         elif joint.angle > limit[1]:
             joint.angle = limit[1]
-            logger.warning(
-                "[Joint] ID: %s angle above limit, clamped to max value %.1f degrees",
-                JointId(joint.id).name, limit[1]
-            )
+            if mode == CtrlMode.POSITION:
+                logger.warning(
+                    "[Joint] ID: %s angle above limit, clamped to max value %.1f degrees",
+                    JointId(joint.id).name, limit[1]
+                )
 
     @staticmethod
     def _check_speed_limit(joint: JointCommand, mode: CtrlMode):
@@ -173,13 +181,18 @@ class GHand:
             joint: Joint to check and modify in place.
             mode: Current control mode.
         """
+        if mode == CtrlMode.TORQUE:
+            logger.warning(
+                "[Joint] ID: %s speed input is invalid in torque mode and will be ignored",
+                JointId(joint.id).name,
+            )
         original_speed = joint.speed
         if mode == CtrlMode.SPEED:
             joint.speed = max(-100, min(100, joint.speed))
         else:
             joint.speed = min(100, abs(joint.speed))
 
-        if joint.speed != original_speed:
+        if joint.speed != original_speed and mode != CtrlMode.TORQUE:
             logger.warning(
                 "[Joint] ID: %s speed %s adjusted to %s in %s mode",
                 JointId(joint.id).name,
@@ -611,7 +624,7 @@ class GHand:
             self._check_speed_limit(joint_cmd, mode)
             self._check_torque_limit(joint_cmd, mode)
             if joint.id in self._joint_limits:
-                self._check_joint_limit(joint_cmd, self._joint_limits[joint.id])
+                self._check_joint_limit(joint_cmd, self._joint_limits[joint.id], mode)
             active_joints.append(joint_cmd)
 
         if not active_joints:
