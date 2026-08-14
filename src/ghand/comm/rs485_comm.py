@@ -47,8 +47,6 @@ from ..types import (
 from .icomm import IComm
 from .modbus_codec import (
     BAUDRATE_CONFIG_REGISTER,
-    BAUDRATE_TO_GEAR_MAP,
-    DEFAULT_BAUDRATE_GEAR,
     REG_CLEAR_FAULT,
     REG_DEVICE_NAME,
     REG_FIRMWARE_VERSION,
@@ -75,6 +73,19 @@ from .modbus_codec import (
     registers_to_bytes,
 )
 
+# RS485 baud rate gear map per protocol documentation.
+# Writing a gear value to BAUDRATE_CONFIG_REGISTER selects the serial baud rate;
+# the new configuration takes effect after the next power-up.
+RS485_BAUDRATE_GEAR_MAP: dict[int, int] = {
+    0x00: 57_600,
+    0x01: 115_200,
+    0x02: 230_400,
+    0x03: 460_800,
+    0x04: 921_600,
+    0x05: 1_000_000,
+}
+RS485_DEFAULT_BAUDRATE_GEAR = 0x05
+
 logger = logging.getLogger("ghand.rs485_comm")
 
 
@@ -82,7 +93,10 @@ class Rs485Comm(IComm):
     """IComm implementation for RS485/Modbus RTU."""
 
     _DEFAULT_POLL_INTERVAL_SEC = 0.1
-    _DEFAULT_BAUDRATE = 1_000_000
+    _DEFAULT_BAUDRATE_GEAR = RS485_DEFAULT_BAUDRATE_GEAR
+    SUPPORTED_BAUDRATE_GEARS = tuple(
+        sorted(RS485_BAUDRATE_GEAR_MAP.keys(), reverse=True)
+    )
     _LINUX_PORT_PATTERNS = (
         "/dev/serial/by-id/*",
         "/dev/ttyUSB*",
@@ -214,11 +228,21 @@ class Rs485Comm(IComm):
             device_name,
         )
 
-    def connect(self, device_name: str) -> bool:
+    def connect(
+        self,
+        device_name: str,
+        baudrate_gear: int | None = None,
+        quiet: bool = False,
+    ) -> bool:
         """Connect to the specified RS485 device.
 
         Args:
             device_name: Serial port name (e.g., "COM3", "/dev/ttyUSB0").
+            baudrate_gear: Connection baud rate gear. If None, the value is
+                taken from the ``GHAND_RS485_BAUDRATE_GEAR`` environment
+                variable, falling back to the default gear (0x05).
+            quiet: When True, suppress non-fatal failure logs. Useful when the
+                caller is scanning several ports or baud rates.
 
         Returns:
             True if the connection succeeds, False otherwise.
@@ -229,13 +253,36 @@ class Rs485Comm(IComm):
 
         resolved_device = self._resolve_device_name(device_name)
         if resolved_device is None:
-            logger.error("No RS485 serial adapters found")
+            if not quiet:
+                logger.error("No RS485 serial adapters found")
             return False
 
-        baudrate = int(os.environ.get("GHAND_RS485_BAUDRATE", self._DEFAULT_BAUDRATE))
+        if baudrate_gear is None:
+            baudrate_gear = int(
+                os.environ.get("GHAND_RS485_BAUDRATE_GEAR", self._DEFAULT_BAUDRATE_GEAR)
+            )
+
+        baudrate = RS485_BAUDRATE_GEAR_MAP.get(baudrate_gear)
+        if baudrate is None:
+            if not quiet:
+                logger.error("Invalid RS485 baudrate gear: %s", baudrate_gear)
+            return False
+
+        if self._connect_with_baudrate(resolved_device, baudrate, quiet):
+            logger.info(
+                "Device connected via RS485 (%s, baudrate_gear=0x%02X, baudrate=%s)",
+                resolved_device,
+                baudrate_gear,
+                baudrate,
+            )
+            return True
+        return False
+
+    def _connect_with_baudrate(self, device_name: str, baudrate: int, quiet: bool) -> bool:
+        """Attempt a single RS485 connection with the given baud rate."""
         try:
             self._client = ModbusSerialClient(
-                port=resolved_device,
+                port=device_name,
                 baudrate=baudrate,
                 bytesize=8,
                 parity="N",
@@ -243,7 +290,8 @@ class Rs485Comm(IComm):
                 timeout=1.0,
             )
             if not self._client.connect():
-                self._log_linux_connect_hint(resolved_device)
+                if not quiet:
+                    self._log_linux_connect_hint(device_name)
                 self._client.close()
                 self._client = None
                 return False
@@ -252,7 +300,7 @@ class Rs485Comm(IComm):
             for slave_id in dict.fromkeys(slave_ids):
                 try:
                     result = self._read_holding_registers(
-                        0x0000, count=1, device_id=slave_id
+                        REG_SLAVE_ID, count=1, device_id=slave_id
                     )
                 except ModbusException:
                     logger.debug("No response from RS485 slave 0x%02X", slave_id)
@@ -263,23 +311,21 @@ class Rs485Comm(IComm):
             else:
                 self._client.close()
                 self._client = None
-                logger.error("No RS485 device responded on %s", resolved_device)
+                if not quiet:
+                    logger.error("No RS485 device responded on %s", device_name)
                 return False
             self._connected = True
-            logger.info(
-                "Device connected via RS485 (%s, baudrate=%s)",
-                resolved_device,
-                baudrate,
-            )
             return True
         except ModbusException as e:
-            logger.error("Failed to connect to RS485 device: %s", e)
+            if not quiet:
+                logger.error("Failed to connect to RS485 device: %s", e)
             if self._client:
                 self._client.close()
                 self._client = None
             return False
         except (OSError, ValueError) as e:
-            self._log_linux_connect_hint(resolved_device, e)
+            if not quiet:
+                self._log_linux_connect_hint(device_name, e)
             if self._client:
                 self._client.close()
                 self._client = None
@@ -316,24 +362,26 @@ class Rs485Comm(IComm):
         self._slave_id = slave_id
         return True
 
-    def set_baudrate_config(self, baudrate: int) -> bool:
+    def set_baudrate_config(
+        self,
+        baudrate_gear: int | None = None,
+    ) -> bool:
         """Write the baud rate gear to holding register 0x002C.
 
         The value is saved to Flash and takes effect after the next power-up.
 
         Args:
-            baudrate: Target baud rate in bps. Supported values are
-                57600, 115200, 230400, 460800, 921600 and 1000000.
-                Invalid values fall back to the default 1 Mbps gear (0x05).
+            baudrate_gear: Gear value written directly to the register. When
+                omitted the default gear (0x05) is used.
 
         Returns:
             True if the device accepted the configuration.
         """
-        gear = BAUDRATE_TO_GEAR_MAP.get(baudrate, DEFAULT_BAUDRATE_GEAR)
+        gear = baudrate_gear if baudrate_gear is not None else RS485_DEFAULT_BAUDRATE_GEAR
         try:
             result = self._write_register(BAUDRATE_CONFIG_REGISTER, gear)
         except Exception as exc:
-            logger.error("Failed to set RS485 baudrate config to %d bps: %s", baudrate, exc)
+            logger.error("Failed to set RS485 baudrate config to gear 0x%02X: %s", gear, exc)
             return False
         return result is not None and not result.isError()
 

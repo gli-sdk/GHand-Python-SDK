@@ -35,11 +35,22 @@ class IComm(ABC):
     # ===== Connection management =====
 
     @abstractmethod
-    def connect(self, device_name: str) -> bool:
+    def connect(
+        self,
+        device_name: str,
+        baudrate_gear: int | None = None,
+        quiet: bool = False,
+    ) -> bool:
         """Connect to the specified device.
 
         Args:
             device_name: Identifier of the device to connect to.
+            baudrate_gear: Optional baud rate gear value. For RS485 this selects
+                the serial baud rate; for CANFD it selects both the arbitration
+                and data phase bitrates. Other implementations may ignore it.
+            quiet: When True, suppress non-fatal failure logs. Useful for
+                auto-detection loops that are expected to try several ports
+                or baud rates before finding a device.
 
         Returns:
             True if the connection succeeds, False otherwise.
@@ -76,11 +87,15 @@ class IComm(ABC):
         """
         return False
 
-    def set_baudrate_config(self, baudrate: int) -> bool:
+    def set_baudrate_config(
+        self,
+        baudrate_gear: int | None = None,
+    ) -> bool:
         """Configure the RS485/CANFD baud rate gear (Flash, effective on reboot).
 
         Args:
-            baudrate: Target baud rate in bps.
+            baudrate_gear: Protocol gear value written directly to holding
+                register 0x002C. When omitted the protocol default gear is used.
 
         Returns:
             True if the command succeeds, False otherwise.

@@ -18,10 +18,10 @@ from __future__ import annotations
 
 import logging
 from ._config import load_product_config
-from .comm.canfd_comm import CanfdComm
+from .comm.canfd_comm import CanfdComm, CANFD_BAUDRATE_GEAR_MAP, CANFD_DEFAULT_BAUDRATE_GEAR
 from .comm.ethercat_comm import EthercatComm
 from .comm.ethercat_protocol import Tpdo
-from .comm.rs485_comm import Rs485Comm
+from .comm.rs485_comm import Rs485Comm, RS485_BAUDRATE_GEAR_MAP, RS485_DEFAULT_BAUDRATE_GEAR
 from collision_sdk import CollisionCheckResult, CollisionClient
 import numpy as np
 from ._converter import joints_to_nparray
@@ -247,12 +247,40 @@ class GHand:
             return False
         return True
 
-    def open(self, id: str = "auto", slave_id: int | None = None) -> bool:
+    def _bitrate_units_to_try(
+        self, baudrate_gear: int | None
+    ) -> tuple[list[int | None], bool]:
+        """Return baud rate gears to try and a quiet flag.
+
+        When no gear is provided, the protocol default gear is used. Auto-scan
+        across multiple gears is intentionally not performed because switching
+        CANFD bitrates without knowing the device's current gear can leave the
+        adapter or device in a bus-recovery state and cause all attempts to fail.
+        """
+        if baudrate_gear is not None:
+            return [baudrate_gear], False
+        if isinstance(self._comm, Rs485Comm):
+            return [self._comm.DEFAULT_BAUDRATE_GEAR], True
+        if isinstance(self._comm, CanfdComm):
+            return [self._comm.DEFAULT_BAUDRATE_GEAR], True
+        return [None], False
+
+    def open(
+        self,
+        id: str = "auto",
+        slave_id: int | None = None,
+        baudrate_gear: int | None = None,
+    ) -> bool:
         """Open the device connection.
 
         Args:
             id: Device ID. Use "auto" to search automatically.
             slave_id: Optional RS485/CANFD slave ID override for this connection.
+            baudrate_gear: Optional baud rate gear value. The gear selects the
+                concrete bitrates for RS485 or CANFD. When omitted, the protocol
+                default gear (0x05) is used. Pass the gear explicitly if the
+                device was configured to a non-default gear via
+                ``set_baudrate_config()``.
 
         Returns:
             True if the connection is established successfully.
@@ -273,24 +301,30 @@ class GHand:
         if id == "auto":
             id_list = self._comm.search_adapters()
             logger.info("Found IDs:\n\t%s", "\n\t".join(str(id) for id in id_list))
+            gears, quiet = self._bitrate_units_to_try(baudrate_gear)
             for aid in id_list:
-                if not self._comm.connect(aid):
+                for gear in gears:
+                    if not self._comm.connect(aid, baudrate_gear=gear, quiet=quiet):
+                        continue
+
+                    self._opened = True
+                    if self._resolve_product_type():
+                        self._sync_product_config_from_comm()
+                        logger.info(
+                            "Device opened successfully (ID: %s, baudrate_gear=0x%02X)",
+                            aid,
+                            gear,
+                        )
+                        return True
+
+                    logger.error("Device verification failed (ID: %s)", aid)
+                    self._comm.disconnect()
+                    self._opened = False
+                else:
                     logger.error("Failed to open device (ID: %s)", aid)
-                    continue
-
-                self._opened = True
-                if self._resolve_product_type():
-                    self._sync_product_config_from_comm()
-                    logger.info("Device opened successfully (ID: %s)", aid)
-                    return True
-
-                logger.error("Device verification failed (ID: %s)", aid)
-                self._comm.disconnect()
-                self._opened = False
-
             return False
         else:
-            if not self._comm.connect(id):
+            if not self._comm.connect(id, baudrate_gear=baudrate_gear):
                 logger.error("Failed to open device (ID: %s)", id)
                 return False
             self._opened = True
@@ -327,15 +361,17 @@ class GHand:
             logger.info("Slave ID set to 0x%02X", slave_id)
         return result
 
-    def set_baudrate_config(self, baudrate: int) -> bool:
+    def set_baudrate_config(
+        self,
+        baudrate_gear: int | None = None,
+    ) -> bool:
         """Set the RS485/CANFD baud rate gear (holding register 0x002C).
 
         The gear is stored in Flash and takes effect after the next power-up.
-        Unsupported values fall back to the 1 Mbps default gear on the device.
 
         Args:
-            baudrate: Target baud rate in bps. Supported values: 57600,
-                115200, 230400, 460800, 921600, 1000000.
+            baudrate_gear: Protocol gear value written directly to the
+                register. When omitted the protocol default gear is used.
 
         Returns:
             True if the device accepted the configuration.
@@ -346,9 +382,31 @@ class GHand:
         if not self.is_connected():
             raise RuntimeError("Device is not connected")
 
-        result = self._comm.set_baudrate_config(baudrate)
+        result = self._comm.set_baudrate_config(baudrate_gear)
         if result:
-            logger.info("Baud rate config set to %d bps (effective after reboot)", baudrate)
+            if self._comm_type == CommType.RS485:
+                gear = baudrate_gear if baudrate_gear is not None else RS485_DEFAULT_BAUDRATE_GEAR
+                baudrate = RS485_BAUDRATE_GEAR_MAP.get(gear)
+                logger.info(
+                    "Baudrate config set to gear 0x%02X (%s bps, effective after reboot)",
+                    gear,
+                    baudrate,
+                )
+            elif self._comm_type == CommType.CANFD:
+                gear = baudrate_gear if baudrate_gear is not None else CANFD_DEFAULT_BAUDRATE_GEAR
+                (abit, abit_sample), (dbit, dbit_sample) = CANFD_BAUDRATE_GEAR_MAP.get(
+                    gear, ((None, None), (None, None))
+                )
+                logger.info(
+                    "Baudrate config set to gear 0x%02X (abit=%s/%s%%, dbit=%s/%s%%, effective after reboot)",
+                    gear,
+                    abit,
+                    abit_sample,
+                    dbit,
+                    dbit_sample,
+                )
+            else:
+                logger.info("Baudrate config set (effective after reboot)")
         return result
 
     def close(self) -> bool:

@@ -48,8 +48,6 @@ from .canfd_transport import CanfdTransport, pack_arbitration, unpack_arbitratio
 from .icomm import IComm
 from .modbus_codec import (
     BAUDRATE_CONFIG_REGISTER,
-    BAUDRATE_TO_GEAR_MAP,
-    DEFAULT_BAUDRATE_GEAR,
     REG_CLEAR_FAULT,
     REG_DEVICE_NAME,
     REG_FIRMWARE_VERSION,
@@ -75,6 +73,21 @@ from .modbus_codec import (
     registers_to_bytes,
 )
 
+# CANFD baud rate gear map per protocol documentation.
+# Writing a gear value to BAUDRATE_CONFIG_REGISTER selects both the arbitration
+# phase bitrate/data-phase bitrate and their sample points; the new
+# configuration takes effect after the next power-up.
+CANFD_BAUDRATE_GEAR_MAP: dict[int, tuple[tuple[int, int], tuple[int, int]]] = {
+    # gear: ((arbitration_baud, arbitration_sample_point), (data_baud, data_sample_point))
+    0x00: ((500_000, 80), (1_000_000, 75)),
+    0x01: ((500_000, 80), (2_000_000, 80)),
+    0x02: ((500_000, 80), (4_000_000, 80)),
+    0x03: ((500_000, 80), (5_000_000, 75)),
+    0x04: ((1_000_000, 75), (4_000_000, 80)),
+    0x05: ((1_000_000, 75), (5_000_000, 75)),
+}
+CANFD_DEFAULT_BAUDRATE_GEAR = 0x05
+
 logger = logging.getLogger("ghand.canfd_comm")
 
 
@@ -84,6 +97,8 @@ class CanfdComm(IComm):
     _DELETE_CONNECTION_SETTLE_SEC = 0.1
     _MIN_REOPEN_INTERVAL_SEC = 0.5
     _DEFAULT_POLL_INTERVAL_SEC = 0.03
+    _DEFAULT_BAUDRATE_GEAR = CANFD_DEFAULT_BAUDRATE_GEAR
+    COMMON_BAUDRATE_GEARS = tuple(sorted(CANFD_BAUDRATE_GEAR_MAP.keys(), reverse=True))
 
     def __init__(self, config: ProductConfig):
         self._config = config
@@ -163,7 +178,12 @@ class CanfdComm(IComm):
             return CanfdTransport(channel=device_name)
         return CanfdTransport()
 
-    def connect(self, device_name: str) -> bool:
+    def connect(
+        self,
+        device_name: str,
+        baudrate_gear: int | None = None,
+        quiet: bool = False,
+    ) -> bool:
         """Connect to the specified CANFD device.
 
         Internally performs the full CANFD connection handshake:
@@ -171,6 +191,11 @@ class CanfdComm(IComm):
 
         Args:
             device_name: ZQWL CDC serial device name (e.g. "COM3" or "/dev/ttyACM0").
+            baudrate_gear: Baud rate gear value. The gear selects both the
+                arbitration and data phase bitrates. Defaults to gear 0x05
+                (1 Mbps arbitration, 5 Mbps data).
+            quiet: When True, suppress non-fatal failure logs. Useful when the
+                caller is scanning several gears.
 
         Returns:
             True if the connection and handshake succeed.
@@ -178,27 +203,67 @@ class CanfdComm(IComm):
         if self._connected:
             return True
 
+        def _log_error(msg: str, *args) -> None:
+            if quiet:
+                logger.debug(msg, *args)
+            else:
+                logger.error(msg, *args)
+
         try:
             self._wait_for_reopen_window()
             if self._transport is None:
                 self._transport = self._create_transport(device_name)
 
-            if not self._transport.open():
-                logger.error("Failed to open CANFD transport")
+            gear = (
+                baudrate_gear
+                if baudrate_gear is not None
+                else self._DEFAULT_BAUDRATE_GEAR
+            )
+            pair = CANFD_BAUDRATE_GEAR_MAP.get(gear)
+            if pair is None:
+                _log_error("Invalid CANFD baudrate gear: %s", baudrate_gear)
+                self._cleanup_failed_connect()
+                return False
+            (abit_baud, abit_sample), (dbit_baud, dbit_sample) = pair
+            logger.info(
+                "Trying CANFD connection at %s with gear=0x%02X (abit=%s/%s%%, dbit=%s/%s%%)",
+                device_name,
+                gear,
+                abit_baud,
+                abit_sample,
+                dbit_baud,
+                dbit_sample,
+            )
+            if not self._transport.open(
+                abit_baud=abit_baud,
+                dbit_baud=dbit_baud,
+                abit_sample=abit_sample,
+                dbit_sample=dbit_sample,
+                quiet=quiet,
+            ):
+                _log_error("Failed to open CANFD transport at gear=0x%02X", gear)
                 self._cleanup_failed_connect()
                 return False
 
             # Establish connection: function code 0x02, write connection timer=0.
             if not self._establish_connection():
-                logger.error("Failed to establish CANFD connection")
+                _log_error("Failed to establish CANFD connection at gear=0x%02X", gear)
                 self._cleanup_failed_connect()
                 return False
 
             self._connected = True
-            logger.info("CANFD device connected (%s)", device_name)
+            logger.info(
+                "CANFD device connected (%s, gear=0x%02X, abit=%s/%s%%, dbit=%s/%s%%)",
+                device_name,
+                gear,
+                abit_baud,
+                abit_sample,
+                dbit_baud,
+                dbit_sample,
+            )
             return True
         except Exception as exc:
-            logger.error("CANFD connect failed: %s", exc)
+            _log_error("CANFD connect failed: %s", exc)
             self._cleanup_failed_connect()
             return False
 
@@ -351,21 +416,27 @@ class CanfdComm(IComm):
         self._dst_id = slave_id
         return True
 
-    def set_baudrate_config(self, baudrate: int) -> bool:
+    def set_baudrate_config(
+        self,
+        baudrate_gear: int | None = None,
+    ) -> bool:
         """Write the baud rate gear to holding register 0x002C.
 
         The value is saved to Flash and takes effect after the next power-up.
-        The same register also controls the CANFD baud rate.
+        For CANFD the gear selects both the arbitration phase bitrate/data-phase
+        bitrate and their sample points.
 
         Args:
-            baudrate: Target baud rate in bps. Supported values are
-                57600, 115200, 230400, 460800, 921600 and 1000000.
-                Invalid values fall back to the default 1 Mbps gear (0x05).
+            baudrate_gear: Gear value written directly to the register. When
+                omitted the default gear (0x05) is used. Supported gears map to:
+                0x00=(500K@80%,1M@75%), 0x01=(500K@80%,2M@80%),
+                0x02=(500K@80%,4M@80%), 0x03=(500K@80%,5M@75%),
+                0x04=(1M@75%,4M@80%), 0x05=(1M@75%,5M@75%) default.
 
         Returns:
             True if the device accepted the configuration.
         """
-        gear = BAUDRATE_TO_GEAR_MAP.get(baudrate, DEFAULT_BAUDRATE_GEAR)
+        gear = baudrate_gear if baudrate_gear is not None else CANFD_DEFAULT_BAUDRATE_GEAR
         try:
             self._transport.write_registers(
                 self._src_id,
@@ -374,7 +445,7 @@ class CanfdComm(IComm):
                 struct.pack(">H", gear),
             )
         except Exception as exc:
-            logger.error("Failed to set CANFD baudrate config to %d bps: %s", baudrate, exc)
+            logger.error("Failed to set CANFD baudrate config to gear 0x%02X: %s", gear, exc)
             return False
         return True
 

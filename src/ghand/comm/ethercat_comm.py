@@ -143,11 +143,18 @@ class EthercatComm(IComm):
         """
         return self._client.search()
 
-    def connect(self, device_name: str) -> bool:
+    def connect(
+        self,
+        device_name: str,
+        baudrate_gear: int | None = None,
+        quiet: bool = False,
+    ) -> bool:
         """Connect to the specified EtherCAT device.
 
         Args:
             device_name: Adapter ID to connect to.
+            baudrate_gear: Ignored for EtherCAT.
+            quiet: Ignored for EtherCAT; errors are always logged.
 
         Returns:
             True if the connection and SOEM startup succeed.

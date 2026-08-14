@@ -60,16 +60,6 @@ class ModbusRegisterProfile:
 # Writing a gear value saves to Flash and takes effect after next power-up.
 BAUDRATE_CONFIG_REGISTER = 0x002C
 
-BAUDRATE_TO_GEAR_MAP: dict[int, int] = {
-    57_600: 0x00,
-    115_200: 0x01,
-    230_400: 0x02,
-    460_800: 0x03,
-    921_600: 0x04,
-    1_000_000: 0x05,
-}
-DEFAULT_BAUDRATE_GEAR = 0x05
-
 # Common holding register addresses (device configuration / control).
 REG_SLAVE_ID = 0x0000
 REG_CLEAR_FAULT = 0x0001
@@ -112,9 +102,9 @@ HOLDING_REG_MAP = GHAND5_HOLDING_REG_MAP
 
 # GHandLite1 protocol: only these 11 joints are present in the Modbus table.
 GHAND_LITE1_JOINT_INPUT_REG_MAP = {
-    JointId.THUMB_TMC_FE: 0x1023,
-    JointId.THUMB_TMC_AA: 0x1026,
-    JointId.THUMB_TMC_PS: 0x1029,
+    JointId.THUMB_MCP: 0x1023,
+    JointId.THUMB_TMC_FE: 0x1026,
+    JointId.THUMB_TMC_AA: 0x1029,
     JointId.FF_PIP: 0x102C,
     JointId.FF_MCP: 0x102F,
     JointId.MF_PIP: 0x1032,
@@ -126,9 +116,9 @@ GHAND_LITE1_JOINT_INPUT_REG_MAP = {
 }
 
 GHAND_LITE1_HOLDING_REG_MAP = {
-    JointId.THUMB_TMC_FE: 0x0010,
-    JointId.THUMB_TMC_AA: 0x0013,
-    JointId.THUMB_TMC_PS: 0x0016,
+    JointId.THUMB_MCP: 0x0010,
+    JointId.THUMB_TMC_FE: 0x0013,
+    JointId.THUMB_TMC_AA: 0x0016,
     JointId.FF_PIP: 0x0019,
     JointId.FF_MCP: 0x001C,
     JointId.MF_PIP: 0x001F,

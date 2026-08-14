@@ -4,7 +4,7 @@
   "aliases": ["GHand Lite 1"],
   "joints": [
     { "id": "THUMB_MCP" },
-    { "id": "THUMB_TMC_FE", "min": 0.0, "max": 30.0 },
+    { "id": "THUMB_TMC_FE", "min": 0.0, "max": 50.0 },
     { "id": "THUMB_TMC_AA", "min": 0.0, "max": 90.0 },
     { "id": "FF_PIP" },
     { "id": "FF_MCP",      "min": 0.0, "max": 90.0 },

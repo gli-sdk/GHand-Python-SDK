@@ -122,6 +122,45 @@ def _zqwl_dlc_to_length(dlc: int) -> int | None:
     return None
 
 
+def _calculate_zqwl_canfd_timing(
+    bitrate: int, sample_point_percent: int
+) -> tuple[int, int, int, int]:
+    """Calculate ZQWL custom CANFD timing parameters.
+
+    ZQWL clock is 60 MHz. Bit timing formula:
+        Baud = 60_000_000 / (SJW+1 + TSEG1+1 + TSEG2+1) / BRP
+        SamplePoint = (SJW+1 + TSEG1+1) / (SJW+1 + TSEG1+1 + TSEG2+1)
+
+    Valid ranges: SJW 0x00~0x03, TSEG1 0x00~0x0F, TSEG2 0x00~0x07,
+    BRP 1~0x0400 (2 bytes, big-endian).
+
+    Returns:
+        (sjw, tseg1, tseg2, brp) timing parameters.
+
+    Raises:
+        ValueError: If no valid integer timing parameters exist for the
+            requested bitrate/sample-point pair.
+    """
+    target = sample_point_percent
+    for sjw in range(4):
+        for tseg1 in range(0x10):
+            for tseg2 in range(8):
+                sample_num = sjw + tseg1 + 2  # SJW+1 + TSEG1+1
+                total = sjw + tseg1 + tseg2 + 3  # SJW+1 + TSEG1+1 + TSEG2+1
+                if sample_num * 100 != target * total:
+                    continue
+                brp = 60_000_000 // (total * bitrate)
+                if brp < 1 or brp > 0x0400:
+                    continue
+                if 60_000_000 // (total * brp) != bitrate:
+                    continue
+                return sjw, tseg1, tseg2, brp
+    raise ValueError(
+        f"Cannot compute ZQWL CANFD timing for bitrate={bitrate}, "
+        f"sample_point={sample_point_percent}%"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Transport class
 # ---------------------------------------------------------------------------
@@ -144,11 +183,31 @@ class CanfdTransport:
     # Device lifecycle
     # ------------------------------------------------------------------
 
-    def open(self, abit_baud: int = 1_000_000, dbit_baud: int = 5_000_000) -> bool:
+    def open(
+        self,
+        abit_baud: int = 1_000_000,
+        dbit_baud: int = 5_000_000,
+        abit_sample: int = 75,
+        dbit_sample: int = 75,
+        quiet: bool = False,
+    ) -> bool:
         """Open the CANFD device and start the CAN channel."""
-        return self._open_zqwl_serial(abit_baud=abit_baud, dbit_baud=dbit_baud)
+        return self._open_zqwl_serial(
+            abit_baud=abit_baud,
+            dbit_baud=dbit_baud,
+            abit_sample=abit_sample,
+            dbit_sample=dbit_sample,
+            quiet=quiet,
+        )
 
-    def _open_zqwl_serial(self, abit_baud: int, dbit_baud: int) -> bool:
+    def _open_zqwl_serial(
+        self,
+        abit_baud: int,
+        dbit_baud: int,
+        abit_sample: int = 75,
+        dbit_sample: int = 75,
+        quiet: bool = False,
+    ) -> bool:
         """Open a ZQWL USBCANFD CDC serial adapter."""
         if self._serial is not None:
             return True
@@ -167,23 +226,34 @@ class CanfdTransport:
                 write_timeout=1.0,
             )
             self._serial = ser
-            self._configure_zqwl_channel(abit_baud=abit_baud, dbit_baud=dbit_baud)
-            logger.info(
-                "ZQWL CANFD serial channel opened (%s, abit=%s, dbit=%s)",
-                self._channel,
-                abit_baud,
-                dbit_baud,
+            # Give the adapter a moment to settle after the CDC serial port opens.
+            time.sleep(0.1)
+            self._configure_zqwl_channel(
+                abit_baud=abit_baud,
+                dbit_baud=dbit_baud,
+                abit_sample=abit_sample,
+                dbit_sample=dbit_sample,
             )
+            if not quiet:
+                logger.info(
+                    "ZQWL CANFD serial channel opened (%s, abit=%s/%s%%, dbit=%s/%s%%)",
+                    self._channel,
+                    abit_baud,
+                    abit_sample,
+                    dbit_baud,
+                    dbit_sample,
+                )
             return True
         except Exception as exc:
-            logger.error("Failed to open ZQWL CANFD serial adapter %s: %s", self._channel, exc)
+            if not quiet:
+                logger.error("Failed to open ZQWL CANFD serial adapter %s: %s", self._channel, exc)
             if self._serial is not None:
                 self._serial.close()
                 self._serial = None
             return False
 
     def _write_zqwl_config(self, func_code: int, write: bool, data: bytes = b"") -> None:
-        """Write one 22-byte ZQWL configuration command."""
+        """Write one 22-byte ZQWL configuration command and log the response."""
         if self._serial is None:
             raise RuntimeError("ZQWL serial adapter not open")
         payload = data[:16].ljust(16, b"\x00")
@@ -193,22 +263,82 @@ class CanfdTransport:
             + payload
             + ZQWL_CONFIG_TAIL
         )
+        logger.debug("ZQWL send func=%#04x %s: %s", func_code, "W" if write else "R", cmd.hex(" "))
         self._serial.write(cmd)
         self._serial.flush()
+        # ZQWL adapters acknowledge config commands with a 22-byte response.
+        # Read whatever is available in a short window and log it for diagnosis.
+        saved_timeout = self._serial.timeout
+        self._serial.timeout = 0.05
+        try:
+            resp = self._serial.read(22)
+            if resp:
+                logger.debug("ZQWL resp func=%#04x: %s", func_code, resp.hex(" "))
+        finally:
+            self._serial.timeout = saved_timeout
 
-    def _configure_zqwl_channel(self, abit_baud: int, dbit_baud: int) -> None:
-        """Configure CAN0 for common CANFD 1M/5M style operation."""
+    def _configure_zqwl_channel(
+        self,
+        abit_baud: int,
+        dbit_baud: int,
+        abit_sample: int = 75,
+        dbit_sample: int = 75,
+    ) -> None:
+        """Configure CAN0/CAN1 for the requested CANFD bitrate and sample points.
+
+        Uses ZQWL function code 0x42. When the requested bitrates are listed in
+        the adapter's common bitrate tables we use the common bitrate code; this
+        avoids depending on the exact custom-mode byte layout. Otherwise we fall
+        back to custom timing parameters.
+        """
+        data = bytearray(16)
+        data[0] = self._can_index & 0xFF
+
         abit_code = ZQWL_COMMON_BITRATE_CODES.get(abit_baud)
         dbit_code = ZQWL_COMMON_DBITRATE_CODES.get(dbit_baud)
-        if abit_code is None or dbit_code is None:
-            raise ValueError(
-                f"Unsupported ZQWL common bitrate pair: abit={abit_baud}, dbit={dbit_baud}"
+        if abit_code is not None and dbit_code is not None:
+            data[1] = 0x00  # common bitrate flag
+            data[2] = ((abit_code & 0x0F) << 4) | (dbit_code & 0x0F)
+            logger.debug(
+                "ZQWL 0x42 common mode: can=%s code=%#04x abit=%s dbit=%s",
+                self._can_index,
+                data[2],
+                abit_baud,
+                dbit_baud,
+            )
+        else:
+            data[1] = 0x01  # custom baud-rate flag
+            abit_sjw, abit_tseg1, abit_tseg2, abit_brp = (
+                _calculate_zqwl_canfd_timing(abit_baud, abit_sample)
+            )
+            dbit_sjw, dbit_tseg1, dbit_tseg2, dbit_brp = (
+                _calculate_zqwl_canfd_timing(dbit_baud, dbit_sample)
+            )
+            # Arbitration phase timing
+            data[2] = abit_sjw & 0xFF
+            data[3] = abit_tseg1 & 0xFF
+            data[4] = abit_tseg2 & 0xFF
+            data[5] = (abit_brp >> 8) & 0xFF
+            data[6] = abit_brp & 0xFF
+            # Data phase timing
+            data[7] = dbit_sjw & 0xFF
+            data[8] = dbit_tseg1 & 0xFF
+            data[9] = dbit_tseg2 & 0xFF
+            data[10] = (dbit_brp >> 8) & 0xFF
+            data[11] = dbit_brp & 0xFF
+            logger.debug(
+                "ZQWL 0x42 custom mode: can=%s abit=%s/%s%% dbit=%s/%s%%",
+                self._can_index,
+                abit_baud,
+                abit_sample,
+                dbit_baud,
+                dbit_sample,
             )
 
-        bitrate_code = ((abit_code & 0x0F) << 4) | (dbit_code & 0x0F)
-        # Function 0x42: CAN parameter; data[0]=CAN channel, data[1]=custom flag,
-        # data[2]=common arbitration/data bitrate code.
-        self._write_zqwl_config(0x42, True, bytes([self._can_index & 0xFF, 0x00, bitrate_code]))
+        logger.debug("ZQWL 0x42 payload: %s", bytes(data).hex(" "))
+        self._write_zqwl_config(0x42, True, bytes(data))
+        time.sleep(0.05)
+
         # Function 0x44: apply parameters and open CAN0/CAN1.
         control = bytearray(16)
         control[0] = 0x01
@@ -218,16 +348,19 @@ class CanfdTransport:
             control[3] = 0x01
         else:
             raise ValueError("ZQWL serial backend currently supports CAN0/CAN1")
+        logger.debug("ZQWL 0x44 payload: %s", bytes(control).hex(" "))
         self._write_zqwl_config(0x44, True, bytes(control))
 
-    def close(self) -> bool:
+    def close(self, quiet: bool = False) -> bool:
         """Stop the channel and close the device."""
         if self._serial is not None:
             self._serial.close()
             self._serial = None
-            logger.info("ZQWL CANFD serial channel closed")
+            if not quiet:
+                logger.info("ZQWL CANFD serial channel closed")
             return True
-        logger.info("CANFD channel closed")
+        if not quiet:
+            logger.info("CANFD channel closed")
         return True
 
     # ------------------------------------------------------------------
