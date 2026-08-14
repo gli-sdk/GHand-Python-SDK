@@ -567,10 +567,15 @@ class GHand:
 
         Returns:
             Tuple of (major, minor, patch) version numbers.
+            GHandLite1 does not expose motor driver version registers, so
+            (0, 0, 0) is returned for that product.
 
         Raises:
             RuntimeError: If communication fails.
         """
+        if self._product_type == ProductType.GHandLite1:
+            logger.info("Motor driver version not available", exc_info=True)
+            return (0, 0, 0)
         return self._comm.get_motor_driver_version()
 
     def fault_clearance(self) -> bool:

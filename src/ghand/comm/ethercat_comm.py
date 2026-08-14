@@ -459,14 +459,21 @@ class EthercatComm(IComm):
         Writes the motor driver MCU id (0x04) to index 0x2007 sub-index 0x01,
         then reads version high/low from sub-indices 0x02/0x03 and parses the
         semantic version as (major, minor, patch).
+
+        Returns (0, 0, 0) if the motor driver version is not available, matching
+        the behaviour of CANFD and RS485 transports.
         """
-        self._client.sdo_write(0x2007, 0x01, b"\x04")
-        version_high = int.from_bytes(
-            self._client.sdo_read(0x2007, 0x02), byteorder="little"
-        )
-        version_low = int.from_bytes(
-            self._client.sdo_read(0x2007, 0x03), byteorder="little"
-        )
+        try:
+            self._client.sdo_write(0x2007, 0x01, b"\x04")
+            version_high = int.from_bytes(
+                self._client.sdo_read(0x2007, 0x02), byteorder="little"
+            )
+            version_low = int.from_bytes(
+                self._client.sdo_read(0x2007, 0x03), byteorder="little"
+            )
+        except Exception:
+            logger.info("Motor driver version not available", exc_info=True)
+            return (0, 0, 0)
         major = (version_high >> 5) & 0x07
         minor = version_high & 0x1F
         patch = (version_low >> 4) & 0x0F
