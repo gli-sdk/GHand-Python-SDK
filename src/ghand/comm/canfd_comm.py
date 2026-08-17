@@ -363,30 +363,11 @@ class CanfdComm(IComm):
                 arb = unpack_arbitration(resp_id)
                 if arb["ack"] == 1 and arb["dst_id"] == self._src_id and arb["src_id"] == dst_id:
                     if arb["func_code"] == 0x82:
-                        error_code = resp_data[0] if resp_data else 0xFF
-                        if error_code == 0x03 and self._connection_is_usable(dst_id):
-                            self._dst_id = dst_id
-                            return True
                         break  # Exception: try next dst_id
                     if arb["func_code"] == 0x02:
                         self._dst_id = dst_id
                         return True
         return False
-
-    def _connection_is_usable(self, dst_id: int) -> bool:
-        """Return whether an existing CANFD connection can serve requests."""
-        try:
-            self._transport.read_registers(
-                self._src_id,
-                dst_id,
-                REG_DEVICE_NAME,
-                1,
-                func_code=0x04,
-                timeout_ms=500,
-            )
-            return True
-        except Exception:
-            return False
 
     def _delete_connection(self) -> None:
         """Send connection-deletion frame (FC 0x05)."""

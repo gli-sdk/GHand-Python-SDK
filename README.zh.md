@@ -102,12 +102,6 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-开发环境可安装额外工具：
-
-```bash
-pip install -e ".[dev]"
-```
-
 ## 快速开始
 
 运行示例前，请确认 GHand 硬件已连接并上电。

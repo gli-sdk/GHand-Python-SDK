@@ -102,12 +102,6 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-For development tools:
-
-```bash
-pip install -e ".[dev]"
-```
-
 ## Quick Start
 
 Make sure your GHand hardware is connected and powered on before running examples.

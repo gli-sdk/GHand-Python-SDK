@@ -260,9 +260,9 @@ class GHand:
         if baudrate_gear is not None:
             return [baudrate_gear], False
         if isinstance(self._comm, Rs485Comm):
-            return [self._comm.DEFAULT_BAUDRATE_GEAR], True
+            return [self._comm._DEFAULT_BAUDRATE_GEAR], True
         if isinstance(self._comm, CanfdComm):
-            return [self._comm.DEFAULT_BAUDRATE_GEAR], True
+            return [self._comm._DEFAULT_BAUDRATE_GEAR], True
         return [None], False
 
     def open(
