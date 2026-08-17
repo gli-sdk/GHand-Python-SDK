@@ -442,14 +442,30 @@ class CanfdComm(IComm):
 
     def move_joints(self, joints: list, mode: CtrlMode) -> bool:
         """Send joint control commands."""
+        if not self.is_connected():
+            logger.error("Cannot move joints: CANFD device is not connected")
+            return False
+
         if self._profile.mode_register is not None:
             mode_value = (mode.value << 8) & 0xFF00
-            self._transport.write_registers(
-                self._src_id,
-                self._dst_id,
+            logger.debug(
+                "CANFD write mode register addr=0x%04X value=0x%04X",
                 self._profile.mode_register,
-                struct.pack(">H", mode_value),
+                mode_value,
             )
+            try:
+                self._transport.write_registers(
+                    self._src_id,
+                    self._dst_id,
+                    self._profile.mode_register,
+                    struct.pack(">H", mode_value),
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to write CANFD mode register addr=0x%04X",
+                    self._profile.mode_register,
+                )
+                raise
 
         for joint in joints:
             joint_id = JointId(joint.id)
@@ -462,12 +478,26 @@ class CanfdComm(IComm):
                 registers = [mode_stop, position, speed_torque]
             else:
                 registers = [position, speed_torque]
-            result = self._transport.write_registers(
-                self._src_id,
-                self._dst_id,
+            logger.debug(
+                "CANFD write joint=%s addr=0x%04X registers=%s",
+                joint_id.name,
                 base_addr,
-                struct.pack(f">{len(registers)}H", *registers),
+                [f"0x{reg:04X}" for reg in registers],
             )
+            try:
+                self._transport.write_registers(
+                    self._src_id,
+                    self._dst_id,
+                    base_addr,
+                    struct.pack(f">{len(registers)}H", *registers),
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to write CANFD joint=%s addr=0x%04X",
+                    joint_id.name,
+                    base_addr,
+                )
+                raise
         return True
 
     def stop(self) -> bool:
