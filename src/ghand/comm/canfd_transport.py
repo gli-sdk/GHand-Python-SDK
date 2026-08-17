@@ -70,9 +70,6 @@ ZQWL_COMMON_DBITRATE_CODES = {
     125_000: 0x9,
     100_000: 0xA,
 }
-ZQWL_CANFD_PAYLOAD_LENGTHS = (
-    0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24, 32, 48, 64,
-)
 
 # ---------------------------------------------------------------------------
 # Arbitration helpers
@@ -118,7 +115,9 @@ def unpack_arbitration(can_id: int) -> dict:
 
 def _zqwl_dlc_to_length(dlc: int) -> int | None:
     """Translate ZQWL CANFD DLC byte value to payload length."""
-    if dlc in ZQWL_CANFD_PAYLOAD_LENGTHS:
+    if 0 <= dlc <= 8:
+        return dlc
+    if dlc in (12, 16, 20, 24, 32, 48, 64):
         return dlc
     return None
 
@@ -373,9 +372,7 @@ class CanfdTransport:
         if self._serial is not None:
             if len(data) > 64:
                 raise ValueError("CANFD frame payload cannot exceed 64 bytes")
-            dlc_length = _zqwl_length_to_dlc(len(data))
-            payload = data.ljust(dlc_length, b"\x00")
-            info1 = dlc_length & 0x7F
+            info1 = len(data) & 0x7F
             info1 |= (self._can_index & 0x01) << 7
             info2 = 0x01  # BRS enabled
             info2 |= ((self._can_index >> 1) & 0x03) << 3
@@ -384,7 +381,7 @@ class CanfdTransport:
             frame = (
                 bytes([ZQWL_CANFD_HEAD, info1, info2])
                 + frame_id.to_bytes(4, "big")
-                + payload
+                + data
                 + bytes([ZQWL_CANFD_TAIL])
             )
             try:
