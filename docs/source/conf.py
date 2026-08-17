@@ -6,14 +6,14 @@ sys.path.insert(0, os.path.abspath('../../src'))
 
 # -- Project information -----------------------------------------------------
 project = 'GHand Python SDK'
-copyright = '2025, Shenzhen GLI Technology Ltd.'
+copyright = '2026, Shenzhen GLI Technology Ltd.'
 author = 'glitech'
 autodoc_member_order = 'bysource'
 
 # The short X.Y version
-version = '1.1'
+version = '2.2'
 # The full version, including alpha/beta/rc tags
-release = '1.1.2'
+release = '2.2.0'
 
 # -- General configuration ---------------------------------------------------
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.viewcode', 'sphinx.ext.napoleon']

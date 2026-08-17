@@ -9,7 +9,6 @@ _logger = logging.getLogger("ghand.adaptive_grasp.demo_config")
 GRASP_OBJECT = "paper_cup"  #default_object
 HOLD_TIME_S = 60.0  #default_hold_time
 
-_ENABLE_VISUALIZATION = False
 _INTERRUPT_RELEASE_WAIT_S = 3.0
 
 
@@ -67,8 +66,6 @@ DEMO_SCENES: dict[str, DemoScene] = {
 def build_demo_runtime_config(
     grasp_object: str = GRASP_OBJECT,
     hold_time_s: float = HOLD_TIME_S,
-    *,
-    enable_visualization: bool = _ENABLE_VISUALIZATION,
     interrupt_release_wait_s: float = _INTERRUPT_RELEASE_WAIT_S,
 ) -> DemoRuntimeConfig:
     if grasp_object not in DEMO_SCENES:
@@ -99,7 +96,7 @@ def build_demo_runtime_config(
         pre_grasp_preset=scene.pre_grasp_preset,
         release_hold_time_s=hold_time_s,
         hold_command_mode=scene.hold_command_mode,
-        enable_visualization=enable_visualization,
+        enable_visualization=False,
     )
     return DemoRuntimeConfig(
         adaptive_config=adaptive_config,

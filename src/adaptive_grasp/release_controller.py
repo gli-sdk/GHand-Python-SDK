@@ -31,6 +31,7 @@ class ReleaseController:
         self.runtime = runtime
         self.config = config
         self.sleep = sleep
+        self._release_lock = threading.Lock()
 
     def release(
         self,
@@ -39,25 +40,32 @@ class ReleaseController:
         release_wait_s: Optional[float] = None,
         control_thread: Optional[threading.Thread] = None,
     ) -> bool:
-        self.runtime.state = GraspState.RELEASE
-        self.runtime.running = False
-        self.runtime.adaptive_hold_started_at = None
-        self.sensor.stop(clear_joint_feedback=False)
+        if not self._release_lock.acquire(blocking=False):
+            _logger.info("release already in progress; skipping duplicate release")
+            return True
 
-        if wait_control_thread:
-            join_thread_if_alive(control_thread, timeout=2.0)
+        try:
+            self.runtime.state = GraspState.RELEASE
+            self.runtime.running = False
+            self.runtime.adaptive_hold_started_at = None
+            self.sensor.stop(clear_joint_feedback=False)
 
-        joints = self.joint_builder.position_command(
-            self.joint_builder.open_pose(),
-            speed=self.config.release_open_speed,
-            torque=self.config.release_open_torque,
-        )
-        ok = self.hand.move_joints(joints, mode=CtrlMode.POSITION)
-        self.sleep(self.config.release_timeout_s if release_wait_s is None else release_wait_s)
-        if not ok:
-            _logger.error("RELEASE phase: move_joints failed")
-            self.runtime.state = GraspState.ERROR
-            return False
+            if wait_control_thread:
+                join_thread_if_alive(control_thread, timeout=2.0)
 
-        self.runtime.state = GraspState.COMPLETED
-        return True
+            joints = self.joint_builder.position_command(
+                self.joint_builder.open_pose(),
+                speed=self.config.release_open_speed,
+                torque=self.config.release_open_torque,
+            )
+            ok = self.hand.move_joints(joints, mode=CtrlMode.POSITION)
+            self.sleep(self.config.release_timeout_s if release_wait_s is None else release_wait_s)
+            if not ok:
+                _logger.error("RELEASE phase: move_joints failed")
+                self.runtime.state = GraspState.ERROR
+                return False
+
+            self.runtime.state = GraspState.COMPLETED
+            return True
+        finally:
+            self._release_lock.release()

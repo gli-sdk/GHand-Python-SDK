@@ -165,7 +165,6 @@ release, completed, error, stopped
 Demo 默认：
 
 ```python
-enable_visualization = False
 hold_command_mode = "position"
 interrupt_release_wait_s = _INTERRUPT_RELEASE_WAIT_S
 ```
