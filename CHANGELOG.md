@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-08-17
+
+### Added
+- Baud rate gear configuration for RS485 and CANFD, including documented gear mappings and connection-time gear selection.
+- Firmware package, position sensor, tactile sensor, motor driver, thumb tactile sensor, and finger tactile sensor version query APIs.
+
+### Changed
+- Refactored CANFD and RS485 register address handling for clearer protocol maintenance.
+- Improved state and error handling names for clearer diagnostics.
+- Updated README and dependency guidance for current installation flows.
+
+### Fixed
+- Handled unavailable motor driver version values without failing device information reads.
+- Constrained NumPy to `>=1.24.0,<1.25.0` to remain compatible with SciPy 1.8 environments.
+
+## [2.1.0] - 2026-08-10
+
+### Added
+- Linux support improvements for EtherCAT, CANFD, and RS485 adapter discovery and connection.
+- RS485 and CANFD slave ID configuration APIs.
+- Adaptive grasp module and examples.
+- Additional motor and tactile sensor error codes.
+
+### Changed
+- Updated product naming and configuration references to `GHand5` and `GHandLite1`.
+- Updated GHand 5 and GHand Lite 1 model identifiers in product configuration files.
+- Reordered GHand Lite 1 joint definitions to match the runtime configuration.
+- Optimized CANFD register writing.
+- Improved adaptive grasp release behavior and position tolerance defaults.
+
+### Fixed
+- Removed timeout text from error-code messages for clearer reporting.
+
 ## [2.0.0] - 2026-06-04
 
 ### Added
