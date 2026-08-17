@@ -1,6 +1,6 @@
 # GHand Python SDK
 
-[![Version](https://img.shields.io/badge/version-v2.0.2-blue.svg)](src/ghand/version.py)
+[![Version](https://img.shields.io/badge/version-v2.2.0-blue.svg)](src/ghand/version.py)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 
@@ -72,22 +72,22 @@ GHand 灵巧手官方 Python SDK，提供 EtherCAT、CAN-FD、RS-485 通信接�
 
 ### 安装指定版本
 
-从 GitHub 安装 `v2.0.2`：
+从 GitHub 安装 `v2.2.0`：
 
 ```bash
-pip install "ghand_python_sdk @ git+https://github.com/gli-sdk/GHand-Python-SDK.git@v2.0.2"
+pip install "ghand_python_sdk @ git+https://github.com/gli-sdk/GHand-Python-SDK.git@v2.2.0"
 ```
 
 或从 Gitee 镜像安装：
 
 ```bash
-pip install "ghand_python_sdk @ git+https://gitee.com/glitech/GHand-Python-SDK.git@v2.0.2"
+pip install "ghand_python_sdk @ git+https://gitee.com/glitech/GHand-Python-SDK.git@v2.2.0"
 ```
 
 ### 从源码安装
 
 ```bash
-git clone -b v2.0.2 https://github.com/gli-sdk/GHand-Python-SDK.git
+git clone -b v2.2.0 https://github.com/gli-sdk/GHand-Python-SDK.git
 cd GHand-Python-SDK
 pip install -r requirements.txt
 pip install -e .
@@ -96,7 +96,7 @@ pip install -e .
 Gitee 镜像：
 
 ```bash
-git clone -b v2.0.2 https://gitee.com/glitech/GHand-Python-SDK.git
+git clone -b v2.2.0 https://gitee.com/glitech/GHand-Python-SDK.git
 cd GHand-Python-SDK
 pip install -r requirements.txt
 pip install -e .
