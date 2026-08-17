@@ -551,6 +551,42 @@ class GHand:
         """
         return self._comm.get_hardware_version()
 
+    def get_firmware_package_version(self) -> tuple:
+        """Retrieve the firmware package version.
+
+        Returns:
+            Tuple of (major, minor, patch) version numbers.
+            (0, 0, 0) is returned if the version is not available.
+
+        Raises:
+            RuntimeError: If communication fails.
+        """
+        return self._comm.get_firmware_package_version()
+
+    def get_position_sensor_version(self) -> tuple:
+        """Retrieve the position sensor version.
+
+        Returns:
+            Tuple of (major, minor, patch) version numbers.
+            (0, 0, 0) is returned if the version is not available.
+
+        Raises:
+            RuntimeError: If communication fails.
+        """
+        return self._comm.get_position_sensor_version()
+
+    def get_tactile_sensor_version(self) -> tuple:
+        """Retrieve the tactile MCU version.
+
+        Returns:
+            Tuple of (major, minor, patch) version numbers.
+            (0, 0, 0) is returned if the version is not available.
+
+        Raises:
+            RuntimeError: If communication fails.
+        """
+        return self._comm.get_tactile_sensor_version()
+
     def get_serial_number(self) -> int:
         """Retrieve the product serial number.
 
@@ -567,16 +603,36 @@ class GHand:
 
         Returns:
             Tuple of (major, minor, patch) version numbers.
-            GHandLite1 does not expose motor driver version registers, so
-            (0, 0, 0) is returned for that product.
+            (0, 0, 0) is returned if the version is not available.
 
         Raises:
             RuntimeError: If communication fails.
         """
-        if self._product_type == ProductType.GHandLite1:
-            logger.info("Motor driver version not available", exc_info=True)
-            return (0, 0, 0)
         return self._comm.get_motor_driver_version()
+
+    def get_thumb_tactile_sensor_version(self) -> tuple:
+        """Retrieve the thumb tactile sensor version.
+
+        Returns:
+            Tuple of (major, minor, patch) version numbers.
+            (0, 0, 0) is returned if the version is not available.
+
+        Raises:
+            RuntimeError: If communication fails.
+        """
+        return self._comm.get_thumb_tactile_sensor_version()
+
+    def get_finger_tactile_sensor_version(self) -> tuple:
+        """Retrieve the finger tactile sensor version.
+
+        Returns:
+            Tuple of (major, minor, patch) version numbers.
+            (0, 0, 0) is returned if the version is not available.
+
+        Raises:
+            RuntimeError: If communication fails.
+        """
+        return self._comm.get_finger_tactile_sensor_version()
 
     def fault_clearance(self) -> bool:
         """Clear device faults.

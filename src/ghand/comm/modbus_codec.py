@@ -71,7 +71,12 @@ REG_HARDWARE_VERSION = 0x1008
 REG_FIRMWARE_VERSION = 0x1010
 REG_SERIAL_NUMBER = 0x1018
 REG_HAND_TYPE = 0x1020
+REG_IN_FIRMWARE_PACKAGE_VER = 0x1185
+REG_IN_POSITION_SENSOR_VER = 0x1186
+REG_IN_TACTILE_SENSOR_VER = 0x1187
 REG_IN_MOTOR_DRV_VER = 0x1188
+REG_IN_THUMB_TACTILE_SENSOR_VER = 0x1189
+REG_IN_FINGER_TACTILE_SENSOR_VER = 0x118A
 
 
 # GHand5 keeps the original SDK mapping: input joint blocks follow JointId values.
@@ -200,6 +205,18 @@ def parse_hardware_version(raw_bytes: bytes) -> str:
 def parse_firmware_version(raw_bytes: bytes) -> str:
     """Parse firmware version from 16 bytes (8 registers)."""
     return raw_bytes.decode("utf-8", errors="ignore").strip("\x00")
+
+
+def parse_packed_firmware_version(raw_bytes: bytes) -> tuple[int, int, int]:
+    """Parse one packed firmware-version register."""
+    if len(raw_bytes) < 2:
+        return (0, 0, 0)
+    version_high = raw_bytes[0]
+    version_low = raw_bytes[1]
+    major = (version_high >> 5) & 0x07
+    minor = version_high & 0x1F
+    patch = (version_low >> 4) & 0x0F
+    return (major, minor, patch)
 
 
 def parse_serial_number(raw_bytes: bytes) -> int:

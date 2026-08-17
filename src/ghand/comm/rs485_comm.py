@@ -19,7 +19,6 @@ from __future__ import annotations
 import logging
 import os
 import platform
-import struct
 import threading
 import time
 from pathlib import Path
@@ -53,7 +52,12 @@ from .modbus_codec import (
     REG_HAND_TYPE,
     REG_HARDWARE_VERSION,
     REG_INIT_JOINT,
+    REG_IN_FINGER_TACTILE_SENSOR_VER,
+    REG_IN_FIRMWARE_PACKAGE_VER,
     REG_IN_MOTOR_DRV_VER,
+    REG_IN_POSITION_SENSOR_VER,
+    REG_IN_TACTILE_SENSOR_VER,
+    REG_IN_THUMB_TACTILE_SENSOR_VER,
     REG_SERIAL_NUMBER,
     REG_SLAVE_ID,
     build_tactile_info,
@@ -65,6 +69,7 @@ from .modbus_codec import (
     parse_hand_info,
     parse_hand_type,
     parse_hardware_version,
+    parse_packed_firmware_version,
     parse_joints,
     parse_serial_number,
     parse_tactile_distributed,
@@ -563,15 +568,37 @@ class Rs485Comm(IComm):
         """
         return parse_hand_type(self._read_input_registers_bytes(REG_HAND_TYPE, 1))
 
-    def get_motor_driver_version(self) -> tuple:
-        """Retrieve the motor driver version."""
+    def _get_packed_version(self, register: int) -> tuple:
         try:
-            result = self._read_holding_registers(REG_IN_MOTOR_DRV_VER, count=3)
-            if result is None or result.isError():
-                return (0, 0, 0)
-            return tuple(result.registers)
+            return parse_packed_firmware_version(
+                self._read_input_registers_bytes(register, 1)
+            )
         except Exception:
             return (0, 0, 0)
+
+    def get_firmware_package_version(self) -> tuple:
+        """Retrieve the firmware package version."""
+        return self._get_packed_version(REG_IN_FIRMWARE_PACKAGE_VER)
+
+    def get_position_sensor_version(self) -> tuple:
+        """Retrieve the position sensor version."""
+        return self._get_packed_version(REG_IN_POSITION_SENSOR_VER)
+
+    def get_tactile_sensor_version(self) -> tuple:
+        """Retrieve the tactile MCU version."""
+        return self._get_packed_version(REG_IN_TACTILE_SENSOR_VER)
+
+    def get_motor_driver_version(self) -> tuple:
+        """Retrieve the motor driver version."""
+        return self._get_packed_version(REG_IN_MOTOR_DRV_VER)
+
+    def get_thumb_tactile_sensor_version(self) -> tuple:
+        """Retrieve the thumb tactile sensor version."""
+        return self._get_packed_version(REG_IN_THUMB_TACTILE_SENSOR_VER)
+
+    def get_finger_tactile_sensor_version(self) -> tuple:
+        """Retrieve the finger tactile sensor version."""
+        return self._get_packed_version(REG_IN_FINGER_TACTILE_SENSOR_VER)
 
     # ===== Tactile sensor =====
 

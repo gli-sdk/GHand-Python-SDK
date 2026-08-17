@@ -453,6 +453,37 @@ class EthercatComm(IComm):
         """Retrieve the product serial number via SDO."""
         return int.from_bytes(self._client.sdo_read(0x1018, 0x04), byteorder="little")
 
+    def _read_packed_firmware_version(self, mcu_id: int) -> tuple:
+        """Read a packed firmware version via SDO."""
+        try:
+            self._client.sdo_write(0x2007, 0x01, bytes([mcu_id]))
+            version_high = int.from_bytes(
+                self._client.sdo_read(0x2007, 0x02), byteorder="little"
+            )
+            version_low = int.from_bytes(
+                self._client.sdo_read(0x2007, 0x03), byteorder="little"
+            )
+        except Exception:
+            logger.info("Packed firmware version not available", exc_info=True)
+            return (0, 0, 0)
+
+        major = (version_high >> 5) & 0x07
+        minor = version_high & 0x1F
+        patch = (version_low >> 4) & 0x0F
+        return (major, minor, patch)
+
+    def get_firmware_package_version(self) -> tuple:
+        """Retrieve the firmware package version via SDO."""
+        return self._read_packed_firmware_version(0x05)
+
+    def get_position_sensor_version(self) -> tuple:
+        """Retrieve the position sensor version via SDO."""
+        return self._read_packed_firmware_version(0x02)
+
+    def get_tactile_sensor_version(self) -> tuple:
+        """Retrieve the tactile MCU version via SDO."""
+        return self._read_packed_firmware_version(0x03)
+
     def get_motor_driver_version(self) -> tuple:
         """Retrieve the motor driver version via SDO.
 
@@ -463,21 +494,15 @@ class EthercatComm(IComm):
         Returns (0, 0, 0) if the motor driver version is not available, matching
         the behaviour of CANFD and RS485 transports.
         """
-        try:
-            self._client.sdo_write(0x2007, 0x01, b"\x04")
-            version_high = int.from_bytes(
-                self._client.sdo_read(0x2007, 0x02), byteorder="little"
-            )
-            version_low = int.from_bytes(
-                self._client.sdo_read(0x2007, 0x03), byteorder="little"
-            )
-        except Exception:
-            logger.info("Motor driver version not available", exc_info=True)
-            return (0, 0, 0)
-        major = (version_high >> 5) & 0x07
-        minor = version_high & 0x1F
-        patch = (version_low >> 4) & 0x0F
-        return (major, minor, patch)
+        return self._read_packed_firmware_version(0x04)
+
+    def get_thumb_tactile_sensor_version(self) -> tuple:
+        """Retrieve the thumb tactile sensor version via SDO."""
+        return self._read_packed_firmware_version(0x06)
+
+    def get_finger_tactile_sensor_version(self) -> tuple:
+        """Retrieve the finger tactile sensor version via SDO."""
+        return self._read_packed_firmware_version(0x07)
 
     def get_hand_type(self) -> int:
         """Retrieve the hand type via SDO.

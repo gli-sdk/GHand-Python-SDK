@@ -54,7 +54,12 @@ from .modbus_codec import (
     REG_HAND_TYPE,
     REG_HARDWARE_VERSION,
     REG_INIT_JOINT,
+    REG_IN_FINGER_TACTILE_SENSOR_VER,
+    REG_IN_FIRMWARE_PACKAGE_VER,
     REG_IN_MOTOR_DRV_VER,
+    REG_IN_POSITION_SENSOR_VER,
+    REG_IN_TACTILE_SENSOR_VER,
+    REG_IN_THUMB_TACTILE_SENSOR_VER,
     REG_SERIAL_NUMBER,
     build_tactile_info,
     encode_joint_command,
@@ -65,6 +70,7 @@ from .modbus_codec import (
     parse_hand_info,
     parse_hand_type,
     parse_hardware_version,
+    parse_packed_firmware_version,
     parse_joints,
     parse_serial_number,
     parse_tactile_distributed,
@@ -598,13 +604,29 @@ class CanfdComm(IComm):
     def get_hand_type(self) -> int:
         return parse_hand_type(self._read_input_bytes(REG_HAND_TYPE, 1))
 
-    def get_motor_driver_version(self) -> tuple:
+    def _get_packed_version(self, register: int) -> tuple:
         try:
-            raw = self._read_input_bytes(REG_IN_MOTOR_DRV_VER, 3)
-            regs = list(struct.unpack(">3H", raw[:6]))
-            return tuple(regs)
+            return parse_packed_firmware_version(self._read_input_bytes(register, 1))
         except Exception:
             return (0, 0, 0)
+
+    def get_firmware_package_version(self) -> tuple:
+        return self._get_packed_version(REG_IN_FIRMWARE_PACKAGE_VER)
+
+    def get_position_sensor_version(self) -> tuple:
+        return self._get_packed_version(REG_IN_POSITION_SENSOR_VER)
+
+    def get_tactile_sensor_version(self) -> tuple:
+        return self._get_packed_version(REG_IN_TACTILE_SENSOR_VER)
+
+    def get_motor_driver_version(self) -> tuple:
+        return self._get_packed_version(REG_IN_MOTOR_DRV_VER)
+
+    def get_thumb_tactile_sensor_version(self) -> tuple:
+        return self._get_packed_version(REG_IN_THUMB_TACTILE_SENSOR_VER)
+
+    def get_finger_tactile_sensor_version(self) -> tuple:
+        return self._get_packed_version(REG_IN_FINGER_TACTILE_SENSOR_VER)
 
     # ------------------------------------------------------------------
     # Tactile sensor
