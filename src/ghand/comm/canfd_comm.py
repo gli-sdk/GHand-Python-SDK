@@ -111,7 +111,7 @@ class CanfdComm(IComm):
         self._profile = get_modbus_profile(config)
         self._transport: CanfdTransport | None = None
         self._src_id = 0x0A  # master node id
-        self._dst_id = getattr(config, "slave_id", 0x31) or 0x31
+        self._slave_id = 0x00
         self._connected = False
         self._poll_thread: threading.Thread | None = None
         self._poll_stop = threading.Event()
@@ -125,8 +125,6 @@ class CanfdComm(IComm):
         """Update the cached product configuration."""
         self._config = config
         self._profile = get_modbus_profile(config)
-        if not self._connected:
-            self._dst_id = getattr(config, "slave_id", 0x31) or 0x31
 
     def _cleanup_failed_connect(self) -> None:
         """Release transport state left by a failed connection attempt."""
@@ -187,6 +185,7 @@ class CanfdComm(IComm):
     def connect(
         self,
         device_name: str,
+        slave_id: int | None = None,
         baudrate_gear: int | None = None,
         quiet: bool = False,
     ) -> bool:
@@ -197,6 +196,8 @@ class CanfdComm(IComm):
 
         Args:
             device_name: ZQWL CDC serial device name (e.g. "COM3" or "/dev/ttyACM0").
+            slave_id: Optional target slave ID. If provided, only this ID is
+                used; otherwise the connection polls 0x31 and 0x32.
             baudrate_gear: Baud rate gear value. The gear selects both the
                 arbitration and data phase bitrates. Defaults to gear 0x05
                 (1 Mbps arbitration, 5 Mbps data).
@@ -252,15 +253,16 @@ class CanfdComm(IComm):
                 return False
 
             # Establish connection: function code 0x02, write connection timer=0.
-            if not self._establish_connection():
+            if not self._establish_connection(slave_id):
                 _log_error("Failed to establish CANFD connection at gear=0x%02X", gear)
                 self._cleanup_failed_connect()
                 return False
 
             self._connected = True
             logger.info(
-                "CANFD device connected (%s, gear=0x%02X, abit=%s/%s%%, dbit=%s/%s%%)",
+                "CANFD device connected (%s, slave_id=0x%02X, gear=0x%02X, abit=%s/%s%%, dbit=%s/%s%%)",
                 device_name,
+                self._slave_id,
                 gear,
                 abit_baud,
                 abit_sample,
@@ -295,6 +297,7 @@ class CanfdComm(IComm):
                 self._transport = None
                 self._last_disconnect_at = time.monotonic()
         self._connected = False
+        self._slave_id = 0x00
         logger.info("CANFD device disconnected")
         return True
 
@@ -302,42 +305,12 @@ class CanfdComm(IComm):
         """Return whether the CANFD device is connected."""
         return self._connected
 
-    # ------------------------------------------------------------------
-    # CANFD handshake helpers
-    # ------------------------------------------------------------------
-
-    def _node_id_detection(self) -> bool:
-        """Listen for slave-initiated Node ID detection frames (FC 0x09).
-
-        The slave actively broadcasts its Node ID upon startup.
-        The master listens for these broadcasts to confirm device presence.
-        """
-        deadline = time.time() + 0.5  # 500ms listening window
-        while time.time() < deadline:
-            result = self._transport.recv_frame(timeout_ms=50)
-            if result is None:
-                continue
-
-            resp_id, resp_data = result
-            arb = unpack_arbitration(resp_id)
-
-            # Slave-initiated Node ID broadcast: ack=1, func_code=0x09
-            if arb["ack"] == 1 and arb["func_code"] == 0x09:
-                if resp_data and len(resp_data) >= 1:
-                    detected_id = resp_data[0]
-                    if detected_id == self._dst_id:
-                        logger.info("Detected slave Node ID 0x%02X", detected_id)
-                        return True
-                    else:
-                        logger.debug("Ignored Node ID detection for 0x%02X", detected_id)
-
-        logger.error("Node ID detection timeout for dst_id=0x%02X", self._dst_id)
-        return False
-
-    def _establish_connection(self) -> bool:
+    def _establish_connection(self, slave_id: int | None = None) -> bool:
         """Send connection-establishment frame (FC 0x02), polling node IDs."""
-        dst_ids = [self._dst_id, 0x31, 0x32]
-        for dst_id in dict.fromkeys(dst_ids):
+        slave_ids = [slave_id] if slave_id is not None else [0x31, 0x32]
+        for slave_id in dict.fromkeys(slave_ids):
+            if slave_id is None:
+                continue
             timer_values = self._profile.canfd_connection_timer_values
             data = (
                 struct.pack(
@@ -348,7 +321,7 @@ class CanfdComm(IComm):
                 + struct.pack(f">{len(timer_values)}H", *timer_values)
             )
             can_id = pack_arbitration(
-                self._src_id, dst_id, ack=0, func_code=0x02,
+                self._src_id, slave_id, ack=0, func_code=0x02,
                 start=1, end=1, toggle=0, seg_num=0,
             )
             self._transport.send_frame(can_id, data)
@@ -359,13 +332,13 @@ class CanfdComm(IComm):
                 result = self._transport.recv_frame(timeout_ms=50)
                 if result is None:
                     continue
-                resp_id, resp_data = result
+                resp_id = result
                 arb = unpack_arbitration(resp_id)
-                if arb["ack"] == 1 and arb["dst_id"] == self._src_id and arb["src_id"] == dst_id:
+                if arb["ack"] == 1 and arb["dst_id"] == self._src_id and arb["src_id"] == slave_id:
                     if arb["func_code"] == 0x82:
                         break  # Exception: try next dst_id
                     if arb["func_code"] == 0x02:
-                        self._dst_id = dst_id
+                        self._slave_id = slave_id
                         return True
         return False
 
@@ -381,7 +354,7 @@ class CanfdComm(IComm):
             + struct.pack(f">{len(delete_values)}H", *delete_values)
         )
         can_id = pack_arbitration(
-            self._src_id, self._dst_id, ack=0, func_code=0x05,
+            self._src_id, self._slave_id, ack=0, func_code=0x05,
             start=1, end=1, toggle=0, seg_num=0,
         )
         self._transport.send_frame(can_id, data)
@@ -393,14 +366,14 @@ class CanfdComm(IComm):
         try:
             self._transport.write_registers(
                 self._src_id,
-                self._dst_id,
+                self._slave_id,
                 0x0000,
                 struct.pack(">H", slave_id),
             )
         except Exception as exc:
             logger.error("Failed to set CANFD slave ID to 0x%02X: %s", slave_id, exc)
             return False
-        self._dst_id = slave_id
+        self._slave_id = slave_id
         return True
 
     def set_baudrate_config(
@@ -427,7 +400,7 @@ class CanfdComm(IComm):
         try:
             self._transport.write_registers(
                 self._src_id,
-                self._dst_id,
+                self._slave_id,
                 BAUDRATE_CONFIG_REGISTER,
                 struct.pack(">H", gear),
             )
@@ -456,7 +429,7 @@ class CanfdComm(IComm):
             try:
                 self._transport.write_registers(
                     self._src_id,
-                    self._dst_id,
+                    self._slave_id,
                     self._profile.mode_register,
                     struct.pack(">H", mode_value),
                 )
@@ -487,7 +460,7 @@ class CanfdComm(IComm):
             try:
                 self._transport.write_registers(
                     self._src_id,
-                    self._dst_id,
+                    self._slave_id,
                     base_addr,
                     struct.pack(f">{len(registers)}H", *registers),
                 )
@@ -505,7 +478,7 @@ class CanfdComm(IComm):
         if self._profile.stop_register is not None:
             self._transport.write_registers(
                 self._src_id,
-                self._dst_id,
+                self._slave_id,
                 self._profile.stop_register,
                 struct.pack(">H", 0x0001),
             )
@@ -516,7 +489,7 @@ class CanfdComm(IComm):
             if base_addr is None:
                 continue
             self._transport.write_registers(
-                self._src_id, self._dst_id, base_addr, struct.pack(">H", 0x0001)
+                self._src_id, self._slave_id, base_addr, struct.pack(">H", 0x0001)
             )
         return True
 
@@ -532,7 +505,7 @@ class CanfdComm(IComm):
         if count == 0:
             return []
         raw_bytes = self._transport.read_registers(
-            self._src_id, self._dst_id, start, count, func_code=0x04
+            self._src_id, self._slave_id, start, count, func_code=0x04
         )
         # Convert bytes back to uint16 register list for the shared codec.
         raw = list(struct.unpack(f">{count}H", raw_bytes[: count * 2]))
@@ -542,7 +515,7 @@ class CanfdComm(IComm):
         """Retrieve high-level hand status."""
         raw_bytes = self._transport.read_registers(
             self._src_id,
-            self._dst_id,
+            self._slave_id,
             self._profile.hand_info_address,
             2,
             func_code=0x04,
@@ -557,7 +530,7 @@ class CanfdComm(IComm):
         # Read state + resultant forces (16 registers from 0x1080)
         raw_bytes = self._transport.read_registers(
             self._src_id,
-            self._dst_id,
+            self._slave_id,
             self._profile.tactile_state_address,
             self._profile.tactile_resultant_register_count,
             func_code=0x04,
@@ -580,7 +553,7 @@ class CanfdComm(IComm):
             # Read distributed force for this region
             dist_regs = (region.count * 3 + 1) // 2
             dist_bytes = self._transport.read_registers(
-                self._src_id, self._dst_id, current_addr, dist_regs, func_code=0x04
+                self._src_id, self._slave_id, current_addr, dist_regs, func_code=0x04
             )
             distributed = parse_tactile_distributed(dist_bytes, region.count)
             current_addr += dist_regs
@@ -597,7 +570,7 @@ class CanfdComm(IComm):
     def _read_input_bytes(self, addr: int, count: int) -> bytes:
         """Helper to read input registers and return raw bytes."""
         return self._transport.read_registers(
-            self._src_id, self._dst_id, addr, count, func_code=0x04
+            self._src_id, self._slave_id, addr, count, func_code=0x04
         )
 
     def get_device_name(self) -> str:
@@ -655,7 +628,7 @@ class CanfdComm(IComm):
     def _write_tactile_control(self, command: int) -> bool:
         self._transport.write_registers(
             self._src_id,
-            self._dst_id,
+            self._slave_id,
             self._profile.tactile_control_address,
             struct.pack(">H", command),
         )
@@ -674,7 +647,7 @@ class CanfdComm(IComm):
         deadline = time.time() + timeout_sec
         while time.time() < deadline:
             raw = self._transport.read_registers(
-                self._src_id, self._dst_id, address, 1, func_code=0x03
+                self._src_id, self._slave_id, address, 1, func_code=0x03
             )
             register = struct.unpack(">H", raw[:2])[0]
             status = register & 0x00FF
@@ -687,7 +660,7 @@ class CanfdComm(IComm):
 
     def clear_fault(self) -> bool:
         self._transport.write_registers(
-            self._src_id, self._dst_id, REG_CLEAR_FAULT, struct.pack(">H", 0x0100)
+            self._src_id, self._slave_id, REG_CLEAR_FAULT, struct.pack(">H", 0x0100)
         )
         if not self._wait_holding_result(REG_CLEAR_FAULT):
             logger.error("Fault clearance failed or timed out")
@@ -697,7 +670,7 @@ class CanfdComm(IComm):
 
     def init_joint(self) -> bool:
         self._transport.write_registers(
-            self._src_id, self._dst_id, REG_INIT_JOINT, struct.pack(">H", 0x0001)
+            self._src_id, self._slave_id, REG_INIT_JOINT, struct.pack(">H", 0x0001)
         )
         logger.info("Joint initialization completed")
         return True
@@ -781,7 +754,7 @@ class CanfdComm(IComm):
                 )
                 count = end - start + 1
                 raw_bytes = self._transport.read_registers(
-                    self._src_id, self._dst_id, start, count, func_code=0x04
+                    self._src_id, self._slave_id, start, count, func_code=0x04
                 )
                 raw = list(struct.unpack(f">{count}H", raw_bytes[: count * 2]))
                 hand_offset = self._profile.hand_info_address - start

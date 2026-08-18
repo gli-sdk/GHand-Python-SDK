@@ -38,6 +38,7 @@ class IComm(ABC):
     def connect(
         self,
         device_name: str,
+        slave_id: int | None = None,
         baudrate_gear: int | None = None,
         quiet: bool = False,
     ) -> bool:
@@ -45,6 +46,8 @@ class IComm(ABC):
 
         Args:
             device_name: Identifier of the device to connect to.
+            slave_id: Optional RS485/CANFD slave ID override for this connection.
+                Implementations that do not use slave IDs may ignore it.
             baudrate_gear: Optional baud rate gear value. For RS485 this selects
                 the serial baud rate; for CANFD it selects both the arbitration
                 and data phase bitrates. Other implementations may ignore it.

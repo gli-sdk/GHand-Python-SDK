@@ -18,7 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Handled unavailable motor driver version values without failing device information reads.
-- Constrained NumPy to `>=1.24.0,<1.25.0` to remain compatible with SciPy 1.8 environments.
 
 ## [2.1.0] - 2026-08-10
 

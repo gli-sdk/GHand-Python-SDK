@@ -236,6 +236,7 @@ class Rs485Comm(IComm):
     def connect(
         self,
         device_name: str,
+        slave_id: int | None = None,
         baudrate_gear: int | None = None,
         quiet: bool = False,
     ) -> bool:
@@ -243,6 +244,8 @@ class Rs485Comm(IComm):
 
         Args:
             device_name: Serial port name (e.g., "COM3", "/dev/ttyUSB0").
+            slave_id: Optional target slave ID. If provided, only this ID is
+                used; otherwise the connection polls 0x31 and 0x32.
             baudrate_gear: Connection baud rate gear. If None, the value is
                 taken from the ``GHAND_RS485_BAUDRATE_GEAR`` environment
                 variable, falling back to the default gear (0x05).
@@ -273,17 +276,20 @@ class Rs485Comm(IComm):
                 logger.error("Invalid RS485 baudrate gear: %s", baudrate_gear)
             return False
 
-        if self._connect_with_baudrate(resolved_device, baudrate, quiet):
+        if self._connect_with_baudrate(resolved_device, baudrate, slave_id, quiet):
             logger.info(
-                "Device connected via RS485 (%s, baudrate_gear=0x%02X, baudrate=%s)",
+                "Device connected via RS485 (%s, slave_id=0x%02X, baudrate_gear=0x%02X, baudrate=%s)",
                 resolved_device,
+                self._slave_id,
                 baudrate_gear,
                 baudrate,
             )
             return True
         return False
 
-    def _connect_with_baudrate(self, device_name: str, baudrate: int, quiet: bool) -> bool:
+    def _connect_with_baudrate(
+        self, device_name: str, slave_id: int | None, baudrate: int, quiet: bool
+    ) -> bool:
         """Attempt a single RS485 connection with the given baud rate."""
         try:
             self._client = ModbusSerialClient(
@@ -300,18 +306,19 @@ class Rs485Comm(IComm):
                 self._client.close()
                 self._client = None
                 return False
-            # Verify device by polling the configured ID first, then common defaults.
-            slave_ids = [self._slave_id, 0x31, 0x32]
-            for slave_id in dict.fromkeys(slave_ids):
+            slave_ids = [slave_id] if slave_id is not None else [0x31, 0x32]
+            for target_slave_id in dict.fromkeys(slave_ids):
+                if target_slave_id is None:
+                    continue
                 try:
                     result = self._read_holding_registers(
-                        REG_SLAVE_ID, count=1, device_id=slave_id
+                        REG_SLAVE_ID, count=1, device_id=target_slave_id
                     )
                 except ModbusException:
-                    logger.debug("No response from RS485 slave 0x%02X", slave_id)
+                    logger.debug("No response from RS485 slave 0x%02X", target_slave_id)
                     continue
                 if result is not None and not result.isError():
-                    self._slave_id = result.registers[0] or slave_id
+                    self._slave_id = result.registers[0] or target_slave_id
                     break
             else:
                 self._client.close()

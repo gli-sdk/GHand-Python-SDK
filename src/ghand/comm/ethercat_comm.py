@@ -146,6 +146,7 @@ class EthercatComm(IComm):
     def connect(
         self,
         device_name: str,
+        slave_id: int | None = None,
         baudrate_gear: int | None = None,
         quiet: bool = False,
     ) -> bool:
@@ -153,6 +154,7 @@ class EthercatComm(IComm):
 
         Args:
             device_name: Adapter ID to connect to.
+            slave_id: Ignored for EtherCAT.
             baudrate_gear: Ignored for EtherCAT.
             quiet: Ignored for EtherCAT; errors are always logged.
 

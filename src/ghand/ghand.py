@@ -313,12 +313,15 @@ class GHand:
             self._opened = False
 
         if id == "auto":
-            id_list = self._comm.search_adapters()
-            logger.info("Found IDs:\n\t%s", "\n\t".join(str(id) for id in id_list))
+            adapters = self._comm.search_adapters()
+            logger.info("Found IDs:\n\t%s", "\n\t".join(str(id) for id in adapters))
             gears, quiet = self._bitrate_units_to_try(baudrate_gear)
-            for aid in id_list:
+            for adapter in adapters:
                 for gear in gears:
-                    if not self._comm.connect(aid, baudrate_gear=gear, quiet=quiet):
+                    connected = self._comm.connect(
+                        adapter, slave_id=slave_id, baudrate_gear=gear, quiet=quiet
+                    )
+                    if not connected:
                         continue
 
                     self._opened = True
@@ -326,21 +329,24 @@ class GHand:
                         self._sync_product_config_from_comm()
                         logger.info(
                             "Device opened successfully (ID: %s, baudrate_gear=0x%02X)",
-                            aid,
+                            adapter,
                             gear,
                         )
                         self._comm.stop()
                         time.sleep(0.1)
                         return True
 
-                    logger.error("Device verification failed (ID: %s)", aid)
+                    logger.error("Device verification failed (ID: %s)", adapter)
                     self._comm.disconnect()
                     self._opened = False
                 else:
-                    logger.error("Failed to open device (ID: %s)", aid)
+                    logger.error("Failed to open device (ID: %s)", adapter)
             return False
         else:
-            if not self._comm.connect(id, baudrate_gear=baudrate_gear):
+            connected = self._comm.connect(
+                id, slave_id=slave_id, baudrate_gear=baudrate_gear,
+            )
+            if not connected:
                 logger.error("Failed to open device (ID: %s)", id)
                 return False
             self._opened = True
