@@ -327,11 +327,14 @@ class GHand:
                     self._opened = True
                     if self._resolve_product_type():
                         self._sync_product_config_from_comm()
-                        logger.info(
-                            "Device opened successfully (ID: %s, baudrate_gear=0x%02X)",
-                            adapter,
-                            gear,
-                        )
+                        if gear is None:
+                            logger.info("Device opened successfully (ID: %s)", adapter)
+                        else:
+                            logger.info(
+                                "Device opened successfully (ID: %s, baudrate_gear=0x%02X)",
+                                adapter,
+                                gear,
+                            )
                         self._comm.stop()
                         time.sleep(0.1)
                         return True
