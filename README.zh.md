@@ -43,7 +43,6 @@ GHand 灵巧手官方 Python SDK，提供 EtherCAT、CAN-FD、RS-485 通信接�
 - **碰撞检测**
   - 在执行运动前检查目标姿态。
   - 支持设置安全裕量，并在检测到碰撞时返回安全角度。
-  - 在不依赖实时设备状态的场景下支持离线姿态验证。
 
 - **自适应抓取扩展**
   - 包含 `adaptive_grasp` 包和力控保持、抓取流程相关示例。
@@ -70,24 +69,10 @@ GHand 灵巧手官方 Python SDK，提供 EtherCAT、CAN-FD、RS-485 通信接�
 - **Windows**：使用 EtherCAT 时需要安装 [Npcap](https://npcap.com/)
 - **Linux**：构建原生依赖时需要 `build-essential` 和 `python3-dev`
 
-### 安装指定版本
-
-从 GitHub 安装 `v2.2.0`：
-
-```bash
-pip install "ghand_python_sdk @ git+https://github.com/gli-sdk/GHand-Python-SDK.git@v2.2.0"
-```
-
-或从 Gitee 镜像安装：
-
-```bash
-pip install "ghand_python_sdk @ git+https://gitee.com/glitech/GHand-Python-SDK.git@v2.2.0"
-```
-
 ### 从源码安装
 
 ```bash
-git clone -b v2.2.0 https://github.com/gli-sdk/GHand-Python-SDK.git
+git clone https://github.com/gli-sdk/GHand-Python-SDK.git
 cd GHand-Python-SDK
 pip install -r requirements.txt
 pip install -e .
@@ -96,7 +81,7 @@ pip install -e .
 Gitee 镜像：
 
 ```bash
-git clone -b v2.2.0 https://gitee.com/glitech/GHand-Python-SDK.git
+git clone https://gitee.com/glitech/GHand-Python-SDK.git
 cd GHand-Python-SDK
 pip install -r requirements.txt
 pip install -e .

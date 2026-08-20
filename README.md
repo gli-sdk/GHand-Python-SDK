@@ -43,7 +43,6 @@ The official Python SDK for the GHand dexterous hand. It provides high-level API
 - **Collision detection**
   - Check target poses before motion.
   - Configure a safety margin and get safe angles when a collision is detected.
-  - Run offline pose validation without a physical device when current joint data is not required.
 
 - **Adaptive grasp extension**
   - Includes the `adaptive_grasp` package and examples for force-aware hold and grasp workflows.
@@ -70,24 +69,10 @@ Local Sphinx sources are also available under `docs/`.
 - **Windows**: [Npcap](https://npcap.com/) when using EtherCAT
 - **Linux**: `build-essential` and `python3-dev` for building native dependencies
 
-### Install a Specific Version
-
-Install `v2.2.0` directly from GitHub:
-
-```bash
-pip install "ghand_python_sdk @ git+https://github.com/gli-sdk/GHand-Python-SDK.git@v2.2.0"
-```
-
-Or install from the Gitee mirror:
-
-```bash
-pip install "ghand_python_sdk @ git+https://gitee.com/glitech/GHand-Python-SDK.git@v2.2.0"
-```
-
 ### Install from Source
 
 ```bash
-git clone -b v2.2.0 https://github.com/gli-sdk/GHand-Python-SDK.git
+git clone https://github.com/gli-sdk/GHand-Python-SDK.git
 cd GHand-Python-SDK
 pip install -r requirements.txt
 pip install -e .
@@ -96,7 +81,7 @@ pip install -e .
 Gitee mirror:
 
 ```bash
-git clone -b v2.2.0 https://gitee.com/glitech/GHand-Python-SDK.git
+git clone https://gitee.com/glitech/GHand-Python-SDK.git
 cd GHand-Python-SDK
 pip install -r requirements.txt
 pip install -e .

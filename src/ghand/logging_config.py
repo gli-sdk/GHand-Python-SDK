@@ -91,24 +91,14 @@ def _init_package_loggers():
 def configure_console(level: int | str) -> None:
     """Configure the console log level.
 
-    Only INFO and DEBUG are supported, intended to lower the verbosity
-    threshold from the default WARNING.
-
     Args:
-        level: Log level. Only ``logging.INFO`` or ``logging.DEBUG`` are accepted.
-
-    Raises:
-        ValueError: If a level other than INFO or DEBUG is provided.
+        level: Standard Python log level name or integer.
 
     Example:
         >>> from ghand.logging_config import configure_console
         >>> configure_console(level=logging.INFO)
     """
-    valid_levels = {logging.INFO, logging.DEBUG}
-    if level not in valid_levels:
-        raise ValueError(
-            f"Only INFO or DEBUG are supported (received: {logging.getLevelName(level)})"
-        )
+    level = logging._checkLevel(level)
 
     logger = logging.getLogger(ROOT_LOGGER_NAME)
 
@@ -121,8 +111,7 @@ def configure_console(level: int | str) -> None:
     else:
         handler = logger._ghand_stderr_handler
 
-    if level < handler.level:
-        handler.setLevel(level)
+    handler.setLevel(level)
 
     logger.setLevel(level)
 
@@ -142,11 +131,18 @@ def configure_file(filename: str, level: int | str = logging.DEBUG) -> None:
         >>> configure_file("ghand.log", level=logging.DEBUG)
     """
     logger = logging.getLogger(ROOT_LOGGER_NAME)
+    level = logging._checkLevel(level)
+
+    existing_handler = getattr(logger, "_ghand_file_handler", None)
+    if existing_handler is not None:
+        logger.removeHandler(existing_handler)
+        existing_handler.close()
 
     handler = logging.FileHandler(filename, mode="a", encoding="utf-8")
     handler.setLevel(level)
     handler.setFormatter(logging.Formatter(FORMAT_VERBOSE, DATEFMT_ISO))
     logger.addHandler(handler)
+    logger._ghand_file_handler = handler
 
     for h in logger.handlers:
         if h.level < logger.level or logger.level == 0:

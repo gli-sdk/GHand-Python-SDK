@@ -15,7 +15,11 @@ from .ports import (
 )
 from .hand_adapter import GHandCommandPort, ensure_hand_command_port
 from .safety import SafetyMonitor, SafetyStatus, SafetyReport
-from .visualization import TactileVisualizer
+
+try:
+    from .visualization import TactileVisualizer
+except ImportError:
+    TactileVisualizer = None  # type: ignore[misc,assignment]
 
 __all__ = [
     "GraspState",
@@ -43,5 +47,7 @@ __all__ = [
     "SafetyMonitor",
     "SafetyStatus",
     "SafetyReport",
-    "TactileVisualizer",
 ]
+
+if TactileVisualizer is not None:
+    __all__.append("TactileVisualizer")

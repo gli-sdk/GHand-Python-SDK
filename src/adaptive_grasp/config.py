@@ -136,7 +136,7 @@ class AdaptiveGraspConfig:
     fragile_step_reduction: float = 0.5  # Position correction scaling applied for fragile object profiles.
 
     # Visualization.
-    enable_visualization: bool = True  # Enables internal diagnostic visualization.
+    enable_visualization: bool = False  # Enables internal diagnostic visualization.
     visualization_backend: str = "TkAgg"  # Matplotlib backend used by internal visualization.
 
     def __post_init__(self) -> None:

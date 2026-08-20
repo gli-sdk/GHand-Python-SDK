@@ -18,15 +18,18 @@ from __future__ import annotations
 
 import logging
 import time
+from typing import Any
 from ._config import load_product_config
 from .comm.canfd_comm import CanfdComm, CANFD_BAUDRATE_GEAR_MAP, CANFD_DEFAULT_BAUDRATE_GEAR
 from .comm.ethercat_comm import EthercatComm
 from .comm.ethercat_protocol import Tpdo
 from .comm.rs485_comm import Rs485Comm, RS485_BAUDRATE_GEAR_MAP, RS485_DEFAULT_BAUDRATE_GEAR
-from collision_sdk import CollisionCheckResult, CollisionClient
 import numpy as np
 from ._converter import joints_to_nparray
 from ._converter import nparray_to_joints
+from .collision import CollisionCheckResult, CollisionClient
+from .collision.angle_mapping import internal_radians_to_sdk_degrees
+from .collision.angle_mapping import neutral_internal_radians
 from .types import (
     CommType,
     CtrlMode,
@@ -785,8 +788,6 @@ class GHand:
 
         try:
             result = self._comm.move_joints(active_joints, mode)
-            if result:
-                logger.info("Command sent successfully")
             return result
         except Exception as e:
             logger.error("Failed to move joints: %s", e)
@@ -796,8 +797,6 @@ class GHand:
         """Stop all joint motion immediately."""
         try:
             result = self._comm.stop()
-            if result:
-                logger.info("Stop command sent successfully")
             return result
         except RuntimeError as e:
             logger.error("Failed to stop joints: %s", e)
@@ -810,7 +809,6 @@ class GHand:
             List of JointData objects.
         """
         joints = self._comm.get_joints()
-        logger.info("Joint data received successfully")
         return joints
 
     def get_hand_info(self) -> HandState:
@@ -831,7 +829,6 @@ class GHand:
             logger.warning("This product does not support tactile sensors")
             return {}
         data = self._comm.get_tactile_data()
-        logger.info("Tactile data received successfully")
         return data
 
     def set_safety_margin(self, margin: float) -> None:
@@ -861,7 +858,7 @@ class GHand:
         logger.info("Collision safety margin set to %s (%.1f mm)", margin, margin * 2)
 
     def _ensure_collision_checker(self) -> CollisionClient:
-        """Lazy initialization of the collision checker."""
+        """Initialize the collision checker object on first use."""
 
         if self._collision_checker is None:
             self._collision_checker = CollisionClient()
@@ -899,6 +896,13 @@ class GHand:
                 logger.debug("Unable to get current joint state, using defaults (0 degrees)")
 
         target_angles = joints_to_nparray(joints, current_joints)
+        if current_joints is None:
+            neutral_angles = internal_radians_to_sdk_degrees(neutral_internal_radians())
+            for index, joint_id in enumerate(_COLLISION_JOINT_ORDER):
+                target_angles[int(joint_id)] = neutral_angles[index]
+            for joint in joints:
+                target_angles[int(joint.id)] = float(joint.angle)
+
         collision_angles = np.asarray(
             [target_angles[int(joint_id)] for joint_id in _COLLISION_JOINT_ORDER]
         )
@@ -920,7 +924,7 @@ class GHand:
     @staticmethod
     def _joints_to_angles(
         joints: list[JointCommand], current_joints: list[JointData] | None = None
-    ) -> np.ndarray:
+    ) -> Any:
         """Convert a list of Joints to a numpy array.
 
         Args:
@@ -935,7 +939,7 @@ class GHand:
 
     @staticmethod
     def _angles_to_joints(
-        angles: np.ndarray, speed: int = 100, torque: int = 100
+        angles: Any, speed: int = 100, torque: int = 100
     ) -> list[JointCommand]:
         """Convert a numpy array to a list of JointCommand objects.
 

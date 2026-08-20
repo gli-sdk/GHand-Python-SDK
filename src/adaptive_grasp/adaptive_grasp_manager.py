@@ -1,7 +1,7 @@
 import logging
 import time
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from ghand import GHand, JointId, TactileSensorId
 
@@ -21,7 +21,9 @@ from .safety import SafetyMonitor, SafetyReport
 from .sensor import SensorClient
 from .tactility import TactileAnalysis, TactileAnalyzer
 from .utils import JOINT_TO_FINGER, join_thread_if_alive
-from .visualization import TactileVisualizer
+
+if TYPE_CHECKING:
+    from .visualization import TactileVisualizer
 
 _logger = logging.getLogger("adaptive_grasp.adaptive_grasp_manager")
 
@@ -35,7 +37,7 @@ class AdaptiveGraspComponents:
     safety: SafetyMonitor
     joint_builder: JointCommandBuilder
     hold_planner_factory: HoldPlannerFactory
-    visualizer: Optional[TactileVisualizer]
+    visualizer: Optional["TactileVisualizer"]
 
 
 def build_adaptive_grasp_components(
@@ -54,10 +56,14 @@ def build_adaptive_grasp_components(
     ))
     torque_joints = tuple(joint_id for joint_id in TORQUE_CONTROL_JOINTS
                           if JOINT_TO_FINGER[joint_id] in active_fingers)
-    visualizer = (TactileVisualizer(
-        active_fingers=active_fingers,
-        backend=config.visualization_backend,
-    ) if config.enable_visualization else None)
+    if config.enable_visualization:
+        from .visualization import TactileVisualizer
+        visualizer: Optional["TactileVisualizer"] = TactileVisualizer(
+            active_fingers=active_fingers,
+            backend=config.visualization_backend,
+        )
+    else:
+        visualizer = None
 
     return AdaptiveGraspComponents(
         sensor=sensor_client,

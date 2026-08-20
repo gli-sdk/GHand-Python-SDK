@@ -33,6 +33,8 @@ class SubscriptionManager:
         self._client = client
         self._is_connected = is_connected
         self._data = None
+        self._data_seq = 0
+        self._dispatched_seq = 0
         self._sub_id_counter = 0
         self._subscribers = {}
         self._interval_sec = self._DEFAULT_INTERVAL_SEC
@@ -43,7 +45,9 @@ class SubscriptionManager:
             self._running = True
             self._thread = threading.Thread(target=self._data_producer, daemon=True)
             self._thread.start()
-            self._dispatcher_thread = threading.Thread(target=self._data_dispatcher, daemon=True)
+            self._dispatcher_thread = threading.Thread(
+                target=self._data_dispatcher, daemon=True
+            )
             self._dispatcher_thread.start()
 
     def stop(self):
@@ -52,12 +56,18 @@ class SubscriptionManager:
         current = threading.current_thread()
         if self._thread and self._thread is not current:
             self._thread.join(timeout=1)
+            if self._thread.is_alive():
+                logger.warning("Subscription producer thread did not stop within timeout")
         self._thread = None
         if self._dispatcher_thread and self._dispatcher_thread is not current:
             self._dispatcher_thread.join(timeout=1)
+            if self._dispatcher_thread.is_alive():
+                logger.warning("Subscription dispatcher thread did not stop within timeout")
         self._dispatcher_thread = None
         with self._lock:
             self._data = None
+            self._data_seq = 0
+            self._dispatched_seq = 0
             self._subscribers.clear()
 
     def _data_producer(self):
@@ -67,6 +77,7 @@ class SubscriptionManager:
                 data = self._client.recv_data()
                 with self._lock:
                     self._data = data
+                    self._data_seq += 1
             except Exception as e:
                 with self._lock:
                     self._data = None
@@ -82,7 +93,12 @@ class SubscriptionManager:
         while self._running:
             with self._lock:
                 data = self._data
+                data_seq = self._data_seq
                 subscribers_copy = self._subscribers.copy()
+                if data_seq == self._dispatched_seq:
+                    data = None
+                else:
+                    self._dispatched_seq = data_seq
             if data:
                 for sub_id, (callback, args, kwargs) in subscribers_copy.items():
                     if not self._running:
@@ -90,8 +106,8 @@ class SubscriptionManager:
                     if callback:
                         try:
                             callback(data, *args, **kwargs)
-                        except Exception as e:
-                            logger.error("Error in callback %s: %s", sub_id, e)
+                        except Exception:
+                            logger.exception("Error in callback %s", sub_id)
             time.sleep(self._interval_sec)
 
     def subscribe(

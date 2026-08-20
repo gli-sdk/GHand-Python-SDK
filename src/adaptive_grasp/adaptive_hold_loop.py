@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Any, Optional, Protocol
+from typing import TYPE_CHECKING, Any, Optional, Protocol
 
 from ghand import CtrlMode, JointCommand, JointId, TactileSensorId
 from .config import AdaptiveGraspConfig, HoldCommandMode
@@ -14,7 +14,9 @@ from .safety import SafetyMonitor, SafetyReport, SafetyStatus
 from .runtime import GraspState
 from .tactility import TactileAnalyzer, TactileAnalysis
 from .utils import normalize_joint_angles, normalize_joint_id
-from .visualization import TactileVisualizer
+
+if TYPE_CHECKING:
+    from .visualization import TactileVisualizer
 
 _logger = logging.getLogger("adaptive_grasp.adaptive_hold_loop")
 _MAX_CONTROL_DT_S = 1.0
@@ -84,7 +86,7 @@ class HoldObserver(Protocol):
 
 class _VisualizerHoldObserver:
 
-    def __init__(self, visualizer: TactileVisualizer):
+    def __init__(self, visualizer: "TactileVisualizer"):
         self._visualizer = visualizer
 
     def on_hold_step(
@@ -114,7 +116,7 @@ class HoldController:
         sensor: SensorFrameSource,
         safety: SafetyMonitor,
         tactile: TactileAnalyzer,
-        visualizer: Optional[TactileVisualizer],
+        visualizer: Optional["TactileVisualizer"],
         joint_builder: JointCommandBuilder,
         config: AdaptiveGraspConfig,
         current_torque: int,

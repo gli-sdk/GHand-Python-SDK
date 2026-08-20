@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Handled unavailable motor driver version values without failing device information reads.
+- Moved collision detection source into the SDK package as `ghand.collision`; no runtime Git download or external `collision_sdk` package is required.
+- Collision modules import normally while collision resources are initialized and checks are executed only when requested.
+- Prevented duplicate dispatch of the same subscription frame and made subscription shutdown deterministic after the last unsubscribe.
+- Removed high-frequency success-path INFO logs from movement and polling APIs.
 
 ## [2.1.0] - 2026-08-10
 
@@ -47,7 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Project**: Renamed from XiaoYao SDK to GHand SDK; `DexHand` refactored to `GHand`.
-- **Dependencies**: Deferred `numpy` and `collision_sdk` loading to first use.
+- **Dependencies**: Collision resources are initialized on first use while SDK modules load normally.
 - **API**: `move_joints()` no longer mutates input objects; `get_joints()` / `get_hand_info()` are pure getters.
 - **Subscription**: Unified callback signature to `Callable[[DeviceData], None]` across all protocols.
 
