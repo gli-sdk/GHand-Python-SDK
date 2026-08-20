@@ -53,6 +53,13 @@ For detailed technical specifications and API references, visit the [Python SDK 
 
 Local Sphinx sources are also available under `docs/`.
 
+Additional local notes:
+
+- [Logging](docs/logging.md)
+- [Error handling](docs/error_handling.md)
+- [Subscription and threading](docs/subscription_threading.md)
+- [Diagnostics](docs/diagnostics.md)
+
 ## System Requirements
 
 | Platform | Requirement |

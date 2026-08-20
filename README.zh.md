@@ -53,6 +53,13 @@ GHand 灵巧手官方 Python SDK，提供 EtherCAT、CAN-FD、RS-485 通信接�
 
 仓库内也提供了 `docs/` Sphinx 文档源码。
 
+其他本地说明：
+
+- [日志配置](docs/logging.md)
+- [错误处理](docs/error_handling.md)
+- [订阅与线程](docs/subscription_threading.md)
+- [诊断信息](docs/diagnostics.md)
+
 ## 系统要求
 
 | 平台 | 要求 |

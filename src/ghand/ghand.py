@@ -30,6 +30,14 @@ from ._converter import nparray_to_joints
 from .collision import CollisionCheckResult, CollisionClient
 from .collision.angle_mapping import internal_radians_to_sdk_degrees
 from .collision.angle_mapping import neutral_internal_radians
+from .diagnostics import (
+    ConnectionDiagnostics,
+    Diagnostics,
+    ErrorDiagnostics,
+    IdentityDiagnostics,
+    SubscriptionDiagnostics,
+)
+from .errors import OperationResult, SdkError
 from .types import (
     CommType,
     CtrlMode,
@@ -98,6 +106,7 @@ class GHand:
         self._tactile_opened = False
         self._safety_margin = 0.0
         self._collision_checker = None
+        self._last_result = OperationResult(SdkError.OK, "", comm_type)
 
     def __enter__(self):
         return self
@@ -108,9 +117,65 @@ class GHand:
 
     def __del__(self):
         try:
-            self.close()
+            if getattr(self, "_opened", False):
+                self.close()
         except Exception:
             pass
+
+    def _set_last_result(self, code: SdkError, message: str = "") -> None:
+        self._last_result = OperationResult(code, message, self._comm_type)
+
+    def get_last_result(self) -> OperationResult:
+        """Return the latest SDK operation result."""
+        return self._last_result
+
+    def get_last_error(self) -> SdkError:
+        """Return the latest SDK operation error code."""
+        return self._last_result.code
+
+    def get_last_error_message(self) -> str:
+        """Return the latest SDK operation error message."""
+        return self._last_result.message
+
+    def get_diagnostics(self) -> Diagnostics:
+        """Return machine-readable SDK diagnostics."""
+        connected = False
+        try:
+            connected = self._comm.is_connected()
+        except Exception:
+            connected = False
+        subscription = self._collect_subscription_diagnostics()
+        return Diagnostics(
+            connection=ConnectionDiagnostics(
+                connected=connected,
+                comm_type=self._comm_type,
+                device="",
+            ),
+            identity=IdentityDiagnostics(
+                product=self._product_type,
+                hand_type=self._hand_type,
+                firmware_version=self._firmware_version,
+            ),
+            subscription=subscription,
+            error=ErrorDiagnostics(
+                last_sdk_error=self._last_result.code,
+                last_error_message=self._last_result.message,
+            ),
+        )
+
+    def _collect_subscription_diagnostics(self) -> SubscriptionDiagnostics:
+        sub_manager = getattr(self._comm, "_sub_manager", None)
+        if sub_manager is not None:
+            with sub_manager._lock:
+                return SubscriptionDiagnostics(
+                    active_subscriptions=len(sub_manager._subscribers),
+                    received_frames=sub_manager._data_seq,
+                    dispatched_frames=sub_manager._dispatched_seq,
+                )
+        callbacks = getattr(self._comm, "_callbacks", None)
+        if callbacks is not None:
+            return SubscriptionDiagnostics(active_subscriptions=len(callbacks))
+        return SubscriptionDiagnostics()
 
     def _create_comm(self, comm_type: CommType):
         """Instantiate the appropriate IComm implementation."""
@@ -309,6 +374,7 @@ class GHand:
         if self._opened:
             try:
                 if self._comm.is_connected():
+                    self._set_last_result(SdkError.OK)
                     return True
             except Exception:
                 logger.exception("Failed to query connection state before reopen")
@@ -330,6 +396,7 @@ class GHand:
                     self._opened = True
                     if self._resolve_product_type():
                         self._sync_product_config_from_comm()
+                        self._set_last_result(SdkError.OK)
                         if gear is None:
                             logger.info("Device opened successfully (ID: %s)", adapter)
                         else:
@@ -345,8 +412,13 @@ class GHand:
                     logger.error("Device verification failed (ID: %s)", adapter)
                     self._comm.disconnect()
                     self._opened = False
+                    self._set_last_result(
+                        SdkError.DEVICE_REJECTED,
+                        f"device verification failed: {adapter}",
+                    )
                 else:
                     logger.error("Failed to open device (ID: %s)", adapter)
+            self._set_last_result(SdkError.TRANSPORT_ERROR, "failed to open device")
             return False
         else:
             connected = self._comm.connect(
@@ -354,21 +426,25 @@ class GHand:
             )
             if not connected:
                 logger.error("Failed to open device (ID: %s)", id)
+                self._set_last_result(SdkError.TRANSPORT_ERROR, f"failed to open {id}")
                 return False
             self._opened = True
             logger.info("Device opened successfully (ID: %s)", id)
 
         if not self._opened:
+            self._set_last_result(SdkError.TRANSPORT_ERROR, "device was not opened")
             return False
         if not self._resolve_product_type():
             self._comm.disconnect()
             self._opened = False
+            self._set_last_result(SdkError.DEVICE_REJECTED, "product type mismatch")
             return False
 
         self._sync_product_config_from_comm()
         
         self._comm.stop()
         time.sleep(0.1)
+        self._set_last_result(SdkError.OK)
         return True
 
     def set_slave_id(self, slave_id: int) -> bool:
@@ -382,14 +458,19 @@ class GHand:
         """
         if self._comm_type not in (CommType.CANFD, CommType.RS485):
             logger.error("set_slave_id is only supported for CANFD and RS485")
+            self._set_last_result(SdkError.NOT_SUPPORTED, "set_slave_id is only supported for CANFD and RS485")
             return False
         if not self.is_connected():
+            self._set_last_result(SdkError.NOT_CONNECTED, "device is not connected")
             raise RuntimeError("Device is not connected")
 
         result = self._comm.set_slave_id(slave_id)
         if result:
             self._product_config.slave_id = slave_id
             logger.info("Slave ID set to 0x%02X", slave_id)
+            self._set_last_result(SdkError.OK)
+        else:
+            self._set_last_result(SdkError.DEVICE_REJECTED, "device rejected slave ID change")
         return result
 
     def set_baudrate_config(
@@ -409,8 +490,10 @@ class GHand:
         """
         if self._comm_type not in (CommType.CANFD, CommType.RS485):
             logger.error("set_baudrate_config is only supported for CANFD and RS485")
+            self._set_last_result(SdkError.NOT_SUPPORTED, "set_baudrate_config is only supported for CANFD and RS485")
             return False
         if not self.is_connected():
+            self._set_last_result(SdkError.NOT_CONNECTED, "device is not connected")
             raise RuntimeError("Device is not connected")
 
         result = self._comm.set_baudrate_config(baudrate_gear)
@@ -438,6 +521,9 @@ class GHand:
                 )
             else:
                 logger.info("Baudrate config set (effective after reboot)")
+            self._set_last_result(SdkError.OK)
+        else:
+            self._set_last_result(SdkError.DEVICE_REJECTED, "device rejected baudrate configuration")
         return result
 
     def close(self) -> bool:
@@ -454,11 +540,11 @@ class GHand:
 
         if connected:
             self._comm.stop()
-            time.sleep(1)
             self._comm.disconnect()
             logger.info("Disconnected from device")
         self._opened = False
         self._tactile_opened = False
+        self._set_last_result(SdkError.OK)
         return True
 
     def is_connected(self) -> bool:
@@ -487,6 +573,7 @@ class GHand:
             Subscription ID.
         """
         if not self.is_connected():
+            self._set_last_result(SdkError.NOT_CONNECTED, "device is not connected")
             raise RuntimeError("Device is not connected")
 
         if isinstance(self._comm, EthercatComm):
@@ -550,7 +637,12 @@ class GHand:
         Returns:
             True if the subscription was removed successfully.
         """
-        return self._comm.unsubscribe(sub_id)
+        result = self._comm.unsubscribe(sub_id)
+        self._set_last_result(
+            SdkError.OK if result else SdkError.INVALID_ARGUMENT,
+            "" if result else f"unknown subscription id: {sub_id}",
+        )
+        return result
 
     def get_firmware_version(self) -> str:
         """Retrieve the firmware version.
@@ -676,8 +768,10 @@ class GHand:
         result = self._comm.clear_fault()
         if result:
             logger.info("Fault cleared successfully")
+            self._set_last_result(SdkError.OK)
         else:
             logger.error("Failed to clear fault")
+            self._set_last_result(SdkError.DEVICE_REJECTED, "failed to clear fault")
         return result
 
     def joint_init(self) -> bool:
@@ -689,8 +783,10 @@ class GHand:
         result = self._comm.init_joint()
         if result:
             logger.info("Joint initialization completed successfully")
+            self._set_last_result(SdkError.OK)
         else:
             logger.error("Failed to initialize joints")
+            self._set_last_result(SdkError.DEVICE_REJECTED, "failed to initialize joints")
         return result
 
     def tactile_open(self) -> bool:
@@ -705,6 +801,9 @@ class GHand:
         result = self._comm.open_tactile()
         if result:
             self._tactile_opened = True
+            self._set_last_result(SdkError.OK)
+        else:
+            self._set_last_result(SdkError.DEVICE_REJECTED, "failed to open tactile sensors")
         return result
 
     def tactile_close(self) -> bool:
@@ -719,6 +818,9 @@ class GHand:
         result = self._comm.close_tactile()
         if result:
             self._tactile_opened = False
+            self._set_last_result(SdkError.OK)
+        else:
+            self._set_last_result(SdkError.DEVICE_REJECTED, "failed to close tactile sensors")
         return result
 
     def tactile_zero(self) -> bool:
@@ -733,8 +835,10 @@ class GHand:
         result = self._comm.zero_tactile()
         if result:
             logger.debug("Tactile zero calibration successful")
+            self._set_last_result(SdkError.OK)
         else:
             logger.error("tactile_zero failed")
+            self._set_last_result(SdkError.DEVICE_REJECTED, "failed to zero tactile sensors")
         return result
 
     def get_hand_type(self) -> HandType:
@@ -764,6 +868,10 @@ class GHand:
         Returns:
             True if the command is sent successfully.
         """
+        if not self.is_connected():
+            self._set_last_result(SdkError.NOT_CONNECTED, "device is not connected")
+            return False
+
         active_joints = []
         for joint in joints:
             if joint.id in self._passive_joints:
@@ -784,22 +892,33 @@ class GHand:
 
         if not active_joints:
             logger.warning("No active joints to move after filtering passive joints")
+            self._set_last_result(SdkError.INVALID_ARGUMENT, "no active joints to move")
             return False
 
         try:
             result = self._comm.move_joints(active_joints, mode)
+            self._set_last_result(
+                SdkError.OK if result else SdkError.TRANSPORT_ERROR,
+                "" if result else "move_joints failed",
+            )
             return result
         except Exception as e:
             logger.error("Failed to move joints: %s", e)
+            self._set_last_result(SdkError.TRANSPORT_ERROR, str(e))
             return False
 
     def stop(self) -> bool:
         """Stop all joint motion immediately."""
         try:
             result = self._comm.stop()
+            self._set_last_result(
+                SdkError.OK if result else SdkError.TRANSPORT_ERROR,
+                "" if result else "stop failed",
+            )
             return result
         except RuntimeError as e:
             logger.error("Failed to stop joints: %s", e)
+            self._set_last_result(SdkError.TRANSPORT_ERROR, str(e))
             return False
 
     def get_joints(self) -> list[JointData]:

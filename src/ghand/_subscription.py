@@ -69,6 +69,17 @@ class SubscriptionManager:
             self._data_seq = 0
             self._dispatched_seq = 0
             self._subscribers.clear()
+            self._interval_sec = self._DEFAULT_INTERVAL_SEC
+
+    def _request_stop_from_worker(self) -> None:
+        """Signal worker shutdown without joining from inside a worker thread."""
+        self._running = False
+
+    def _recompute_interval_locked(self) -> None:
+        intervals = [
+            item[3] for item in self._subscribers.values() if item[3] is not None
+        ]
+        self._interval_sec = min(intervals) if intervals else self._DEFAULT_INTERVAL_SEC
 
     def _data_producer(self):
         """Background thread that continuously receives data from the device."""
@@ -83,7 +94,7 @@ class SubscriptionManager:
                     self._data = None
                 if self._is_connected is not None and not self._is_connected():
                     logger.error("Subscription stopped: %s", e)
-                    self.stop()
+                    self._request_stop_from_worker()
                     break
                 logger.error("Error receiving data: %s", e)
             time.sleep(self._interval_sec)
@@ -100,7 +111,7 @@ class SubscriptionManager:
                 else:
                     self._dispatched_seq = data_seq
             if data:
-                for sub_id, (callback, args, kwargs) in subscribers_copy.items():
+                for sub_id, (callback, args, kwargs, _) in subscribers_copy.items():
                     if not self._running:
                         break
                     if callback:
@@ -130,11 +141,13 @@ class SubscriptionManager:
             raise RuntimeError("Device is not connected")
 
         with self._lock:
-            if interval_ms is not None:
-                self._interval_sec = interval_ms / 1000.0
+            interval_sec = (
+                interval_ms / 1000.0 if interval_ms is not None else None
+            )
             self._sub_id_counter += 1
             sub_id = self._sub_id_counter
-            self._subscribers[sub_id] = (callback, args, kwargs)
+            self._subscribers[sub_id] = (callback, args, kwargs, interval_sec)
+            self._recompute_interval_locked()
         if not self._running:
             self.start()
         return sub_id
@@ -152,6 +165,7 @@ class SubscriptionManager:
             if sub_id not in self._subscribers:
                 return False
             del self._subscribers[sub_id]
+            self._recompute_interval_locked()
             should_stop = not self._subscribers
         if should_stop:
             self.stop()

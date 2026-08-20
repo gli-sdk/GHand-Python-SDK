@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Kept collision runtime dependencies in core metadata and moved visualization-only dependencies (`matplotlib`, `meshcat`) to the adaptive extra.
+- Made `TactileVisualizer` and collision 3D visualization imports optional so the SDK imports cleanly without matplotlib/meshcat installed.
+- Disabled `enable_visualization` by default in `AdaptiveGraspConfig`.
+- Updated `README.md` and `README.zh.md` to reflect the simplified dependency set.
+
 ## [2.2.0] - 2026-08-17
 
 ### Added
@@ -17,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated README and dependency guidance for current installation flows.
 
 ### Fixed
+- Added Python SDK operation result APIs and stable SDK error classes for bool-returning operations.
+- Added a compatible `GHand.get_diagnostics()` API with connection, subscription, and last-error fields.
+- Made default logging import-safe with `NullHandler`; console logging is now opt-in.
+- Removed the fixed one-second wait from `GHand.close()`.
+- Stored subscription intervals per subscriber and avoided worker-thread self-join during shutdown.
 - Handled unavailable motor driver version values without failing device information reads.
 - Moved collision detection source into the SDK package as `ghand.collision`; no runtime Git download or external `collision_sdk` package is required.
 - Collision modules import normally while collision resources are initialized and checks are executed only when requested.

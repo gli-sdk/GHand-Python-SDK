@@ -27,6 +27,14 @@ from . import logging_config  # auto-initialize logging handlers
 from ._converter import JointConverter, joints_to_nparray, nparray_to_joints
 from .gestures import execute_gesture, get_all_gestures
 from .ghand import GHand
+from .errors import (
+    CommunicationError,
+    GHandError,
+    HandStateError,
+    OperationResult,
+    SdkError,
+)
+from .diagnostics import Diagnostics
 from .types import (
     CommType,
     CtrlMode,
@@ -59,6 +67,12 @@ __all__ = [
     "TactileInfo",
     "CommType",
     "CtrlMode",
+    "SdkError",
+    "OperationResult",
+    "GHandError",
+    "CommunicationError",
+    "HandStateError",
+    "Diagnostics",
     # Enums
     "State",
     "ErrorCode",

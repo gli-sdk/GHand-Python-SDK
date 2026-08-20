@@ -15,8 +15,8 @@
 """GHand SDK logging configuration module.
 
 Provides SDK-standard logging setup:
-- Default output of WARNING and ERROR to stderr
-- Support for upgrading to INFO or DEBUG level
+- Default NullHandler for library-friendly imports
+- Explicit console/file configuration helpers
 - Optional file log output
 - Simple design with three fixed levels
 """
@@ -61,13 +61,22 @@ LOG_COLORS = {
 }
 
 
+def _refresh_logger_level(logger: logging.Logger) -> None:
+    levels = [
+        handler.level
+        for handler in logger.handlers
+        if not isinstance(handler, logging.NullHandler)
+    ]
+    logger.setLevel(min(levels) if levels else logging.NOTSET)
+
+
 def _init_package_loggers():
-    """Initialize the package logger with a default WARNING-level stderr handler.
+    """Initialize the package logger with a NullHandler.
 
     This ensures:
-    1. SDK defaults to emitting WARNING and ERROR to stderr.
+    1. SDK imports do not alter host application logging output.
     2. No "No handler found" warnings are produced.
-    3. Users can upgrade verbosity via ``configure_console()``.
+    3. Users can opt into console output via ``configure_console()``.
     """
     root_logger = logging.getLogger(ROOT_LOGGER_NAME)
     if hasattr(root_logger, "_ghand_initialized"):
@@ -75,12 +84,10 @@ def _init_package_loggers():
 
     root_logger._ghand_initialized = True
 
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setLevel(logging.WARNING)
-    handler.setFormatter(logging.Formatter(FORMAT_SIMPLE, DATEFMT_STANDARD))
+    handler = logging.NullHandler()
 
     root_logger.addHandler(handler)
-    root_logger._ghand_stderr_handler = handler
+    root_logger._ghand_null_handler = handler
 
 
 # ============================================================================
@@ -113,7 +120,7 @@ def configure_console(level: int | str) -> None:
 
     handler.setLevel(level)
 
-    logger.setLevel(level)
+    _refresh_logger_level(logger)
 
 
 def configure_file(filename: str, level: int | str = logging.DEBUG) -> None:
@@ -144,9 +151,7 @@ def configure_file(filename: str, level: int | str = logging.DEBUG) -> None:
     logger.addHandler(handler)
     logger._ghand_file_handler = handler
 
-    for h in logger.handlers:
-        if h.level < logger.level or logger.level == 0:
-            logger.setLevel(h.level)
+    _refresh_logger_level(logger)
 
 
 def get_logger(name: str = ROOT_LOGGER_NAME) -> logging.Logger:
