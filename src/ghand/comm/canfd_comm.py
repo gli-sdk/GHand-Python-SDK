@@ -332,7 +332,7 @@ class CanfdComm(IComm):
                 result = self._transport.recv_frame(timeout_ms=50)
                 if result is None:
                     continue
-                resp_id = result
+                resp_id, _ = result
                 arb = unpack_arbitration(resp_id)
                 if arb["ack"] == 1 and arb["dst_id"] == self._src_id and arb["src_id"] == slave_id:
                     if arb["func_code"] == 0x82:
