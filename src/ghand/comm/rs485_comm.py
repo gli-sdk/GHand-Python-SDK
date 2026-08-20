@@ -318,7 +318,7 @@ class Rs485Comm(IComm):
                     logger.debug("No response from RS485 slave 0x%02X", target_slave_id)
                     continue
                 if result is not None and not result.isError():
-                    self._slave_id = result.registers[0] or target_slave_id
+                    self._slave_id = target_slave_id
                     break
             else:
                 self._client.close()
