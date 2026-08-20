@@ -1,4 +1,4 @@
-import sys
+﻿import sys
 import time
 from pathlib import Path
 
@@ -7,8 +7,8 @@ SRC_ROOT = str(PROJECT_ROOT / "src")
 if SRC_ROOT not in sys.path:
     sys.path.insert(0, SRC_ROOT)
 
-from adaptive_grasp import AdaptiveGrasper
-from adaptive_grasp.demo_config import build_demo_runtime_config
+from ghand.adaptive_grasp import AdaptiveGrasper
+from ghand.adaptive_grasp.demo_config import build_demo_runtime_config
 from ghand import (
     CommType,
     GHand,

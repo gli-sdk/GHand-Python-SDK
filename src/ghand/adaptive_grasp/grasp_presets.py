@@ -1,4 +1,4 @@
-from ghand import JointId, TactileSensorId
+﻿from ..types import JointId, TactileSensorId
 
 
 PASSIVE_DIP_JOINTS: set[JointId] = {

@@ -1,7 +1,7 @@
-from typing import Any
+﻿from typing import Any
 
-from ghand import CtrlMode, JointCommand, JointId
-from ghand.gestures import _wait_for_completion
+from ..gestures import _wait_for_completion
+from ..types import CtrlMode, JointCommand, JointId
 
 from .ports import GraspSequenceHandPort
 
@@ -75,14 +75,11 @@ def ensure_hand_command_port(hand: Any) -> GraspSequenceHandPort:
 def _ghand_attr(name: str, hand: Any | None = None) -> Any:
     if hand is not None and hasattr(hand, name):
         return getattr(hand, name)
-    try:
-        import ghand
-    except ImportError as exc:
-        raise RuntimeError(
-            "GHandCommandPort requires the ghand package. "
-            "Install with `python -m pip install -e .` to pull project dependencies."
-        ) from exc
-    return getattr(ghand, name)
+    sdk_types = {
+        "CtrlMode": CtrlMode,
+        "JointCommand": JointCommand,
+    }
+    return sdk_types[name]
 
 
 def _map_ghand_ctrl_mode(mode: CtrlMode, hand: Any | None = None) -> Any:

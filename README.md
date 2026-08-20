@@ -271,8 +271,9 @@ GHand-Python-SDK/
 |   |   |-- types.py            # Data types, enums, and structures
 |   |   |-- gestures.py         # Predefined gesture utilities
 |   |   |-- comm/               # EtherCAT, CAN-FD, and RS-485 drivers
+|   |   |-- adaptive_grasp/     # Adaptive grasp internal capability
+|   |   |-- collision/          # Collision detection internal capability
 |   |   `-- py.typed            # Type hint marker
-|   `-- adaptive_grasp/         # Adaptive grasp extension package
 |-- config/                     # Product JSON configurations
 |-- examples/                   # Tutorial, demo, and extension examples
 |-- docs/                       # Sphinx documentation source

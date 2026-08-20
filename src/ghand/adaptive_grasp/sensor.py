@@ -2,8 +2,7 @@ import logging
 import time
 from typing import Any, Optional
 
-from ghand import JointData, TactileInfo, TactileSensorId
-from ghand.comm.ethercat_comm import EthercatComm
+from ..types import JointData, TactileInfo, TactileSensorId
 from .utils import active_finger_normal_forces, normal_force_z, normalize_joint_id
 
 _logger = logging.getLogger("ghand.sensor")
@@ -11,11 +10,7 @@ _DEFAULT_FINGER_TOUCH_THRESHOLD_N = 0.1
 
 
 class SensorClient:
-    """统一封装灵巧手传感器数据的订阅、提取与缓存。
-
-    通过 ``hand.subscribe()`` 后台接收统一的 ``DeviceData``，缓存触觉数据和关节反馈，
-    供控制器或其它模块以只读方式安全访问。
-    """
+    """Caches subscribed tactile and joint feedback data for grasp control."""
 
     def __init__(
         self,
@@ -40,16 +35,16 @@ class SensorClient:
         self._get_monotonic_time = get_monotonic_time or time.monotonic
 
     # ------------------------------------------------------------------
-    # 生命周期
+    # Lifecycle
     # ------------------------------------------------------------------
     def start(self) -> None:
-        """开始订阅传感器数据并清空旧缓存。"""
+        """Start subscribing sensor data and clear stale caches."""
         self._latest_tactile_data = None
         self._latest_joint_feedback = None
         self._sub_id = self._hand.subscribe(self._on_data)
 
     def stop(self, clear_joint_feedback: bool = False) -> None:
-        """取消订阅，默认保留关节反馈缓存供后续阶段读取。"""
+        """Stop subscription and optionally clear cached joint feedback."""
         if self._sub_id is not None:
             try:
                 self._hand.unsubscribe(self._sub_id)
@@ -61,13 +56,13 @@ class SensorClient:
             self._latest_joint_feedback = None
 
     def reset(self) -> None:
-        """清空所有缓存与时间戳。"""
+        """Clear cached sensor data and timestamps."""
         self._latest_tactile_data = None
         self._latest_joint_feedback = None
         self._last_sample_time_s = None
 
     # ------------------------------------------------------------------
-    # 数据访问
+    # Data access
     # ------------------------------------------------------------------
     @property
     def tactile_data(self) -> Optional[dict[TactileSensorId, Any]]:
@@ -96,7 +91,7 @@ class SensorClient:
         return sum(normal_forces.values())
 
     def active_finger_touch_flag(self) -> dict[TactileSensorId, bool]:
-        # 判断活动手指是否都接触
+        # Check whether each active finger is in contact.
         if self._latest_tactile_data is None:
             return {finger: False for finger in self._active_fingers}
 
@@ -111,7 +106,7 @@ class SensorClient:
         return touch_flag
 
     # ------------------------------------------------------------------
-    # 内部回调
+    # Internal callback
     # ------------------------------------------------------------------
     def _on_data(self, data: Any) -> None:
         if not (hasattr(data, "tactile") and hasattr(data, "joints")):

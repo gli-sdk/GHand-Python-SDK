@@ -1,7 +1,7 @@
-import threading
+﻿import threading
 from typing import Any
 
-from ghand import JointId, TactileSensorId
+from ..types import JointId, TactileSensorId
 
 
 def clip(value: float, lower: float, upper: float) -> float:

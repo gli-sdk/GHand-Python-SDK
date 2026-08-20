@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 
 from ghand import ProductType, configure_logging
 from ghand.ghand import CommType, GHand

@@ -1,7 +1,7 @@
-from dataclasses import dataclass
+﻿from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
-from ghand import TactileSensorId
+from ..types import TactileSensorId
 
 from .config import AdaptiveGraspConfig
 from .object_profile import ObjectProfile

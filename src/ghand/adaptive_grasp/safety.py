@@ -1,9 +1,9 @@
-import logging
+﻿import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Optional
 
-from ghand import TactileSensorId
+from ..types import TactileSensorId
 
 from .config import AdaptiveGraspConfig
 from .runtime import GraspState

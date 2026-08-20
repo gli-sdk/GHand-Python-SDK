@@ -1,6 +1,6 @@
-from typing import Any, Optional, Protocol, runtime_checkable
+﻿from typing import Any, Optional, Protocol, runtime_checkable
 
-from ghand import CtrlMode, JointCommand, TactileSensorId
+from ..types import CtrlMode, JointCommand, TactileSensorId
 
 
 @runtime_checkable

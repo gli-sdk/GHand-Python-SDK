@@ -1,4 +1,4 @@
-import math
+﻿import math
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -8,7 +8,7 @@ from .grasp_presets import (
     resolve_active_fingers,
 )
 from .object_profile import ObjectProfileRegistry
-from ghand import JointId, TactileSensorId
+from ..types import JointId, TactileSensorId
 
 
 class HoldCommandMode(Enum):

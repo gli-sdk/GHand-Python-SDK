@@ -1,7 +1,7 @@
-from dataclasses import dataclass
+﻿from dataclasses import dataclass
 from typing import Optional
 
-from ghand import JointId, TactileSensorId
+from ..types import JointId, TactileSensorId
 
 from .config import AdaptiveGraspConfig
 from .force_reference_planner import ForceReferenceDecision

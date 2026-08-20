@@ -1,9 +1,10 @@
-import logging
+﻿import logging
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional
 
-from ghand import GHand, JointId, TactileSensorId
+from ..ghand import GHand
+from ..types import JointId, TactileSensorId
 
 from .adaptive_hold_loop import HoldController
 from .adaptive_hold_runner import AdaptiveHoldRunner

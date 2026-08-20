@@ -1,9 +1,9 @@
-import math
+﻿import math
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Any
 
-from ghand import TactileSensorId
+from ..types import TactileSensorId
 from .config import AdaptiveGraspConfig
 from .pid_controller import LowPassFilter
 from .utils import clip, tactile_distributed_force, tactile_force_xyz

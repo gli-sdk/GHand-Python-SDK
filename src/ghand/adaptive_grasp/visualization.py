@@ -1,4 +1,4 @@
-import json
+﻿import json
 import logging
 import os
 import subprocess
@@ -13,7 +13,7 @@ from typing import Any, Optional
 import matplotlib
 import matplotlib.pyplot as plt
 
-from ghand import JointId, TactileSensorId
+from ..types import JointId, TactileSensorId
 from .tactility import TactileAnalysis
 from .utils import FINGER_TO_MCP_PIP
 

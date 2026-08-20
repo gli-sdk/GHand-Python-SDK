@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 import time
 
 from ghand import ProductType, configure_logging
@@ -20,7 +20,7 @@ def data_callback(data):
     print(f"  Hand state: {data.hand}")
     for joint in data.joints:
         print(
-            f"  {JointId(joint.id).name}: angle={joint.angle:.1f}°, "
+            f"  {JointId(joint.id).name}: angle={joint.angle:.1f}掳, "
             f"speed={joint.speed}, torque={joint.torque}, "
             f"state={joint.state}, error={joint.error}"
         )

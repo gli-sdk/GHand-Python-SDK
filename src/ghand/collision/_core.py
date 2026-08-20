@@ -45,4 +45,4 @@ from .collision_detector import (
     is_pose_collision_detail,
     path_collision_check,
 )
-from .CollisionClient import CollisionCheckResult, CollisionClient
+from .collision_client import CollisionCheckResult, CollisionClient

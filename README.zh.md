@@ -6,7 +6,7 @@
 
 [English](README.md)
 
-GHand 灵巧手官方 Python SDK，提供 EtherCAT、CAN-FD、RS-485 通信接入，以及关节控制、触觉感知、碰撞检测和自适应抓取示例。
+GHand 灵巧手官方 Python SDK，提供 EtherCAT、CAN-FD、RS-485 通信接入，以及关节控制、触觉感知、碰撞检测和自适应抓取能力。
 
 ## 目录
 
@@ -28,7 +28,7 @@ GHand 灵巧手官方 Python SDK，提供 EtherCAT、CAN-FD、RS-485 通信接�
 
 - **设备控制**
   - 通过 EtherCAT、CAN-FD 或 RS-485 打开和关闭 GHand 设备。
-  - 读取固件版本、硬件版本、序列号、产品名称、左右手类型和电机驱动版本。
+  - 读取固件、硬件、序列号、产品名称、左右手类型和电机驱动版本。
   - 清除故障、初始化关节、停止运动，并执行常用设备操作。
 
 - **关节控制**
@@ -44,16 +44,14 @@ GHand 灵巧手官方 Python SDK，提供 EtherCAT、CAN-FD、RS-485 通信接�
   - 在执行运动前检查目标姿态。
   - 支持设置安全裕量，并在检测到碰撞时返回安全角度。
 
-- **自适应抓取扩展**
-  - 包含 `adaptive_grasp` 包和力控保持、抓取流程相关示例。
+- **自适应抓取**
+  - 内置 `ghand.adaptive_grasp` 包，提供力感知保持和抓取流程示例。
 
 ## 文档
 
 详细技术规格和 API 参考请查看 [Python SDK 开发者文档](https://fcnzogxju7xr.feishu.cn/docx/PlY7dUod5o3tZYxzXiUc0BN1nyd)。
 
-仓库内也提供了 `docs/` Sphinx 文档源码。
-
-其他本地说明：
+本地文档：
 
 - [日志配置](docs/logging.md)
 - [错误处理](docs/error_handling.md)
@@ -63,7 +61,7 @@ GHand 灵巧手官方 Python SDK，提供 EtherCAT、CAN-FD、RS-485 通信接�
 ## 系统要求
 
 | 平台 | 要求 |
-|---|---|
+| --- | --- |
 | Python | 3.10 或更高版本 |
 | Linux | Ubuntu 22.04/24.04 LTS (x86_64), glibc >= 2.35 |
 | Windows | 10 / 11 |
@@ -118,7 +116,7 @@ else:
     print("Connection failed")
 ```
 
-其他设备版本接口：
+更多设备版本 API 示例：
 
 ```python
 def format_version(version):
@@ -162,7 +160,7 @@ sudo setcap 'cap_net_raw,cap_net_admin=eip' $(which python3)
 
 ### Linux RS-485 串口
 
-Linux 下使用 USB-RS485 转接器时，SDK 自动发现优先扫描 `/dev/serial/by-id/*`、`/dev/ttyUSB*`、`/dev/ttyACM*` 和 `/dev/ttyAMA*`。SDK 不自动扫描 `/dev/ttyS*`，因为这些通常是主板内置串口。如果确实使用内置串口，请在 `open()` 中显式传入设备路径。
+Linux 下使用 USB-RS485 转接器时，SDK 自动发现优先扫描 `/dev/serial/by-id/*`、`/dev/ttyUSB*`、`/dev/ttyACM*` 和 `/dev/ttyAMA*`。如果使用内置串口，请在 `open()` 中显式传入设备路径。
 
 常用检查命令：
 
@@ -179,11 +177,9 @@ groups
 sudo usermod -aG dialout $USER
 ```
 
-修改用户组后需要注销并重新登录。
-
 ### CAN-FD 适配器
 
-CAN-FD 模式支持 ZQWL-CANFD CDC 串口适配器。Linux 下通常显示为 `/dev/ttyACM0` 或 `/dev/serial/by-id/...`，Windows 下通常显示为 `COMx`。
+CAN-FD 模式支持 ZQWL-CANFD CDC 串口适配器。Linux 下通常表现为 `/dev/ttyACM0` 或 `/dev/serial/by-id/...` ; Windows 下通常表现为 `COMx`。
 
 常用检查命令：
 
@@ -194,7 +190,7 @@ ls -l /dev/ttyACM* /dev/serial/by-id/ 2>/dev/null
 python3 -m serial.tools.list_ports
 ```
 
-如果 `lsusb -t` 显示 `Driver=cdc_acm`，说明适配器处于 CDC 串口模式，SDK 可在 CAN-FD 模式下扫描该设备。
+如果 `lsusb -t` 显示 `Driver=cdc_acm`，说明适配器处于 CDC 串口模式，可被 SDK 的 CAN-FD 模式扫描到。
 
 ### RS-485/CAN-FD 从站 ID 与波特率
 
@@ -230,7 +226,7 @@ ok = hand.set_baudrate_config(0x05)
 RS-485 波特率档位：
 
 | 档位 | 波特率 |
-|---|---|
+|------|--------|
 | `0x00` | 57,600 bps |
 | `0x01` | 115,200 bps |
 | `0x02` | 230,400 bps |
@@ -241,13 +237,13 @@ RS-485 波特率档位：
 CAN-FD 波特率档位：
 
 | 档位 | 仲裁段 | 数据段 |
-|---|---|---|
-| `0x00` | 500,000 bps，采样点 80% | 1,000,000 bps，采样点 75% |
-| `0x01` | 500,000 bps，采样点 80% | 2,000,000 bps，采样点 80% |
-| `0x02` | 500,000 bps，采样点 80% | 4,000,000 bps，采样点 80% |
-| `0x03` | 500,000 bps，采样点 80% | 5,000,000 bps，采样点 75% |
-| `0x04` | 1,000,000 bps，采样点 75% | 4,000,000 bps，采样点 80% |
-| `0x05` | 1,000,000 bps，采样点 75% | 5,000,000 bps，采样点 75%（默认） |
+|------|--------|--------|
+| `0x00` | 500,000 bps, 80% 采样点 | 1,000,000 bps, 75% 采样点 |
+| `0x01` | 500,000 bps, 80% 采样点 | 2,000,000 bps, 80% 采样点 |
+| `0x02` | 500,000 bps, 80% 采样点 | 4,000,000 bps, 80% 采样点 |
+| `0x03` | 500,000 bps, 80% 采样点 | 5,000,000 bps, 75% 采样点 |
+| `0x04` | 1,000,000 bps, 75% 采样点 | 4,000,000 bps, 80% 采样点 |
+| `0x05` | 1,000,000 bps, 75% 采样点 | 5,000,000 bps, 75% 采样点（默认） |
 
 ## 示例
 
@@ -266,13 +262,14 @@ CAN-FD 波特率档位：
 ```text
 GHand-Python-SDK/
 |-- src/
-|   |-- ghand/                  # 核心 SDK 包
-|   |   |-- ghand.py            # GHand 主类与公共 API
-|   |   |-- types.py            # 数据类型、枚举与结构体
+|   |-- ghand/                  # SDK 包
+|   |   |-- ghand.py            # GHand 主类和公开 API
+|   |   |-- types.py            # 数据类型、枚举和结构体
 |   |   |-- gestures.py         # 预定义手势工具
-|   |   |-- comm/               # EtherCAT、CAN-FD、RS-485 通信驱动
+|   |   |-- comm/               # EtherCAT、CAN-FD、RS-485 驱动
+|   |   |-- adaptive_grasp/     # 自适应抓取内部能力
+|   |   |-- collision/          # 碰撞检测内部能力
 |   |   `-- py.typed            # 类型提示标记
-|   `-- adaptive_grasp/         # 自适应抓取扩展包
 |-- config/                     # 产品 JSON 配置
 |-- examples/                   # 教程、演示和扩展示例
 |-- docs/                       # Sphinx 文档源码
@@ -280,12 +277,9 @@ GHand-Python-SDK/
 |-- requirements.txt            # 运行时依赖
 |-- pyproject.toml              # 构建配置
 |-- setup.cfg                   # 打包元数据
-|-- setup.py                    # setuptools 版本加载
-|-- LICENSE                     # Apache License 2.0
 |-- README.md                   # 英文说明
 |-- README.zh.md                # 中文说明
-|-- CONTRIBUTING.md             # 贡献指南
-`-- CHANGELOG.md                # 版本历史
+`-- CHANGELOG.md                # 更新日志
 ```
 
 ## 开源与生态资源
@@ -300,11 +294,11 @@ GHand-Python-SDK/
 
 ## 贡献指南
 
-欢迎社区贡献。请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)，了解缺陷报告、功能请求和 PR 提交流程。
+欢迎贡献。请阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 了解如何提交 bug 报告、功能请求和 pull request。
 
 ## 支持与反馈
 
-- **技术支持**：项目相关问题请在本仓库提交 issue。
+- **技术支持**：项目相关问题请在仓库提交 issue。
 - **商务咨询**：[support@glitech.com](mailto:support@glitech.com)
 
 ## 许可证

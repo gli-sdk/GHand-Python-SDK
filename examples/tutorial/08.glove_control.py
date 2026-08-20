@@ -1,4 +1,4 @@
-import socket
+﻿import socket
 import time
 
 from ghand.ghand import CommType, GHand, JointCommand, JointId

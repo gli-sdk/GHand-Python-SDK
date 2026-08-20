@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 import time
 
 from ghand import (
@@ -76,7 +76,7 @@ def main():
                             print(
                                 f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\t"
                                 f"error:{joint.error:<30},\t"
-                                f"angle: {joint.angle:.2f}°,\t"
+                                f"angle: {joint.angle:.2f}掳,\t"
                                 f"speed: {joint.speed},\ttorque: {joint.torque}")
             else:
                 print("Failed to send torque command")

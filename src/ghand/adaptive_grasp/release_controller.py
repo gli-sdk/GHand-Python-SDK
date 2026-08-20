@@ -1,9 +1,9 @@
-import logging
+﻿import logging
 import threading
 import time
 from typing import Callable, Optional
 
-from ghand import CtrlMode
+from ..types import CtrlMode
 
 from .config import AdaptiveGraspConfig
 from .joint_builder import JointCommandBuilder

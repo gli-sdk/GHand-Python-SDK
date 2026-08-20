@@ -1,6 +1,6 @@
-from typing import Optional
+﻿from typing import Optional
 
-from ghand import JointId, TactileSensorId
+from ..types import JointId, TactileSensorId
 
 from .position_hold_planner import ForceDecision, ForceDecisions, JointAngles
 from .tactility import TactileAnalysis

@@ -1,6 +1,6 @@
-from typing import Mapping, Optional
+﻿from typing import Mapping, Optional
 
-from ghand import JointCommand, JointId
+from ..types import JointCommand, JointId
 from .config import AdaptiveGraspConfig
 from .utils import clip
 
