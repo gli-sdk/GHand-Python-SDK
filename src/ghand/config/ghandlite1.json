@@ -1,7 +1,6 @@
 {
   "model": "L1-6A11D-S01",
   "name": "GHand Lite 1",
-  "aliases": ["GHand Lite 1"],
   "joints": [
     { "id": "THUMB_MCP" },
     { "id": "THUMB_TMC_FE", "min": 0.0, "max": 50.0 },

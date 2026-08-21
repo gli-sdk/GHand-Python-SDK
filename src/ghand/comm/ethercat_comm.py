@@ -75,7 +75,6 @@ class EthercatComm(IComm):
         return ProductConfig(
             name=config.name,
             model=config.model,
-            aliases=list(config.aliases),
             valid_joints=list(config.valid_joints),
             joint_limits=config.joint_limits.copy(),
             has_tactile=config.has_tactile,

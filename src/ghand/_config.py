@@ -193,7 +193,6 @@ def _parse_product_config(
     config = ProductConfig(
         name=data.get("name", ""),
         model=data.get("model", ""),
-        aliases=list(data.get("aliases", [])),
         valid_joints=valid_joints,
         joint_limits=joint_limits,
         has_tactile=data.get("has_tactile", False),
@@ -296,10 +295,7 @@ def find_config_by_name(device_name: str) -> ProductConfig | None:
             except (json.JSONDecodeError, OSError):
                 continue
 
-            names = [
-                data.get("name", ""),
-                *data.get("aliases", []),
-            ]
+            names = [data.get("name", "")]
 
             if any(
                 name.lower() == normalized_name
@@ -330,10 +326,7 @@ def find_config_by_name(device_name: str) -> ProductConfig | None:
         if data is None:
             continue
 
-        names = [
-            data.get("name", ""),
-            *data.get("aliases", []),
-        ]
+        names = [data.get("name", "")]
 
         if any(
             name.lower() == normalized_name

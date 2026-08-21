@@ -228,7 +228,6 @@ class ProductConfig:
 
     name: str = ""
     model: str = ""
-    aliases: list[str] = field(default_factory=list)
     valid_joints: list[JointId] = field(default_factory=list)
     joint_limits: dict[JointId, tuple[float, float]] = field(default_factory=dict)
     has_tactile: bool = False
