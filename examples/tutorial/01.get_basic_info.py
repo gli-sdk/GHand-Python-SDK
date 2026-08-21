@@ -4,7 +4,7 @@ from ghand import ProductType, configure_logging
 from ghand.ghand import CommType, GHand
 
 # Configure SDK logging (shows connection state, errors, etc.)
-configure_logging(level=logging.DEBUG)
+configure_logging(level=logging.INFO)
 
 
 def format_version(version):

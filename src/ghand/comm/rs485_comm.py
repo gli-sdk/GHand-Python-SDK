@@ -279,7 +279,7 @@ class Rs485Comm(IComm):
                 logger.error("Invalid RS485 baudrate gear: %s", baudrate_gear)
             return False
 
-        if self._connect_with_baudrate(resolved_device, baudrate, slave_id, quiet):
+        if self._connect_with_baudrate(resolved_device, slave_id, baudrate, quiet):
             logger.info(
                 "Device connected via RS485 (%s, slave_id=0x%02X, baudrate_gear=0x%02X, baudrate=%s)",
                 resolved_device,
