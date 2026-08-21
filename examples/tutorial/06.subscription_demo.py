@@ -20,7 +20,7 @@ def data_callback(data):
     print(f"  Hand state: {data.hand}")
     for joint in data.joints:
         print(
-            f"  {JointId(joint.id).name}: angle={joint.angle:.1f}掳, "
+            f"  {JointId(joint.id).name}: angle={joint.angle:.1f}deg, "
             f"speed={joint.speed}, torque={joint.torque}, "
             f"state={joint.state}, error={joint.error}"
         )

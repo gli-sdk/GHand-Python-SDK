@@ -4,6 +4,7 @@
 """Meshcat-based visualization drop-in replacement for src/collision_detect/visualization.py."""
 
 import copy
+import logging
 from typing import Dict, List, Optional, Sequence
 import time
 import numpy as np
@@ -24,6 +25,8 @@ from .mesh_utils import create_capsule_mesh, create_trimesh_from_joint
 from .passive_dip_mapping import apply_passive_dip_mapping
 from .runtime_loader import load_collision_runtime
 from .transforms import CAPSULE_LINK_NAMES
+
+logger = logging.getLogger("ghand.collision.visualization_meshcat")
 
 PLOT_LINK_NAMES = list(LINK_NAMES)
 
@@ -58,8 +61,8 @@ def add_xy_grid(
     z_height: float = -0.05,
     step: float = 0.05,
 ):
-    """No-op for API compatibility 鈥?Meshcat displays a built-in grid by default."""
-    print('Meshcat visualizer uses its built-in grid; add_xy_grid is a no-op.')
+    """No-op for API compatibility - Meshcat displays a built-in grid by default."""
+    logger.info('Meshcat visualizer uses its built-in grid; add_xy_grid is a no-op.')
 
 
 def _trimesh_to_meshcat(mesh_obj: trimesh.Trimesh):
@@ -108,7 +111,7 @@ def _add_palm_plane(
     path_prefix: str = 'palm_plane',
 ) -> None:
     if plane.aabb_min is None or plane.aabb_max is None or plane.p0 is None:
-        print('Skipped palm plane visualization: plane boundary data is incomplete.')
+        logger.warning('Skipped palm plane visualization: plane boundary data is incomplete.')
         return
 
     translation = np.zeros(3, dtype=float) if translation is None else np.asarray(translation, dtype=float)
@@ -160,7 +163,11 @@ def _add_palm_plane(
             opacity=center_alpha,
         ),
     )
-    print(f'Added palm plane: center={center.tolist()}, boundary_vertices={quad.tolist()}')
+    logger.info(
+        'Added palm plane: center=%s, boundary_vertices=%s',
+        center.tolist(),
+        quad.tolist(),
+    )
 
 
 def _add_pose_geometry(
@@ -231,7 +238,12 @@ def _add_pose_geometry(
             vis[path_prefix][f"capsule_{link_name}"].set_object(geom, material)
             capsule_count += 1
 
-    print(f'Added pose "{label}": {total_faces} mesh faces, {capsule_count} capsules.')
+    logger.info(
+        'Added pose "%s": %s mesh faces, %s capsules.',
+        label,
+        total_faces,
+        capsule_count,
+    )
 
 
 def visualize_scene(
@@ -244,7 +256,7 @@ def visualize_scene(
     plot_plane: bool = True,
 ):
     """Visualize a single hand pose in a meshcat scene."""
-    print('\nPreparing single-pose meshcat visualization...')
+    logger.info('Preparing single-pose meshcat visualization...')
     vis = meshcat.Visualizer()
     vis["/Background"].set_property("top_color", [1, 1, 1])
     vis["/Background"].set_property("bottom_color", [1, 1, 1])
@@ -268,7 +280,7 @@ def visualize_scene(
         path_prefix='current_pose',
     )
 
-    print(f'Open the viewer at: {vis.url()}')
+    logger.info('Open the viewer at: %s', vis.url())
     vis.open()
     time.sleep(3.0)
     try:
@@ -290,7 +302,7 @@ def visualize_pose_comparison_scene(
     separation: float = 0.18,
 ):
     """Visualize static-collision and safe poses side by side in one meshcat scene."""
-    print('\nPreparing side-by-side meshcat visualization...')
+    logger.info('Preparing side-by-side meshcat visualization...')
     vis = meshcat.Visualizer()
     vis["/Background"].set_property("top_color", [1, 1, 1])
     vis["/Background"].set_property("bottom_color", [1, 1, 1])
@@ -325,7 +337,7 @@ def visualize_pose_comparison_scene(
             path_prefix='safe_pose',
         )
 
-    print(f'Open the viewer at: {vis.url()}')
+    logger.info('Open the viewer at: %s', vis.url())
     vis.open()
     time.sleep(3.0)
     try:

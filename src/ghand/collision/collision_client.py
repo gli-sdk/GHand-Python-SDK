@@ -41,9 +41,6 @@ class CollisionClient:
             dip_mp.apply_passive_dip_mapping(clamped_angles),
             dtype=float,
         )
-        if False:
-            for name, val in zip(dip_mp.JOINT_ORDER, full_angles):
-                print(f'{name}: {math.degrees(val):.4f},')
 
         has_collision, safe_angles, collision_pairs = self._evaluate_collision(
             full_angles,

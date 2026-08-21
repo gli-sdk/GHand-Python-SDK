@@ -2,12 +2,15 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import functools
+import logging
 from typing import Any, Callable, Dict, List, Tuple
 
 import numpy as np
 
 from .datatypes import JointData, JOINT_NAMES
 from .transforms import FINGER_JOINT_MAP, build_joint_transform
+
+logger = logging.getLogger("ghand.collision.runtime_builder")
 
 
 def build_joint_runtime(
@@ -24,7 +27,10 @@ def build_joint_runtime(
     for joint_name in JOINT_NAMES:
         joint = joint_map.get(joint_name)
         if joint is None:
-            print(f'{joint_name} not found, please chech joint data')
+            logger.warning(
+                '%s not found, please check joint data',
+                joint_name,
+            )
             continue
         link_name = str(joint.get('child', f'{joint_name}_link'))
 

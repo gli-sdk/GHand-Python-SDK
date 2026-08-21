@@ -11,7 +11,7 @@ texts are provided in the `LICENSES/` directory for packaging and audit use.
 | Component | Version range | License | Purpose | License text |
 | --- | --- | --- | --- | --- |
 | pysoem | `>=1.0.2,<2.0.0` | MIT | EtherCAT communication | `LICENSES/pysoem-MIT.txt` |
-| pymodbus | `>=3.0.0` | BSD-3-Clause | Modbus/RS-485 protocol support | `LICENSES/pymodbus-BSD-3-Clause.txt` |
+| pymodbus | `>=3.0.0,<4.0.0` | BSD-3-Clause | Modbus/RS-485 protocol support | `LICENSES/pymodbus-BSD-3-Clause.txt` |
 | pyserial | `>=3.5` | BSD-3-Clause | Serial transport support | `LICENSES/pyserial-BSD-3-Clause.txt` |
 | netifaces | `>=0.11.0` | MIT-style | Network interface discovery | `LICENSES/netifaces-LICENSE.txt` |
 | numpy | `>=1.24.0` | BSD-3-Clause | Numeric data handling | `LICENSES/numpy-BSD-3-Clause.txt` |

@@ -270,11 +270,13 @@ GHand-Python-SDK/
 |   |   |-- ghand.py            # GHand 主类和公开 API
 |   |   |-- types.py            # 数据类型、枚举和结构体
 |   |   |-- gestures.py         # 预定义手势工具
+|   |   |-- config/             # 内置产品 JSON 配置
+|   |   |   |-- ghand5.json
+|   |   |   `-- ghandlite1.json
 |   |   |-- comm/               # EtherCAT、CAN-FD、RS-485 驱动
 |   |   |-- adaptive_grasp/     # 自适应抓取内部能力
 |   |   |-- collision/          # 碰撞检测内部能力
 |   |   `-- py.typed            # 类型提示标记
-|-- config/                     # 产品 JSON 配置
 |-- examples/                   # 教程、演示和扩展示例
 |-- docs/                       # Sphinx 文档源码
 |-- tests/                      # 测试套件

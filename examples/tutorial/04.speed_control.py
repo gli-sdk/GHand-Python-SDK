@@ -58,7 +58,7 @@ def main():
                     if joint.id in [JointId.THUMB_MCP, JointId.FF_PIP, JointId.MF_PIP]:
                         print(f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\t"
                               f"error:{joint.error:<30},\t"
-                              f"angle: {joint.angle:.2f}掳,\t"
+                              f"angle: {joint.angle:.2f}deg,\t"
                               f"speed: {joint.speed},\ttorque: {joint.torque}")
             else:
                 print("Failed to send speed command")
@@ -90,7 +90,7 @@ def main():
                     if joint.id in [JointId.THUMB_MCP, JointId.FF_PIP, JointId.MF_PIP]:
                         print(f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\t"
                               f"error:{joint.error:<30},\t"
-                              f"angle: {joint.angle:.2f}掳,\t"
+                              f"angle: {joint.angle:.2f}deg,\t"
                               f"speed: {joint.speed},\ttorque: {joint.torque}")
             else:
                 print("Failed to send speed command")

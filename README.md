@@ -270,11 +270,13 @@ GHand-Python-SDK/
 |   |   |-- ghand.py            # Main GHand class and public API
 |   |   |-- types.py            # Data types, enums, and structures
 |   |   |-- gestures.py         # Predefined gesture utilities
+|   |   |-- config/             # Bundled product JSON configurations
+|   |   |   |-- ghand5.json
+|   |   |   `-- ghandlite1.json
 |   |   |-- comm/               # EtherCAT, CAN-FD, and RS-485 drivers
 |   |   |-- adaptive_grasp/     # Adaptive grasp internal capability
 |   |   |-- collision/          # Collision detection internal capability
 |   |   `-- py.typed            # Type hint marker
-|-- config/                     # Product JSON configurations
 |-- examples/                   # Tutorial, demo, and extension examples
 |-- docs/                       # Sphinx documentation source
 |-- tests/                      # Test suite
