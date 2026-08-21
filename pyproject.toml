@@ -13,13 +13,13 @@ authors = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "pysoem>=0.2.0",
+    "pysoem>=1.0.2,<2.0.0",
     "netifaces>=0.11.0",
     "numpy>=1.24.0",
-    "numpy-stl>=3.1.0",
-    "pandas>=2.0.0",
     "pymodbus>=3.0.0",
     "pyserial>=3.5",
+    "numpy-stl>=3.1.0",
+    "pandas>=2.0.0",
 ]
 
 [project.optional-dependencies]

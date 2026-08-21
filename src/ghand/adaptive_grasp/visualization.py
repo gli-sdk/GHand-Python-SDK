@@ -1,4 +1,7 @@
-﻿import json
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
+import json
 import logging
 import os
 import subprocess

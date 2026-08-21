@@ -1,4 +1,7 @@
-﻿from typing import Optional
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
+from typing import Optional
 
 from ..types import JointId, TactileSensorId
 

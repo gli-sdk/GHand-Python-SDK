@@ -1,4 +1,7 @@
-﻿import numpy as np
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
+import numpy as np
 from dataclasses import dataclass
 from typing import Any
 

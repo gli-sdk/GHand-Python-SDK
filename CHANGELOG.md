@@ -8,7 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- Kept collision runtime dependencies in core metadata and moved visualization-only dependencies (`matplotlib`, `meshcat`) to the adaptive extra.
+- Kept the GHand Python SDK under Apache License 2.0.
+- Updated the PySOEM dependency to the MIT-licensed `>=1.0.2,<2.0.0` release range.
+- Split collision and visualization dependencies into optional extras.
+- Added missing optional dependency declarations for `trimesh`, `meshcat`, and `matplotlib`.
+- Added third-party license notices and license text files.
 - Made `TactileVisualizer` and collision 3D visualization imports optional so the SDK imports cleanly without matplotlib/meshcat installed.
 - Disabled `enable_visualization` by default in `AdaptiveGraspConfig`.
 - Updated `README.md` and `README.zh.md` to reflect the simplified dependency set.

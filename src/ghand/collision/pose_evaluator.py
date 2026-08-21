@@ -1,4 +1,7 @@
-﻿from typing import Callable, Dict, List, Tuple
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
+from typing import Callable, Dict, List, Tuple
 
 import numpy as np
 

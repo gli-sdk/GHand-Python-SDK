@@ -1,4 +1,7 @@
-﻿"""Meshcat-based visualization drop-in replacement for src/collision_detect/visualization.py."""
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
+"""Meshcat-based visualization drop-in replacement for src/collision_detect/visualization.py."""
 
 import copy
 from typing import Dict, List, Optional, Sequence

@@ -1,4 +1,7 @@
-﻿import threading
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
+import threading
 from typing import Any
 
 from ..types import JointId, TactileSensorId

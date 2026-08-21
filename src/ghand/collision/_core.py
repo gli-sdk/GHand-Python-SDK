@@ -1,4 +1,7 @@
-﻿from .datatypes import ANGLE_MAP, LINK_NAMES, JointData, Plane, STLData
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
+from .datatypes import ANGLE_MAP, LINK_NAMES, JointData, Plane, STLData
 from .transforms import build_joint_transform, cal_capsule_param, cal_stl_trans, update_joint_transforms
 from .runtime_builder import build_joint_runtime
 from .runtime_loader import CollisionRuntime, load_collision_runtime

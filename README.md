@@ -283,6 +283,8 @@ GHand-Python-SDK/
 |-- setup.cfg                   # Packaging metadata
 |-- setup.py                    # Version loader for setuptools
 |-- LICENSE                     # Apache License 2.0
+|-- LICENSES/                   # Third-party license texts
+|-- THIRD_PARTY_NOTICES.md      # Third-party dependency notices
 |-- README.md                   # English README
 |-- README.zh.md                # Chinese README
 |-- CONTRIBUTING.md             # Contribution guidelines
@@ -310,4 +312,8 @@ Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for gu
 
 ## License
 
-This project is licensed under the [Apache License 2.0](LICENSE).
+GHand Python SDK is licensed under the [Apache License 2.0](LICENSE).
+
+Third-party dependencies remain subject to their own license terms. See
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the `LICENSES/` directory
+for details.

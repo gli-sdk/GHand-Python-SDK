@@ -1,4 +1,7 @@
-﻿from ..types import JointId, TactileSensorId
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
+from ..types import JointId, TactileSensorId
 
 
 PASSIVE_DIP_JOINTS: set[JointId] = {

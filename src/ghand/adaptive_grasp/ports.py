@@ -1,4 +1,7 @@
-﻿from typing import Any, Optional, Protocol, runtime_checkable
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
+from typing import Any, Optional, Protocol, runtime_checkable
 
 from ..types import CtrlMode, JointCommand, TactileSensorId
 

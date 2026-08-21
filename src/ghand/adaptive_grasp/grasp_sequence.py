@@ -1,4 +1,7 @@
-﻿import logging
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
+import logging
 import time
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Optional

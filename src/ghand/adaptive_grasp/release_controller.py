@@ -1,4 +1,7 @@
-﻿import logging
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
+import logging
 import threading
 import time
 from typing import Callable, Optional

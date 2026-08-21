@@ -42,7 +42,7 @@ GHand 灵巧手官方 Python SDK，提供 EtherCAT、CAN-FD、RS-485 通信接�
 
 - **碰撞检测**
   - 在执行运动前检查目标姿态。
-  - 支持设置安全裕量，并在检测到碰撞时返回安全角度。
+  - 支持设置安全余量，并在检测到碰撞时返回安全角度。
 
 - **自适应抓取**
   - 内置 `ghand.adaptive_grasp` 包，提供力感知保持和抓取流程示例。
@@ -51,7 +51,9 @@ GHand 灵巧手官方 Python SDK，提供 EtherCAT、CAN-FD、RS-485 通信接�
 
 详细技术规格和 API 参考请查看 [Python SDK 开发者文档](https://fcnzogxju7xr.feishu.cn/docx/PlY7dUod5o3tZYxzXiUc0BN1nyd)。
 
-本地文档：
+本地 Sphinx 文档源码位于 `docs/`。
+
+其他本地说明：
 
 - [日志配置](docs/logging.md)
 - [错误处理](docs/error_handling.md)
@@ -152,7 +154,7 @@ hand.open("auto", slave_id=0x31)
 
 ### Linux EtherCAT 权限
 
-EtherCAT 需要原始套接字权限。如果遇到权限错误，可为 Python 解释器授予能力：
+EtherCAT 需要原始套接字权限。如果遇到权限错误，可以为 Python 解释器授予能力：
 
 ```bash
 sudo setcap 'cap_net_raw,cap_net_admin=eip' $(which python3)
@@ -177,9 +179,11 @@ groups
 sudo usermod -aG dialout $USER
 ```
 
+修改用户组后需要重新登录。
+
 ### CAN-FD 适配器
 
-CAN-FD 模式支持 ZQWL-CANFD CDC 串口适配器。Linux 下通常表现为 `/dev/ttyACM0` 或 `/dev/serial/by-id/...` ; Windows 下通常表现为 `COMx`。
+CAN-FD 模式支持 ZQWL-CANFD CDC 串口适配器。Linux 下通常表现为 `/dev/ttyACM0` 或 `/dev/serial/by-id/...`，Windows 下通常表现为 `COMx`。
 
 常用检查命令：
 
@@ -226,7 +230,7 @@ ok = hand.set_baudrate_config(0x05)
 RS-485 波特率档位：
 
 | 档位 | 波特率 |
-|------|--------|
+| --- | --- |
 | `0x00` | 57,600 bps |
 | `0x01` | 115,200 bps |
 | `0x02` | 230,400 bps |
@@ -237,7 +241,7 @@ RS-485 波特率档位：
 CAN-FD 波特率档位：
 
 | 档位 | 仲裁段 | 数据段 |
-|------|--------|--------|
+| --- | --- | --- |
 | `0x00` | 500,000 bps, 80% 采样点 | 1,000,000 bps, 75% 采样点 |
 | `0x01` | 500,000 bps, 80% 采样点 | 2,000,000 bps, 80% 采样点 |
 | `0x02` | 500,000 bps, 80% 采样点 | 4,000,000 bps, 80% 采样点 |
@@ -274,11 +278,16 @@ GHand-Python-SDK/
 |-- examples/                   # 教程、演示和扩展示例
 |-- docs/                       # Sphinx 文档源码
 |-- tests/                      # 测试套件
-|-- requirements.txt            # 运行时依赖
+|-- requirements.txt            # 核心运行时依赖
 |-- pyproject.toml              # 构建配置
 |-- setup.cfg                   # 打包元数据
+|-- setup.py                    # setuptools 版本加载
+|-- LICENSE                     # Apache License 2.0
+|-- LICENSES/                   # 第三方许可证文本
+|-- THIRD_PARTY_NOTICES.md      # 第三方依赖声明
 |-- README.md                   # 英文说明
 |-- README.zh.md                # 中文说明
+|-- CONTRIBUTING.md             # 贡献指南
 `-- CHANGELOG.md                # 更新日志
 ```
 
@@ -303,4 +312,6 @@ GHand-Python-SDK/
 
 ## 许可证
 
-本项目基于 [Apache License 2.0](LICENSE) 开源。
+GHand Python SDK 基于 [Apache License 2.0](LICENSE) 开源。
+
+第三方依赖仍遵循各自许可证条款。详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 和 `LICENSES/` 目录。

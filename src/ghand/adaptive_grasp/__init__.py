@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
 from .runtime import GraspState
 from .config import AdaptiveGraspConfig, HoldCommandMode
 from .adaptive_grasp_manager import AdaptiveGrasper

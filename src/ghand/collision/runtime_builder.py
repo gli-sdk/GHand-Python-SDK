@@ -1,4 +1,7 @@
-﻿import functools
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
+import functools
 from typing import Any, Callable, Dict, List, Tuple
 
 import numpy as np

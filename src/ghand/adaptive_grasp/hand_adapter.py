@@ -1,4 +1,7 @@
-﻿from typing import Any
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
+from typing import Any
 
 from ..gestures import _wait_for_completion
 from ..types import CtrlMode, JointCommand, JointId

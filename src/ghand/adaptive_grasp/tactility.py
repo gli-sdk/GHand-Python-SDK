@@ -1,4 +1,7 @@
-﻿import math
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
+import math
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Any

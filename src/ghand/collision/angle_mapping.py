@@ -1,4 +1,7 @@
-﻿"""A7 SDK angle validation and unit conversion helpers."""
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
+"""A7 SDK angle validation and unit conversion helpers."""
 
 from __future__ import annotations
 
