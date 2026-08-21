@@ -42,6 +42,7 @@ from .diagnostics import (
 )
 from .errors import OperationResult, SdkError
 from .types import (
+    CANFDBitTiming,
     CommType,
     CtrlMode,
     DeviceData,
@@ -53,12 +54,15 @@ from .types import (
     JointId,
     ProductConfig,
     ProductType,
+    RS485BaudRate,
     State,
     TactileInfo,
     TactileSensorId,
 )
 
 logger = logging.getLogger("ghand.ghand")
+
+BaudRateSelection = RS485BaudRate | CANFDBitTiming
 
 _COLLISION_JOINT_ORDER = (
     JointId.LF_MCP,
@@ -350,10 +354,25 @@ class GHand:
             return [self._comm._DEFAULT_BAUDRATE_GEAR], True
         return [None], False
 
+    def _baud_rate_to_gear(self, baud_rate: BaudRateSelection | None) -> int | None:
+        if baud_rate is None:
+            return None
+        if self._comm_type == CommType.RS485:
+            if not isinstance(baud_rate, RS485BaudRate):
+                raise TypeError("RS485 communication requires RS485BaudRate")
+            return int(baud_rate)
+        if self._comm_type == CommType.CANFD:
+            if not isinstance(baud_rate, CANFDBitTiming):
+                raise TypeError("CANFD communication requires CANFDBitTiming")
+            return int(baud_rate)
+        raise TypeError("baud_rate is only supported for RS485 and CANFD")
+
     def open(
         self,
         id: str = "auto",
         slave_id: int | None = None,
+        baud_rate: BaudRateSelection | None = None,
+        *,
         baudrate_gear: int | None = None,
     ) -> bool:
         """Open the device connection.
@@ -361,15 +380,20 @@ class GHand:
         Args:
             id: Device ID. Use "auto" to search automatically.
             slave_id: Optional RS485/CANFD slave ID override for this connection.
-            baudrate_gear: Optional baud rate gear value. The gear selects the
-                concrete bitrates for RS485 or CANFD. When omitted, the protocol
-                default gear (0x05) is used. Pass the gear explicitly if the
-                device was configured to a non-default gear via
-                ``set_baudrate_config()``.
+            baud_rate: Optional RS485 baud rate or CANFD bit timing profile.
+                Pass ``RS485BaudRate`` for RS485 and ``CANFDBitTiming`` for
+                CANFD. When omitted, the protocol default is used. The legacy
+                ``baudrate_gear`` keyword is accepted for compatibility but is
+                not recommended for new code.
 
         Returns:
             True if the connection is established successfully.
         """
+        if baud_rate is not None and baudrate_gear is not None:
+            raise ValueError("Use either baud_rate or baudrate_gear, not both")
+        if baud_rate is not None:
+            baudrate_gear = self._baud_rate_to_gear(baud_rate)
+
         if slave_id is not None:
             self._product_config.slave_id = slave_id
             self._comm.update_config(self._product_config)
@@ -478,15 +502,16 @@ class GHand:
 
     def set_baudrate_config(
         self,
-        baudrate_gear: int | None = None,
+        baud_rate: BaudRateSelection,
     ) -> bool:
-        """Set the RS485/CANFD baud rate gear (holding register 0x002C).
+        """Set the RS485 baud rate or CANFD bit timing (register 0x002C).
 
-        The gear is stored in Flash and takes effect after the next power-up.
+        The protocol gear mapped from the enum is stored in Flash and takes
+        effect after the next power-up.
 
         Args:
-            baudrate_gear: Protocol gear value written directly to the
-                register. When omitted the protocol default gear is used.
+            baud_rate: ``RS485BaudRate`` for RS485 connections, or
+                ``CANFDBitTiming`` for CANFD connections.
 
         Returns:
             True if the device accepted the configuration.
@@ -499,6 +524,7 @@ class GHand:
             self._set_last_result(SdkError.NOT_CONNECTED, "device is not connected")
             raise RuntimeError("Device is not connected")
 
+        baudrate_gear = self._baud_rate_to_gear(baud_rate)
         result = self._comm.set_baudrate_config(baudrate_gear)
         if result:
             if self._comm_type == CommType.RS485:

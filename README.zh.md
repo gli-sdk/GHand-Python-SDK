@@ -213,19 +213,30 @@ ok = hand.set_slave_id(0x32)
 hand.close()
 ```
 
-使用非默认波特率档位连接：
+使用非默认 RS-485 波特率连接：
 
 ```python
-hand.open("COM10", slave_id=0x31, baudrate_gear=0x05)
+from ghand import RS485BaudRate
+
+hand.open("COM10", slave_id=0x31, baud_rate=RS485BaudRate.BAUD_1000000)
 ```
 
-写入 RS-485/CAN-FD 波特率配置：
+写入 RS-485 波特率配置：
 
 ```python
-ok = hand.set_baudrate_config(0x05)
+ok = hand.set_baudrate_config(RS485BaudRate.BAUD_1000000)
 ```
 
-波特率配置由设备保存，并在下一次上电后生效。设备断电重启后，需要在 `open()` 中显式传入已配置的 `baudrate_gear`。
+CAN-FD 使用 bit timing 配置枚举，不使用 RS-485 波特率枚举：
+
+```python
+from ghand import CANFDBitTiming
+
+hand.open("COM10", slave_id=0x31, baud_rate=CANFDBitTiming.TIMING_1M_5M)
+ok = hand.set_baudrate_config(CANFDBitTiming.TIMING_1M_5M)
+```
+
+波特率/bit timing 配置由设备保存，并在下一次上电后生效。设备断电重启后，需要在 `open()` 中显式传入已配置的枚举值。
 
 RS-485 波特率档位：
 

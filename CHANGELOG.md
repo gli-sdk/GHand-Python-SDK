@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Split collision and visualization dependencies into optional extras.
 - Added missing optional dependency declarations for `trimesh`, `meshcat`, and `matplotlib`.
 - Added third-party license notices and license text files.
+- Added `RS485BaudRate` and `CANFDBitTiming` enums for RS485/CANFD baud-rate configuration and updated public examples to avoid raw protocol gear values.
 - Made `TactileVisualizer` and collision 3D visualization imports optional so the SDK imports cleanly without matplotlib/meshcat installed.
 - Disabled `enable_visualization` by default in `AdaptiveGraspConfig`.
 - Updated `README.md` and `README.zh.md` to reflect the simplified dependency set.

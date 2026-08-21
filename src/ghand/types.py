@@ -51,6 +51,38 @@ class JointId(enum.IntEnum):
     LF_MCP = 17
 
 
+class RS485BaudRate(enum.IntEnum):
+    """Predefined RS485 baud rates mapped to GHand protocol gear values."""
+
+    BAUD_57600 = 0x00
+    BAUD_115200 = 0x01
+    BAUD_230400 = 0x02
+    BAUD_460800 = 0x03
+    BAUD_921600 = 0x04
+    BAUD_1000000 = 0x05
+
+
+class CANFDBitTiming(enum.IntEnum):
+    """Predefined CAN FD bit timing profiles.
+
+    Names use ``TIMING_<arbitration bitrate>_<data bitrate>``. Each value maps
+    directly to the protocol gear stored by the GHand device.
+    """
+
+    # Arbitration: 500 Kbps @ 80%; data: 1 Mbps @ 75%.
+    TIMING_500K_1M = 0x00
+    # Arbitration: 500 Kbps @ 80%; data: 2 Mbps @ 80%.
+    TIMING_500K_2M = 0x01
+    # Arbitration: 500 Kbps @ 80%; data: 4 Mbps @ 80%.
+    TIMING_500K_4M = 0x02
+    # Arbitration: 500 Kbps @ 80%; data: 5 Mbps @ 75%.
+    TIMING_500K_5M = 0x03
+    # Arbitration: 1 Mbps @ 75%; data: 4 Mbps @ 80%.
+    TIMING_1M_4M = 0x04
+    # Arbitration: 1 Mbps @ 75%; data: 5 Mbps @ 75%.
+    TIMING_1M_5M = 0x05
+
+
 def _unknown_member(cls, fallback, value):
     """Build a pseudo-member named after *fallback* but carrying *value*.
 

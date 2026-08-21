@@ -213,19 +213,30 @@ ok = hand.set_slave_id(0x32)
 hand.close()
 ```
 
-Connect with a non-default baud-rate gear:
+Connect with a non-default RS-485 baud rate:
 
 ```python
-hand.open("COM10", slave_id=0x31, baudrate_gear=0x05)
+from ghand import RS485BaudRate
+
+hand.open("COM10", slave_id=0x31, baud_rate=RS485BaudRate.BAUD_1000000)
 ```
 
-Write the RS-485/CAN-FD baud-rate configuration to the device:
+Write the RS-485 baud-rate configuration to the device:
 
 ```python
-ok = hand.set_baudrate_config(0x05)
+ok = hand.set_baudrate_config(RS485BaudRate.BAUD_1000000)
 ```
 
-The baud-rate configuration is stored by the device and takes effect after the next power-up. After the device is power-cycled, pass the configured gear explicitly to `open()`.
+For CAN-FD, use a bit timing profile instead of an RS-485 baud-rate enum:
+
+```python
+from ghand import CANFDBitTiming
+
+hand.open("COM10", slave_id=0x31, baud_rate=CANFDBitTiming.TIMING_1M_5M)
+ok = hand.set_baudrate_config(CANFDBitTiming.TIMING_1M_5M)
+```
+
+The baud-rate/timing configuration is stored by the device and takes effect after the next power-up. After the device is power-cycled, pass the configured enum explicitly to `open()`.
 
 RS-485 baud-rate gears:
 
