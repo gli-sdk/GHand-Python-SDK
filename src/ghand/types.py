@@ -120,6 +120,68 @@ class GestureType(enum.Enum):
     SIX_SIGN = "six_sign"
 
 
+class SelfTestError(enum.IntFlag):
+    """A0 summary bit mask. Multiple bits may be set simultaneously."""
+
+    NONE = 0x00
+    MOTOR = 0x01
+    ZEROING = 0x04
+    FAN = 0x08
+    TEMPERATURE_SENSOR = 0x10
+    TACTILE_SENSOR = 0x20
+    POSITION_SENSOR = 0x40
+    VERSION = 0x80
+
+
+class VersionCheckError(enum.IntFlag):
+    """A1 version-mismatch bit mask."""
+
+    NONE = 0x00
+    MOTOR_DRIVER = 0x20
+    TACTILE_SENSOR = 0x40
+    POSITION_SENSOR = 0x80
+
+
+class TactileCheckError(enum.IntFlag):
+    """A3 tactile-sensor bit mask per motor channel."""
+
+    NONE = 0x00
+    THUMB_TIP_DISCONNECTED = 0x01
+    FF_TIP_DISCONNECTED = 0x02
+    MF_TIP_DISCONNECTED = 0x04
+    RF_TIP_DISCONNECTED = 0x08
+    LF_TIP_DISCONNECTED = 0x10
+    COMMUNICATION_FAILED = 0x80
+
+
+class ZeroingError(enum.IntEnum):
+    """A6 zeroing error per motor channel (single-value enum)."""
+
+    NONE = 0x00
+    MOTOR_ABNORMAL = 0x01
+    FULL_STROKE_CHECK_FAILED = 0x02
+    ZEROING_TIMEOUT = 0x03
+
+
+class MotorCheckError(enum.IntEnum):
+    """A8 motor-detection error per motor channel."""
+
+    NONE = 0x00
+    HARDWARE_OVER_CURRENT = 0x01
+    SOFTWARE_OVER_CURRENT = 0x02
+    BUS_OVER_CURRENT = 0x03
+    HARDWARE_OVER_VOLTAGE = 0x04
+    HARDWARE_UNDER_VOLTAGE = 0x05
+    PHASE_LOSS = 0x06
+    STALL = 0x07
+    HARDWARE_OVER_TEMPERATURE = 0x08
+    COMMUNICATION_LOST = 0x09
+    SOFTWARE_OVER_VOLTAGE = 0x0A
+    SOFTWARE_UNDER_VOLTAGE = 0x0B
+    SOFTWARE_OVER_TEMPERATURE = 0x0C
+    POSITION_SENSOR_ERROR = 0x0D
+
+
 # ============================================================================
 # Dataclasses
 # ============================================================================
@@ -251,6 +313,116 @@ class DeviceData:
         for joint in self.joints:
             jid = JointId(joint.id)
             setattr(self, jid.name.lower(), joint)
+
+
+@dataclass
+class MotorDiagnosticError:
+    """Self-test error for a single 13-channel motor slot."""
+
+    motor_index: int
+    joint_id: JointId | None
+    error_code: int
+
+
+@dataclass
+class SelfTestErrorInfo:
+    """Structured result of the self-test error query (Command 0xA0)."""
+
+    summary: SelfTestError = SelfTestError.NONE
+    version: VersionCheckError = VersionCheckError.NONE
+    position_sensor: list[MotorDiagnosticError] = field(default_factory=list)
+    tactile_sensor: list[MotorDiagnosticError] = field(default_factory=list)
+    temperature: int = 0
+    fan: int = 0
+    zeroing: list[MotorDiagnosticError] = field(default_factory=list)
+    motor: list[MotorDiagnosticError] = field(default_factory=list)
+
+    @property
+    def has_error(self) -> bool:
+        return self.summary != SelfTestError.NONE
+
+    def describe(self) -> str:
+        """Return a human-readable description of all self-test errors."""
+        lines = [f"summary: 0x{int(self.summary):02X}"]
+
+        if self.summary != SelfTestError.NONE:
+            names = [
+                flag.name
+                for flag in SelfTestError
+                if flag != SelfTestError.NONE and self.summary & flag
+            ]
+            lines[0] += f" ({', '.join(names)})"
+
+        if self.summary & SelfTestError.VERSION:
+            names = [
+                flag.name
+                for flag in VersionCheckError
+                if flag != VersionCheckError.NONE and self.version & flag
+            ]
+            lines.append(
+                f"version: 0x{int(self.version):02X} ({', '.join(names) or 'none'})"
+            )
+        if self.summary & SelfTestError.POSITION_SENSOR:
+            lines.append(
+                "position_sensor: "
+                + _describe_motor_errors(
+                    self.position_sensor,
+                    lambda c: "position sensor abnormal" if c else "unknown",
+                )
+            )
+        if self.summary & SelfTestError.TACTILE_SENSOR:
+            lines.append(
+                "tactile_sensor: "
+                + _describe_motor_errors(self.tactile_sensor, _describe_tactile_code)
+            )
+        if self.summary & SelfTestError.TEMPERATURE_SENSOR:
+            desc = "temperature sensor abnormal" if self.temperature else "none"
+            lines.append(f"temperature: 0x{self.temperature:02X} ({desc})")
+        if self.summary & SelfTestError.FAN:
+            desc = "fan abnormal" if self.fan else "none"
+            lines.append(f"fan: 0x{self.fan:02X} ({desc})")
+        if self.summary & SelfTestError.ZEROING:
+            lines.append(
+                "zeroing: "
+                + _describe_motor_errors(
+                    self.zeroing, lambda c: _enum_name_or_unknown(ZeroingError, c)
+                )
+            )
+        if self.summary & SelfTestError.MOTOR:
+            lines.append(
+                "motor: "
+                + _describe_motor_errors(
+                    self.motor, lambda c: _enum_name_or_unknown(MotorCheckError, c)
+                )
+            )
+        return "\n  ".join(lines)
+
+
+def _enum_name_or_unknown(enum_type, code: int) -> str:
+    try:
+        return enum_type(code).name
+    except ValueError:
+        return f"unknown (0x{code:02X})"
+
+
+def _describe_tactile_code(code: int) -> str:
+    names = [
+        flag.name
+        for flag in TactileCheckError
+        if flag != TactileCheckError.NONE and code & flag
+    ]
+    return ", ".join(names) if names else f"unknown (0x{code:02X})"
+
+
+def _describe_motor_errors(errors: list[MotorDiagnosticError], describe_code) -> str:
+    if not errors:
+        return "none"
+    return "; ".join(
+        f"motor={e.motor_index} "
+        f"joint={e.joint_id.name if e.joint_id is not None else 'unknown'} "
+        f"code=0x{e.error_code:02X} ({describe_code(e.error_code)})"
+        for e in errors
+    )
 
 
 # ============================================================================

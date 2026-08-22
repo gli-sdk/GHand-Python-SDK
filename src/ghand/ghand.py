@@ -39,6 +39,7 @@ from .types import (
     JointId,
     ProductConfig,
     ProductType,
+    SelfTestErrorInfo,
     State,
     TactileInfo,
     TactileSensorId,
@@ -668,6 +669,21 @@ class GHand:
             HandState instance.
         """
         return self._comm.get_hand_info()
+
+    def get_self_test_error_info(self) -> SelfTestErrorInfo:
+        """Read structured self-test error information from the device.
+
+        Reads only the already-latched self-test result stored on the device
+        (object dictionary ``0x2008``). This method does NOT trigger a manual
+        self-test (``0x01``) or manual zeroing (``0x02``).
+
+        Returns:
+            ``SelfTestErrorInfo`` populated only for the error categories
+            actually flagged by the A0 summary.
+        """
+        if not self.is_connected():
+            raise RuntimeError("Device is not connected")
+        return self._comm.get_self_test_error_info()
 
     def get_tactile_data(self) -> dict:
         """Retrieve tactile sensor data.
