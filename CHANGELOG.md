@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Support for Linux ARM64 (aarch64) architecture
+- Support for macOS (Intel x86_64 and Apple Silicon arm64)
+
 ### Changed
+- Replaced unmaintained `netifaces` dependency with `psutil` for better cross-platform compatibility and macOS Apple Silicon support
 - Kept the GHand Python SDK under Apache License 2.0.
 - Updated the PySOEM dependency to the MIT-licensed `>=1.0.2,<2.0.0` release range.
 - Split collision and visualization dependencies into optional extras.

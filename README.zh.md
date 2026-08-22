@@ -65,8 +65,9 @@ GHand 灵巧手官方 Python SDK，提供 EtherCAT、CAN-FD、RS-485 通信接�
 | 平台 | 要求 |
 | --- | --- |
 | Python | 3.10 或更高版本 |
-| Linux | Ubuntu 22.04/24.04 LTS (x86_64), glibc >= 2.35 |
+| Linux | Ubuntu 22.04/24.04 LTS (x86_64 / aarch64), glibc >= 2.35 |
 | Windows | 10 / 11 |
+| macOS | 12+ (Intel x86_64 / Apple Silicon arm64) |
 
 ## 安装
 
@@ -75,6 +76,7 @@ GHand 灵巧手官方 Python SDK，提供 EtherCAT、CAN-FD、RS-485 通信接�
 - **Python** 3.10 或更高版本
 - **Windows**：使用 EtherCAT 时需要安装 [Npcap](https://npcap.com/)
 - **Linux**：构建原生依赖时需要 `build-essential` 和 `python3-dev`
+- **macOS**：CAN-FD 和 RS-485 无需额外依赖。EtherCAT 通过 pcap 访问原始套接字需要 `sudo` 权限(macOS 无 Linux `setcap` 的持久化能力等价物)。
 
 ### 从源码安装
 
@@ -158,6 +160,14 @@ EtherCAT 需要原始套接字权限。如果遇到权限错误，可以为 Pyth
 
 ```bash
 sudo setcap 'cap_net_raw,cap_net_admin=eip' $(which python3)
+```
+
+### macOS EtherCAT 权限
+
+macOS 下 EtherCAT 通过 pcap 使用原始套接字,需要 root 权限。使用 `sudo` 运行 Python 脚本:
+
+```bash
+sudo python3 examples/tutorial/01.get_basic_info.py
 ```
 
 ### Linux RS-485 串口

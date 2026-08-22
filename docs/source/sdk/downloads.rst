@@ -30,7 +30,7 @@ You can also install directly from Git:
 
 - Latest version: v2.2.0
 - Python requirement: 3.10 or higher
-- Supported platforms: Windows 10/11, Linux Ubuntu 22.04/24.04 LTS
+- Supported platforms: Windows 10/11, Linux Ubuntu 22.04/24.04 LTS (x86_64/aarch64), macOS 12+ (Intel/Apple Silicon)
 - RS485/CANFD default baud-rate gear: ``0x05``
 
 Example Code

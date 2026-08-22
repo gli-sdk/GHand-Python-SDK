@@ -24,7 +24,7 @@ import threading
 import time
 from collections import deque
 
-import netifaces
+import psutil
 import pysoem
 
 
@@ -408,7 +408,7 @@ class EthercatClient:
             List of adapter IDs.
         """
         logger.info("Searching for network interfaces...")
-        ids = netifaces.interfaces()
+        ids = list(psutil.net_if_addrs().keys())
         if platform.system() == 'Windows':
             for i in range(len(ids)):
                 ids[i] = "\\Device\\NPF_" + ids[i]

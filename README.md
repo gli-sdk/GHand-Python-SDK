@@ -65,8 +65,9 @@ Additional local notes:
 | Platform | Requirement |
 |----------|-------------|
 | Python | 3.10 or higher |
-| Linux | Ubuntu 22.04/24.04 LTS (x86_64), glibc >= 2.35 |
+| Linux | Ubuntu 22.04/24.04 LTS (x86_64 / aarch64), glibc >= 2.35 |
 | Windows | 10 / 11 |
+| macOS | 12+ (Intel x86_64 / Apple Silicon arm64) |
 
 ## Installation
 
@@ -75,6 +76,7 @@ Additional local notes:
 - **Python** 3.10 or higher
 - **Windows**: [Npcap](https://npcap.com/) when using EtherCAT
 - **Linux**: `build-essential` and `python3-dev` for building native dependencies
+- **macOS**: No additional prerequisites for CAN-FD or RS-485. For EtherCAT, raw socket access via pcap requires `sudo` (no persistent capability equivalent to Linux `setcap` on macOS).
 
 ### Install from Source
 
@@ -158,6 +160,14 @@ EtherCAT needs raw socket access. If you see permission errors, grant the capabi
 
 ```bash
 sudo setcap 'cap_net_raw,cap_net_admin=eip' $(which python3)
+```
+
+### EtherCAT on macOS
+
+EtherCAT on macOS uses raw sockets via pcap and requires root privileges. Run Python scripts with `sudo`:
+
+```bash
+sudo python3 examples/tutorial/01.get_basic_info.py
 ```
 
 ### RS-485 Serial Ports on Linux
