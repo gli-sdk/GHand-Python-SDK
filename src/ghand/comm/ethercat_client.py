@@ -44,6 +44,12 @@ class EthercatClient:
     _WKC_WINDOW_MIN_SAMPLES = 30
     _MAX_INVALID_WKC_RATIO = 0.5
     _MAX_PROCESS_DATA_AGE_SEC = 0.25
+    # A single stale snapshot is still returned to callers when the current
+    # cycle's WKC is bad, as long as the last valid frame is fresher than this.
+    _PROCESS_DATA_TIMEOUT_SEC = 0.1
+    # Number of consecutive invalid-WKC cycles before we escalate the log tier
+    # from debug to warning. Below this we treat single misses as expected jitter.
+    _WKC_DEGRADED_THRESHOLD = 3
 
     @staticmethod
     def _matches_expected_size(actual_size: int, expected_size) -> bool:
@@ -55,9 +61,9 @@ class EthercatClient:
         return actual_size in expected_size
 
     @classmethod
-    def _wkc_is_unhealthy(cls, consecutive_invalid: int, validity_window) -> bool:
+    def _wkc_is_unhealthy(cls, consecutive_wkc_errors: int, validity_window) -> bool:
         """Evaluate sustained WKC failure without letting sporadic success hide it."""
-        if consecutive_invalid >= cls._MAX_CONSECUTIVE_INVALID_WKC:
+        if consecutive_wkc_errors >= cls._MAX_CONSECUTIVE_INVALID_WKC:
             return True
         if len(validity_window) < cls._WKC_WINDOW_MIN_SAMPLES:
             return False
@@ -76,17 +82,35 @@ class EthercatClient:
     def __init__(self):
         """Initialize a new EthercatClient instance."""
         self._master = self._create_master()
+        # WKC observed in the most recent cycle (raw pysoem value).
         self._actual_wkc = 0
+        # WKC we expect on a fully-mapped bus (populated after config_map()).
+        self._expected_wkc = 0
         self._pd_thread_stop_event = threading.Event()
         self._ch_thread_stop_event = threading.Event()
         self._connected = False
         self._slave = None
-        # Connection health flag
+        # A single WKC miss is not a disconnect: we track four orthogonal
+        # states so callers and the rest of the driver can react proportionately.
+        # - _connection_lost: sustained WKC failure has been observed and the
+        #   client has been (or is being) torn down. Terminal.
+        # - _has_valid_process_data: at least one good cycle has been seen since
+        #   the client entered OP. Reset on cleanup.
+        # - _last_valid_process_time: monotonic timestamp of the most recent
+        #   good cycle. Used both for freshness checks and to age out the
+        #   cached snapshot.
+        # - _consecutive_wkc_errors: contiguous run of invalid-WKC cycles.
+        #   Drives log tiering and the disconnect trigger.
         self._connection_lost = False
-        self._process_data_valid = False
-        self._last_valid_process_data_time = None
-        self._consecutive_invalid_wkc = 0
+        self._has_valid_process_data = False
+        self._last_valid_process_time = None
+        self._consecutive_wkc_errors = 0
         self._wkc_validity_window = deque(maxlen=self._WKC_WINDOW_SIZE)
+        # Cached copy of the last known-good TPDO snapshot. recv_data() serves
+        # this while the current cycle's WKC is bad but still within the
+        # process-data timeout, so a single bad cycle does not surface as an
+        # error to the application.
+        self._last_valid_tpdo_snapshot = None
         # Thread-safety lock
         self._data_lock = threading.RLock()
         # Exclusive adapter lock
@@ -252,11 +276,13 @@ class EthercatClient:
             self._slave = None
             self._connected = False
             self._actual_wkc = 0
+            self._expected_wkc = 0
             self._connection_lost = False
-            self._process_data_valid = False
-            self._last_valid_process_data_time = None
-            self._consecutive_invalid_wkc = 0
+            self._has_valid_process_data = False
+            self._last_valid_process_time = None
+            self._consecutive_wkc_errors = 0
             self._wkc_validity_window.clear()
+            self._last_valid_tpdo_snapshot = None
 
         self._release_lock()
         self._master = self._create_master()
@@ -297,24 +323,53 @@ class EthercatClient:
                 with self._data_lock:
                     self._master.send_processdata()
                     self._actual_wkc = self._master.receive_processdata(15_000)
-                    valid = self._actual_wkc >= 1
-                    self._process_data_valid = valid
+                    valid = self._actual_wkc >= self._expected_wkc and self._actual_wkc >= 1
                     self._wkc_validity_window.append(valid)
                     if valid:
-                        self._last_valid_process_data_time = time.monotonic()
-                        self._consecutive_invalid_wkc = 0
+                        self._has_valid_process_data = True
+                        self._last_valid_process_time = time.monotonic()
+                        self._consecutive_wkc_errors = 0
+                        # Snapshot the freshly-received TPDO so callers can be
+                        # served a coherent frame even if the next cycle's WKC
+                        # is bad. bytes(...) copies out of the shared buffer.
+                        if self._slave is not None:
+                            self._last_valid_tpdo_snapshot = bytes(self._slave.input)
                     else:
-                        self._consecutive_invalid_wkc += 1
+                        self._consecutive_wkc_errors += 1
                 if not valid:
-                    logger.warning("Invalid working counter (WKC): %s", self._actual_wkc)
+                    # Tiered logging: single misses are noise on a healthy bus,
+                    # a small run is a warning, and sustained failure is an
+                    # error that also trips connection_lost below.
+                    if self._consecutive_wkc_errors == 1:
+                        logger.debug(
+                            "Invalid WKC on one cycle: actual=%s expected=%s",
+                            self._actual_wkc,
+                            self._expected_wkc,
+                        )
+                    elif self._consecutive_wkc_errors < self._WKC_DEGRADED_THRESHOLD:
+                        logger.warning(
+                            "Invalid WKC (transient): actual=%s expected=%s streak=%s",
+                            self._actual_wkc,
+                            self._expected_wkc,
+                            self._consecutive_wkc_errors,
+                        )
+                    else:
+                        logger.warning(
+                            "Invalid WKC (degraded): actual=%s expected=%s streak=%s window=%s/%s",
+                            self._actual_wkc,
+                            self._expected_wkc,
+                            self._consecutive_wkc_errors,
+                            sum(self._wkc_validity_window),
+                            len(self._wkc_validity_window),
+                        )
                     if self._master.in_op and self._wkc_is_unhealthy(
-                        self._consecutive_invalid_wkc,
+                        self._consecutive_wkc_errors,
                         self._wkc_validity_window,
                     ):
                         logger.error(
-                            "Unhealthy EtherCAT process data: consecutive_invalid=%s, "
+                            "Unhealthy EtherCAT process data: consecutive_wkc_errors=%s, "
                             "valid_window=%s/%s; disconnecting",
-                            self._consecutive_invalid_wkc,
+                            self._consecutive_wkc_errors,
                             sum(self._wkc_validity_window),
                             len(self._wkc_validity_window),
                         )
@@ -351,31 +406,33 @@ class EthercatClient:
             time.sleep(0.01)
 
     def recv_data(self) -> bytes:
-        """Receive the latest TPDO bytes from the slave.
+        """Receive the latest known-good TPDO snapshot from the slave.
+
+        A single bad WKC cycle does not surface as an error to callers — the
+        most recent good frame is served as long as it is fresher than
+        ``_PROCESS_DATA_TIMEOUT_SEC``. Only sustained WKC failure (via
+        ``_connection_lost``) or a stale snapshot beyond that timeout is fatal.
 
         Returns:
-            Raw input process data.
+            Raw input process data from the last valid cycle.
 
         Raises:
-            RuntimeError: If the device is disconnected.
+            RuntimeError: If the device is disconnected, no valid frame has
+                ever been received, or the cached snapshot is stale.
         """
         with self._data_lock:
             if self._connection_lost:
                 raise RuntimeError("Device disconnected")
-            if not self._process_data_valid:
+            if not self._has_valid_process_data or self._last_valid_tpdo_snapshot is None:
                 raise RuntimeError(
-                    f"No valid EtherCAT process data (WKC={self._actual_wkc})"
+                    f"No valid EtherCAT process data yet (WKC={self._actual_wkc})"
                 )
-            if (
-                self._last_valid_process_data_time is None
-                or time.monotonic() - self._last_valid_process_data_time
-                > self._MAX_PROCESS_DATA_AGE_SEC
-            ):
-                raise RuntimeError("EtherCAT process data is stale")
-            if self._slave is not None:
-                return bytes(self._slave.input)
-            else:
-                raise RuntimeError("Device disconnected")
+            age = time.monotonic() - (self._last_valid_process_time or 0.0)
+            if age > self._PROCESS_DATA_TIMEOUT_SEC:
+                raise RuntimeError(
+                    f"EtherCAT process data timeout: last valid frame {age * 1000:.1f} ms old"
+                )
+            return self._last_valid_tpdo_snapshot
 
     def send_data(self, data: bytes):
         """Send RPDO bytes to the slave.
@@ -389,7 +446,7 @@ class EthercatClient:
         with self._data_lock:
             if self._connection_lost:
                 raise RuntimeError("Device disconnected")
-            if not self._process_data_valid:
+            if not self._has_valid_process_data:
                 raise RuntimeError(
                     f"Cannot send command without valid EtherCAT process data "
                     f"(WKC={self._actual_wkc})"
@@ -493,6 +550,14 @@ class EthercatClient:
                 #     return False
 
                 self._master.config_map()
+
+                # Snapshot expected WKC after PDO mapping is fixed so the
+                # process-data thread can distinguish "one slave missed" from
+                # "any WKC >= 1 is fine".
+                try:
+                    self._expected_wkc = int(self._master.expected_wkc)
+                except Exception:
+                    self._expected_wkc = 1
 
                 # if not self._matches_expected_size(len(slave.input), expected_input_size):
                 #     logger.error("Expected input size error!")
