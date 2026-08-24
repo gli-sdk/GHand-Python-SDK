@@ -290,7 +290,6 @@ class GHand:
             joint.speed = min(100, abs(joint.speed))
 
         if joint.speed != original_speed and mode != CtrlMode.TORQUE:
-        if joint.speed != original_speed and mode != CtrlMode.TORQUE:
             logger.warning(
                 "[Joint] ID: %s speed %s adjusted to %s in %s mode",
                 JointId(joint.id).name,
