@@ -228,13 +228,7 @@ class GHand:
             joint: Joint to check and modify in place.
             limit: Tuple of (min, max) in degrees.
             mode: Current control mode.
-            mode: Current control mode.
         """
-        if mode == CtrlMode.SPEED or mode == CtrlMode.TORQUE:
-            logger.warning(
-                "[Joint] ID: %s angle input is invalid in %s mode and will be ignored",
-                JointId(joint.id).name, mode.name,
-            )
         if mode == CtrlMode.SPEED or mode == CtrlMode.TORQUE:
             logger.warning(
                 "[Joint] ID: %s angle input is invalid in %s mode and will be ignored",
@@ -247,18 +241,8 @@ class GHand:
                     "[Joint] ID: %s angle below limit, clamped to min value %.1f degrees",
                     JointId(joint.id).name, limit[0]
                 )
-            if mode == CtrlMode.POSITION:
-                logger.warning(
-                    "[Joint] ID: %s angle below limit, clamped to min value %.1f degrees",
-                    JointId(joint.id).name, limit[0]
-                )
         elif joint.angle > limit[1]:
             joint.angle = limit[1]
-            if mode == CtrlMode.POSITION:
-                logger.warning(
-                    "[Joint] ID: %s angle above limit, clamped to max value %.1f degrees",
-                    JointId(joint.id).name, limit[1]
-                )
             if mode == CtrlMode.POSITION:
                 logger.warning(
                     "[Joint] ID: %s angle above limit, clamped to max value %.1f degrees",
@@ -273,11 +257,6 @@ class GHand:
             joint: Joint to check and modify in place.
             mode: Current control mode.
         """
-        if mode == CtrlMode.TORQUE:
-            logger.warning(
-                "[Joint] ID: %s speed input is invalid in torque mode and will be ignored",
-                JointId(joint.id).name,
-            )
         if mode == CtrlMode.TORQUE:
             logger.warning(
                 "[Joint] ID: %s speed input is invalid in torque mode and will be ignored",
@@ -307,7 +286,7 @@ class GHand:
             mode: Current control mode.
         """
         original_torque = joint.torque
-        if mode ==CtrlMode.TORQUE:
+        if mode == CtrlMode.TORQUE:
             joint.torque = max(-100, min(100, joint.torque))
         else:
             joint.torque = min(100, abs(joint.torque))
