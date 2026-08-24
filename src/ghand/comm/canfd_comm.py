@@ -44,6 +44,7 @@ from ..types import (
     JointData,
     JointId,
     ProductConfig,
+    SelfTestErrorInfo,
     State,
     TactileInfo,
 )
@@ -81,6 +82,7 @@ from .modbus_codec import (
     parse_tactile_state_error,
     registers_to_bytes,
 )
+from .self_test_workflow import build_self_test_error_info
 
 # CANFD baud rate gear map per protocol documentation.
 # Writing a gear value to BAUDRATE_CONFIG_REGISTER selects both the arbitration
@@ -677,6 +679,29 @@ class CanfdComm(IComm):
         )
         logger.info("Joint initialization completed")
         return True
+
+    # ------------------------------------------------------------------
+    # Self-test error query (registers 0x0038 ~ 0x003F)
+    # ------------------------------------------------------------------
+
+    def _self_test_read_registers(self, address: int, count: int) -> list[int]:
+        raw = self._transport.read_registers(
+            self._src_id, self._dst_id, address, count, func_code=0x03
+        )
+        return list(struct.unpack(f">{count}H", raw[: count * 2]))
+
+    def _self_test_write_register(self, address: int, value: int) -> None:
+        self._transport.write_registers(
+            self._src_id, self._dst_id, address, struct.pack(">H", value)
+        )
+
+    def get_self_test_error_info(self) -> SelfTestErrorInfo:
+        """Query self-test error information via CANFD-mapped registers 0x0038~0x003F."""
+        return build_self_test_error_info(
+            self._config,
+            self._self_test_read_registers,
+            self._self_test_write_register,
+        )
 
     # ------------------------------------------------------------------
     # Subscription (polling-based)

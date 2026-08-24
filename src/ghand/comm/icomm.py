@@ -292,6 +292,20 @@ class IComm(ABC):
         """
         ...
 
+    def get_self_test_error_info(self):
+        """Retrieve structured self-test error information.
+
+        Default implementation returns an empty ``SelfTestErrorInfo``. Backends
+        that support the self-test error query (object dictionary 0x2008)
+        should override this method.
+
+        Returns:
+            SelfTestErrorInfo instance.
+        """
+        from ..types import SelfTestErrorInfo
+
+        return SelfTestErrorInfo()
+
     # ===== Subscription =====
 
     @abstractmethod

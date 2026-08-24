@@ -55,6 +55,7 @@ from .types import (
     ProductConfig,
     ProductType,
     RS485BaudRate,
+    SelfTestErrorInfo,
     State,
     TactileInfo,
     TactileSensorId,
@@ -227,7 +228,13 @@ class GHand:
             joint: Joint to check and modify in place.
             limit: Tuple of (min, max) in degrees.
             mode: Current control mode.
+            mode: Current control mode.
         """
+        if mode == CtrlMode.SPEED or mode == CtrlMode.TORQUE:
+            logger.warning(
+                "[Joint] ID: %s angle input is invalid in %s mode and will be ignored",
+                JointId(joint.id).name, mode.name,
+            )
         if mode == CtrlMode.SPEED or mode == CtrlMode.TORQUE:
             logger.warning(
                 "[Joint] ID: %s angle input is invalid in %s mode and will be ignored",
@@ -240,8 +247,18 @@ class GHand:
                     "[Joint] ID: %s angle below limit, clamped to min value %.1f degrees",
                     JointId(joint.id).name, limit[0]
                 )
+            if mode == CtrlMode.POSITION:
+                logger.warning(
+                    "[Joint] ID: %s angle below limit, clamped to min value %.1f degrees",
+                    JointId(joint.id).name, limit[0]
+                )
         elif joint.angle > limit[1]:
             joint.angle = limit[1]
+            if mode == CtrlMode.POSITION:
+                logger.warning(
+                    "[Joint] ID: %s angle above limit, clamped to max value %.1f degrees",
+                    JointId(joint.id).name, limit[1]
+                )
             if mode == CtrlMode.POSITION:
                 logger.warning(
                     "[Joint] ID: %s angle above limit, clamped to max value %.1f degrees",
@@ -261,12 +278,18 @@ class GHand:
                 "[Joint] ID: %s speed input is invalid in torque mode and will be ignored",
                 JointId(joint.id).name,
             )
+        if mode == CtrlMode.TORQUE:
+            logger.warning(
+                "[Joint] ID: %s speed input is invalid in torque mode and will be ignored",
+                JointId(joint.id).name,
+            )
         original_speed = joint.speed
         if mode == CtrlMode.SPEED:
             joint.speed = max(-100, min(100, joint.speed))
         else:
             joint.speed = min(100, abs(joint.speed))
 
+        if joint.speed != original_speed and mode != CtrlMode.TORQUE:
         if joint.speed != original_speed and mode != CtrlMode.TORQUE:
             logger.warning(
                 "[Joint] ID: %s speed %s adjusted to %s in %s mode",
@@ -569,6 +592,7 @@ class GHand:
 
         if connected:
             self._comm.stop()
+            time.sleep(1)
             self._comm.disconnect()
             logger.info("Disconnected from device")
         self._opened = False
@@ -966,6 +990,21 @@ class GHand:
             HandState instance.
         """
         return self._comm.get_hand_info()
+
+    def get_self_test_error_info(self) -> SelfTestErrorInfo:
+        """Read structured self-test error information from the device.
+
+        Reads only the already-latched self-test result stored on the device
+        (object dictionary ``0x2008``). This method does NOT trigger a manual
+        self-test (``0x01``) or manual zeroing (``0x02``).
+
+        Returns:
+            ``SelfTestErrorInfo`` populated only for the error categories
+            actually flagged by the A0 summary.
+        """
+        if not self.is_connected():
+            raise RuntimeError("Device is not connected")
+        return self._comm.get_self_test_error_info()
 
     def get_tactile_data(self) -> dict:
         """Retrieve tactile sensor data.

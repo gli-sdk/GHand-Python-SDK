@@ -423,3 +423,50 @@ def build_tactile_info(
         resultant_force=resultant_force,
         distributed_force=distributed_force,
     )
+
+
+# ============================================================================
+# Self-test error registers (0x0038 ~ 0x003F, shared by RS485 and CANFD)
+# ============================================================================
+
+SELF_TEST_COMMAND_REGISTER = 0x0038
+SELF_TEST_DATA_REGISTER = 0x0039
+SELF_TEST_DATA_REGISTER_COUNT = 7  # 7 * 16 bits = 14 bytes (13 error + 1 result)
+
+SELF_TEST_STATE_IDLE = 0
+SELF_TEST_STATE_PROCESSING = 1
+SELF_TEST_STATE_SUCCESS = 2
+SELF_TEST_STATE_FAILED = 3
+
+
+def encode_self_test_command_register(command: int) -> int:
+    """Pack the self-test command byte into ``0x0038`` (high byte = command,
+    low byte = state; the state field is read-only from the master's side)."""
+    return (command & 0xFF) << 8
+
+
+def parse_self_test_state(register_value: int) -> int:
+    """Return the state byte contained in the low byte of ``0x0038``."""
+    return register_value & 0x00FF
+
+
+def parse_self_test_data_registers(
+    registers: list[int],
+) -> tuple[list[int], int]:
+    """Decode the 7 data registers into ``(error_code[13], result)``.
+
+    Modbus registers are big-endian: register N -> two bytes ``[hi, lo]``.
+    The 14-byte payload contains the 13 error bytes followed by the result.
+    """
+    if len(registers) < SELF_TEST_DATA_REGISTER_COUNT:
+        raise ValueError(
+            f"Self-test data must have {SELF_TEST_DATA_REGISTER_COUNT} "
+            f"registers, got {len(registers)}"
+        )
+    payload = bytearray()
+    for reg in registers[:SELF_TEST_DATA_REGISTER_COUNT]:
+        payload.append((reg >> 8) & 0xFF)
+        payload.append(reg & 0xFF)
+    error_codes = list(payload[:13])
+    result = payload[13]
+    return error_codes, result
