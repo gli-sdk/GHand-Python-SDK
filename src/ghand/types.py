@@ -159,8 +159,10 @@ class ZeroingError(enum.IntEnum):
 
     NONE = 0x00
     MOTOR_ABNORMAL = 0x01
-    FULL_STROKE_CHECK_FAILED = 0x02
-    ZEROING_TIMEOUT = 0x03
+    JOINT_STALL = 0x02
+    BRAKE_TIMEOUT = 0x03
+    GLOBAL_TIMEOUT = 0x04
+    COMMUNICATION_FAULT = 0x05
 
 
 class MotorCheckError(enum.IntEnum):
