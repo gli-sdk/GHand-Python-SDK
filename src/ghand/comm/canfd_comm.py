@@ -686,13 +686,13 @@ class CanfdComm(IComm):
 
     def _self_test_read_registers(self, address: int, count: int) -> list[int]:
         raw = self._transport.read_registers(
-            self._src_id, self._dst_id, address, count, func_code=0x03
+            self._src_id, self._slave_id, address, count, func_code=0x03
         )
         return list(struct.unpack(f">{count}H", raw[: count * 2]))
 
     def _self_test_write_register(self, address: int, value: int) -> None:
         self._transport.write_registers(
-            self._src_id, self._dst_id, address, struct.pack(">H", value)
+            self._src_id, self._slave_id, address, struct.pack(">H", value)
         )
 
     def get_self_test_error_info(self) -> SelfTestErrorInfo:
