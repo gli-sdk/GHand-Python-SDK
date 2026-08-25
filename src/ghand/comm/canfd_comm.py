@@ -578,43 +578,55 @@ class CanfdComm(IComm):
             self._src_id, self._slave_id, addr, count, func_code=0x04
         )
 
+    def _get_string_info(self, addr: int, count: int, parse) -> str:
+        try:
+            return parse(self._read_input_bytes(addr, count)) or "N/A"
+        except Exception:
+            return "N/A"
+
     def get_device_name(self) -> str:
-        return parse_device_name(self._read_input_bytes(REG_DEVICE_NAME, 8))
+        return self._get_string_info(REG_DEVICE_NAME, 8, parse_device_name)
 
     def get_hardware_version(self) -> str:
-        return parse_hardware_version(self._read_input_bytes(REG_HARDWARE_VERSION, 8))
+        return self._get_string_info(REG_HARDWARE_VERSION, 8, parse_hardware_version)
 
     def get_firmware_version(self) -> str:
-        return parse_firmware_version(self._read_input_bytes(REG_FIRMWARE_VERSION, 8))
+        return self._get_string_info(REG_FIRMWARE_VERSION, 8, parse_firmware_version)
 
     def get_serial_number(self) -> int:
         return parse_serial_number(self._read_input_bytes(REG_SERIAL_NUMBER, 8))
 
     def get_hand_type(self) -> int:
-        return parse_hand_type(self._read_input_bytes(REG_HAND_TYPE, 1))
-
-    def _get_packed_version(self, register: int) -> tuple:
         try:
-            return parse_packed_firmware_version(self._read_input_bytes(register, 1))
+            return parse_hand_type(self._read_input_bytes(REG_HAND_TYPE, 1))
         except Exception:
-            return (0, 0, 0)
+            return 0
 
-    def get_firmware_package_version(self) -> tuple:
+    def _get_packed_version(self, register: int) -> str:
+        try:
+            raw = self._read_input_bytes(register, 1)
+            if len(raw) < 2:
+                return "N/A"
+            return parse_packed_firmware_version(raw)
+        except Exception:
+            return "N/A"
+
+    def get_firmware_package_version(self) -> str:
         return self._get_packed_version(REG_IN_FIRMWARE_PACKAGE_VER)
 
-    def get_position_sensor_version(self) -> tuple:
+    def get_position_sensor_version(self) -> str:
         return self._get_packed_version(REG_IN_POSITION_SENSOR_VER)
 
-    def get_tactile_sensor_version(self) -> tuple:
+    def get_tactile_sensor_version(self) -> str:
         return self._get_packed_version(REG_IN_TACTILE_SENSOR_VER)
 
-    def get_motor_driver_version(self) -> tuple:
+    def get_motor_driver_version(self) -> str:
         return self._get_packed_version(REG_IN_MOTOR_DRV_VER)
 
-    def get_thumb_tactile_sensor_version(self) -> tuple:
+    def get_thumb_tactile_sensor_version(self) -> str:
         return self._get_packed_version(REG_IN_THUMB_TACTILE_SENSOR_VER)
 
-    def get_finger_tactile_sensor_version(self) -> tuple:
+    def get_finger_tactile_sensor_version(self) -> str:
         return self._get_packed_version(REG_IN_FINGER_TACTILE_SENSOR_VER)
 
     # ------------------------------------------------------------------

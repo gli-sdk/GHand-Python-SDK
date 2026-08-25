@@ -115,7 +115,7 @@ The SDK provides the following device version query APIs:
    hand.get_thumb_tactile_sensor_version()
    hand.get_finger_tactile_sensor_version()
 
-Component version APIs return ``(major, minor, patch)``. If a device does not expose a specific component version, the API returns ``(0, 0, 0)``.
+Component version APIs return a version string such as ``"2.5.13"``. If a device does not expose a specific component version, the API returns ``"N/A"``.
 
 **RS485/CANFD Baud-Rate Gears**
 

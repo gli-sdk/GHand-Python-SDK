@@ -234,21 +234,21 @@ class IComm(ABC):
         ...
 
     @abstractmethod
-    def get_firmware_package_version(self) -> tuple:
+    def get_firmware_package_version(self) -> str:
         """Retrieve the firmware package version.
 
         """
         ...
 
     @abstractmethod
-    def get_position_sensor_version(self) -> tuple:
+    def get_position_sensor_version(self) -> str:
         """Retrieve the position sensor version.
 
         """
         ...
 
     @abstractmethod
-    def get_tactile_sensor_version(self) -> tuple:
+    def get_tactile_sensor_version(self) -> str:
         """Retrieve the tactile MCU version.
 
         """
@@ -262,21 +262,21 @@ class IComm(ABC):
         ...
 
     @abstractmethod
-    def get_motor_driver_version(self) -> tuple:
+    def get_motor_driver_version(self) -> str:
         """Retrieve the motor driver version.
 
         """
         ...
 
     @abstractmethod
-    def get_thumb_tactile_sensor_version(self) -> tuple:
+    def get_thumb_tactile_sensor_version(self) -> str:
         """Retrieve the thumb tactile sensor version.
 
         """
         ...
 
     @abstractmethod
-    def get_finger_tactile_sensor_version(self) -> tuple:
+    def get_finger_tactile_sensor_version(self) -> str:
         """Retrieve the finger tactile sensor version.
 
         """

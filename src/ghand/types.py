@@ -170,7 +170,7 @@ class ErrorCode(DeviceCode):
 
 
 class HandType(enum.Enum):
-    UNKNOWN = "unknown"
+    NONE = "none"
     LEFT_HAND = "left_hand"
     RIGHT_HAND = "right_hand"
 

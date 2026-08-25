@@ -450,21 +450,32 @@ class EthercatComm(IComm):
 
     def get_device_name(self) -> str:
         """Retrieve the device name via SDO."""
-        return self._client.sdo_read(0x1008, 0x00).decode("utf-8").strip("\x00")
+        return self._read_string_sdo(0x1008, 0x00)
 
     def get_hardware_version(self) -> str:
         """Retrieve the hardware version via SDO."""
-        return self._client.sdo_read(0x1009, 0x00).decode("utf-8").strip("\x00")
+        return self._read_string_sdo(0x1009, 0x00)
 
     def get_firmware_version(self) -> str:
         """Retrieve the firmware version via SDO."""
-        return self._client.sdo_read(0x100A, 0x00).decode("utf-8").strip("\x00")
+        return self._read_string_sdo(0x100A, 0x00)
+
+    def _read_string_sdo(self, index: int, subindex: int) -> str:
+        try:
+            return (
+                self._client.sdo_read(index, subindex)
+                .decode("utf-8", errors="ignore")
+                .strip("\x00")
+                or "N/A"
+            )
+        except Exception:
+            return "N/A"
 
     def get_serial_number(self) -> int:
         """Retrieve the product serial number via SDO."""
         return int.from_bytes(self._client.sdo_read(0x1018, 0x04), byteorder="little")
 
-    def _read_packed_firmware_version(self, mcu_id: int) -> tuple:
+    def _read_packed_firmware_version(self, mcu_id: int) -> str:
         """Read a packed firmware version via SDO."""
         try:
             self._client.sdo_write(0x2007, 0x01, bytes([mcu_id]))
@@ -476,42 +487,42 @@ class EthercatComm(IComm):
             )
         except Exception:
             logger.info("Packed firmware version not available", exc_info=True)
-            return (0, 0, 0)
+            return "N/A"
 
         major = (version_high >> 5) & 0x07
         minor = version_high & 0x1F
         patch = (version_low >> 4) & 0x0F
-        return (major, minor, patch)
+        return f"{major}.{minor}.{patch}"
 
-    def get_firmware_package_version(self) -> tuple:
+    def get_firmware_package_version(self) -> str:
         """Retrieve the firmware package version via SDO."""
         return self._read_packed_firmware_version(0x05)
 
-    def get_position_sensor_version(self) -> tuple:
+    def get_position_sensor_version(self) -> str:
         """Retrieve the position sensor version via SDO."""
         return self._read_packed_firmware_version(0x02)
 
-    def get_tactile_sensor_version(self) -> tuple:
+    def get_tactile_sensor_version(self) -> str:
         """Retrieve the tactile MCU version via SDO."""
         return self._read_packed_firmware_version(0x03)
 
-    def get_motor_driver_version(self) -> tuple:
+    def get_motor_driver_version(self) -> str:
         """Retrieve the motor driver version via SDO.
 
         Writes the motor driver MCU id (0x04) to index 0x2007 sub-index 0x01,
         then reads version high/low from sub-indices 0x02/0x03 and parses the
         semantic version as (major, minor, patch).
 
-        Returns (0, 0, 0) if the motor driver version is not available, matching
+        Returns "N/A" if the motor driver version is not available, matching
         the behaviour of CANFD and RS485 transports.
         """
         return self._read_packed_firmware_version(0x04)
 
-    def get_thumb_tactile_sensor_version(self) -> tuple:
+    def get_thumb_tactile_sensor_version(self) -> str:
         """Retrieve the thumb tactile sensor version via SDO."""
         return self._read_packed_firmware_version(0x06)
 
-    def get_finger_tactile_sensor_version(self) -> tuple:
+    def get_finger_tactile_sensor_version(self) -> str:
         """Retrieve the finger tactile sensor version via SDO."""
         return self._read_packed_firmware_version(0x07)
 
@@ -521,7 +532,10 @@ class EthercatComm(IComm):
         Returns:
             0 for unknown, 1 for left hand, 2 for right hand.
         """
-        return int.from_bytes(self._client.sdo_read(0x2001, 0x00), byteorder="little")
+        try:
+            return int.from_bytes(self._client.sdo_read(0x2001, 0x00), byteorder="little")
+        except Exception:
+            return 0
 
     # ===== Self-test error query =====
 

@@ -210,16 +210,16 @@ def parse_firmware_version(raw_bytes: bytes) -> str:
     return raw_bytes.decode("utf-8", errors="ignore").strip("\x00")
 
 
-def parse_packed_firmware_version(raw_bytes: bytes) -> tuple[int, int, int]:
+def parse_packed_firmware_version(raw_bytes: bytes) -> str:
     """Parse one packed firmware-version register."""
     if len(raw_bytes) < 2:
-        return (0, 0, 0)
+        raise ValueError("packed firmware version requires at least 2 bytes")
     version_high = raw_bytes[0]
     version_low = raw_bytes[1]
     major = (version_high >> 5) & 0x07
     minor = version_high & 0x1F
     patch = (version_low >> 4) & 0x0F
-    return (major, minor, patch)
+    return f"{major}.{minor}.{patch}"
 
 
 def parse_serial_number(raw_bytes: bytes) -> int:
@@ -241,11 +241,13 @@ def parse_hand_info(raw: list[int]) -> HandState:
 
     Args:
         raw: List of uint16 register values.  raw[0] = state+error,
-             raw[1] = temperature.
+             raw[1] = signed int16 temperature.
     """
     state_byte = (raw[0] >> 8) & 0xFF
     error_byte = raw[0] & 0xFF
     temperature = raw[1]
+    if temperature >= 32768:
+        temperature -= 65536
     return HandState(
         state=_parse_state(state_byte),
         error=_parse_error_code(error_byte),
