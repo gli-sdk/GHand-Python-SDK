@@ -47,7 +47,6 @@ class EthercatClient:
     _WKC_WINDOW_SIZE = 100
     _WKC_WINDOW_MIN_SAMPLES = 30
     _MAX_INVALID_WKC_RATIO = 0.5
-    _MAX_PROCESS_DATA_AGE_SEC = 0.25
     # A single stale snapshot is still returned to callers when the current
     # cycle's WKC is bad, as long as the last valid frame is fresher than this.
     _PROCESS_DATA_TIMEOUT_SEC = 0.1
