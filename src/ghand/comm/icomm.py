@@ -306,6 +306,16 @@ class IComm(ABC):
 
         return SelfTestErrorInfo()
 
+    def get_self_test_status(self) -> int:
+        """Retrieve the self-test status byte.
+
+        Backends that expose a direct self-test status register should override
+        this method. Status values are: ``0`` idle, ``1`` processing,
+        ``2`` command processed successfully, ``3`` failed. The default ``0``
+        matches the idle/unknown status.
+        """
+        return 0
+
     # ===== Subscription =====
 
     @abstractmethod

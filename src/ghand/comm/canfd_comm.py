@@ -718,6 +718,10 @@ class CanfdComm(IComm):
             self._self_test_write_register,
         )
 
+    def get_self_test_status(self) -> int:
+        """Read the current self-test status from holding register 0x0038 low byte."""
+        return self._self_test_read_registers(0x0038, 1)[0] & 0x00FF
+
     # ------------------------------------------------------------------
     # Subscription (polling-based)
     # ------------------------------------------------------------------

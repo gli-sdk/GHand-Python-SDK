@@ -978,6 +978,20 @@ class GHand:
             raise RuntimeError("Device is not connected")
         return self._comm.get_self_test_error_info()
 
+    def get_self_test_status(self) -> int:
+        """Read the current self-test status from the device.
+
+        EtherCAT reads object ``0x2008:0x02``. CANFD and RS485 read the low
+        byte of holding register ``0x0038``.
+
+        Returns:
+            Status byte reported by the device: ``0`` idle, ``1`` processing,
+            ``2`` command processed successfully, ``3`` failed.
+        """
+        if not self.is_connected():
+            raise RuntimeError("Device is not connected")
+        return self._comm.get_self_test_status()
+
     def get_tactile_data(self) -> dict:
         """Retrieve tactile sensor data.
 

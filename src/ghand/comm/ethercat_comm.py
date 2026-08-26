@@ -606,6 +606,15 @@ class EthercatComm(IComm):
 
         return info
 
+    def get_self_test_status(self) -> int:
+        """Read the current self-test status from object dictionary 0x2008:0x02.
+
+        Status values: 0 idle, 1 processing, 2 command processed successfully,
+        3 failed.
+        """
+        raw = self._client.sdo_read(self._SELF_TEST_INDEX, self._SELF_TEST_SUB_STATE)
+        return raw[0] if raw else self._SELF_TEST_STATE_IDLE
+
     def _read_diagnostic_error_codes(self, command: int) -> list[int]:
         """Execute one 0x2008 read transaction and return the 13-byte error array.
 
