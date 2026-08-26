@@ -740,11 +740,11 @@ class GHand:
         """
         return self._comm.get_tactile_sensor_version()
 
-    def get_serial_number(self) -> int:
+    def get_serial_number(self) -> str:
         """Retrieve the product serial number.
 
         Returns:
-            Serial number.
+            Device ASCII serial string.
 
         Raises:
             RuntimeError: If communication fails.

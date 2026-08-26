@@ -255,7 +255,7 @@ class IComm(ABC):
         ...
 
     @abstractmethod
-    def get_serial_number(self) -> int:
+    def get_serial_number(self) -> str:
         """Retrieve the product serial number.
 
         """

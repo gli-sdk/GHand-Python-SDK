@@ -60,9 +60,9 @@ from .modbus_codec import (
     REG_IN_FIRMWARE_PACKAGE_VER,
     REG_IN_MOTOR_DRV_VER,
     REG_IN_POSITION_SENSOR_VER,
+    REG_IN_SERIAL_NUMBER,
     REG_IN_TACTILE_SENSOR_VER,
     REG_IN_THUMB_TACTILE_SENSOR_VER,
-    REG_SERIAL_NUMBER,
     REG_SLAVE_ID,
     build_tactile_info,
     encode_joint_command,
@@ -73,9 +73,9 @@ from .modbus_codec import (
     parse_hand_info,
     parse_hand_type,
     parse_hardware_version,
+    parse_ascii_serial_number,
     parse_packed_firmware_version,
     parse_joints,
-    parse_serial_number,
     parse_tactile_distributed,
     parse_tactile_resultant,
     parse_tactile_state_error,
@@ -574,9 +574,14 @@ class Rs485Comm(IComm):
         except Exception:
             return "N/A"
 
-    def get_serial_number(self) -> int:
+    def get_serial_number(self) -> str:
         """Retrieve the product serial number."""
-        return parse_serial_number(self._read_input_registers_bytes(REG_SERIAL_NUMBER, 8))
+        try:
+            return parse_ascii_serial_number(
+                self._read_input_registers_bytes(REG_IN_SERIAL_NUMBER, 10)
+            )
+        except Exception:
+            return "N/A"
 
     def get_hand_type(self) -> int:
         """Retrieve the hand type.

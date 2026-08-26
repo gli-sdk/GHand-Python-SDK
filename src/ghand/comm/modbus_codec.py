@@ -80,6 +80,7 @@ REG_IN_TACTILE_SENSOR_VER = 0x1187
 REG_IN_MOTOR_DRV_VER = 0x1188
 REG_IN_THUMB_TACTILE_SENSOR_VER = 0x1189
 REG_IN_FINGER_TACTILE_SENSOR_VER = 0x118A
+REG_IN_SERIAL_NUMBER = 0x119A
 
 
 # GHand5 keeps the original SDK mapping: input joint blocks follow JointId values.
@@ -225,6 +226,11 @@ def parse_packed_firmware_version(raw_bytes: bytes) -> str:
 def parse_serial_number(raw_bytes: bytes) -> int:
     """Parse serial number from 16 bytes (8 registers)."""
     return int.from_bytes(raw_bytes, byteorder="big")
+
+
+def parse_ascii_serial_number(raw_bytes: bytes) -> str:
+    """Parse the 19-byte ASCII product serial number."""
+    return raw_bytes[:19].decode("ascii", errors="ignore").strip("\x00")
 
 
 def parse_hand_type(raw_bytes: bytes) -> int:

@@ -471,9 +471,13 @@ class EthercatComm(IComm):
         except Exception:
             return "N/A"
 
-    def get_serial_number(self) -> int:
-        """Retrieve the product serial number via SDO."""
-        return int.from_bytes(self._client.sdo_read(0x1018, 0x04), byteorder="little")
+    def get_serial_number(self) -> str:
+        """Retrieve the 19-byte ASCII product serial number via SDO."""
+        try:
+            raw = self._client.sdo_read(0x200C, 0x01)
+            return raw[:19].decode("ascii", errors="ignore").strip("\x00")
+        except Exception:
+            return "N/A"
 
     def _read_packed_firmware_version(self, mcu_id: int) -> str:
         """Read a packed firmware version via SDO."""
