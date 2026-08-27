@@ -496,7 +496,7 @@ class EthercatComm(IComm):
         major = (version_high >> 5) & 0x07
         minor = version_high & 0x1F
         patch = (version_low >> 4) & 0x0F
-        return f"{major}.{minor}.{patch}"
+        return f"V{major}.{minor}.{patch}"
 
     def get_firmware_package_version(self) -> str:
         """Retrieve the firmware package version via SDO."""
