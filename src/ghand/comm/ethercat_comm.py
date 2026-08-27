@@ -60,6 +60,7 @@ class EthercatComm(IComm):
     """IComm implementation for EtherCAT."""
 
     _COMPAT_THUMB_TACTILE_COUNT = 28
+    _SDO_WRITE_SETTLE_SEC = 0.02
 
     def __init__(self, config: ProductConfig):
         self._client = EthercatClient()
@@ -394,6 +395,7 @@ class EthercatComm(IComm):
             True on success, False if the device rejected the command.
         """
         self._client.sdo_write(0x2004, 0x01, b'\x01')
+        time.sleep(self._SDO_WRITE_SETTLE_SEC)
         result = self._client.sdo_read(0x2004, 0x03)
         if result != b'\x00':
             logger.error("Device rejected open_tactile command")
@@ -407,6 +409,7 @@ class EthercatComm(IComm):
             True on success, False if the device rejected the command.
         """
         self._client.sdo_write(0x2004, 0x01, b'\x02')
+        time.sleep(self._SDO_WRITE_SETTLE_SEC)
         result = self._client.sdo_read(0x2004, 0x03)
         if result != b'\x00':
             logger.error("Device rejected close_tactile command")
@@ -420,6 +423,7 @@ class EthercatComm(IComm):
             True on success, False if the device rejected the command.
         """
         self._client.sdo_write(0x2004, 0x01, b'\x04')
+        time.sleep(self._SDO_WRITE_SETTLE_SEC)
         result = self._client.sdo_read(0x2004, 0x03)
         if result != b'\x00':
             logger.error("Device rejected zero_tactile command")
@@ -483,6 +487,7 @@ class EthercatComm(IComm):
         """Read a packed firmware version via SDO."""
         try:
             self._client.sdo_write(0x2007, 0x01, bytes([mcu_id]))
+            time.sleep(self._SDO_WRITE_SETTLE_SEC)
             version_high = int.from_bytes(
                 self._client.sdo_read(0x2007, 0x02), byteorder="little"
             )
@@ -626,6 +631,7 @@ class EthercatComm(IComm):
             self._SELF_TEST_SUB_COMMAND,
             bytes([command & 0xFF]),
         )
+        time.sleep(self._SDO_WRITE_SETTLE_SEC)
 
         # State 只用于判断事务是否结束(2 或 3 都算结束);
         # Result 不判断,只读取 error_code 数据。

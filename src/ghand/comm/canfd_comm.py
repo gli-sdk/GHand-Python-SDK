@@ -608,7 +608,7 @@ class CanfdComm(IComm):
     def _get_packed_version(self, register: int) -> str:
         try:
             raw = self._read_input_bytes(register, 1)
-            if len(raw) < 2:
+            if len(raw) < 2 or raw[:2] == b"\x00\x00":
                 return "N/A"
             return parse_packed_firmware_version(raw)
         except Exception:
