@@ -55,6 +55,7 @@ from .types import (
     ProductConfig,
     ProductType,
     RS485BaudRate,
+    SelfTestErrorInfo,
     State,
     TactileInfo,
     TactileSensorId,
@@ -107,7 +108,7 @@ class GHand:
         )
         self._has_tactile = self._product_config.has_tactile
         self._comm = self._create_comm(comm_type)
-        self._hand_type = HandType.UNKNOWN
+        self._hand_type = HandType.NONE
         self._firmware_version = ""
         self._opened = False
         self._tactile_opened = False
@@ -285,7 +286,7 @@ class GHand:
             mode: Current control mode.
         """
         original_torque = joint.torque
-        if mode ==CtrlMode.TORQUE:
+        if mode == CtrlMode.TORQUE:
             joint.torque = max(-100, min(100, joint.torque))
         else:
             joint.torque = min(100, abs(joint.torque))
@@ -569,6 +570,7 @@ class GHand:
 
         if connected:
             self._comm.stop()
+            time.sleep(1)
             self._comm.disconnect()
             logger.info("Disconnected from device")
         self._opened = False
@@ -705,36 +707,33 @@ class GHand:
         """
         return self._comm.get_hardware_version()
 
-    def get_firmware_package_version(self) -> tuple:
+    def get_firmware_package_version(self) -> str:
         """Retrieve the firmware package version.
 
         Returns:
-            Tuple of (major, minor, patch) version numbers.
-            (0, 0, 0) is returned if the version is not available.
+            Version string, or "N/A" if the version is not available.
 
         Raises:
             RuntimeError: If communication fails.
         """
         return self._comm.get_firmware_package_version()
 
-    def get_position_sensor_version(self) -> tuple:
+    def get_position_sensor_version(self) -> str:
         """Retrieve the position sensor version.
 
         Returns:
-            Tuple of (major, minor, patch) version numbers.
-            (0, 0, 0) is returned if the version is not available.
+            Version string, or "N/A" if the version is not available.
 
         Raises:
             RuntimeError: If communication fails.
         """
         return self._comm.get_position_sensor_version()
 
-    def get_tactile_sensor_version(self) -> tuple:
+    def get_tactile_sensor_version(self) -> str:
         """Retrieve the tactile MCU version.
 
         Returns:
-            Tuple of (major, minor, patch) version numbers.
-            (0, 0, 0) is returned if the version is not available.
+            Version string, or "N/A" if the version is not available.
 
         Raises:
             RuntimeError: If communication fails.
@@ -752,36 +751,33 @@ class GHand:
         """
         return self._comm.get_serial_number()
 
-    def get_motor_driver_version(self) -> tuple:
+    def get_motor_driver_version(self) -> str:
         """Retrieve the motor driver version.
 
         Returns:
-            Tuple of (major, minor, patch) version numbers.
-            (0, 0, 0) is returned if the version is not available.
+            Version string, or "N/A" if the version is not available.
 
         Raises:
             RuntimeError: If communication fails.
         """
         return self._comm.get_motor_driver_version()
 
-    def get_thumb_tactile_sensor_version(self) -> tuple:
+    def get_thumb_tactile_sensor_version(self) -> str:
         """Retrieve the thumb tactile sensor version.
 
         Returns:
-            Tuple of (major, minor, patch) version numbers.
-            (0, 0, 0) is returned if the version is not available.
+            Version string, or "N/A" if the version is not available.
 
         Raises:
             RuntimeError: If communication fails.
         """
         return self._comm.get_thumb_tactile_sensor_version()
 
-    def get_finger_tactile_sensor_version(self) -> tuple:
+    def get_finger_tactile_sensor_version(self) -> str:
         """Retrieve the finger tactile sensor version.
 
         Returns:
-            Tuple of (major, minor, patch) version numbers.
-            (0, 0, 0) is returned if the version is not available.
+            Version string, or "N/A" if the version is not available.
 
         Raises:
             RuntimeError: If communication fails.
@@ -874,12 +870,12 @@ class GHand:
         """Retrieve the hand type (left or right).
 
         Returns:
-            HandType.LEFT_HAND or HandType.RIGHT_HAND.
+            HandType.NONE, HandType.LEFT_HAND, or HandType.RIGHT_HAND.
 
         Raises:
             RuntimeError: If communication fails.
         """
-        if self._hand_type == HandType.UNKNOWN:
+        if self._hand_type == HandType.NONE:
             htype = self._comm.get_hand_type()
             if htype == 1:
                 self._hand_type = HandType.LEFT_HAND
@@ -966,6 +962,21 @@ class GHand:
             HandState instance.
         """
         return self._comm.get_hand_info()
+
+    def get_self_test_error_info(self) -> SelfTestErrorInfo:
+        """Read structured self-test error information from the device.
+
+        Reads only the already-latched self-test result stored on the device
+        (object dictionary ``0x2008``). This method does NOT trigger a manual
+        self-test (``0x01``) or manual zeroing (``0x02``).
+
+        Returns:
+            ``SelfTestErrorInfo`` populated only for the error categories
+            actually flagged by the A0 summary.
+        """
+        if not self.is_connected():
+            raise RuntimeError("Device is not connected")
+        return self._comm.get_self_test_error_info()
 
     def get_tactile_data(self) -> dict:
         """Retrieve tactile sensor data.

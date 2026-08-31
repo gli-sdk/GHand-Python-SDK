@@ -112,10 +112,10 @@ Refer to the version information table below:
 +-------------+------------------+--------------+
 |    doc      | GHand Firmware   |  GHand SDK   |
 +=============+==================+==============+
-|   v0.2.5    |      v2.5.11     |    v2.2.0    |
+|   v0.2.5    |      v2.5.13     |    v2.2.1    |
 +-------------+------------------+--------------+
 
-1. Released GHand Python SDK v2.2.0
+1. Released GHand Python SDK v2.2.1
 2. Added baud-rate gear configuration for RS485 and CANFD
 3. Added documented baud-rate gear mappings and connection-time gear selection
 4. Added firmware package, position sensor, tactile sensor, motor driver, thumb tactile sensor, and finger tactile sensor version query APIs

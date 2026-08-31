@@ -24,8 +24,12 @@ import threading
 import time
 from collections import deque
 
-import psutil
 import pysoem
+
+try:
+    import psutil
+except ImportError:
+    psutil = None
 
 
 logger = logging.getLogger("ghand.ethercat_client")
@@ -465,10 +469,19 @@ class EthercatClient:
             List of adapter IDs.
         """
         logger.info("Searching for network interfaces...")
-        ids = list(psutil.net_if_addrs().keys())
-        if platform.system() == 'Windows':
-            for i in range(len(ids)):
-                ids[i] = "\\Device\\NPF_" + ids[i]
+        ids = []
+        try:
+            ids = [adapter.name for adapter in pysoem.find_adapters()]
+        except Exception as e:
+            logger.warning("pysoem adapter discovery failed: %s", e)
+
+        if not ids and psutil is not None:
+            ids = list(psutil.net_if_addrs().keys())
+            if platform.system() == 'Windows':
+                for i in range(len(ids)):
+                    ids[i] = "\\Device\\NPF_" + ids[i]
+        elif not ids:
+            logger.warning("psutil is not installed; adapter fallback discovery is unavailable")
         logger.info("Found %s network interface(s)", len(ids))
         return ids
 

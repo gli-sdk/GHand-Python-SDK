@@ -13,7 +13,7 @@ You can obtain the GHand Python SDK in the following ways:
 .. code-block:: bash
 
    # Clone the repository
-   git clone -b v2.2.0 https://github.com/gli-sdk/GHand-Python-SDK
+   git clone -b v2.2.1 https://github.com/gli-sdk/GHand-Python-SDK
    cd GHand-Python-SDK
 
    # Install SDK
@@ -24,11 +24,11 @@ You can also install directly from Git:
 
 .. code-block:: bash
 
-   pip install "ghand_python_sdk @ git+https://github.com/gli-sdk/GHand-Python-SDK.git@v2.2.0"
+   pip install "ghand_python_sdk @ git+https://github.com/gli-sdk/GHand-Python-SDK.git@v2.2.1"
 
 **Current Version**
 
-- Latest version: v2.2.0
+- Latest version: v2.2.1
 - Python requirement: 3.10 or higher
 - Supported platforms: Windows 10/11, Linux Ubuntu 22.04/24.04 LTS (x86_64/aarch64), macOS 12+ (Intel/Apple Silicon)
 - RS485/CANFD default baud-rate gear: ``0x05``
@@ -115,7 +115,7 @@ The SDK provides the following device version query APIs:
    hand.get_thumb_tactile_sensor_version()
    hand.get_finger_tactile_sensor_version()
 
-Component version APIs return ``(major, minor, patch)``. If a device does not expose a specific component version, the API returns ``(0, 0, 0)``.
+Component version APIs return a version string such as ``"2.5.13"``. If a device does not expose a specific component version, the API returns ``"N/A"``.
 
 **RS485/CANFD Baud-Rate Gears**
 

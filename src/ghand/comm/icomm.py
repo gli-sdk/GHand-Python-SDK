@@ -234,21 +234,21 @@ class IComm(ABC):
         ...
 
     @abstractmethod
-    def get_firmware_package_version(self) -> tuple:
+    def get_firmware_package_version(self) -> str:
         """Retrieve the firmware package version.
 
         """
         ...
 
     @abstractmethod
-    def get_position_sensor_version(self) -> tuple:
+    def get_position_sensor_version(self) -> str:
         """Retrieve the position sensor version.
 
         """
         ...
 
     @abstractmethod
-    def get_tactile_sensor_version(self) -> tuple:
+    def get_tactile_sensor_version(self) -> str:
         """Retrieve the tactile MCU version.
 
         """
@@ -262,21 +262,21 @@ class IComm(ABC):
         ...
 
     @abstractmethod
-    def get_motor_driver_version(self) -> tuple:
+    def get_motor_driver_version(self) -> str:
         """Retrieve the motor driver version.
 
         """
         ...
 
     @abstractmethod
-    def get_thumb_tactile_sensor_version(self) -> tuple:
+    def get_thumb_tactile_sensor_version(self) -> str:
         """Retrieve the thumb tactile sensor version.
 
         """
         ...
 
     @abstractmethod
-    def get_finger_tactile_sensor_version(self) -> tuple:
+    def get_finger_tactile_sensor_version(self) -> str:
         """Retrieve the finger tactile sensor version.
 
         """
@@ -291,6 +291,20 @@ class IComm(ABC):
 
         """
         ...
+
+    def get_self_test_error_info(self):
+        """Retrieve structured self-test error information.
+
+        Default implementation returns an empty ``SelfTestErrorInfo``. Backends
+        that support the self-test error query (object dictionary 0x2008)
+        should override this method.
+
+        Returns:
+            SelfTestErrorInfo instance.
+        """
+        from ..types import SelfTestErrorInfo
+
+        return SelfTestErrorInfo()
 
     # ===== Subscription =====
 

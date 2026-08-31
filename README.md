@@ -1,6 +1,6 @@
 # GHand Python SDK
 
-[![Version](https://img.shields.io/badge/version-v2.2.0-blue.svg)](src/ghand/version.py)
+[![Version](https://img.shields.io/badge/version-v2.2.1-blue.svg)](src/ghand/version.py)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 
@@ -123,15 +123,12 @@ else:
 Additional device version APIs:
 
 ```python
-def format_version(version):
-    return "not available" if version == (0, 0, 0) else ".".join(map(str, version))
-
-print("Firmware package:", format_version(hand.get_firmware_package_version()))
-print("Position sensor:", format_version(hand.get_position_sensor_version()))
-print("Tactile MCU:", format_version(hand.get_tactile_sensor_version()))
-print("Motor driver:", format_version(hand.get_motor_driver_version()))
-print("Thumb tactile sensor:", format_version(hand.get_thumb_tactile_sensor_version()))
-print("Finger tactile sensor:", format_version(hand.get_finger_tactile_sensor_version()))
+print("Firmware package:", hand.get_firmware_package_version())
+print("Position sensor:", hand.get_position_sensor_version())
+print("Tactile MCU:", hand.get_tactile_sensor_version())
+print("Motor driver:", hand.get_motor_driver_version())
+print("Thumb tactile sensor:", hand.get_thumb_tactile_sensor_version())
+print("Finger tactile sensor:", hand.get_finger_tactile_sensor_version())
 ```
 
 Minimal CAN-FD example:

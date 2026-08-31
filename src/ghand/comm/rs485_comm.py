@@ -43,6 +43,7 @@ from ..types import (
     JointData,
     JointId,
     ProductConfig,
+    SelfTestErrorInfo,
     State,
     TactileInfo,
 )
@@ -80,6 +81,7 @@ from .modbus_codec import (
     parse_tactile_state_error,
     registers_to_bytes,
 )
+from .self_test_workflow import build_self_test_error_info
 
 # RS485 baud rate gear map per protocol documentation.
 # Writing a gear value to BAUDRATE_CONFIG_REGISTER selects the serial baud rate;
@@ -556,15 +558,21 @@ class Rs485Comm(IComm):
 
     def get_device_name(self) -> str:
         """Retrieve the device name."""
-        return parse_device_name(self._read_input_registers_bytes(REG_DEVICE_NAME, 8))
+        return self._get_string_info(REG_DEVICE_NAME, 8, parse_device_name)
 
     def get_hardware_version(self) -> str:
         """Retrieve the hardware version."""
-        return parse_hardware_version(self._read_input_registers_bytes(REG_HARDWARE_VERSION, 8))
+        return self._get_string_info(REG_HARDWARE_VERSION, 8, parse_hardware_version)
 
     def get_firmware_version(self) -> str:
         """Retrieve the firmware version."""
-        return parse_firmware_version(self._read_input_registers_bytes(REG_FIRMWARE_VERSION, 8))
+        return self._get_string_info(REG_FIRMWARE_VERSION, 8, parse_firmware_version)
+
+    def _get_string_info(self, register: int, count: int, parse) -> str:
+        try:
+            return parse(self._read_input_registers_bytes(register, count)) or "N/A"
+        except Exception:
+            return "N/A"
 
     def get_serial_number(self) -> int:
         """Retrieve the product serial number."""
@@ -576,37 +584,41 @@ class Rs485Comm(IComm):
         Returns:
             0 for unknown, 1 for left hand, 2 for right hand.
         """
-        return parse_hand_type(self._read_input_registers_bytes(REG_HAND_TYPE, 1))
-
-    def _get_packed_version(self, register: int) -> tuple:
         try:
-            return parse_packed_firmware_version(
-                self._read_input_registers_bytes(register, 1)
-            )
+            return parse_hand_type(self._read_input_registers_bytes(REG_HAND_TYPE, 1))
         except Exception:
-            return (0, 0, 0)
+            return 0
 
-    def get_firmware_package_version(self) -> tuple:
+    def _get_packed_version(self, register: int) -> str:
+        try:
+            raw = self._read_input_registers_bytes(register, 1)
+            if len(raw) < 2 or raw[:2] == b"\x00\x00":
+                return "N/A"
+            return parse_packed_firmware_version(raw)
+        except Exception:
+            return "N/A"
+
+    def get_firmware_package_version(self) -> str:
         """Retrieve the firmware package version."""
         return self._get_packed_version(REG_IN_FIRMWARE_PACKAGE_VER)
 
-    def get_position_sensor_version(self) -> tuple:
+    def get_position_sensor_version(self) -> str:
         """Retrieve the position sensor version."""
         return self._get_packed_version(REG_IN_POSITION_SENSOR_VER)
 
-    def get_tactile_sensor_version(self) -> tuple:
+    def get_tactile_sensor_version(self) -> str:
         """Retrieve the tactile MCU version."""
         return self._get_packed_version(REG_IN_TACTILE_SENSOR_VER)
 
-    def get_motor_driver_version(self) -> tuple:
+    def get_motor_driver_version(self) -> str:
         """Retrieve the motor driver version."""
         return self._get_packed_version(REG_IN_MOTOR_DRV_VER)
 
-    def get_thumb_tactile_sensor_version(self) -> tuple:
+    def get_thumb_tactile_sensor_version(self) -> str:
         """Retrieve the thumb tactile sensor version."""
         return self._get_packed_version(REG_IN_THUMB_TACTILE_SENSOR_VER)
 
-    def get_finger_tactile_sensor_version(self) -> tuple:
+    def get_finger_tactile_sensor_version(self) -> str:
         """Retrieve the finger tactile sensor version."""
         return self._get_packed_version(REG_IN_FINGER_TACTILE_SENSOR_VER)
 
@@ -672,6 +684,31 @@ class Rs485Comm(IComm):
             return False
         logger.info("Joint initialization completed")
         return True
+
+    # ===== Self-test error query =====
+
+    def _self_test_read_registers(self, address: int, count: int) -> list[int]:
+        result = self._read_holding_registers(address, count=count)
+        if result is None or result.isError():
+            raise RuntimeError(
+                f"RS485 self-test read failed at 0x{address:04X}"
+            )
+        return list(result.registers)
+
+    def _self_test_write_register(self, address: int, value: int) -> None:
+        result = self._write_register(address, value)
+        if result is None or result.isError():
+            raise RuntimeError(
+                f"RS485 self-test write failed at 0x{address:04X}"
+            )
+
+    def get_self_test_error_info(self) -> SelfTestErrorInfo:
+        """Query self-test error information via holding registers 0x0038~0x003F."""
+        return build_self_test_error_info(
+            self._config,
+            self._self_test_read_registers,
+            self._self_test_write_register,
+        )
 
     # ===== Subscription =====
 

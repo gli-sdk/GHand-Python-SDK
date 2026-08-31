@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-08-24
+
 ### Added
 - Support for Linux ARM64 (aarch64) architecture
 - Support for macOS (Intel x86_64 and Apple Silicon arm64)
