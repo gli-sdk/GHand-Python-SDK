@@ -117,21 +117,23 @@ The SDK provides the following device version query APIs:
 
 Component version APIs return a version string such as ``"2.5.13"``. If a device does not expose a specific component version, the API returns ``"N/A"``.
 
-**RS485/CANFD Baud-Rate Gears**
+**RS485/CANFD Baud-Rate Configuration**
 
-Use ``baudrate_gear`` when connecting to a device that has been configured to a non-default baud-rate gear:
-
-.. code-block:: python
-
-   hand.open("COM10", slave_id=0x31, baudrate_gear=0x03)
-
-Use ``set_baudrate_config()`` to write a new gear to the device:
+Use ``baud_rate`` when connecting to a device that has been configured to a non-default baud rate or CANFD bit timing:
 
 .. code-block:: python
 
-   hand.set_baudrate_config(0x03)
+   from ghand import RS485BaudRate
 
-The new gear is saved by the device and takes effect after the next power-up. After power cycling, pass the configured gear explicitly to ``open()``.
+   hand.open("COM10", slave_id=0x31, baud_rate=RS485BaudRate.BAUD_460800)
+
+Use ``set_baudrate_config()`` to write a new baud rate or bit timing to the device:
+
+.. code-block:: python
+
+   hand.set_baudrate_config(RS485BaudRate.BAUD_460800)
+
+The new configuration is saved by the device and takes effect after the next power-up. After power cycling, pass the configured enum explicitly to ``open()``.
 
 RS485 gear mapping:
 

@@ -373,8 +373,6 @@ class GHand:
         id: str = "auto",
         slave_id: int | None = None,
         baud_rate: BaudRateSelection | None = None,
-        *,
-        baudrate_gear: int | None = None,
     ) -> bool:
         """Open the device connection.
 
@@ -383,17 +381,12 @@ class GHand:
             slave_id: Optional RS485/CANFD slave ID override for this connection.
             baud_rate: Optional RS485 baud rate or CANFD bit timing profile.
                 Pass ``RS485BaudRate`` for RS485 and ``CANFDBitTiming`` for
-                CANFD. When omitted, the protocol default is used. The legacy
-                ``baudrate_gear`` keyword is accepted for compatibility but is
-                not recommended for new code.
+                CANFD. When omitted, the protocol default is used.
 
         Returns:
             True if the connection is established successfully.
         """
-        if baud_rate is not None and baudrate_gear is not None:
-            raise ValueError("Use either baud_rate or baudrate_gear, not both")
-        if baud_rate is not None:
-            baudrate_gear = self._baud_rate_to_gear(baud_rate)
+        baudrate_gear = self._baud_rate_to_gear(baud_rate)
 
         if slave_id is not None:
             self._product_config.slave_id = slave_id
