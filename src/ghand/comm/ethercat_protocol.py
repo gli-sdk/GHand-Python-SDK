@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from ..types import ErrorCode, JointId, ProductConfig, State
 
 # TPDO component byte sizes
-_HAND_TPDO_SIZE = struct.calcsize('<BBh')  # 4
+_HAND_TPDO_SIZE = struct.calcsize('<H6s6s6sh')  # 22
 _JOINT_TPDO_SIZE = struct.calcsize('<BBfbb')  # 8
 _TACTILE_STATE_SIZE = 2  # BB
 _TACTILE_RESULTANT_SIZE = 6  # resultant xyz (int16[3], low byte valid)
@@ -52,20 +52,25 @@ class HandTpdo:
     """Hand-level status fields within a TPDO frame."""
 
     state: int
-    error: int
+    error_warn: bytes
+    error_fault: bytes
+    error_critical: bytes
     temperature: int
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        expected_size = struct.calcsize('<BBh')
+        expected_size = struct.calcsize('<H6s6s6sh')
         if len(data) < expected_size:
-            return cls(0, 0, 0)
-        state, error, temperature = struct.unpack_from('<BBh', data, 0)
-        return cls(state, error, temperature)
+            return cls(0, b"\x00" * 6, b"\x00" * 6, b"\x00" * 6, 0)
+        state, error_warn, error_fault, error_critical, temperature = struct.unpack_from(
+            '<H6s6s6sh', data, 0
+        )
+        return cls(state & 0xFF, error_warn, error_fault, error_critical, temperature)
 
     def __str__(self):
         return (
-            f"HandTpdo(state={State(self.state)}, error={ErrorCode(self.error)}, "
+            f"HandTpdo(state={State(self.state)}, error_warn={self.error_warn!r}, "
+            f"error_fault={self.error_fault!r}, error_critical={self.error_critical!r}, "
             f"temperature={self.temperature})"
         )
 

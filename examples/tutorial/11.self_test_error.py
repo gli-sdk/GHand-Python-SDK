@@ -5,7 +5,7 @@ Run: python examples/tutorial/11.self_test_error.py
 
 
 from ghand import ProductType
-from ghand.ghand import CommType, ErrorCode, GHand
+from ghand.ghand import CommType, GHand
 from ghand.types import MotorCheckError, SelfTestError, TactileCheckError, ZeroingError
 
 
@@ -62,8 +62,8 @@ def main():
         return
 
     hand_info = hand.get_hand_info()
-    if hand_info.error != ErrorCode.SELF_TEST_ERROR:
-        print(f"No self-test error (device error={hand_info.error.name})")
+    if not (hand_info.error_critical[0] & 0x02):
+        print("No self-test error")
         hand.close()
         return
 

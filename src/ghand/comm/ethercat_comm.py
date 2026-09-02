@@ -357,7 +357,9 @@ class EthercatComm(IComm):
         hand_tpdo = HandTpdo.from_bytes(data)
         return HandState(
             state=self._parse_state(hand_tpdo.state),
-            error=self._parse_error_code(hand_tpdo.error),
+            error_warn=hand_tpdo.error_warn,
+            error_fault=hand_tpdo.error_fault,
+            error_critical=hand_tpdo.error_critical,
             temperature=hand_tpdo.temperature,
         )
 

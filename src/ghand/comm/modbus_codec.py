@@ -47,7 +47,7 @@ class ModbusRegisterProfile:
     control_layout: str
     mode_register: int | None = 0x0010
     stop_register: int | None = 0x0010
-    hand_info_address: int = 0x1021
+    hand_info_address: int = 0x1047
     tactile_state_address: int = 0x1080
     tactile_control_address: int = 0x002B
     tactile_resultant_register_count: int = 16
@@ -243,22 +243,31 @@ def parse_hand_type(raw_bytes: bytes) -> int:
 
 
 def parse_hand_info(raw: list[int]) -> HandState:
-    """Parse 2 input registers (0x1021~0x1022) into HandState.
+    """Parse 11 input registers (0x1047~0x1051) into HandState.
 
     Args:
-        raw: List of uint16 register values.  raw[0] = state+error,
-             raw[1] = signed int16 temperature.
+        raw: raw[0] = state in low byte, raw[1:4] = warn bitfield,
+             raw[4:7] = fault bitfield, raw[7:10] = critical bitfield,
+             raw[10] = signed int16 temperature in 0.1 degC units.
     """
-    state_byte = (raw[0] >> 8) & 0xFF
-    error_byte = raw[0] & 0xFF
-    temperature = raw[1]
+    state_byte = raw[0] & 0xFF
+    error_warn = _registers_to_bytes_low_high(raw[1:4]) if len(raw) >= 4 else b"\x00" * 6
+    error_fault = _registers_to_bytes_low_high(raw[4:7]) if len(raw) >= 7 else b"\x00" * 6
+    error_critical = _registers_to_bytes_low_high(raw[7:10]) if len(raw) >= 10 else b"\x00" * 6
+    temperature = raw[10] if len(raw) >= 11 else 0
     if temperature >= 32768:
         temperature -= 65536
     return HandState(
         state=_parse_state(state_byte),
-        error=_parse_error_code(error_byte),
+        error_warn=error_warn,
+        error_fault=error_fault,
+        error_critical=error_critical,
         temperature=temperature,
     )
+
+
+def _registers_to_bytes_low_high(raw: list[int]) -> bytes:
+    return bytes(byte for reg in raw for byte in (reg & 0xFF, (reg >> 8) & 0xFF))
 
 
 def _parse_state(value: int) -> State:

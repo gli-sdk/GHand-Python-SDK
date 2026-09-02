@@ -522,10 +522,10 @@ class CanfdComm(IComm):
             self._src_id,
             self._slave_id,
             self._profile.hand_info_address,
-            2,
+            11,
             func_code=0x04,
         )
-        raw = list(struct.unpack(">2H", raw_bytes[:4]))
+        raw = list(struct.unpack(">11H", raw_bytes[:22]))
         return parse_hand_info(raw)
 
     def get_tactile_data(self) -> dict:
@@ -807,7 +807,7 @@ class CanfdComm(IComm):
                     continue
                 start = min(self._profile.hand_info_address, joint_start)
                 end = max(
-                    self._profile.hand_info_address + 1,
+                    self._profile.hand_info_address + 10,
                     joint_start + joint_count - 1,
                 )
                 count = end - start + 1
@@ -816,7 +816,7 @@ class CanfdComm(IComm):
                 )
                 raw = list(struct.unpack(f">{count}H", raw_bytes[: count * 2]))
                 hand_offset = self._profile.hand_info_address - start
-                hand_state = parse_hand_info(raw[hand_offset:hand_offset + 2])
+                hand_state = parse_hand_info(raw[hand_offset:hand_offset + 11])
                 joints = parse_joints(
                     raw,
                     self._config.valid_joints,

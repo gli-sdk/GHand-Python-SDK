@@ -26,7 +26,7 @@ import time
 from typing import Dict
 
 from .ghand import GHand
-from .types import ErrorCode, GestureType, JointCommand, JointId, State
+from .types import GestureType, JointCommand, JointId, State
 
 logger = logging.getLogger("ghand.gestures")
 
@@ -227,7 +227,9 @@ def _wait_for_completion(
             last_error,
         )
         return False
-    if hand_info.state.is_abnormal or hand_info.error != ErrorCode.NORMAL:
+    if hand_info.state.is_abnormal or any(
+        hand_info.error_warn + hand_info.error_fault + hand_info.error_critical
+    ):
         logger.warning("Action completed with error state. Please clear fault and retry.")
         return False
     return True

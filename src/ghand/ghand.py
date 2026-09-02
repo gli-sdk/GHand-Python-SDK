@@ -631,7 +631,9 @@ class GHand:
         """Convert an EtherCAT Tpdo to a protocol-agnostic DeviceData."""
         hand = HandState(
             state=EthercatComm._parse_state(tpdo.hand.state),
-            error=EthercatComm._parse_error_code(tpdo.hand.error),
+            error_warn=tpdo.hand.error_warn,
+            error_fault=tpdo.hand.error_fault,
+            error_critical=tpdo.hand.error_critical,
             temperature=tpdo.hand.temperature,
         )
         joints = [
