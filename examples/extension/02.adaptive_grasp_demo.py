@@ -16,7 +16,7 @@ from ghand import (
     ProductType,
     configure_logging
 )
-configure_logging(level=logging.WARNING)
+configure_logging(level=logging.ERROR)
 
 def main() -> None:
     hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
