@@ -352,8 +352,12 @@ class CanfdTransport:
         time.sleep(0.05)
 
         # Function 0x44: apply parameters and open CAN0/CAN1.
+        self._set_zqwl_channel_enabled(True)
+
+    def _set_zqwl_channel_enabled(self, enabled: bool) -> None:
+        """Open or close the configured ZQWL CAN channel."""
         control = bytearray(16)
-        control[0] = 0x01
+        control[0] = 0x01 if enabled else 0x00
         if self._can_index == 0:
             control[2] = 0x01
         elif self._can_index == 1:
@@ -366,8 +370,14 @@ class CanfdTransport:
     def close(self, quiet: bool = False) -> bool:
         """Stop the channel and close the device."""
         if self._serial is not None:
-            self._serial.close()
-            self._serial = None
+            try:
+                self._set_zqwl_channel_enabled(False)
+            except Exception as exc:
+                if not quiet:
+                    logger.warning("Failed to stop ZQWL CANFD channel before close: %s", exc)
+            finally:
+                self._serial.close()
+                self._serial = None
             if not quiet:
                 logger.info("ZQWL CANFD serial channel closed")
             return True

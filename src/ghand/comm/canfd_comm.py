@@ -187,6 +187,57 @@ class CanfdComm(IComm):
             return CanfdTransport(channel=device_name)
         return CanfdTransport()
 
+    def prepare_baudrate_listener(
+        self,
+        device_name: str,
+        baudrate_gear: int | None = None,
+        quiet: bool = False,
+    ) -> bool:
+        """Open the ZQWL adapter at a CANFD baud rate without handshaking."""
+        self._wait_for_reopen_window()
+        if self._transport is None:
+            self._transport = self._create_transport(device_name)
+
+        gear = (
+            baudrate_gear
+            if baudrate_gear is not None
+            else self._DEFAULT_BAUDRATE_GEAR
+        )
+        pair = CANFD_BAUDRATE_GEAR_MAP.get(gear)
+        if pair is None:
+            if quiet:
+                logger.debug("Invalid CANFD baudrate gear: %s", baudrate_gear)
+            else:
+                logger.error("Invalid CANFD baudrate gear: %s", baudrate_gear)
+            self._cleanup_failed_connect()
+            return False
+
+        (abit_baud, abit_sample), (dbit_baud, dbit_sample) = pair
+        if not self._transport.open(
+            abit_baud=abit_baud,
+            dbit_baud=dbit_baud,
+            abit_sample=abit_sample,
+            dbit_sample=dbit_sample,
+            quiet=quiet,
+        ):
+            if quiet:
+                logger.debug("Failed to open CANFD listener at gear=0x%02X", gear)
+            else:
+                logger.error("Failed to open CANFD listener at gear=0x%02X", gear)
+            self._cleanup_failed_connect()
+            return False
+
+        logger.info(
+            "CANFD adapter listening (%s, gear=0x%02X, abit=%s/%s%%, dbit=%s/%s%%)",
+            device_name,
+            gear,
+            abit_baud,
+            abit_sample,
+            dbit_baud,
+            dbit_sample,
+        )
+        return True
+
     def connect(
         self,
         device_name: str,
@@ -362,7 +413,36 @@ class CanfdComm(IComm):
             self._src_id, self._slave_id, ack=0, func_code=0x05,
             start=1, end=1, toggle=0, seg_num=0,
         )
-        self._transport.send_frame(can_id, data)
+        if not self._transport.send_frame(can_id, data):
+            raise ConnectionError("Failed to send CANFD connection deletion frame")
+
+        deadline = time.time() + 0.5
+        while time.time() < deadline:
+            result = self._transport.recv_frame(timeout_ms=50)
+            if result is None:
+                continue
+
+            resp_id, resp_data = result
+            arb = unpack_arbitration(resp_id)
+            if (
+                arb["ack"] != 1
+                or arb["dst_id"] != self._src_id
+                or arb["src_id"] != self._slave_id
+            ):
+                continue
+
+            if arb["func_code"] == 0x85:
+                error_code = resp_data[0] if resp_data else 0xFF
+                raise RuntimeError(
+                    f"CANFD connection deletion failed: {error_code:#x}; "
+                    "please restart the device power"
+                )
+            if arb["func_code"] == 0x05:
+                return
+
+        raise TimeoutError(
+            "CANFD connection deletion response timeout; please restart the device power"
+        )
 
     def set_slave_id(self, slave_id: int) -> bool:
         """Write a new CANFD node/slave ID to holding register 0x0000."""

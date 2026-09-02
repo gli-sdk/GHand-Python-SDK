@@ -549,6 +549,48 @@ class GHand:
             self._set_last_result(SdkError.DEVICE_REJECTED, "device rejected baudrate configuration")
         return result
 
+    def prepare_canfd_baudrate_listener(
+        self,
+        id: str = "auto",
+        baud_rate: CANFDBitTiming | None = None,
+    ) -> bool:
+        """Open the CANFD adapter at a baud rate without connecting the hand.
+
+        This is useful after writing a new CANFD baud-rate configuration: keep
+        this listener open, power-cycle the hand, then call open() at the same
+        baud rate.
+        """
+        if self._comm_type != CommType.CANFD or not isinstance(self._comm, CanfdComm):
+            logger.error("prepare_canfd_baudrate_listener is only supported for CANFD")
+            self._set_last_result(
+                SdkError.NOT_SUPPORTED,
+                "prepare_canfd_baudrate_listener is only supported for CANFD",
+            )
+            return False
+
+        baudrate_gear = self._baud_rate_to_gear(baud_rate)
+
+        if id == "auto":
+            adapters = self._comm.search_adapters()
+            logger.info("Found IDs:\n\t%s", "\n\t".join(str(id) for id in adapters))
+            for adapter in adapters:
+                if self._comm.prepare_baudrate_listener(adapter, baudrate_gear):
+                    self._opened = True
+                    self._set_last_result(SdkError.OK)
+                    return True
+                logger.error("Failed to prepare CANFD listener (ID: %s)", adapter)
+            self._set_last_result(SdkError.TRANSPORT_ERROR, "failed to prepare CANFD listener")
+            return False
+
+        if not self._comm.prepare_baudrate_listener(id, baudrate_gear):
+            logger.error("Failed to prepare CANFD listener (ID: %s)", id)
+            self._set_last_result(SdkError.TRANSPORT_ERROR, f"failed to prepare CANFD listener {id}")
+            return False
+
+        self._opened = True
+        self._set_last_result(SdkError.OK)
+        return True
+
     def close(self) -> bool:
         """Close the device connection.
 

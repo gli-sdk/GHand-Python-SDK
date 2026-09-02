@@ -50,12 +50,20 @@ def main():
         hand.close()
         return
 
-    time.sleep(1)
     hand.close()
     print("Baud-rate configuration written successfully.")
-    print("Power-cycle the device, then reconnect with:")
-    print(f"  hand.open({device_id!r}, slave_id=0x{slave_id:02X}, "
-          f"baud_rate={type(target_baud_rate).__name__}.{target_baud_rate.name})")
+
+    print(f"Preparing CANFD adapter listener at {target_baud_rate.name}...")
+    if not hand.prepare_canfd_baudrate_listener(device_id, target_baud_rate):
+        print("Failed to prepare CANFD adapter listener")
+        return
+
+    input("Power-cycle the device now, then press Enter to reconnect...")
+    if hand.open(device_id, slave_id=slave_id, baud_rate=target_baud_rate):
+        print("Reconnected with the new baud-rate configuration.")
+    else:
+        print("Failed to reconnect with the new baud-rate configuration.")
+    hand.close()
 
 
 if __name__ == "__main__":
