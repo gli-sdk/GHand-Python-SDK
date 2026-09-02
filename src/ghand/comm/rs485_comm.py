@@ -303,7 +303,7 @@ class Rs485Comm(IComm):
                 bytesize=8,
                 parity="N",
                 stopbits=1,
-                timeout=0.5,
+                timeout=1.0,
             )
             if not self._client.connect():
                 if not quiet:

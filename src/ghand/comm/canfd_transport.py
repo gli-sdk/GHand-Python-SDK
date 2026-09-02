@@ -574,7 +574,7 @@ class CanfdTransport:
         dst_id: int,
         addr: int,
         data: bytes,
-        timeout_ms: int = 500,
+        timeout_ms: int = 5000,
     ) -> bool:
         """Write register data starting at *addr*.
 
