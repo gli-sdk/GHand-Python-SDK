@@ -505,7 +505,7 @@ class CanfdTransport:
         addr: int,
         count: int,
         func_code: int = 0x03,
-        timeout_ms: int = 500,
+        timeout_ms: int = 5000,
     ) -> bytes:
         """Read *count* registers starting at *addr*.
 
