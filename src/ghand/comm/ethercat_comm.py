@@ -32,7 +32,9 @@ from ..types import (
     HandState,
     JointCommand,
     JointData,
+    JointErrorCode,
     JointId,
+    JointState,
     MotorCheckError,
     MotorDiagnosticError,
     ProductConfig,
@@ -300,11 +302,13 @@ class EthercatComm(IComm):
             joints.append(
                 JointData(
                     id=joint_id,
+                    state=self._parse_joint_state(joint_tpdo.state),
+                    error=self._parse_joint_error_code(joint_tpdo.error),
+                    mode=joint_tpdo.mode,
+                    stop=joint_tpdo.stop,
                     angle=angle,
                     speed=joint_tpdo.speed,
-                    torque=joint_tpdo.torque,
-                    state=self._parse_state(joint_tpdo.state),
-                    error=self._parse_error_code(joint_tpdo.error),
+                    current=joint_tpdo.current,
                 )
             )
         return joints
@@ -322,12 +326,12 @@ class EthercatComm(IComm):
             joints.append(
                 JointData(
                     id=joint_id,
+                    state=self._parse_joint_state(state),
+                    error=self._parse_joint_error_code(error),
                     angle=angle_raw / 10.0,
                     speed=speed,
-                    torque=torque,
-                    state=self._parse_state(state),
-                    error=self._parse_error_code(error),
-                )
+                    current=torque,
+                    )
             )
             offset += 6
         return joints
@@ -345,6 +349,20 @@ class EthercatComm(IComm):
             return ErrorCode(value)
         except ValueError:
             return ErrorCode.UNKNOWN_ERROR
+
+    @staticmethod
+    def _parse_joint_state(value: int) -> JointState:
+        try:
+            return JointState(value)
+        except ValueError:
+            return JointState.UNKNOWN_STATE
+
+    @staticmethod
+    def _parse_joint_error_code(value: int) -> JointErrorCode:
+        try:
+            return JointErrorCode(value)
+        except ValueError:
+            return JointErrorCode.UNKNOWN_ERROR
 
     def get_hand_info(self) -> HandState:
         """Retrieve high-level hand status from TPDO.

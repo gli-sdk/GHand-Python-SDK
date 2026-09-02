@@ -94,7 +94,7 @@ def main():
             print(
                 f"  {JointId(joint.id).name:<15}"
                 f"angle: {joint.angle:.2f} deg, "
-                f"speed: {joint.speed}, torque: {joint.torque}"
+                f"speed: {joint.speed}, current: {joint.current}"
             )
 
     # Step 7: Close all connections

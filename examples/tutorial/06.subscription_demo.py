@@ -21,7 +21,7 @@ def data_callback(data):
     for joint in data.joints:
         print(
             f"  {JointId(joint.id).name}: angle={joint.angle:.1f}deg, "
-            f"speed={joint.speed}, torque={joint.torque}, "
+            f"speed={joint.speed}, current={joint.current}, "
             f"state={joint.state}, error={joint.error}"
         )
     if data.tactile:

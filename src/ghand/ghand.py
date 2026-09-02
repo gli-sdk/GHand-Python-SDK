@@ -51,7 +51,9 @@ from .types import (
     HandType,
     JointCommand,
     JointData,
+    JointErrorCode,
     JointId,
+    JointState,
     ProductConfig,
     ProductType,
     RS485BaudRate,
@@ -639,11 +641,13 @@ class GHand:
         joints = [
             JointData(
                 id=jid.value,
-                state=EthercatComm._parse_state(jtpdo.state),
-                error=EthercatComm._parse_error_code(jtpdo.error),
+                state=JointState(jtpdo.state),
+                error=JointErrorCode(jtpdo.error),
+                mode=jtpdo.mode,
+                stop=jtpdo.stop,
                 angle=jtpdo.angle,
                 speed=jtpdo.speed,
-                torque=jtpdo.torque,
+                current=jtpdo.current,
             )
             for jid, jtpdo in tpdo.joints.items()
         ]

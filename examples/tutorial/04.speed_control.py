@@ -59,7 +59,7 @@ def main():
                         print(f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\t"
                               f"error:{joint.error:<30},\t"
                               f"angle: {joint.angle:.2f}deg,\t"
-                              f"speed: {joint.speed},\ttorque: {joint.torque}")
+                              f"speed: {joint.speed},\tcurrent: {joint.current}")
             else:
                 print("Failed to send speed command")
                 break
@@ -91,7 +91,7 @@ def main():
                         print(f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\t"
                               f"error:{joint.error:<30},\t"
                               f"angle: {joint.angle:.2f}deg,\t"
-                              f"speed: {joint.speed},\ttorque: {joint.torque}")
+                              f"speed: {joint.speed},\tcurrent: {joint.current}")
             else:
                 print("Failed to send speed command")
                 break

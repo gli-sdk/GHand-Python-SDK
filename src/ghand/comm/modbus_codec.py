@@ -29,7 +29,9 @@ from ..types import (
     ErrorCode,
     HandState,
     JointData,
+    JointErrorCode,
     JointId,
+    JointState,
     ProductType,
     State,
     TactileInfo,
@@ -83,9 +85,9 @@ REG_IN_FINGER_TACTILE_SENSOR_VER = 0x118A
 REG_IN_SERIAL_NUMBER = 0x119A
 
 
-# GHand5 keeps the original SDK mapping: input joint blocks follow JointId values.
+# GHand5 joint input blocks follow JointId values, 5 registers per joint.
 GHAND5_JOINT_INPUT_REG_MAP = {
-    joint_id: 0x1023 + joint_id.value * 3 for joint_id in JointId
+    joint_id: 0x1023 + joint_id.value * 5 for joint_id in JointId
 }
 
 # Mapping from controlled GHand5 joint ID to holding-register base address.
@@ -284,41 +286,82 @@ def _parse_error_code(value: int) -> ErrorCode:
         return ErrorCode.UNKNOWN_ERROR
 
 
-def parse_joint_data(raw: list[int], offset: int, joint_id: int) -> JointData:
-    """Parse 3 input registers into JointData.
+def _parse_joint_state(value: int) -> JointState:
+    try:
+        return JointState(value)
+    except ValueError:
+        return JointState.UNKNOWN_STATE
 
-    Layout (big-endian device bytes):
-        Register N:   [state uint8][error uint8]
-        Register N+1: [angle high][angle low]  -> int16, divide by 10
-        Register N+2: [speed int8][torque int8]
+
+def _parse_joint_error_code(value: int) -> JointErrorCode:
+    try:
+        return JointErrorCode(value)
+    except ValueError:
+        return JointErrorCode.UNKNOWN_ERROR
+
+
+def parse_joint_data(raw: list[int], offset: int, joint_id: int) -> JointData:
+    """Parse 5 input registers into JointData.
+
+    Layout:
+        Register N:   [error uint8][state uint8]
+        Register N+1: [reserved uint8][mode uint8]
+        Register N+2: angle int16, unit 0.01 deg
+        Register N+3: speed int16, unit 1%
+        Register N+4: current int16, unit 1%
 
     Args:
         raw: List of uint16 register values.
         offset: Starting index in *raw* for this joint.
         joint_id: Numeric joint identifier.
     """
+    status_byte = raw[offset] & 0xFF
+    error_byte = (raw[offset] >> 8) & 0xFF
+    mode = raw[offset + 1] & 0xFF
+    angle_raw = raw[offset + 2]
+    if angle_raw >= 32768:
+        angle_raw -= 65536
+    angle = angle_raw / 100.0
+
+    speed = raw[offset + 3]
+    if speed >= 32768:
+        speed -= 65536
+
+    current = raw[offset + 4]
+    if current >= 32768:
+        current -= 65536
+
+    return JointData(
+        id=joint_id,
+        state=_parse_joint_state(status_byte),
+        error=_parse_joint_error_code(error_byte),
+        mode=mode,
+        angle=angle,
+        speed=speed,
+        current=current,
+    )
+
+
+def parse_lite1_joint_data(raw: list[int], offset: int, joint_id: int) -> JointData:
+    """Parse the legacy GHandLite1 3-register joint input layout."""
     status_byte = (raw[offset] >> 8) & 0xFF
     error_byte = raw[offset] & 0xFF
     angle_raw = raw[offset + 1]
     if angle_raw >= 32768:
         angle_raw -= 65536
-    angle = angle_raw / 10.0
-
     speed = (raw[offset + 2] >> 8) & 0xFF
     if speed >= 128:
         speed -= 256
-
     torque = raw[offset + 2] & 0xFF
     if torque >= 128:
         torque -= 256
-
     return JointData(
         id=joint_id,
-        state=_parse_state(status_byte),
-        error=_parse_error_code(error_byte),
-        angle=angle,
+        state=_parse_joint_state(status_byte),
+        error=_parse_joint_error_code(error_byte),
+        angle=angle_raw / 10.0,
         speed=speed,
-        torque=torque,
+        current=torque,
     )
 
 
@@ -340,9 +383,13 @@ def parse_joints(
         if address is None:
             continue
         offset = address - start_address
-        if offset + 2 >= len(raw):
+        width = 3 if profile is GHAND_LITE1_MODBUS_PROFILE else 5
+        if offset + width - 1 >= len(raw):
             continue
-        joints.append(parse_joint_data(raw, offset, joint_id.value))
+        if width == 3:
+            joints.append(parse_lite1_joint_data(raw, offset, joint_id.value))
+        else:
+            joints.append(parse_joint_data(raw, offset, joint_id.value))
     return joints
 
 

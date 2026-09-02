@@ -23,7 +23,7 @@ from ..types import ErrorCode, JointId, ProductConfig, State
 
 # TPDO component byte sizes
 _HAND_TPDO_SIZE = struct.calcsize('<H6s6s6sh')  # 22
-_JOINT_TPDO_SIZE = struct.calcsize('<BBfbb')  # 8
+_JOINT_TPDO_SIZE = struct.calcsize('<BBBBhhh')  # 10
 _TACTILE_STATE_SIZE = 2  # BB
 _TACTILE_RESULTANT_SIZE = 6  # resultant xyz (int16[3], low byte valid)
 _TACTILE_SAMPLE_PER_GROUP = 3  # xyz per sample group
@@ -81,23 +81,28 @@ class JointTpdo:
 
     state: int
     error: int
+    mode: int
+    stop: int
     angle: float
     speed: int
-    torque: int
+    current: int
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        expected_size = struct.calcsize('<BBfbb')
+        expected_size = struct.calcsize('<BBBBhhh')
         if len(data) < expected_size:
-            return cls(0, 0, 0.0, 0, 0)
-        state, error, angle, speed, torque = struct.unpack_from('<BBfbb', data, 0)
-        return cls(state, error, math.degrees(angle), speed, torque)
+            return cls(0, 0, 0, 0, 0.0, 0, 0)
+        state, error, mode, stop, angle_raw, speed, current = struct.unpack_from(
+            '<BBBBhhh', data, 0
+        )
+        angle = math.degrees(angle_raw / 100.0)
+        return cls(state, error, mode, stop, angle, speed, current)
 
     def __str__(self):
         return (
             f"JointTpdo(state={State(self.state)}, error={ErrorCode(self.error)}, "
-            f"angle={self.angle:.3f}, speed={self.speed}, "
-            f"torque={self.torque})"
+            f"mode={self.mode}, stop={self.stop}, angle={self.angle:.3f}, "
+            f"speed={self.speed}, current={self.current})"
         )
 
 
@@ -158,12 +163,12 @@ class Tpdo:
     """Full TPDO (Transmit Process Data Object) frame."""
 
     def __init__(self, config: ProductConfig):
-        self.hand = HandTpdo(0, 0, 0)
+        self.hand = HandTpdo(0, b"\x00" * 6, b"\x00" * 6, b"\x00" * 6, 0)
         self.joints: dict[JointId, JointTpdo] = {}
         self.tactile_state = TactileSensorState()
 
         for jid in config.valid_joints:
-            joint = JointTpdo(0, 0, 0.0, 0, 0)
+            joint = JointTpdo(0, 0, 0, 0, 0.0, 0, 0)
             self.joints[jid] = joint
             setattr(self, jid.name.lower(), joint)
 

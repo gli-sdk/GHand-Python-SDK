@@ -136,7 +136,7 @@ class SensorClient:
                 error=joint_data.error,
                 angle=joint_data.angle,
                 speed=joint_data.speed,
-                torque=joint_data.torque,
+                current=joint_data.current,
             )
             for joint_data in getattr(data, "joints", ())
         ]

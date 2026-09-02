@@ -169,6 +169,50 @@ class ErrorCode(DeviceCode):
         return _unknown_member(cls, cls.UNKNOWN_ERROR, value)
 
 
+class JointState(DeviceCode):
+    DISABLED = 0
+    RUNNING = 1
+    STOPPED = 2
+    FAULT = 3
+    UNKNOWN_STATE = 255
+
+    @classmethod
+    def _missing_(cls, value):
+        """Map any undefined joint state to UNKNOWN_STATE, keeping the raw value."""
+        return _unknown_member(cls, cls.UNKNOWN_STATE, value)
+
+    @property
+    def is_abnormal(self) -> bool:
+        """True for fault or any undefined joint state."""
+        return self not in (
+            JointState.DISABLED,
+            JointState.RUNNING,
+            JointState.STOPPED,
+        )
+
+
+class JointErrorCode(DeviceCode):
+    NORMAL = 0
+    MOTOR_HARDWARE_OVERCURRENT = 1
+    MOTOR_CONTINUOUS_CURRENT_HIGH = 2
+    MOTOR_BUS_OVERCURRENT = 3
+    MOTOR_HARDWARE_OVERVOLTAGE = 4
+    MOTOR_HARDWARE_UNDERVOLTAGE = 5
+    MOTOR_PHASE_LOSS = 6
+    MOTOR_STALLED = 7
+    MOTOR_CHIP_OVERTEMPERATURE = 8
+    COMMUNICATION_LOST = 9
+    MOTOR_SOFTWARE_OVERVOLTAGE = 10
+    MOTOR_SOFTWARE_UNDERVOLTAGE = 11
+    MOTOR_OVERTEMPERATURE = 12
+    UNKNOWN_ERROR = 255
+
+    @classmethod
+    def _missing_(cls, value):
+        """Map undefined joint error codes to UNKNOWN_ERROR, keeping the raw value."""
+        return _unknown_member(cls, cls.UNKNOWN_ERROR, value)
+
+
 class HandType(enum.Enum):
     NONE = "none"
     LEFT_HAND = "left_hand"
@@ -379,11 +423,13 @@ class JointData:
     """Single joint state received from the device."""
 
     id: int = JointId.THUMB_IP
-    state: State = State.STOPPED
-    error: ErrorCode = ErrorCode.NORMAL
+    state: JointState = JointState.DISABLED
+    error: JointErrorCode = JointErrorCode.NORMAL
+    mode: int = 0
+    stop: int = 0
     angle: float = 0.0  # degrees
     speed: int = 0
-    torque: int = 0
+    current: int = 0
 
 
 @dataclass
