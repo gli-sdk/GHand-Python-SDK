@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 # Copyright 2026 GLITech
@@ -231,7 +231,7 @@ class GHand:
             limit: Tuple of (min, max) in degrees.
             mode: Current control mode.
         """
-        if mode == CtrlMode.SPEED or mode == CtrlMode.TORQUE:
+        if mode == CtrlMode.SPEED or mode == CtrlMode.CURRENT:
             logger.warning(
                 "[Joint] ID: %s angle input is invalid in %s mode and will be ignored",
                 JointId(joint.id).name, mode.name,
@@ -257,11 +257,11 @@ class GHand:
 
         Args:
             joint: Joint to check and modify in place.
-            mode: Current control mode.
+            mode: current control mode.
         """
-        if mode == CtrlMode.TORQUE:
+        if mode == CtrlMode.CURRENT:
             logger.warning(
-                "[Joint] ID: %s speed input is invalid in torque mode and will be ignored",
+                "[Joint] ID: %s speed input is invalid in current mode and will be ignored",
                 JointId(joint.id).name,
             )
         original_speed = joint.speed
@@ -270,7 +270,7 @@ class GHand:
         else:
             joint.speed = min(100, abs(joint.speed))
 
-        if joint.speed != original_speed and mode != CtrlMode.TORQUE:
+        if joint.speed != original_speed and mode != CtrlMode.CURRENT:
             logger.warning(
                 "[Joint] ID: %s speed %s adjusted to %s in %s mode",
                 JointId(joint.id).name,
@@ -280,25 +280,25 @@ class GHand:
             )
 
     @staticmethod
-    def _check_torque_limit(joint: JointCommand, mode: CtrlMode):
-        """Validate and clamp joint torque based on the control mode.
+    def _check_current_limit(joint: JointCommand, mode: CtrlMode):
+        """Validate and clamp joint current based on the control mode.
 
         Args:
             joint: Joint to check and modify in place.
-            mode: Current control mode.
+            mode: current control mode.
         """
-        original_torque = joint.torque
-        if mode == CtrlMode.TORQUE:
-            joint.torque = max(-100, min(100, joint.torque))
+        original_current = joint.current
+        if mode == CtrlMode.CURRENT:
+            joint.current = max(-100, min(100, joint.current))
         else:
-            joint.torque = min(100, abs(joint.torque))
+            joint.current = min(100, abs(joint.current))
 
-        if joint.torque != original_torque:
+        if joint.current != original_current:
             logger.warning(
-                "[Joint] ID: %s torque %s adjusted to %s in %s mode",
+                "[Joint] ID: %s current %s adjusted to %s in %s mode",
                 JointId(joint.id).name,
-                original_torque,
-                joint.torque,
+                original_current,
+                joint.current,
                 mode.name,
             )
 
@@ -507,7 +507,7 @@ class GHand:
         self,
         baud_rate: BaudRateSelection,
     ) -> bool:
-        """Set the RS485 baud rate or CANFD bit timing (register 0x002C).
+        """Set the RS485 baud rate or CANFD bit timing (register 0x0004).
 
         The protocol gear mapped from the enum is stored in Flash and takes
         effect after the next power-up.
@@ -911,12 +911,16 @@ class GHand:
             # Create a copy so the caller's original object is not mutated.
             joint_cmd = JointCommand(
                 id=int(joint.id),
+                mode=getattr(joint, "mode", mode),
+                stop=joint.stop,
                 angle=joint.angle,
                 speed=joint.speed,
-                torque=joint.torque,
+                current=joint.current,
+                kp=joint.kp,
+                kd=joint.kd,
             )
             self._check_speed_limit(joint_cmd, mode)
-            self._check_torque_limit(joint_cmd, mode)
+            self._check_current_limit(joint_cmd, mode)
             if joint.id in self._joint_limits:
                 self._check_joint_limit(joint_cmd, self._joint_limits[joint.id], mode)
             active_joints.append(joint_cmd)
@@ -1118,17 +1122,17 @@ class GHand:
 
     @staticmethod
     def _angles_to_joints(
-        angles: Any, speed: int = 100, torque: int = 100
+        angles: Any, speed: int = 100, current: int = 100
     ) -> list[JointCommand]:
         """Convert a numpy array to a list of JointCommand objects.
 
         Args:
             angles: 18-element numpy array of joint angles in degrees.
             speed: Speed percentage applied to all joints. Defaults to 100.
-            torque: Torque percentage applied to all joints. Defaults to 100.
+            current: Current percentage applied to all joints. Defaults to 100.
 
         Returns:
             List of 18 JointCommand objects.
         """
 
-        return nparray_to_joints(angles, speed, torque)
+        return nparray_to_joints(angles, speed, current)

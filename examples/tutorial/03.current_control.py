@@ -17,11 +17,11 @@ def main():
             print("Connection failed")
             return
 
-        print("\n=== Torque Control Mode Demo ===")
-        print("This demo controls finger joints using torque mode")
-        print("Torque values control the force applied by each joint\n")
+        print("\n=== current control Mode Demo ===")
+        print("This demo controls finger joints using current mode")
+        print("Current values control the force applied by each joint\n")
 
-        # Torque control cycle
+        # current control cycle
         cycle_count = 0
         max_cycles = 0  # Set to 0 for infinite loop
 
@@ -30,10 +30,10 @@ def main():
             if max_cycles > 0 and cycle_count > max_cycles:
                 break
 
-            print(f"\n--- Cycle {cycle_count}: Torque control started ---")
+            print(f"\n--- Cycle {cycle_count}: current control started ---")
 
-            # Step 1: Apply torque to close fingers
-            print("\nStep 1: Applying torque to close fingers (torque=10)")
+            # Step 1: Apply current to close fingers
+            print("\nStep 1: Applying current to close fingers (current=10)")
             joints = []
             for joint_id in [
                     JointId.THUMB_MCP,
@@ -47,9 +47,9 @@ def main():
                     JointId.LF_PIP,
                     JointId.LF_MCP,
             ]:
-                joints.append(JointCommand(id=joint_id, torque=10))
+                joints.append(JointCommand(id=joint_id, current=10))
 
-            result = hand.move_joints(joints, mode=CtrlMode.TORQUE)
+            result = hand.move_joints(joints, mode=CtrlMode.CURRENT)
             if result:
                 time.sleep(2)
                 current_joints = hand.get_joints()
@@ -61,11 +61,11 @@ def main():
                               f"angle: {joint.angle:.2f}deg,\t"
                               f"speed: {joint.speed},\tcurrent: {joint.current}")
             else:
-                print("Failed to send torque command")
+                print("Failed to send current command")
                 break
 
-            # Step 2: Release grip (zero torque)
-            print("\nStep 2: Opening fingers (torque=-10)")
+            # Step 2: Release grip (zero current)
+            print("\nStep 2: Opening fingers (current=-10)")
             joints = []
             for joint_id in [
                     JointId.THUMB_MCP,
@@ -79,9 +79,9 @@ def main():
                     JointId.LF_PIP,
                     JointId.LF_MCP,
             ]:
-                joints.append(JointCommand(id=joint_id, torque=-10))
+                joints.append(JointCommand(id=joint_id, current=-10))
 
-            result = hand.move_joints(joints, mode=CtrlMode.TORQUE)
+            result = hand.move_joints(joints, mode=CtrlMode.CURRENT)
             if result:
                 time.sleep(2)
                 current_joints = hand.get_joints()
@@ -93,10 +93,10 @@ def main():
                               f"angle: {joint.angle:.2f}deg,\t"
                               f"speed: {joint.speed},\tcurrent: {joint.current}")
             else:
-                print("Failed to send torque command")
+                print("Failed to send current command")
                 break
 
-            print(f"\n--- Cycle {cycle_count}: Torque control completed ---")
+            print(f"\n--- Cycle {cycle_count}: current control completed ---")
             if max_cycles == 0:
                 print("Press Ctrl+C to stop the demo and exit\n")
 

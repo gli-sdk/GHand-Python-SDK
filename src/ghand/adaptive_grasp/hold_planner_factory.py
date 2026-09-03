@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 from dataclasses import dataclass
@@ -77,7 +77,7 @@ class HoldPlannerFactory:
             active_joint_ids=active_joint_ids,
             contact_joint_angles=contact_snapshot.joint_angles,
             hold_speed=self._resolve_stiff_position_hold_speed(profile),
-            hold_torque=self._resolve_stiff_position_hold_torque(profile),
+            hold_current=self._resolve_stiff_position_hold_current(profile),
             default_target_force_n=self._resolve_stiff_position_target_force(
                 profile),
             stiff_position_force_drop_ratio=(
@@ -93,14 +93,14 @@ class HoldPlannerFactory:
             return profile.stiff_position_hold_speed
         return self.config.stiff_position_hold_speed
 
-    def _resolve_stiff_position_hold_torque(
+    def _resolve_stiff_position_hold_current(
         self,
         profile: Optional[ObjectProfile],
     ) -> int:
         if (profile is not None
-                and profile.stiff_position_hold_torque is not None):
-            return profile.stiff_position_hold_torque
-        return self.config.stiff_position_hold_torque
+                and profile.stiff_position_hold_current is not None):
+            return profile.stiff_position_hold_current
+        return self.config.stiff_position_hold_current
 
     def _resolve_stiff_position_target_force(
         self,

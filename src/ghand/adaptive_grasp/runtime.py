@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 from dataclasses import dataclass
@@ -34,7 +34,7 @@ class _HoldStepSensor(Protocol):
 class AdaptiveGraspRuntime:
     state: GraspState = GraspState.IDLE
     running: bool = False
-    current_torque: int = 0
+    current_current: int = 0
     object_profile: Optional[Any] = None
     adaptive_hold_started_at: Optional[float] = None
     last_contact_snapshot: Optional[Any] = None
@@ -49,7 +49,7 @@ class AdaptiveGraspRuntime:
     def reset_for_grasp(self) -> None:
         self.running = True
         self.state = GraspState.IDLE
-        self.current_torque = 0
+        self.current_current = 0
         self.object_profile = None
         self.adaptive_hold_started_at = None
         self.last_contact_snapshot = None
@@ -82,8 +82,8 @@ class AdaptiveGraspRuntime:
         self.last_tactile_analysis = step.tactile_analysis
         self.last_safety_report = step.safety_report
         self.last_force_decisions = step.force_decisions
-        if step.current_torque is not None:
-            self.current_torque = step.current_torque
+        if step.current_current is not None:
+            self.current_current = step.current_current
 
         self.last_tactile_data_age_s = (
             sensor.data_age_s(step_start)

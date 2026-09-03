@@ -26,7 +26,6 @@ from dataclasses import dataclass
 
 from ..types import (
     CtrlMode,
-    ErrorCode,
     HandState,
     JointData,
     JointErrorCode,
@@ -47,28 +46,29 @@ class ModbusRegisterProfile:
     joint_input_addresses: dict[JointId, int]
     joint_control_addresses: dict[JointId, int]
     control_layout: str
-    mode_register: int | None = 0x0010
-    stop_register: int | None = 0x0010
+    mode_register: int | None = 0x0260
+    stop_register: int | None = 0x0260
     hand_info_address: int = 0x1047
-    tactile_state_address: int = 0x1080
-    tactile_control_address: int = 0x002B
+    tactile_state_address: int = 0x1110
+    tactile_control_address: int = 0x0020
     tactile_resultant_register_count: int = 16
-    canfd_connection_timer_address: int = 0x0031
-    canfd_connection_timer_registers: int = 1
-    canfd_connection_timer_values: tuple[int, ...] = (0x0000,)
-    canfd_connection_delete_address: int = 0x0030
-    canfd_connection_delete_registers: int = 2
-    canfd_connection_delete_values: tuple[int, ...] = (0x0000, 0x0000)
+    canfd_connection_timer_address: int = 0x0001
+    canfd_connection_timer_registers: int = 2
+    canfd_connection_timer_values: tuple[int, ...] = (0x0000, 0x0000)
+    canfd_connection_delete_address: int = 0x0000
+    canfd_connection_delete_registers: int = 1
+    canfd_connection_delete_values: tuple[int, ...] = (0x0000,)
 
 
 # Baud rate configuration register (REG_HOLD_BAUD_CONFIG).
 # Writing a gear value saves to Flash and takes effect after next power-up.
-BAUDRATE_CONFIG_REGISTER = 0x002C
+BAUDRATE_CONFIG_REGISTER = 0x0004
 
 # Common holding register addresses (device configuration / control).
-REG_SLAVE_ID = 0x0000
-REG_CLEAR_FAULT = 0x0001
-REG_INIT_JOINT = 0x0002
+REG_CONNECTION_CONTROL = 0x0000
+REG_SLAVE_ID = 0x0003
+REG_CLEAR_FAULT = 0x001F
+REG_INIT_JOINT = 0x001E
 
 # Common input register addresses (device info / status).
 REG_DEVICE_NAME = 0x1000
@@ -85,96 +85,93 @@ REG_IN_FINGER_TACTILE_SENSOR_VER = 0x118A
 REG_IN_SERIAL_NUMBER = 0x119A
 
 
-# GHand5 joint input blocks follow JointId values, 5 registers per joint.
-GHAND5_JOINT_INPUT_REG_MAP = {
-    joint_id: 0x1023 + joint_id.value * 5 for joint_id in JointId
-}
+def build_controllable_joint_addresses(
+    valid_joints: list[JointId],
+    joint_limits: dict[JointId, tuple[float, float]],
+    base_address: int = 0x0261,
+    stride: int = 6,
+) -> dict[JointId, int]:
+    """Build controllable joint register address mapping from config.
 
-# Mapping from controlled GHand5 joint ID to holding-register base address.
-GHAND5_HOLDING_REG_MAP = {
-    JointId.THUMB_MCP: 0x0011,
-    JointId.THUMB_TMC_FE: 0x0013,
-    JointId.THUMB_TMC_AA: 0x0015,
-    JointId.THUMB_TMC_PS: 0x0017,
-    JointId.FF_PIP: 0x0019,
-    JointId.FF_MCP: 0x001B,
-    JointId.FF_MCP_AA: 0x001D,
-    JointId.MF_PIP: 0x001F,
-    JointId.MF_MCP: 0x0021,
-    JointId.RF_PIP: 0x0023,
-    JointId.RF_MCP: 0x0025,
-    JointId.LF_PIP: 0x0027,
-    JointId.LF_MCP: 0x0029,
-}
+    Only joints in joint_limits (active joints) are assigned control register
+    addresses. Addresses are allocated sequentially in the order joints appear
+    in valid_joints, starting from base_address with stride between each.
 
-# Backwards-compatible alias for existing imports.
-HOLDING_REG_MAP = GHAND5_HOLDING_REG_MAP
+    Args:
+        valid_joints: All product joints (active + passive).
+        joint_limits: Active joint limits dict (only active joints have min/max).
+        base_address: Starting register address (default 0x0261).
+        stride: Register stride between joints (default 6).
+
+    Returns:
+        Mapping from active joint ID to control register address.
+    """
+    controllable_map = {}
+    address_offset = 0
+
+    for joint_id in valid_joints:
+        if joint_id in joint_limits:
+            controllable_map[joint_id] = base_address + address_offset
+            address_offset += stride
+
+    return controllable_map
 
 
-# GHandLite1 protocol: only these 11 joints are present in the Modbus table.
-GHAND_LITE1_JOINT_INPUT_REG_MAP = {
-    JointId.THUMB_MCP: 0x1023,
-    JointId.THUMB_TMC_FE: 0x1026,
-    JointId.THUMB_TMC_AA: 0x1029,
-    JointId.FF_PIP: 0x102C,
-    JointId.FF_MCP: 0x102F,
-    JointId.MF_PIP: 0x1032,
-    JointId.MF_MCP: 0x1035,
-    JointId.RF_PIP: 0x1038,
-    JointId.RF_MCP: 0x103B,
-    JointId.LF_PIP: 0x103E,
-    JointId.LF_MCP: 0x1041,
-}
+def build_modbus_profile_from_config(config) -> ModbusRegisterProfile:
+    """Build ModbusRegisterProfile dynamically from ProductConfig.
 
-GHAND_LITE1_HOLDING_REG_MAP = {
-    JointId.THUMB_MCP: 0x0010,
-    JointId.THUMB_TMC_FE: 0x0013,
-    JointId.THUMB_TMC_AA: 0x0016,
-    JointId.FF_PIP: 0x0019,
-    JointId.FF_MCP: 0x001C,
-    JointId.MF_PIP: 0x001F,
-    JointId.MF_MCP: 0x0022,
-    JointId.RF_PIP: 0x0025,
-    JointId.RF_MCP: 0x0028,
-    JointId.LF_PIP: 0x002B,
-    JointId.LF_MCP: 0x002E,
-}
+    Args:
+        config: ProductConfig object.
 
-PRODUCT_TYPE_TO_MODBUS_PROFILE = {
-    ProductType.GHand5: ModbusRegisterProfile(
-        product_type=ProductType.GHand5,
-        joint_input_addresses=GHAND5_JOINT_INPUT_REG_MAP,
-        joint_control_addresses=GHAND5_HOLDING_REG_MAP,
+    Returns:
+        Dynamically generated Modbus register profile.
+    """
+    joint_input_addresses = {
+        joint_id: 0x1023 + joint_id.value * 5 for joint_id in config.valid_joints
+    }
+
+    joint_control_addresses = build_controllable_joint_addresses(
+        valid_joints=config.valid_joints,
+        joint_limits=config.joint_limits,
+        base_address=0x0261,
+        stride=6,
+    )
+
+    return ModbusRegisterProfile(
+        product_type=config.product_type or ProductType.GHand5,
+        joint_input_addresses=joint_input_addresses,
+        joint_control_addresses=joint_control_addresses,
         control_layout="shared_mode_2reg",
-        mode_register=0x0010,
-        stop_register=0x0010,
-        tactile_control_address=0x002B,
-    ),
-    ProductType.GHandLite1: ModbusRegisterProfile(
-        product_type=ProductType.GHandLite1,
-        joint_input_addresses=GHAND_LITE1_JOINT_INPUT_REG_MAP,
-        joint_control_addresses=GHAND_LITE1_HOLDING_REG_MAP,
-        control_layout="per_joint_mode_3reg",
-        mode_register=None,
-        stop_register=None,
-        tactile_control_address=0x0031,
-        canfd_connection_timer_address=0x0037,
-        canfd_connection_timer_registers=2,
-        canfd_connection_timer_values=(0x0000, 0x0000),
-        canfd_connection_delete_address=0x0036,
-        canfd_connection_delete_registers=3,
-        canfd_connection_delete_values=(0x0000, 0x0000, 0x0000),
-    ),
-}
+        mode_register=0x0260,
+        stop_register=0x0260,
+        tactile_control_address=0x0020,
+    )
 
 
 def get_modbus_profile(config_or_name=None) -> ModbusRegisterProfile:
-    """Return the Modbus register profile for a product type or config."""
+    """Return the Modbus register profile for a product type or config.
+
+    Args:
+        config_or_name: ProductConfig object or ProductType enum.
+
+    Returns:
+        Dynamically generated Modbus register profile from config file.
+    """
+    # If passed a ProductConfig, use it directly
+    if hasattr(config_or_name, "valid_joints") and hasattr(
+        config_or_name, "joint_limits"
+    ):
+        return build_modbus_profile_from_config(config_or_name)
+
+    # If passed a ProductType, load config first then generate
+    from ghand._config import load_product_config
+
     product_type = getattr(config_or_name, "product_type", config_or_name)
-    return PRODUCT_TYPE_TO_MODBUS_PROFILE.get(
-        product_type,
-        PRODUCT_TYPE_TO_MODBUS_PROFILE[ProductType.GHand5],
-    )
+    if product_type is None:
+        product_type = ProductType.GHand5
+
+    config = load_product_config(product_type)
+    return build_modbus_profile_from_config(config)
 
 
 def get_joint_input_span(
@@ -189,7 +186,7 @@ def get_joint_input_span(
     if not addresses:
         return 0, 0
     start = min(addresses)
-    end = max(address + 2 for address in addresses)
+    end = max(address + 4 for address in addresses)
     return start, end - start + 1
 
 
@@ -279,13 +276,6 @@ def _parse_state(value: int) -> State:
         return State.UNKNOWN_STATE
 
 
-def _parse_error_code(value: int) -> ErrorCode:
-    try:
-        return ErrorCode(value)
-    except ValueError:
-        return ErrorCode.UNKNOWN_ERROR
-
-
 def _parse_joint_state(value: int) -> JointState:
     try:
         return JointState(value)
@@ -342,29 +332,6 @@ def parse_joint_data(raw: list[int], offset: int, joint_id: int) -> JointData:
     )
 
 
-def parse_lite1_joint_data(raw: list[int], offset: int, joint_id: int) -> JointData:
-    """Parse the legacy GHandLite1 3-register joint input layout."""
-    status_byte = (raw[offset] >> 8) & 0xFF
-    error_byte = raw[offset] & 0xFF
-    angle_raw = raw[offset + 1]
-    if angle_raw >= 32768:
-        angle_raw -= 65536
-    speed = (raw[offset + 2] >> 8) & 0xFF
-    if speed >= 128:
-        speed -= 256
-    torque = raw[offset + 2] & 0xFF
-    if torque >= 128:
-        torque -= 256
-    return JointData(
-        id=joint_id,
-        state=_parse_joint_state(status_byte),
-        error=_parse_joint_error_code(error_byte),
-        angle=angle_raw / 10.0,
-        speed=speed,
-        current=torque,
-    )
-
-
 def parse_joints(
     raw: list[int],
     valid_joints: list[JointId],
@@ -383,18 +350,14 @@ def parse_joints(
         if address is None:
             continue
         offset = address - start_address
-        width = 3 if profile is GHAND_LITE1_MODBUS_PROFILE else 5
-        if offset + width - 1 >= len(raw):
+        if offset + 4 >= len(raw):
             continue
-        if width == 3:
-            joints.append(parse_lite1_joint_data(raw, offset, joint_id.value))
-        else:
-            joints.append(parse_joint_data(raw, offset, joint_id.value))
+        joints.append(parse_joint_data(raw, offset, joint_id.value))
     return joints
 
 
 def parse_tactile_state_error(raw: list[int]) -> tuple[int, int]:
-    """Parse tactile state and error from the first register (0x1080).
+    """Parse tactile state and error from the first register (0x1110).
 
     Returns:
         (state_byte, error_byte)
@@ -406,7 +369,7 @@ def parse_tactile_resultant(raw: list[int], region_index: int) -> list[float]:
     """Parse resultant force (Fx, Fy, Fz) for a tactile region.
 
     Args:
-        raw: First 16 registers starting at 0x1080.
+        raw: First 16 registers starting at 0x1110.
         region_index: 0=THUMB, 1=FF, 2=MF, 3=RF, 4=LF.
 
     Returns:
@@ -447,20 +410,38 @@ def parse_tactile_distributed(data_bytes: bytes, count: int) -> list[float]:
     return distributed
 
 
-def encode_joint_command(joint) -> tuple[int, int]:
-    """Encode a JointCommand into two holding-register values.
+def encode_joint_command(joint, mode: CtrlMode) -> list[int]:
+    """Encode a JointCommand into six holding-register values.
 
     Layout:
-        Register N:   uint16(angle * 10)
-        Register N+1: [speed int8][torque int8]
+        Register N:   [stop uint8][mode uint8]
+        Register N+1: angle int16, unit 0.1 deg
+        Register N+2: speed int16, unit 1%
+        Register N+3: current int16, unit 1%
+        Register N+4: kp int16
+        Register N+5: kd int16
 
     Returns:
-        (reg0, reg1)
+        [reg0, reg1, reg2, reg3, reg4, reg5]
     """
     angle_raw = int(joint.angle * 10)
-    reg0 = angle_raw & 0xFFFF
-    reg1 = ((joint.speed & 0xFF) << 8) | (joint.torque & 0xFF)
-    return reg0, reg1
+    joint_mode = getattr(joint, "mode", mode)
+    if joint_mode is None:
+        joint_mode = mode
+    if isinstance(joint_mode, CtrlMode):
+        mode_value = joint_mode.value
+    else:
+        mode_value = int(joint_mode)
+    stop = int(getattr(joint, "stop", 1))
+    mode_stop = ((stop & 0xFF) << 8) | (mode_value & 0x0F)
+    return [
+        mode_stop,
+        angle_raw & 0xFFFF,
+        int(joint.speed) & 0xFFFF,
+        int(joint.current) & 0xFFFF,
+        int(getattr(joint, "kp", 0)) & 0xFFFF,
+        int(getattr(joint, "kd", 0)) & 0xFFFF,
+    ]
 
 
 def encode_joint_command_registers(
@@ -469,11 +450,7 @@ def encode_joint_command_registers(
     profile: ModbusRegisterProfile,
 ) -> list[int]:
     """Encode a joint command according to the product's control layout."""
-    position, speed_torque = encode_joint_command(joint)
-    if profile.control_layout == "per_joint_mode_3reg":
-        mode_stop = (mode.value << 8) & 0xFF00
-        return [mode_stop, position, speed_torque]
-    return [position, speed_torque]
+    return encode_joint_command(joint, mode)
 
 
 def build_tactile_info(

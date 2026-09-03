@@ -47,7 +47,7 @@ def main():
                     JointId.LF_PIP,
                     JointId.LF_MCP,
             ]:
-                joints.append(JointCommand(id=joint_id, speed=100, torque=100))
+                joints.append(JointCommand(id=joint_id, speed=100, current=100))
 
             result = hand.move_joints(joints, mode=CtrlMode.SPEED)
             if result:
@@ -79,7 +79,7 @@ def main():
                     JointId.LF_PIP,
                     JointId.LF_MCP,
             ]:
-                joints.append(JointCommand(id=joint_id,speed=-100, torque=100))
+                joints.append(JointCommand(id=joint_id,speed=-100, current=100))
 
             result = hand.move_joints(joints, mode=CtrlMode.SPEED)
             if result:

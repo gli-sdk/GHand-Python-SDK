@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
@@ -59,7 +59,7 @@ class ReleaseController:
             joints = self.joint_builder.position_command(
                 self.joint_builder.open_pose(),
                 speed=self.config.release_open_speed,
-                torque=self.config.release_open_torque,
+                current=self.config.release_open_current,
             )
             ok = self.hand.move_joints(joints, mode=CtrlMode.POSITION)
             self.sleep(self.config.release_timeout_s if release_wait_s is None else release_wait_s)

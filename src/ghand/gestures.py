@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 # Copyright 2026 GLITech
@@ -113,7 +113,7 @@ GESTURE_DEFINITIONS: Dict[GestureType, Dict[JointId, float]] = {
 
 
 def execute_gesture(
-    hand: GHand, gesture: GestureType, speed: int = 100, torque: int = 100, wait: bool = True
+    hand: GHand, gesture: GestureType, speed: int = 100, current: int = 100, wait: bool = True
 ) -> bool:
     """Execute a predefined gesture.
 
@@ -121,7 +121,7 @@ def execute_gesture(
         hand: GHand instance.
         gesture: Gesture type to execute.
         speed: Speed percentage (0-100). Defaults to 100.
-        torque: Torque percentage (0-100). Defaults to 100.
+        current: Current percentage (0-100). Defaults to 100.
         wait: Whether to block until the motion completes. Defaults to True.
 
     Returns:
@@ -133,7 +133,7 @@ def execute_gesture(
 
     angles = GESTURE_DEFINITIONS[gesture]
     joints = [
-        JointCommand(id=joint_id, angle=angle, speed=speed, torque=torque)
+        JointCommand(id=joint_id, angle=angle, speed=speed, current=current)
         for joint_id, angle in angles.items()
     ]
 
@@ -186,7 +186,7 @@ def _wait_for_completion(
             first_error_time = None
         except Exception as exc:
             # Only fail if we've been unable to read state for a sustained
-            # window — a single WKC miss must not surface as a test error.
+            # window - a single WKC miss must not surface as a test error.
             now = time.monotonic()
             if first_error_time is None:
                 first_error_time = now

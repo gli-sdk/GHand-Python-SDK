@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 # Copyright 2026 GLITech
@@ -22,7 +22,6 @@ Wraps EthercatClient and handles PDO encoding/decoding.
 
 import logging
 import math
-import struct
 import time
 
 from .._subscription import SubscriptionManager
@@ -38,7 +37,6 @@ from ..types import (
     MotorCheckError,
     MotorDiagnosticError,
     ProductConfig,
-    ProductType,
     SelfTestError,
     SelfTestErrorInfo,
     State,
@@ -56,6 +54,25 @@ from .ethercat_protocol import (
 from .icomm import IComm
 
 logger = logging.getLogger("ghand.ethercat_comm")
+
+
+# EtherCAT SDO object dictionary indices
+SDO_DEVICE_NAME = 0x1008
+SDO_HARDWARE_VERSION = 0x1009
+SDO_FIRMWARE_VERSION = 0x100A
+SDO_SERIAL_NUMBER_LEGACY = 0x1018
+SDO_HAND_TYPE = 0x2001
+SDO_FAULT_CLEAR = 0x2002
+SDO_JOINT_INIT = 0x2003
+SDO_TACTILE_CONTROL = 0x2004
+SDO_FIRMWARE_INFO = 0x2007
+SDO_SELF_TEST = 0x2008
+SDO_SERIAL_NUMBER = 0x200C
+
+# SDO subindices
+SDO_SUB_COMMAND = 0x01
+SDO_SUB_STATE = 0x02
+SDO_SUB_RESULT = 0x03
 
 
 class EthercatComm(IComm):
@@ -93,15 +110,8 @@ class EthercatComm(IComm):
             slave_id=config.slave_id,
         )
 
-    @staticmethod
-    def _uses_per_joint_control_layout(config: ProductConfig) -> bool:
-        """Return whether the product uses per-joint EtherCAT control fields."""
-        return config.product_type == ProductType.GHandLite1
-
     def _expected_rpdo_bytes(self, config: ProductConfig) -> int:
         """Return the expected EtherCAT RPDO byte size for the product."""
-        if self._uses_per_joint_control_layout(config):
-            return len(self._controlled_joints) * 6
         return 2 + len(self._controlled_joints) * 6
 
     def _build_tpdo_layouts(self, config: ProductConfig) -> dict[int, ProductConfig]:
@@ -143,7 +153,6 @@ class EthercatComm(IComm):
         self._tpdo_size_selected = False
         self._controlled_joints = [j for j in config.valid_joints if j in config.joint_limits]
         self._expected_rpdo_size = self._expected_rpdo_bytes(config)
-        self._uses_per_joint_control_pdo_layout = self._uses_per_joint_control_layout(config)
 
     # ===== Connection management =====
 
@@ -201,65 +210,28 @@ class EthercatComm(IComm):
 
         Args:
             joints: List of JointCommand objects.
-            mode: Control mode (position, speed, or torque).
+            mode: Control mode (position, speed, or current).
 
         Returns:
             True if the command is sent successfully.
         """
-        if self._uses_per_joint_control_pdo_layout:
-            self._client.send_data(self._build_per_joint_control_rpdo(joints, mode, stop=0))
-        else:
-            rpdo = Rpdo(self._controlled_joints)
-            rpdo.mode = mode.value
-            rpdo.stop = 0
+        rpdo = Rpdo(self._controlled_joints)
+        rpdo.mode = mode.value
+        rpdo.stop = 0
 
-            for joint in joints:
-                rpdo.joints[joint.id] = (math.radians(joint.angle), joint.speed, joint.torque)
+        for joint in joints:
+            rpdo.joints[joint.id] = (math.radians(joint.angle), joint.speed, joint.current)
 
-            self._client.send_data(rpdo.to_bytes())
+        self._client.send_data(rpdo.to_bytes())
         return True
 
     def stop(self) -> bool:
         """Send an immediate stop command to all joints."""
-        if self._uses_per_joint_control_pdo_layout:
-            self._client.send_data(self._build_per_joint_control_rpdo([], CtrlMode.POSITION, stop=1))
-        else:
-            rpdo = Rpdo(self._controlled_joints)
-            rpdo.mode = 0
-            rpdo.stop = 1
-            self._client.send_data(rpdo.to_bytes())
+        rpdo = Rpdo(self._controlled_joints)
+        rpdo.mode = 0
+        rpdo.stop = 1
+        self._client.send_data(rpdo.to_bytes())
         return True
-
-    def _build_per_joint_control_rpdo(
-        self,
-        joints: list[JointCommand],
-        mode: CtrlMode,
-        stop: int,
-    ) -> bytes:
-        """Build the per-joint-control EtherCAT 6-byte-per-joint RPDO."""
-        by_id = {joint.id: joint for joint in joints}
-        data = bytearray()
-        for joint_id in self._controlled_joints:
-            joint = by_id.get(joint_id)
-            if joint is None:
-                position = 0
-                speed = 0
-                torque = 0
-            else:
-                position = int(joint.angle * 10) & 0xFFFF
-                speed = int(joint.speed)
-                torque = int(joint.torque)
-            data.extend(
-                struct.pack(
-                    "<BBHbb",
-                    mode.value & 0xFF,
-                    stop & 0xFF,
-                    position,
-                    speed,
-                    torque,
-                )
-            )
-        return bytes(data)
 
     # ===== State retrieval =====
 
@@ -289,9 +261,6 @@ class EthercatComm(IComm):
         """
         data = self._recv_tpdo_data()
 
-        if self._uses_per_joint_control_pdo_layout:
-            return self._parse_per_joint_control_joints(data)
-
         tpdo = Tpdo.from_bytes(data, self._config)
 
         joints = []
@@ -311,29 +280,6 @@ class EthercatComm(IComm):
                     current=joint_tpdo.current,
                 )
             )
-        return joints
-
-    def _parse_per_joint_control_joints(self, data: bytes) -> list[JointData]:
-        """Parse the per-joint-control EtherCAT TPDO joint prefix."""
-        offset = 4
-        joints = []
-        for joint_id in self._config.valid_joints:
-            if len(data) < offset + 6:
-                break
-            state, error, angle_raw, speed, torque = struct.unpack_from(
-                "<BBHbb", data, offset
-            )
-            joints.append(
-                JointData(
-                    id=joint_id,
-                    state=self._parse_joint_state(state),
-                    error=self._parse_joint_error_code(error),
-                    angle=angle_raw / 10.0,
-                    speed=speed,
-                    current=torque,
-                    )
-            )
-            offset += 6
         return joints
 
     @staticmethod
@@ -414,9 +360,9 @@ class EthercatComm(IComm):
         Returns:
             True on success, False if the device rejected the command.
         """
-        self._client.sdo_write(0x2004, 0x01, b'\x01')
+        self._client.sdo_write(SDO_TACTILE_CONTROL, SDO_SUB_COMMAND, b'\x01')
         time.sleep(self._SDO_WRITE_SETTLE_SEC)
-        result = self._client.sdo_read(0x2004, 0x03)
+        result = self._client.sdo_read(SDO_TACTILE_CONTROL, SDO_SUB_RESULT)
         if result != b'\x00':
             logger.error("Device rejected open_tactile command")
             return False
@@ -428,9 +374,9 @@ class EthercatComm(IComm):
         Returns:
             True on success, False if the device rejected the command.
         """
-        self._client.sdo_write(0x2004, 0x01, b'\x02')
+        self._client.sdo_write(SDO_TACTILE_CONTROL, SDO_SUB_COMMAND, b'\x02')
         time.sleep(self._SDO_WRITE_SETTLE_SEC)
-        result = self._client.sdo_read(0x2004, 0x03)
+        result = self._client.sdo_read(SDO_TACTILE_CONTROL, SDO_SUB_RESULT)
         if result != b'\x00':
             logger.error("Device rejected close_tactile command")
             return False
@@ -442,9 +388,9 @@ class EthercatComm(IComm):
         Returns:
             True on success, False if the device rejected the command.
         """
-        self._client.sdo_write(0x2004, 0x01, b'\x04')
+        self._client.sdo_write(SDO_TACTILE_CONTROL, SDO_SUB_COMMAND, b'\x04')
         time.sleep(self._SDO_WRITE_SETTLE_SEC)
-        result = self._client.sdo_read(0x2004, 0x03)
+        result = self._client.sdo_read(SDO_TACTILE_CONTROL, SDO_SUB_RESULT)
         if result != b'\x00':
             logger.error("Device rejected zero_tactile command")
             return False
@@ -458,7 +404,7 @@ class EthercatComm(IComm):
         Returns:
             True on success, False if the device rejected the command.
         """
-        self._client.sdo_write(0x2002, 0x01, b'\x01')
+        self._client.sdo_write(SDO_FAULT_CLEAR, SDO_SUB_COMMAND, b'\x01')
         logger.info("Fault cleared")
         return True
 
@@ -468,21 +414,21 @@ class EthercatComm(IComm):
         Returns:
             True on success, False if the device rejected the command.
         """
-        self._client.sdo_write(0x2003, 0x01, b'\x01')
+        self._client.sdo_write(SDO_JOINT_INIT, SDO_SUB_COMMAND, b'\x01')
         logger.info("Joint initialization completed")
         return True
 
     def get_device_name(self) -> str:
         """Retrieve the device name via SDO."""
-        return self._read_string_sdo(0x1008, 0x00)
+        return self._read_string_sdo(SDO_DEVICE_NAME, 0x00)
 
     def get_hardware_version(self) -> str:
         """Retrieve the hardware version via SDO."""
-        return self._read_string_sdo(0x1009, 0x00)
+        return self._read_string_sdo(SDO_HARDWARE_VERSION, 0x00)
 
     def get_firmware_version(self) -> str:
         """Retrieve the firmware version via SDO."""
-        return self._read_string_sdo(0x100A, 0x00)
+        return self._read_string_sdo(SDO_FIRMWARE_VERSION, 0x00)
 
     def _read_string_sdo(self, index: int, subindex: int) -> str:
         try:
@@ -498,7 +444,7 @@ class EthercatComm(IComm):
     def get_serial_number(self) -> str:
         """Retrieve the 19-byte ASCII product serial number via SDO."""
         try:
-            raw = self._client.sdo_read(0x200C, 0x01)
+            raw = self._client.sdo_read(SDO_SERIAL_NUMBER, 0x01)
             return raw[:19].decode("ascii", errors="ignore").strip("\x00")
         except Exception:
             return "N/A"
@@ -506,13 +452,13 @@ class EthercatComm(IComm):
     def _read_packed_firmware_version(self, mcu_id: int) -> str:
         """Read a packed firmware version via SDO."""
         try:
-            self._client.sdo_write(0x2007, 0x01, bytes([mcu_id]))
+            self._client.sdo_write(SDO_FIRMWARE_INFO, SDO_SUB_COMMAND, bytes([mcu_id]))
             time.sleep(self._SDO_WRITE_SETTLE_SEC)
             version_high = int.from_bytes(
-                self._client.sdo_read(0x2007, 0x02), byteorder="little"
+                self._client.sdo_read(SDO_FIRMWARE_INFO, SDO_SUB_STATE), byteorder="little"
             )
             version_low = int.from_bytes(
-                self._client.sdo_read(0x2007, 0x03), byteorder="little"
+                self._client.sdo_read(SDO_FIRMWARE_INFO, SDO_SUB_RESULT), byteorder="little"
             )
         except Exception:
             logger.info("Packed firmware version not available", exc_info=True)
@@ -562,16 +508,11 @@ class EthercatComm(IComm):
             0 for unknown, 1 for left hand, 2 for right hand.
         """
         try:
-            return int.from_bytes(self._client.sdo_read(0x2001, 0x00), byteorder="little")
+            return int.from_bytes(self._client.sdo_read(SDO_HAND_TYPE, 0x00), byteorder="little")
         except Exception:
             return 0
 
     # ===== Self-test error query =====
-
-    _SELF_TEST_INDEX = 0x2008
-    _SELF_TEST_SUB_COMMAND = 0x01
-    _SELF_TEST_SUB_STATE = 0x02
-    _SELF_TEST_SUB_ERROR_CODE = 0x03
 
     _SELF_TEST_STATE_IDLE = 0
     _SELF_TEST_STATE_PROCESSING = 1
@@ -582,7 +523,7 @@ class EthercatComm(IComm):
     _SELF_TEST_POLL_TIMEOUT_SEC = 1.0
 
     def get_self_test_error_info(self) -> SelfTestErrorInfo:
-        """Query self-test error information via object dictionary 0x2008.
+        """Query self-test error information via object dictionary SDO_SELF_TEST.
 
         Reads the A0 summary and only dispatches the detailed A1~A8 queries for
         error categories that are actually flagged. Does not trigger a
@@ -632,33 +573,33 @@ class EthercatComm(IComm):
         return info
 
     def get_self_test_status(self) -> int:
-        """Read the current self-test status from object dictionary 0x2008:0x02.
+        """Read the current self-test status from object dictionary SDO_SELF_TEST:0x02.
 
         Status values: 0 idle, 1 processing, 2 command processed successfully,
         3 failed.
         """
-        raw = self._client.sdo_read(self._SELF_TEST_INDEX, self._SELF_TEST_SUB_STATE)
+        raw = self._client.sdo_read(SDO_SELF_TEST, SDO_SUB_STATE)
         return raw[0] if raw else self._SELF_TEST_STATE_IDLE
 
     def _read_diagnostic_error_codes(self, command: int) -> list[int]:
-        """Execute one 0x2008 read transaction and return the 13-byte error array.
+        """Execute one SDO_SELF_TEST read transaction and return the 13-byte error array.
 
         The caller decides which slots of the returned list are meaningful.
         Raises ``RuntimeError`` on transaction failure or timeout.
         """
         self._client.sdo_write(
-            self._SELF_TEST_INDEX,
-            self._SELF_TEST_SUB_COMMAND,
+            SDO_SELF_TEST,
+            SDO_SUB_COMMAND,
             bytes([command & 0xFF]),
         )
         time.sleep(self._SDO_WRITE_SETTLE_SEC)
 
-        # State 只用于判断事务是否结束(2 或 3 都算结束);
-        # Result 不判断,只读取 error_code 数据。
+        # Use state only to determine whether the command transaction ended.
+        # The result byte is informational; read the error_code SDO below.
         self._poll_self_test_state(command)
 
         raw = self._client.sdo_read(
-            self._SELF_TEST_INDEX, self._SELF_TEST_SUB_ERROR_CODE
+            SDO_SELF_TEST, SDO_SUB_RESULT
         )
         codes = list(raw[:13])
         if len(codes) < 13:
@@ -670,7 +611,7 @@ class EthercatComm(IComm):
         deadline = time.monotonic() + self._SELF_TEST_POLL_TIMEOUT_SEC
         while True:
             raw = self._client.sdo_read(
-                self._SELF_TEST_INDEX, self._SELF_TEST_SUB_STATE
+                SDO_SELF_TEST, SDO_SUB_STATE
             )
             state = raw[0] if raw else self._SELF_TEST_STATE_IDLE
             if state in (

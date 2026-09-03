@@ -21,7 +21,7 @@ class GHandCommandPort:
                 id=joint.id,
                 angle=joint.angle,
                 speed=joint.speed,
-                torque=joint.torque,
+                current=joint.current,
             )
             for joint in joints
         ]

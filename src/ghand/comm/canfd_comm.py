@@ -39,13 +39,11 @@ except ImportError:
 
 from ..types import (
     CtrlMode,
-    ErrorCode,
     HandState,
     JointData,
     JointId,
     ProductConfig,
     SelfTestErrorInfo,
-    State,
     TactileInfo,
 )
 from .canfd_transport import CanfdTransport, pack_arbitration, unpack_arbitration
@@ -385,7 +383,7 @@ class CanfdComm(IComm):
         self,
         baudrate_gear: int | None = None,
     ) -> bool:
-        """Write the baud rate gear to holding register 0x002C.
+        """Write the baud rate gear to holding register 0x0004.
 
         The value is saved to Flash and takes effect after the next power-up.
         For CANFD the gear selects both the arbitration phase bitrate/data-phase
@@ -450,12 +448,7 @@ class CanfdComm(IComm):
             base_addr = self._profile.joint_control_addresses.get(joint_id)
             if base_addr is None:
                 continue
-            position, speed_torque = encode_joint_command(joint)
-            if self._profile.control_layout == "per_joint_mode_3reg":
-                mode_stop = ((mode.value & 0xFF) << 8) | 0x00
-                registers = [mode_stop, position, speed_torque]
-            else:
-                registers = [position, speed_torque]
+            registers = encode_joint_command(joint, mode)
             logger.debug(
                 "CANFD write joint=%s addr=0x%04X registers=%s",
                 joint_id.name,
@@ -532,7 +525,7 @@ class CanfdComm(IComm):
         """Retrieve tactile sensor data."""
         if not self._config.has_tactile:
             return {}
-        # Read state + resultant forces (16 registers from 0x1080)
+        # Read state + resultant forces (16 registers from 0x1110)
         raw_bytes = self._transport.read_registers(
             self._src_id,
             self._slave_id,

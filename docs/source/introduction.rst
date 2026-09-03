@@ -1,4 +1,4 @@
-.. _introduction:
+﻿.. _introduction:
 
 Introduction
 ============
@@ -15,8 +15,8 @@ Key Features
     - Hardware self-test (sensors, motors).
     - Firmware upgrade.
 - Fine Joint Control:
-    - Set target angle, speed, or torque for single or multiple joints.
-    - Get current angle, speed, and torque for single or all joints.
+    - Set target angle, speed, or current for single or multiple joints.
+    - Get current angle, speed, and current for single or all joints.
     - Stop all joint motion.
 - Tactile Sensing:
     - Read five-finger tactile sensor arrays and resultant force data (52 sensors for thumb, 31 sensors for each of the other four fingers).

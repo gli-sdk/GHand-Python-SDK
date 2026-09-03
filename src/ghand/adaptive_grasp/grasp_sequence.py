@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
@@ -31,7 +31,7 @@ class ContactSnapshot:
     joint_angles: dict[JointId, float]
     finger_fz: dict[TactileSensorId, float]
     total_fz: float
-    torque: int
+    current: int
     reason: str
     timestamp_s: float
 
@@ -48,13 +48,13 @@ class PhaseResult:
     def __init__(
         self,
         success: bool,
-        final_torque: int,
+        final_current: int,
         should_release: bool = False,
         contact_snapshot: Optional[ContactSnapshot] = None,
         safety_report: Optional[SafetyReport] = None,
     ):
         self.success = success
-        self.final_torque = final_torque
+        self.final_current = final_current
         self.should_release = should_release
         self.contact_snapshot = contact_snapshot
         self.safety_report = safety_report
@@ -84,7 +84,7 @@ class PhaseController:
         self._get_monotonic_time = get_time
         self._on_state_change = on_state_change
         self._joint_limits = self._normalize_joint_limits(joint_limits or {})
-        self.current_torque = self._phase_closing_torque()
+        self.current_current = self._phase_closing_current()
         self._phase_should_release = False
         self._contact_snapshot: Optional[ContactSnapshot] = None
         self._safety_report: Optional[SafetyReport] = None
@@ -114,7 +114,7 @@ class PhaseController:
             if not is_running():
                 return PhaseResult(
                     success=False,
-                    final_torque=self.current_torque,
+                    final_current=self.current_current,
                     should_release=self._phase_should_release,
                     contact_snapshot=self._contact_snapshot,
                     safety_report=self._safety_report,
@@ -124,38 +124,38 @@ class PhaseController:
                 self._set_state(GraspState.ERROR)
                 return PhaseResult(
                     success=False,
-                    final_torque=self.current_torque,
+                    final_current=self.current_current,
                     should_release=self._phase_should_release,
                     contact_snapshot=self._contact_snapshot,
                     safety_report=self._safety_report,
                 )
         return PhaseResult(
             success=True,
-            final_torque=self.current_torque,
+            final_current=self.current_current,
             contact_snapshot=self._contact_snapshot,
         )
 
     def _set_state(self, state: GraspState) -> None:
         self._on_state_change(state)
 
-    def _phase_closing_torque(self) -> int:
-        torque = (
-            self._object_profile.phase_closing_torque
+    def _phase_closing_current(self) -> int:
+        current = (
+            self._object_profile.phase_closing_current
             if self._object_profile is not None
             else 30
         )
-        return int(clip(torque, -100.0, self.config.max_torque))
+        return int(clip(current, -100.0, self.config.max_current))
 
     def _execute_position_phase(
         self,
         state: GraspState,
         pose: dict[JointId, float],
         speed: int,
-        torque: int,
+        current: int,
         is_running: Callable[[], bool] = lambda: True,
     ) -> bool:
         self._set_state(state)
-        joints = self._joint_builder.position_command(pose, speed=speed, torque=torque)
+        joints = self._joint_builder.position_command(pose, speed=speed, current=current)
         ok = self.hand_port.move_joints(joints, mode=CtrlMode.POSITION)
         if not ok:
             return False
@@ -232,7 +232,7 @@ class PhaseController:
             GraspState.OPEN,
             self._joint_builder.open_pose(),
             speed=self.config.open_speed,
-            torque=self.config.open_torque,
+            current=self.config.open_current,
             is_running=is_running,
         )
 
@@ -241,14 +241,14 @@ class PhaseController:
             GraspState.PRE_GRASP,
             self.config.pre_grasp_pose,
             speed=self.config.pre_grasp_speed,
-            torque=self.config.pre_grasp_torque,
+            current=self.config.pre_grasp_current,
             is_running=is_running,
         )
 
     def _phase_closing(self, is_running: Callable[[], bool]) -> bool:
         self._set_state(GraspState.CLOSING_TO_CONTACT)
         start = self._get_monotonic_time()
-        self.current_torque = self._phase_closing_torque()
+        self.current_current = self._phase_closing_current()
 
         if joints_feedback := self._sensor.joint_feedback:
             self._safety.set_closing_baseline(joints_feedback)
@@ -261,7 +261,7 @@ class PhaseController:
                 _logger.error("CLOSING phase timeout")
                 return False
 
-            self.hand_port.move_joints(self._joint_builder.torque_command(self.current_torque), mode=CtrlMode.TORQUE)
+            self.hand_port.move_joints(self._joint_builder.current_command(self.current_current), mode=CtrlMode.CURRENT)
             time.sleep(self.config.closing_period_s)
 
             frame = self._read_closing_sensor_frame()
@@ -346,12 +346,12 @@ class PhaseController:
         if stall_counter < self.config.closing_stall_cycles:
             return False
 
-        _logger.info("CLOSING: torque-stall contact confirmed")
+        _logger.info("CLOSING: current-stall contact confirmed")
         self._record_contact_snapshot(
             frame.joint_feedback,
             frame.tactile_data,
             frame.total_fz,
-            "torque_stall",
+            "current_stall",
         )
         time.sleep(self.config.control_period_s)
         return True
@@ -366,7 +366,7 @@ class PhaseController:
         joint_angles = {}
         for joint in joint_feedback:
             joint_id = normalize_joint_id(joint.id)
-            if (joint_id in self._joint_builder.torque_joints
+            if (joint_id in self._joint_builder.current_joints
                     or joint_id in _CONTACT_SNAPSHOT_THUMB_AUX_JOINTS):
                 joint_angles[joint_id] = self._clamp_snapshot_joint_angle(
                     joint_id,
@@ -380,7 +380,7 @@ class PhaseController:
             joint_angles=joint_angles,
             finger_fz=finger_fz,
             total_fz=total_fz,
-            torque=self.current_torque,
+            current=self.current_current,
             reason=reason,
             timestamp_s=self._get_monotonic_time(),
         )
@@ -416,7 +416,7 @@ class PhaseController:
     def _is_joints_stalled(self, prev: dict[JointId, float], current: dict[JointId, float]) -> bool:
         if not prev or not current:
             return False
-        for joint_id in self._joint_builder.torque_joints:
+        for joint_id in self._joint_builder.current_joints:
             delta = abs(current.get(joint_id, 0.0) - prev.get(joint_id, 0.0))
             if delta > self.config.closing_stall_angle_threshold:
                 return False

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 # Copyright 2026 GLITech
@@ -249,6 +249,6 @@ class Rpdo:
         data = bytearray()
         data.extend(struct.pack('<B', self.mode))
         data.extend(struct.pack('<B', self.stop))
-        for angle, speed, torque in self.joints.values():
-            data.extend(struct.pack('<fbb', angle, speed, torque))
+        for angle, speed, current in self.joints.values():
+            data.extend(struct.pack('<fbb', angle, speed, current))
         return bytes(data)

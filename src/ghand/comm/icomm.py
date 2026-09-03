@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 # Copyright 2026 GLITech
@@ -101,7 +101,7 @@ class IComm(ABC):
 
         Args:
             baudrate_gear: Protocol gear value written directly to holding
-                register 0x002C. When omitted the protocol default gear is used.
+                register 0x0004. When omitted the protocol default gear is used.
 
         Returns:
             True if the command succeeds, False otherwise.
@@ -116,7 +116,7 @@ class IComm(ABC):
 
         Args:
             joints: List of JointCommand objects.
-            mode: Control mode (position, speed, or torque).
+            mode: Control mode (position, speed, or current).
 
         Returns:
             True if the command is sent successfully.

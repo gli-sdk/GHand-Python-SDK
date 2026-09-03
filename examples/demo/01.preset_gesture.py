@@ -44,7 +44,7 @@ def main():
             for i, gesture in enumerate(gesture_demo, 1):
                 print(f"Demo {i}: [{gesture.value}]")
 
-                if not execute_gesture(hand, gesture, speed=100, torque=100):
+                if not execute_gesture(hand, gesture, speed=100, current=100):
                     print(f"{gesture.value} action failed, terminating demo")
                     hand.close()
                     return

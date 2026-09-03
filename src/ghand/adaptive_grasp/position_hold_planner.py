@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 from dataclasses import dataclass
@@ -21,7 +21,7 @@ FingerForces = dict[TactileSensorId, float]
 @dataclass
 class ForceDecision:
     control_u: float
-    next_torque: int
+    next_current: int
     target_angles: JointAngles
     is_fragile_mode: bool
     near_limit: bool = False
@@ -35,7 +35,7 @@ class PositionHoldPlanner:
     """Plans position-mode JointCommand corrections from shared force references.
 
     ``force_reference`` and ``dt`` are kept on ``compute`` so position and
-    torque planners can share the same call shape, even though the direct
+    Current planners can share the same call shape, even though the direct
     position-control strategy does not currently use them.
     """
 
@@ -163,7 +163,7 @@ class PositionHoldPlanner:
 
         return ForceDecision(
             control_u=control_u,
-            next_torque=self._compute_next_torque(),
+            next_current=self._compute_next_current(),
             target_angles=target_angles,
             is_fragile_mode=self.is_fragile_mode,
             near_limit=near_limit,
@@ -214,13 +214,13 @@ class PositionHoldPlanner:
             return self.profile.safe_force_max / finger_count
         return self.config.max_normal_force_per_finger_n
 
-    def _compute_next_torque(self) -> int:
-        if self.profile is None or self.profile.position_hold_torque is None:
-            raise ValueError("ObjectProfile.position_hold_torque is required for position hold mode")
-        next_torque = self.profile.position_hold_torque
+    def _compute_next_current(self) -> int:
+        if self.profile is None or self.profile.position_hold_current is None:
+            raise ValueError("ObjectProfile.position_hold_current is required for position hold mode")
+        next_current = self.profile.position_hold_current
         if self.is_fragile_mode:
-            next_torque = int(next_torque * self.config.fragile_torque_reduction)
-        return next_torque
+            next_current = int(next_current * self.config.fragile_current_reduction)
+        return next_current
 
     def _compute_next_speed(self) -> int:
         if self.profile is None or self.profile.position_hold_speed is None:

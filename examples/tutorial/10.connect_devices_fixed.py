@@ -78,17 +78,17 @@ def main():
     joints1 = []
 
     joints1.append(JointCommand(id=JointId.THUMB_MCP, angle=0, speed=100,
-                                torque=100))  # Angle range: 0~75 (degrees)
+                                current=100))  # Angle range: 0~75 (degrees)
     joints1.append(JointCommand(id=JointId.THUMB_TMC_FE, angle=50, speed=100,
-                                torque=100))  # Angle range: 0~55 (degrees)
+                                current=100))  # Angle range: 0~55 (degrees)
     joints1.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=20, speed=100,
-                                torque=100))  # Angle range: 0~90 (degrees)
+                                current=100))  # Angle range: 0~90 (degrees)
     joints1.append(JointCommand(id=JointId.THUMB_TMC_PS, angle=0, speed=100,
-                                torque=100))  # Angle range: 0~90 (degrees)
+                                current=100))  # Angle range: 0~90 (degrees)
     joints1.append(JointCommand(id=JointId.FF_PIP, angle=0, speed=100,
-                                torque=100))  # Angle range: 0~75 (degrees)
+                                current=100))  # Angle range: 0~75 (degrees)
     joints1.append(JointCommand(id=JointId.FF_MCP, angle=0, speed=100,
-                                torque=100))  # Angle range: 0~70 (degrees)
+                                current=100))  # Angle range: 0~70 (degrees)
 
     result = hand1.move_joints(joints1)
     if result:
@@ -102,17 +102,17 @@ def main():
             )
 
     joints1.append(JointCommand(id=JointId.THUMB_MCP, angle=0, speed=100,
-                                torque=100))  # Angle range: 0~75 (degrees)
+                                current=100))  # Angle range: 0~75 (degrees)
     joints1.append(JointCommand(id=JointId.THUMB_TMC_FE, angle=0, speed=100,
-                                torque=100))  # Angle range: 0~55 (degrees)
+                                current=100))  # Angle range: 0~55 (degrees)
     joints1.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=20, speed=100,
-                                torque=100))  # Angle range: 0~90 (degrees)
+                                current=100))  # Angle range: 0~90 (degrees)
     joints1.append(JointCommand(id=JointId.THUMB_TMC_PS, angle=0, speed=100,
-                                torque=100))  # Angle range: 0~90 (degrees)
+                                current=100))  # Angle range: 0~90 (degrees)
     joints1.append(JointCommand(id=JointId.FF_PIP, angle=50, speed=100,
-                                torque=100))  # Angle range: 0~75 (degrees)
+                                current=100))  # Angle range: 0~75 (degrees)
     joints1.append(JointCommand(id=JointId.FF_MCP, angle=50, speed=100,
-                                torque=100))  # Angle range: 0~70 (degrees)
+                                current=100))  # Angle range: 0~70 (degrees)
 
     result = hand2.move_joints(joints1)
     if result:

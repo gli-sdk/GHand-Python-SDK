@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 import math
@@ -54,14 +54,14 @@ class AdaptiveGraspConfig:
     )  # Fingers used for contact, tactile analysis, and hold control.
     # Open, pre-grasp, and closing-to-contact phases.
     open_speed: int = 100  # Speed command used when opening the hand.
-    open_torque: int = 100  # Torque/current limit used when opening the hand.
+    open_current: int = 100  # current limit used when opening the hand.
     pre_grasp_speed: int = 80  # Speed command used when moving to the pre-grasp pose.
-    pre_grasp_torque: int = 80  # Torque/current limit used when moving to the pre-grasp pose.
+    pre_grasp_current: int = 80  # current limit used when moving to the pre-grasp pose.
     closing_total_contact_threshold_n: float = 0.2  # Total normal force threshold for ending the closing phase.
     finger_touch_threshold_n: float = 0.1  # Per-finger normal force threshold for considering a finger in contact.
 
-    max_torque: int = 80  # Maximum torque/current limit used during adaptive closing.
-    thumb_aux_torque: int = 3  # Auxiliary thumb torque/current offset used during closing.
+    max_current: int = 80  # Maximum current limit used during adaptive closing.
+    thumb_aux_current: int = 3  # Auxiliary thumb current offset used during closing.
     phase_timeout: float = 10.0  # Default timeout for high-level grasp phases.
     control_period_s: float = 0.02  # Main adaptive hold loop period.
     closing_period_s: float = 0.2  # Polling period during the closing-to-contact phase.
@@ -116,7 +116,7 @@ class AdaptiveGraspConfig:
 
     # Stiff position hold mode
     stiff_position_hold_speed: int = 90  # Default speed command for stiff_position hold mode.
-    stiff_position_hold_torque: int = 90  # Default torque/current command for stiff_position hold mode.
+    stiff_position_hold_current: int = 90  # Default current command for stiff_position hold mode.
     stiff_position_step_deg: float = 0.2  # Default incremental angle step in degrees for stiff_position hold mode.
     stiff_position_max_delta_deg: float = 5.0  # Default max angle delta from contact in degrees for stiff_position hold mode.
     stiff_position_force_drop_ratio: float = 0.5  # Ratio drop in total normal force that triggers contact-loss guard in stiff_position mode.
@@ -124,7 +124,7 @@ class AdaptiveGraspConfig:
     # Release phase.
     release_hold_time_s: float = 20.0  # Duration to keep adaptive hold before automatic release in the demo sequence.
     release_open_speed: int = 80  # Speed command used during release opening.
-    release_open_torque: int = 80  # Torque/current limit used during release opening.
+    release_open_current: int = 80  # current limit used during release opening.
     release_timeout_s: float = 5.0  # Timeout for the release phase.
 
     # Safety policy.
@@ -135,7 +135,7 @@ class AdaptiveGraspConfig:
     enable_fault_release_fallback: bool = True  # Releases the hand automatically when recoverable safety faults occur.
 
     # Fragile-object reductions.
-    fragile_torque_reduction: float = 0.8  # Torque scaling applied for fragile object profiles.
+    fragile_current_reduction: float = 0.8  # Current scaling applied for fragile object profiles.
     fragile_step_reduction: float = 0.5  # Position correction scaling applied for fragile object profiles.
 
     # Visualization.
@@ -180,8 +180,8 @@ class AdaptiveGraspConfig:
             less_than_or_equal_to=100,
         )
         _validate_range(
-            "open_torque",
-            self.open_torque,
+            "open_current",
+            self.open_current,
             greater_than_or_equal_to=0,
             less_than_or_equal_to=100,
         )
@@ -192,16 +192,16 @@ class AdaptiveGraspConfig:
             less_than_or_equal_to=100,
         )
         _validate_range(
-            "pre_grasp_torque",
-            self.pre_grasp_torque,
+            "pre_grasp_current",
+            self.pre_grasp_current,
             greater_than_or_equal_to=0,
             less_than_or_equal_to=100,
         )
 
-        _validate_range("max_torque", self.max_torque, greater_than=0)
+        _validate_range("max_current", self.max_current, greater_than=0)
         _validate_range(
-            "thumb_aux_torque",
-            self.thumb_aux_torque,
+            "thumb_aux_current",
+            self.thumb_aux_current,
             greater_than_or_equal_to=-100,
             less_than_or_equal_to=100,
         )
@@ -327,8 +327,8 @@ class AdaptiveGraspConfig:
 
     def _validate_fragile_object_params(self) -> None:
         _validate_range(
-            "fragile_torque_reduction",
-            self.fragile_torque_reduction,
+            "fragile_current_reduction",
+            self.fragile_current_reduction,
             greater_than=0.0,
             less_than_or_equal_to=1.0,
         )
@@ -484,8 +484,8 @@ class AdaptiveGraspConfig:
             less_than_or_equal_to=100,
         )
         _validate_range(
-            "stiff_position_hold_torque",
-            self.stiff_position_hold_torque,
+            "stiff_position_hold_current",
+            self.stiff_position_hold_current,
             greater_than_or_equal_to=0,
             less_than_or_equal_to=100,
         )
@@ -519,8 +519,8 @@ class AdaptiveGraspConfig:
             less_than_or_equal_to=100,
         )
         _validate_range(
-            "release_open_torque",
-            self.release_open_torque,
+            "release_open_current",
+            self.release_open_current,
             greater_than_or_equal_to=0,
             less_than_or_equal_to=100,
         )

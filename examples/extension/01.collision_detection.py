@@ -24,9 +24,9 @@ from ghand import (
 # Configure logging
 configure_logging(level=logging.INFO)
 
-# Default speed and torque
+# Default speed and current
 DEFAULT_SPEED = 100
-DEFAULT_TORQUE = 100
+DEFAULT_CURRENT = 100
 
 
 def main():
@@ -55,31 +55,31 @@ def main():
                 id=JointId.THUMB_MCP,
                 angle=66,
                 speed=DEFAULT_SPEED,
-                torque=DEFAULT_TORQUE,
+                current=DEFAULT_CURRENT,
             ),
             JointCommand(
                 id=JointId.THUMB_TMC_AA,
                 angle=52,
                 speed=DEFAULT_SPEED,
-                torque=DEFAULT_TORQUE,
+                current=DEFAULT_CURRENT,
             ),
             JointCommand(
                 id=JointId.THUMB_TMC_PS,
                 angle=-10,
                 speed=DEFAULT_SPEED,
-                torque=DEFAULT_TORQUE,
+                current=DEFAULT_CURRENT,
             ),
             JointCommand(
                 id=JointId.FF_PIP,
                 angle=70,
                 speed=DEFAULT_SPEED,
-                torque=DEFAULT_TORQUE,
+                current=DEFAULT_CURRENT,
             ),
             JointCommand(
                 id=JointId.FF_MCP,
                 angle=70,
                 speed=DEFAULT_SPEED,
-                torque=DEFAULT_TORQUE,
+                current=DEFAULT_CURRENT,
             ),
         ]
 
@@ -117,7 +117,7 @@ def main():
             safe_joints = nparray_to_joints(
                 result.safe_angles,
                 speed=DEFAULT_SPEED,
-                torque=DEFAULT_TORQUE,
+                current=DEFAULT_CURRENT,
             )
             print("Executing motion with safe angles...")
             success = hand.move_joints(safe_joints)

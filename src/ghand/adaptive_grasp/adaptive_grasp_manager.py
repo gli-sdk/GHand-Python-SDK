@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
@@ -15,7 +15,7 @@ from .config import AdaptiveGraspConfig
 from .grasp_sequence import ContactSnapshot, PhaseController
 from .hand_adapter import ensure_hand_command_port
 from .hold_planner_factory import HoldPlannerFactory
-from .joint_builder import JointCommandBuilder, TORQUE_CONTROL_JOINTS
+from .joint_builder import JointCommandBuilder, CURRENT_CONTROL_JOINTS
 from .object_profile import ObjectProfile, ObjectProfileRegistry
 from .ports import SensorFrameSource
 from .position_hold_planner import ForceDecision
@@ -58,7 +58,7 @@ def build_adaptive_grasp_components(
         finger_touch_threshold_n=config.finger_touch_threshold_n,
         get_monotonic_time=get_monotonic_time,
     ))
-    torque_joints = tuple(joint_id for joint_id in TORQUE_CONTROL_JOINTS
+    current_joints = tuple(joint_id for joint_id in CURRENT_CONTROL_JOINTS
                           if JOINT_TO_FINGER[joint_id] in active_fingers)
     if config.enable_visualization:
         from .visualization import TactileVisualizer
@@ -73,7 +73,7 @@ def build_adaptive_grasp_components(
         sensor=sensor_client,
         tactile=TactileAnalyzer(config),
         safety=SafetyMonitor(config),
-        joint_builder=JointCommandBuilder(config, torque_joints),
+        joint_builder=JointCommandBuilder(config, current_joints),
         hold_planner_factory=HoldPlannerFactory(config),
         visualizer=visualizer,
     )
@@ -114,7 +114,7 @@ class AdaptiveGrasper:
         self._joint_builder = self._components.joint_builder
         self._hold_planner_factory = self._components.hold_planner_factory
         self._visualizer = self._components.visualizer
-        self._torque_joints = self._joint_builder.torque_joints
+        self._current_joints = self._joint_builder.current_joints
 
         self._release_controller = ReleaseController(
             hand=self._hand_port,
@@ -154,7 +154,7 @@ class AdaptiveGrasper:
                 self._cleanup_grasp(state=GraspState.ERROR)
                 return False
 
-            self.current_torque = result.final_torque
+            self.current_current = result.final_current
             self._runtime.last_contact_snapshot = result.contact_snapshot
 
             self._start_adaptive_control()
@@ -176,12 +176,12 @@ class AdaptiveGrasper:
         self._runtime.running = value
 
     @property
-    def current_torque(self) -> int:
-        return self._runtime.current_torque
+    def current_current(self) -> int:
+        return self._runtime.current_current
 
-    @current_torque.setter
-    def current_torque(self, value: int) -> None:
-        self._runtime.current_torque = value
+    @current_current.setter
+    def current_current(self, value: int) -> None:
+        self._runtime.current_current = value
 
     @property
     def _control_thread(self):
@@ -301,7 +301,7 @@ class AdaptiveGrasper:
             self._visualizer,
             self._joint_builder,
             self.config,
-            self.current_torque,
+            self.current_current,
             contact_joint_angles=(contact_snapshot.joint_angles
                                   if contact_snapshot is not None else None),
             force_reference_planner=planners.force_reference_planner,

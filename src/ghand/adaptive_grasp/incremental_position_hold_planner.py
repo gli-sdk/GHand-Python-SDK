@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 from typing import Optional
@@ -28,7 +28,7 @@ class IncrementalPositionHoldPlanner:
         active_joint_ids: set[JointId],
         contact_joint_angles: Optional[JointAngles] = None,
         hold_speed: int,
-        hold_torque: int,
+        hold_current: int,
         default_target_force_n: Optional[float] = None,
         stiff_position_force_drop_ratio: float,
     ):
@@ -39,7 +39,7 @@ class IncrementalPositionHoldPlanner:
         self.contact_joint_angles = normalize_joint_angles(
             contact_joint_angles or {})
         self._hold_speed = hold_speed
-        self._hold_torque = hold_torque
+        self._hold_current = hold_current
         self._default_target_force_n = default_target_force_n
         self._stiff_position_force_drop_ratio = stiff_position_force_drop_ratio
         self._previous_total_fz: Optional[float] = None
@@ -63,17 +63,17 @@ class IncrementalPositionHoldPlanner:
             if self._is_contact_lost(total_fz):
                 return self._hold_decisions(current_angles,
                                             speed=100,
-                                            torque=self._hold_torque)
+                                            current=self._hold_current)
 
             if total_fz >= target_force:
                 return self._hold_decisions(current_angles,
                                             speed=100,
-                                            torque=self._hold_torque)
+                                            current=self._hold_current)
 
             next_angles = self._increment_angles(current_angles)
             return self._hold_decisions(next_angles,
                                         speed=self._hold_speed,
-                                        torque=self._hold_torque)
+                                        current=self._hold_current)
         finally:
             self._previous_total_fz = total_fz
 
@@ -105,7 +105,7 @@ class IncrementalPositionHoldPlanner:
         angles: JointAngles,
         *,
         speed: int,
-        torque: int,
+        current: int,
     ) -> ForceDecisions:
         angles = normalize_joint_angles(angles)
         target_angles = {
@@ -116,7 +116,7 @@ class IncrementalPositionHoldPlanner:
             finger:
             ForceDecision(
                 control_u=0.0,
-                next_torque=torque,
+                next_current=current,
                 target_angles=target_angles,
                 is_fragile_mode=False,
                 near_limit=False,

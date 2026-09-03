@@ -16,67 +16,67 @@ def main():
         JointId.THUMB_MCP: {
             "angle": 0,
             "speed": 0,
-            "torque": 0
+            "current": 0
         },
         JointId.THUMB_TMC_FE: {
             "angle": 0,
             "speed": 0,
-            "torque": 0
+            "current": 0
         },
         JointId.THUMB_TMC_AA: {
             "angle": 0,
             "speed": 0,
-            "torque": 0
+            "current": 0
         },
         JointId.THUMB_TMC_PS: {
             "angle": 0,
             "speed": 0,
-            "torque": 0
+            "current": 0
         },
         JointId.FF_PIP: {
             "angle": 0,
             "speed": 0,
-            "torque": 0
+            "current": 0
         },
         JointId.FF_MCP: {
             "angle": 0,
             "speed": 0,
-            "torque": 0
+            "current": 0
         },
         JointId.FF_MCP_AA: {
             "angle": 0,
             "speed": 0,
-            "torque": 0
+            "current": 0
         },
         JointId.MF_PIP: {
             "angle": 0,
             "speed": 0,
-            "torque": 0
+            "current": 0
         },
         JointId.MF_MCP: {
             "angle": 0,
             "speed": 0,
-            "torque": 0
+            "current": 0
         },
         JointId.RF_PIP: {
             "angle": 0,
             "speed": 0,
-            "torque": 0
+            "current": 0
         },
         JointId.RF_MCP: {
             "angle": 0,
             "speed": 0,
-            "torque": 0
+            "current": 0
         },
         JointId.LF_PIP: {
             "angle": 0,
             "speed": 0,
-            "torque": 0
+            "current": 0
         },
         JointId.LF_MCP: {
             "angle": 0,
             "speed": 0,
-            "torque": 0
+            "current": 0
         },
     }
 
@@ -98,7 +98,7 @@ def main():
             for joint_id in joint_params:
                 joint_params[joint_id]["angle"] = 0
                 joint_params[joint_id]["speed"] = 0
-                joint_params[joint_id]["torque"] = 0
+                joint_params[joint_id]["current"] = 0
 
             # Record joints that have been set
             set_joints = set()
@@ -120,7 +120,7 @@ def main():
                         for joint_id in set_joints:
                             params = joint_params[joint_id]
                             print(
-                                f"  {JointId(joint_id).name}: angle={params['angle']}, speed={params['speed']}, torque={params['torque']}"
+                                f"  {JointId(joint_id).name}: angle={params['angle']}, speed={params['speed']}, current={params['current']}"
                             )
 
                     joint_input = input("Enter joint ID (or press Enter to finish): ").strip()
@@ -137,16 +137,16 @@ def main():
                                 f"Angle value [{current_params['angle']}]: ").strip()
                             speed_input = input(
                                 f"Speed value [{current_params['speed']}]: ").strip()
-                            torque_input = input(
-                                f"Torque value [{current_params['torque']}]: ").strip()
+                            current_input = input(
+                                f"Current value [{current_params['current']}]: ").strip()
 
                             # Update parameters for selected joint
                             if angle_input:
                                 joint_params[joint_id]["angle"] = float(angle_input)
                             if speed_input:
                                 joint_params[joint_id]["speed"] = int(speed_input)
-                            if torque_input:
-                                joint_params[joint_id]["torque"] = int(torque_input)
+                            if current_input:
+                                joint_params[joint_id]["current"] = int(current_input)
                         else:
                             print("Invalid joint ID")
                     else:
@@ -163,7 +163,7 @@ def main():
                         id=joint_id,
                         angle=params["angle"],
                         speed=params["speed"],
-                        torque=params["torque"],
+                        current=params["current"],
                     ))
 
             result = hand.move_joints(joints)

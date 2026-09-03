@@ -1,4 +1,4 @@
-# GHand Python SDK
+﻿# GHand Python SDK
 
 [![Version](https://img.shields.io/badge/version-v2.2.1-blue.svg)](src/ghand/version.py)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
@@ -32,8 +32,8 @@ GHand 灵巧手官方 Python SDK，提供 EtherCAT、CAN-FD、RS-485 通信接�
   - 清除故障、初始化关节、停止运动，并执行常用设备操作。
 
 - **关节控制**
-  - 按位置、速度或力矩模式控制单个或多个关节。
-  - 读取当前关节角度、速度、力矩、状态和错误反馈。
+  - 按位置、速度或电流模式控制单个或多个关节。
+  - 读取当前关节角度、速度、电流、状态和错误反馈。
   - 根据产品配置自动限制主动关节命令范围。
 
 - **触觉感知**
@@ -271,7 +271,7 @@ CAN-FD 波特率档位：
 
 - `examples/tutorial/01.get_basic_info.py`：连接设备并读取基础信息
 - `examples/tutorial/02.move_joints.py`：位置控制
-- `examples/tutorial/03.torque_control.py`：力矩控制
+- `examples/tutorial/03.current_control.py`：电流控制
 - `examples/tutorial/04.speed_control.py`：速度控制
 - `examples/tutorial/05.tactile_callback.py`：触觉数据回调
 - `examples/tutorial/06.subscription_demo.py`：数据订阅

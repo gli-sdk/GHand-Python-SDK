@@ -1,4 +1,4 @@
-.. _downloads:
+﻿.. _downloads:
 
 Resource Downloads
 ==================
@@ -47,7 +47,7 @@ All example code is included in the ``examples/`` directory of the SDK repositor
 2. **Joint Control** - ``02.move_joints.py``
    - Control single joint motion
    - Control multiple joints simultaneously
-   - Set target angle, speed, and torque
+   - Set target angle, speed, and current
 
 3. **Preset Gestures** - ``01.preset_gesture.py``
    - Execute preset gesture actions

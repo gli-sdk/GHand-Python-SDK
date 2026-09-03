@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 # Copyright 2026 GLITech
@@ -228,8 +228,9 @@ class CommType(enum.Enum):
 
 class CtrlMode(enum.Enum):
     POSITION = 0
-    TORQUE = 1
-    SPEED = 2
+    SPEED = 1
+    CURRENT = 2
+    MIT = 3
 
 
 class TactileSensorId(enum.IntEnum):
@@ -370,7 +371,7 @@ class HandFaultInfo:
 
         parts = []
         if self.temperature is not None:
-            parts.append(f"Temperature: {self.temperature}°C")
+            parts.append(f"Temperature: {self.temperature}degC")
 
         msg = base_msg
         if parts:
@@ -413,9 +414,13 @@ class JointCommand:
     """Single joint command sent to the device."""
 
     id: int = JointId.THUMB_IP
+    mode: CtrlMode | None = None
+    stop: int = 1
     angle: float = 0.0  # degrees
     speed: int = 0
-    torque: int = 0
+    current: int = 0
+    kp: int = 0
+    kd: int = 0
 
 
 @dataclass

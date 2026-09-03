@@ -1,4 +1,4 @@
-# GHand Python SDK
+﻿# GHand Python SDK
 
 [![Version](https://img.shields.io/badge/version-v2.2.1-blue.svg)](src/ghand/version.py)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
@@ -32,8 +32,8 @@ The official Python SDK for the GHand dexterous hand. It provides high-level API
   - Clear faults, initialize joints, stop motion, and run common device operations.
 
 - **Joint control**
-  - Command one or more joints by position, speed, or torque.
-  - Read current joint angle, speed, torque, state, and error feedback.
+  - Command one or more joints by position, speed, or current.
+  - Read current joint angle, speed, current, state, and error feedback.
   - Clamp active joint commands to product-specific limits.
 
 - **Tactile sensing**
@@ -271,7 +271,7 @@ CAN-FD baud-rate gears:
 
 - `examples/tutorial/01.get_basic_info.py`: connect and read device information
 - `examples/tutorial/02.move_joints.py`: position control
-- `examples/tutorial/03.torque_control.py`: torque control
+- `examples/tutorial/03.current_control.py`: current control
 - `examples/tutorial/04.speed_control.py`: speed control
 - `examples/tutorial/05.tactile_callback.py`: tactile data callback
 - `examples/tutorial/06.subscription_demo.py`: data subscription

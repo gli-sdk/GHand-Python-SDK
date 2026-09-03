@@ -26,9 +26,9 @@ def main():
             print("Connection failed")
             return
 
-        print("\n=== Torque Control Mode Demo ===")
+        print("\n=== current control Mode Demo ===")
 
-        # Torque control cycle
+        # current control cycle
         cycle_count = 0
         max_cycles = 1  # Set to 0 for infinite loop
 
@@ -38,29 +38,29 @@ def main():
                 break
 
             joints = []
-            joints.append(JointCommand(id=JointId.THUMB_TMC_FE, angle=36, speed=50, torque=100))
-            joints.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=70, speed=50, torque=100))
-            joints.append(JointCommand(id=JointId.THUMB_TMC_PS, angle=10, speed=50, torque=100))
-            joints.append(JointCommand(id=JointId.FF_MCP, angle=51, speed=50, torque=100))
-            joints.append(JointCommand(id=JointId.MF_MCP, angle=46, speed=50, torque=100))
-            joints.append(JointCommand(id=JointId.RF_MCP, angle=40, speed=50, torque=100))
+            joints.append(JointCommand(id=JointId.THUMB_TMC_FE, angle=36, speed=50, current=100))
+            joints.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=70, speed=50, current=100))
+            joints.append(JointCommand(id=JointId.THUMB_TMC_PS, angle=10, speed=50, current=100))
+            joints.append(JointCommand(id=JointId.FF_MCP, angle=51, speed=50, current=100))
+            joints.append(JointCommand(id=JointId.MF_MCP, angle=46, speed=50, current=100))
+            joints.append(JointCommand(id=JointId.RF_MCP, angle=40, speed=50, current=100))
 
             result = hand.move_joints(joints)
             if result:
                 time.sleep(2)  # Wait for movement to complete
 
-            print(f"\n--- Cycle {cycle_count}: Torque control started ---")
+            print(f"\n--- Cycle {cycle_count}: current control started ---")
 
-            # Step 1: Apply torque to close fingers
-            print("\nStep 1: Applying torque to close fingers (torque=10)")
-            torque_joints = [
-                JointCommand(id=JointId.THUMB_TMC_AA, torque=5),
-                JointCommand(id=JointId.THUMB_MCP, torque=8),
-                JointCommand(id=JointId.FF_PIP, torque=8),
-                JointCommand(id=JointId.MF_PIP, torque=8),
+            # Step 1: Apply current to close fingers
+            print("\nStep 1: Applying current to close fingers (current=10)")
+            current_joints = [
+                JointCommand(id=JointId.THUMB_TMC_AA, current=5),
+                JointCommand(id=JointId.THUMB_MCP, current=8),
+                JointCommand(id=JointId.FF_PIP, current=8),
+                JointCommand(id=JointId.MF_PIP, current=8),
             ]
 
-            result = hand.move_joints(torque_joints, mode=CtrlMode.TORQUE)
+            result = hand.move_joints(current_joints, mode=CtrlMode.CURRENT)
             if result:
                 while True:
                     time.sleep(2)
@@ -79,7 +79,7 @@ def main():
                                 f"angle: {joint.angle:.2f}deg,\t"
                                 f"speed: {joint.speed},\tcurrent: {joint.current}")
             else:
-                print("Failed to send torque command")
+                print("Failed to send current command")
                 break
     except KeyboardInterrupt:
         print("\nProgram interrupted by user.")

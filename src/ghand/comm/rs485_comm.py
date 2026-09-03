@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 # Copyright 2026 GLITech
@@ -38,13 +38,11 @@ except ImportError:
     ModbusSerialClient = None  # type: ignore[misc,assignment]
     ModbusException = Exception  # type: ignore[misc,assignment]
 from ..types import (
-    ErrorCode,
     HandState,
     JointData,
     JointId,
     ProductConfig,
     SelfTestErrorInfo,
-    State,
     TactileInfo,
 )
 from .icomm import IComm
@@ -383,7 +381,7 @@ class Rs485Comm(IComm):
         self,
         baudrate_gear: int | None = None,
     ) -> bool:
-        """Write the baud rate gear to holding register 0x002C.
+        """Write the baud rate gear to holding register 0x0004.
 
         The value is saved to Flash and takes effect after the next power-up.
 
@@ -411,7 +409,7 @@ class Rs485Comm(IComm):
 
         Args:
             joints: List of JointCommand objects.
-            mode: Control mode (position, speed, or torque).
+            mode: Control mode (position, speed, or current).
 
         Returns:
             True if all commands are sent successfully.
@@ -427,12 +425,7 @@ class Rs485Comm(IComm):
             base_addr = self._profile.joint_control_addresses.get(joint_id)
             if base_addr is None:
                 continue
-            position, speed_torque = encode_joint_command(joint)
-            if self._profile.control_layout == "per_joint_mode_3reg":
-                mode_stop = ((mode.value & 0xFF) << 8) | 0x00
-                registers = [mode_stop, position, speed_torque]
-            else:
-                registers = [position, speed_torque]
+            registers = encode_joint_command(joint, mode)
 
             result = self._write_registers(base_addr, registers)
             if result is None or result.isError():
@@ -676,7 +669,7 @@ class Rs485Comm(IComm):
         result = self._write_register(REG_CLEAR_FAULT, 0x0100)
         if result is None or result.isError():
             return False
-        if not self._wait_holding_result(0x0001):
+        if not self._wait_holding_result(REG_CLEAR_FAULT):
             logger.error("Fault clearance failed or timed out")
             return False
         logger.info("Fault cleared")
