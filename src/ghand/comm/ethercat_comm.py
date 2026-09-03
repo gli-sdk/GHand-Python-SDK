@@ -581,6 +581,9 @@ class EthercatComm(IComm):
             info.version = VersionCheckError(self._get_version_check_error_code())
             logger.info("Self-test error: version mismatch (0x%02X)", int(info.version))
 
+        if info.summary & SelfTestError.POSITION_SENSOR_UNMAPPED:
+            logger.info("Self-test error: position sensor unmapped")
+
         if info.summary & SelfTestError.POSITION_SENSOR:
             info.position_sensor = self._collect_motor_errors(
                 self._get_position_sensor_error_codes()

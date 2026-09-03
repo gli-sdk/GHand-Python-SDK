@@ -188,7 +188,7 @@ class CanfdTransport:
     ):
         self._can_index = can_index
         self._channel = channel
-        self._serial: serial.Serial | None = None
+        self._serial = None
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------------

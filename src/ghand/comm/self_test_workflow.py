@@ -154,6 +154,8 @@ def build_self_test_error_info(
             read_diagnostic_error_codes(0xA1, read_registers, write_register)[0]
         )
         logger.info("Self-test error: version mismatch (0x%02X)", int(info.version))
+    if info.summary & SelfTestError.POSITION_SENSOR_UNMAPPED:
+        logger.info("Self-test error: position sensor unmapped")
     if info.summary & SelfTestError.POSITION_SENSOR:
         info.position_sensor = collect(
             read_diagnostic_error_codes(0xA2, read_registers, write_register)

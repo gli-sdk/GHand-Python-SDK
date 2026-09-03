@@ -214,6 +214,7 @@ class SelfTestError(enum.IntFlag):
 
     NONE = 0x00
     MOTOR = 0x01
+    POSITION_SENSOR_UNMAPPED = 0x02
     ZEROING = 0x04
     FAN = 0x08
     TEMPERATURE_SENSOR = 0x10
@@ -442,6 +443,8 @@ class SelfTestErrorInfo:
             ]
             lines[0] += f" ({', '.join(names)})"
 
+        if self.summary & SelfTestError.POSITION_SENSOR_UNMAPPED:
+            lines.append("position_sensor_unmapped: position sensor unmapped")
         if self.summary & SelfTestError.VERSION:
             names = [
                 flag.name

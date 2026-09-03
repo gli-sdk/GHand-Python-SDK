@@ -47,6 +47,15 @@ def _describe_tactile(code: int) -> str:
     return ", ".join(names) if names else f"unknown (0x{code:02X})"
 
 
+def _describe_summary(summary: SelfTestError) -> str:
+    names = [
+        flag.name
+        for flag in SelfTestError
+        if flag != SelfTestError.NONE and summary & flag
+    ]
+    return ", ".join(names) if names else "NONE"
+
+
 def _fmt_single_code(summary, flag, code, description) -> str:
     """Format a single-value error field. Show 'none' if not queried."""
     if not (summary & flag):
@@ -70,7 +79,11 @@ def main():
     info = hand.get_self_test_error_info()
 
     print("Self-test failed! Error details:")
-    print(f"  {'summary':<16} 0x{int(info.summary):02X}  ({info.summary.name})")
+    print(f"  {'summary':<16} 0x{int(info.summary):02X}  ({_describe_summary(info.summary)})")
+    print(
+        f"  {'pos_unmapped':<16} "
+        f"{'position sensor unmapped' if info.summary & SelfTestError.POSITION_SENSOR_UNMAPPED else 'none'}"
+    )
     print(f"  {'version':<16} 0x{int(info.version):02X}")
     print(f"  {'position_sensor':<16} {_fmt_motor_errors(info.position_sensor, lambda c: 'position sensor abnormal' if c else '')}")
     print(f"  {'tactile_sensor':<16} {_fmt_motor_errors(info.tactile_sensor, _describe_tactile)}")
