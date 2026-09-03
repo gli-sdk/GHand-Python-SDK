@@ -44,7 +44,7 @@ class SensorClient:
         """Start subscribing sensor data and clear stale caches."""
         self._latest_tactile_data = None
         self._latest_joint_feedback = None
-        self._sub_id = self._hand.subscribe(self._on_data)
+        self._sub_id = self._hand.subscribe(self._on_data,interval_ms = 20)
 
     def stop(self, clear_joint_feedback: bool = False) -> None:
         """Stop subscription and optionally clear cached joint feedback."""

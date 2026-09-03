@@ -67,7 +67,7 @@ class JointCommandBuilder:
         ]
         joints += [
             JointCommand(id=JointId.THUMB_TMC_PS, angle=0.0, speed=0, torque=thumb_aux_torque),
-            JointCommand(id=JointId.THUMB_TMC_AA, angle=20.0, speed=0, torque=thumb_aux_torque),
+            JointCommand(id=JointId.THUMB_TMC_AA, angle=0.0, speed=0, torque=thumb_aux_torque),
         ]
         return joints
 
