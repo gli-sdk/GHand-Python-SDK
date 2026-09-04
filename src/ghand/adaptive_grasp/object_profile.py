@@ -124,6 +124,7 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         friction_coeff=0.8,
         is_fragile=True,
         material="latex",
+        phase_closing_torque=9,
         position_hold_torque=8,
         position_hold_speed=8,
     ),
