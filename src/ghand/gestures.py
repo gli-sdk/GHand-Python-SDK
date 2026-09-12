@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
 # Copyright 2026 GLITech
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -142,34 +145,89 @@ def execute_gesture(
     return result
 
 
-def _wait_for_completion(hand: GHand) -> bool:
+def _wait_for_completion(
+    hand: GHand,
+    timeout_s: float = 5.0,
+    poll_period_s: float = 0.005,
+    warmup_s: float = 0.1,
+    transient_error_grace_s: float = 0.1,
+) -> bool:
     """Wait for the hand motion to complete and verify the final state.
+
+    A single ``get_hand_info()`` failure is tolerated: EtherCAT can briefly
+    return no fresh TPDO frame during a bad cycle, and treating that as a
+    fatal test error causes false negatives. We keep retrying until either
+    we get a fresh reading, the transient-error grace period elapses, or
+    the overall deadline is hit.
 
     Args:
         hand: GHand instance.
+        timeout_s: Overall deadline for the motion to complete.
+        poll_period_s: Delay between polls.
+        warmup_s: Grace period during which we allow the hand to not yet
+            report RUNNING before we assume the command produced no motion.
+        transient_error_grace_s: Contiguous duration for which
+            ``get_hand_info()`` may fail before we give up.
 
     Returns:
         True if the hand ends in a normal state, False otherwise.
     """
-    start_time = time.time()
+    deadline = time.monotonic() + timeout_s
+    start_time = time.monotonic()
     has_been_running = False
+    hand_info = None
+    last_error = None
+    first_error_time = None
 
     while True:
-        hand_info = hand.get_hand_info()
+        try:
+            hand_info = hand.get_hand_info()
+            last_error = None
+            first_error_time = None
+        except Exception as exc:
+            # Only fail if we've been unable to read state for a sustained
+            # window — a single WKC miss must not surface as a test error.
+            now = time.monotonic()
+            if first_error_time is None:
+                first_error_time = now
+            last_error = exc
+            if now - first_error_time >= transient_error_grace_s:
+                logger.error(
+                    "get_hand_info() failed for %.3fs while waiting for motion: %s",
+                    now - first_error_time,
+                    exc,
+                )
+                return False
+            if now >= deadline:
+                logger.error(
+                    "Timed out waiting for motion; last error: %s", exc
+                )
+                return False
+            time.sleep(poll_period_s)
+            continue
+
         if hand_info.state == State.RUNNING:
             has_been_running = True
         elif has_been_running and hand_info.state == State.STOPPED:
             break
-        elif hand_info.state in (State.ABNORMAL_RUNNING, State.PROTECTIVE_STOPPED):
+        elif hand_info.state.is_abnormal:
             break
-        elif not has_been_running and time.time() - start_time >= 0.1:
+        elif not has_been_running and time.monotonic() - start_time >= warmup_s:
             break
-        time.sleep(0.005)
 
-    if (
-        hand_info.state in [State.ABNORMAL_RUNNING, State.PROTECTIVE_STOPPED]
-        or hand_info.error != ErrorCode.NORMAL
-    ):
+        if time.monotonic() >= deadline:
+            logger.warning("Motion did not complete within %.3fs", timeout_s)
+            break
+
+        time.sleep(poll_period_s)
+
+    if hand_info is None:
+        logger.warning(
+            "No hand_info observed while waiting for motion (last error: %s)",
+            last_error,
+        )
+        return False
+    if hand_info.state.is_abnormal or hand_info.error != ErrorCode.NORMAL:
         logger.warning("Action completed with error state. Please clear fault and retry.")
         return False
     return True

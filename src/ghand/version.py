@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
 # Copyright 2026 GLITech
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,7 +18,7 @@
 """GHand SDK version information."""
 
 SDK_VERSION_MAJOR = 2
-SDK_VERSION_MINOR = 1
-SDK_VERSION_REVISION = 0
+SDK_VERSION_MINOR = 2
+SDK_VERSION_REVISION = 1
 
-__version__ = "2.1.0"
+__version__ = "2.2.1"

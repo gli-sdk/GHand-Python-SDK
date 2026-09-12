@@ -1,12 +1,11 @@
-import logging
+﻿import logging
 import time
 
 from ghand import ProductType, configure_logging
 from ghand.ghand import CommType, CtrlMode, GHand, JointCommand, JointId
-from ghand.types import ErrorCode, State
 
 # Configure SDK logging (shows connection state, warnings, errors)
-configure_logging(level=logging.DEBUG)
+configure_logging(level=logging.INFO)
 
 
 def main():
@@ -57,9 +56,9 @@ def main():
                 print("Current joint states:")
                 for joint in current_joints:
                     if joint.id in [JointId.THUMB_MCP, JointId.FF_PIP, JointId.MF_PIP]:
-                        print(f"  {JointId(joint.id).name:<15}- state:{State(joint.state).name},\t"
-                              f"error:{ErrorCode(joint.error).name},\t"
-                              f"angle: {joint.angle:.2f}°,\t"
+                        print(f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\t"
+                              f"error:{joint.error:<30},\t"
+                              f"angle: {joint.angle:.2f}deg,\t"
                               f"speed: {joint.speed},\ttorque: {joint.torque}")
             else:
                 print("Failed to send torque command")
@@ -89,9 +88,9 @@ def main():
                 print("Current joint states (released):")
                 for joint in current_joints:
                     if joint.id in [JointId.THUMB_MCP, JointId.FF_PIP, JointId.MF_PIP]:
-                        print(f"  {JointId(joint.id).name:<15}- state:{State(joint.state).name},\t"
-                              f"error:{ErrorCode(joint.error).name},\t"
-                              f"angle: {joint.angle:.2f}°,\t"
+                        print(f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\t"
+                              f"error:{joint.error:<30},\t"
+                              f"angle: {joint.angle:.2f}deg,\t"
                               f"speed: {joint.speed},\ttorque: {joint.torque}")
             else:
                 print("Failed to send torque command")

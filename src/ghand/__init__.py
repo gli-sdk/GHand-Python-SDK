@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
 # Copyright 2026 GLITech
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,9 +30,18 @@ from . import logging_config  # auto-initialize logging handlers
 from ._converter import JointConverter, joints_to_nparray, nparray_to_joints
 from .gestures import execute_gesture, get_all_gestures
 from .ghand import GHand
+from .errors import (
+    CommunicationError,
+    GHandError,
+    HandStateError,
+    OperationResult,
+    SdkError,
+)
+from .diagnostics import Diagnostics
 from .types import (
     CommType,
     CtrlMode,
+    CANFDBitTiming,
     DeviceData,
     ErrorCode,
     GestureType,
@@ -39,6 +51,7 @@ from .types import (
     JointData,
     JointId,
     ProductType,
+    RS485BaudRate,
     State,
     TactileInfo,
     TactileSensorId,
@@ -53,12 +66,20 @@ __all__ = [
     "JointData",
     "JointId",
     "ProductType",
+    "RS485BaudRate",
+    "CANFDBitTiming",
     "HandState",
     "HandType",
     "TactileSensorId",
     "TactileInfo",
     "CommType",
     "CtrlMode",
+    "SdkError",
+    "OperationResult",
+    "GHandError",
+    "CommunicationError",
+    "HandStateError",
+    "Diagnostics",
     # Enums
     "State",
     "ErrorCode",

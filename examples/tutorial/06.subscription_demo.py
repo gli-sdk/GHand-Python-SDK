@@ -1,9 +1,9 @@
-import logging
+﻿import logging
 import time
 
 from ghand import ProductType, configure_logging
 from ghand.ghand import CommType, GHand
-from ghand.types import ErrorCode, State, JointId
+from ghand.types import JointId
 
 # Configure SDK logging (shows connection state, warnings, errors)
 configure_logging(level=logging.INFO)
@@ -20,9 +20,9 @@ def data_callback(data):
     print(f"  Hand state: {data.hand}")
     for joint in data.joints:
         print(
-            f"  {JointId(joint.id).name}: angle={joint.angle:.1f}°, "
+            f"  {JointId(joint.id).name}: angle={joint.angle:.1f}deg, "
             f"speed={joint.speed}, torque={joint.torque}, "
-            f"state={State(joint.state).name}, error={ErrorCode(joint.error).name}"
+            f"state={joint.state}, error={joint.error}"
         )
     if data.tactile:
         for sensor_id, tactile in data.tactile.items():

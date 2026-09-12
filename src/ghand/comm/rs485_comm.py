@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
 # Copyright 2026 GLITech
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,7 +22,6 @@ from __future__ import annotations
 import logging
 import os
 import platform
-import struct
 import threading
 import time
 from pathlib import Path
@@ -41,11 +43,27 @@ from ..types import (
     JointData,
     JointId,
     ProductConfig,
+    SelfTestErrorInfo,
     State,
     TactileInfo,
 )
 from .icomm import IComm
 from .modbus_codec import (
+    BAUDRATE_CONFIG_REGISTER,
+    REG_CLEAR_FAULT,
+    REG_DEVICE_NAME,
+    REG_FIRMWARE_VERSION,
+    REG_HAND_TYPE,
+    REG_HARDWARE_VERSION,
+    REG_INIT_JOINT,
+    REG_IN_FINGER_TACTILE_SENSOR_VER,
+    REG_IN_FIRMWARE_PACKAGE_VER,
+    REG_IN_MOTOR_DRV_VER,
+    REG_IN_POSITION_SENSOR_VER,
+    REG_IN_SERIAL_NUMBER,
+    REG_IN_TACTILE_SENSOR_VER,
+    REG_IN_THUMB_TACTILE_SENSOR_VER,
+    REG_SLAVE_ID,
     build_tactile_info,
     encode_joint_command,
     get_joint_input_span,
@@ -55,13 +73,28 @@ from .modbus_codec import (
     parse_hand_info,
     parse_hand_type,
     parse_hardware_version,
+    parse_ascii_serial_number,
+    parse_packed_firmware_version,
     parse_joints,
-    parse_serial_number,
     parse_tactile_distributed,
     parse_tactile_resultant,
     parse_tactile_state_error,
     registers_to_bytes,
 )
+from .self_test_workflow import build_self_test_error_info
+
+# RS485 baud rate gear map per protocol documentation.
+# Writing a gear value to BAUDRATE_CONFIG_REGISTER selects the serial baud rate;
+# the new configuration takes effect after the next power-up.
+RS485_BAUDRATE_GEAR_MAP: dict[int, int] = {
+    0x00: 57_600,
+    0x01: 115_200,
+    0x02: 230_400,
+    0x03: 460_800,
+    0x04: 921_600,
+    0x05: 1_000_000,
+}
+RS485_DEFAULT_BAUDRATE_GEAR = 0x05
 
 logger = logging.getLogger("ghand.rs485_comm")
 
@@ -70,7 +103,10 @@ class Rs485Comm(IComm):
     """IComm implementation for RS485/Modbus RTU."""
 
     _DEFAULT_POLL_INTERVAL_SEC = 0.1
-    _DEFAULT_BAUDRATE = 1_000_000
+    _DEFAULT_BAUDRATE_GEAR = RS485_DEFAULT_BAUDRATE_GEAR
+    SUPPORTED_BAUDRATE_GEARS = tuple(
+        sorted(RS485_BAUDRATE_GEAR_MAP.keys(), reverse=True)
+    )
     _LINUX_PORT_PATTERNS = (
         "/dev/serial/by-id/*",
         "/dev/ttyUSB*",
@@ -202,11 +238,24 @@ class Rs485Comm(IComm):
             device_name,
         )
 
-    def connect(self, device_name: str) -> bool:
+    def connect(
+        self,
+        device_name: str,
+        slave_id: int | None = None,
+        baudrate_gear: int | None = None,
+        quiet: bool = False,
+    ) -> bool:
         """Connect to the specified RS485 device.
 
         Args:
             device_name: Serial port name (e.g., "COM3", "/dev/ttyUSB0").
+            slave_id: Optional target slave ID. If provided, only this ID is
+                used; otherwise the connection polls 0x31 and 0x32.
+            baudrate_gear: Connection baud rate gear. If None, the value is
+                taken from the ``GHAND_RS485_BAUDRATE_GEAR`` environment
+                variable, falling back to the default gear (0x05).
+            quiet: When True, suppress non-fatal failure logs. Useful when the
+                caller is scanning several ports or baud rates.
 
         Returns:
             True if the connection succeeds, False otherwise.
@@ -217,13 +266,39 @@ class Rs485Comm(IComm):
 
         resolved_device = self._resolve_device_name(device_name)
         if resolved_device is None:
-            logger.error("No RS485 serial adapters found")
+            if not quiet:
+                logger.error("No RS485 serial adapters found")
             return False
 
-        baudrate = int(os.environ.get("GHAND_RS485_BAUDRATE", self._DEFAULT_BAUDRATE))
+        if baudrate_gear is None:
+            baudrate_gear = int(
+                os.environ.get("GHAND_RS485_BAUDRATE_GEAR", self._DEFAULT_BAUDRATE_GEAR)
+            )
+
+        baudrate = RS485_BAUDRATE_GEAR_MAP.get(baudrate_gear)
+        if baudrate is None:
+            if not quiet:
+                logger.error("Invalid RS485 baudrate gear: %s", baudrate_gear)
+            return False
+
+        if self._connect_with_baudrate(resolved_device, slave_id, baudrate, quiet):
+            logger.info(
+                "Device connected via RS485 (%s, slave_id=0x%02X, baudrate_gear=0x%02X, baudrate=%s)",
+                resolved_device,
+                self._slave_id,
+                baudrate_gear,
+                baudrate,
+            )
+            return True
+        return False
+
+    def _connect_with_baudrate(
+        self, device_name: str, slave_id: int | None, baudrate: int, quiet: bool
+    ) -> bool:
+        """Attempt a single RS485 connection with the given baud rate."""
         try:
             self._client = ModbusSerialClient(
-                port=resolved_device,
+                port=device_name,
                 baudrate=baudrate,
                 bytesize=8,
                 parity="N",
@@ -231,43 +306,43 @@ class Rs485Comm(IComm):
                 timeout=1.0,
             )
             if not self._client.connect():
-                self._log_linux_connect_hint(resolved_device)
+                if not quiet:
+                    self._log_linux_connect_hint(device_name)
                 self._client.close()
                 self._client = None
                 return False
-            # Verify device by polling the configured ID first, then common defaults.
-            slave_ids = [self._slave_id, 0x31, 0x32]
-            for slave_id in dict.fromkeys(slave_ids):
+            slave_ids = [slave_id] if slave_id is not None else [0x31, 0x32]
+            for target_slave_id in dict.fromkeys(slave_ids):
+                if target_slave_id is None:
+                    continue
                 try:
                     result = self._read_holding_registers(
-                        0x0000, count=1, device_id=slave_id
+                        REG_SLAVE_ID, count=1, device_id=target_slave_id
                     )
                 except ModbusException:
-                    logger.debug("No response from RS485 slave 0x%02X", slave_id)
+                    logger.debug("No response from RS485 slave 0x%02X", target_slave_id)
                     continue
                 if result is not None and not result.isError():
-                    self._slave_id = result.registers[0] or slave_id
+                    self._slave_id = target_slave_id
                     break
             else:
                 self._client.close()
                 self._client = None
-                logger.error("No RS485 device responded on %s", resolved_device)
+                if not quiet:
+                    logger.error("No RS485 device responded on %s", device_name)
                 return False
             self._connected = True
-            logger.info(
-                "Device connected via RS485 (%s, baudrate=%s)",
-                resolved_device,
-                baudrate,
-            )
             return True
         except ModbusException as e:
-            logger.error("Failed to connect to RS485 device: %s", e)
+            if not quiet:
+                logger.error("Failed to connect to RS485 device: %s", e)
             if self._client:
                 self._client.close()
                 self._client = None
             return False
         except (OSError, ValueError) as e:
-            self._log_linux_connect_hint(resolved_device, e)
+            if not quiet:
+                self._log_linux_connect_hint(device_name, e)
             if self._client:
                 self._client.close()
                 self._client = None
@@ -295,7 +370,7 @@ class Rs485Comm(IComm):
         if not 0 < slave_id <= 0xFF:
             raise ValueError("slave_id must be in range 1..255")
         try:
-            result = self._write_register(0x0000, slave_id)
+            result = self._write_register(REG_SLAVE_ID, slave_id)
         except Exception as exc:
             logger.error("Failed to set RS485 slave ID to 0x%02X: %s", slave_id, exc)
             return False
@@ -303,6 +378,29 @@ class Rs485Comm(IComm):
             return False
         self._slave_id = slave_id
         return True
+
+    def set_baudrate_config(
+        self,
+        baudrate_gear: int | None = None,
+    ) -> bool:
+        """Write the baud rate gear to holding register 0x002C.
+
+        The value is saved to Flash and takes effect after the next power-up.
+
+        Args:
+            baudrate_gear: Gear value written directly to the register. When
+                omitted the default gear (0x05) is used.
+
+        Returns:
+            True if the device accepted the configuration.
+        """
+        gear = baudrate_gear if baudrate_gear is not None else RS485_DEFAULT_BAUDRATE_GEAR
+        try:
+            result = self._write_register(BAUDRATE_CONFIG_REGISTER, gear)
+        except Exception as exc:
+            logger.error("Failed to set RS485 baudrate config to gear 0x%02X: %s", gear, exc)
+            return False
+        return result is not None and not result.isError()
 
     # ===== Joint control (single register write) =====
 
@@ -460,19 +558,30 @@ class Rs485Comm(IComm):
 
     def get_device_name(self) -> str:
         """Retrieve the device name."""
-        return parse_device_name(self._read_input_registers_bytes(0x1000, 8))
+        return self._get_string_info(REG_DEVICE_NAME, 8, parse_device_name)
 
     def get_hardware_version(self) -> str:
         """Retrieve the hardware version."""
-        return parse_hardware_version(self._read_input_registers_bytes(0x1008, 8))
+        return self._get_string_info(REG_HARDWARE_VERSION, 8, parse_hardware_version)
 
     def get_firmware_version(self) -> str:
         """Retrieve the firmware version."""
-        return parse_firmware_version(self._read_input_registers_bytes(0x1010, 8))
+        return self._get_string_info(REG_FIRMWARE_VERSION, 8, parse_firmware_version)
 
-    def get_serial_number(self) -> int:
+    def _get_string_info(self, register: int, count: int, parse) -> str:
+        try:
+            return parse(self._read_input_registers_bytes(register, count)) or "N/A"
+        except Exception:
+            return "N/A"
+
+    def get_serial_number(self) -> str:
         """Retrieve the product serial number."""
-        return parse_serial_number(self._read_input_registers_bytes(0x1018, 8))
+        try:
+            return parse_ascii_serial_number(
+                self._read_input_registers_bytes(REG_IN_SERIAL_NUMBER, 10)
+            )
+        except Exception:
+            return "N/A"
 
     def get_hand_type(self) -> int:
         """Retrieve the hand type.
@@ -480,17 +589,43 @@ class Rs485Comm(IComm):
         Returns:
             0 for unknown, 1 for left hand, 2 for right hand.
         """
-        return parse_hand_type(self._read_input_registers_bytes(0x1020, 1))
-
-    def get_motor_driver_version(self) -> tuple:
-        """Retrieve the motor driver version."""
         try:
-            result = self._read_holding_registers(0x2007, count=3)
-            if result is None or result.isError():
-                return (0, 0, 0)
-            return tuple(result.registers)
+            return parse_hand_type(self._read_input_registers_bytes(REG_HAND_TYPE, 1))
         except Exception:
-            return (0, 0, 0)
+            return 0
+
+    def _get_packed_version(self, register: int) -> str:
+        try:
+            raw = self._read_input_registers_bytes(register, 1)
+            if len(raw) < 2 or raw[:2] == b"\x00\x00":
+                return "N/A"
+            return parse_packed_firmware_version(raw)
+        except Exception:
+            return "N/A"
+
+    def get_firmware_package_version(self) -> str:
+        """Retrieve the firmware package version."""
+        return self._get_packed_version(REG_IN_FIRMWARE_PACKAGE_VER)
+
+    def get_position_sensor_version(self) -> str:
+        """Retrieve the position sensor version."""
+        return self._get_packed_version(REG_IN_POSITION_SENSOR_VER)
+
+    def get_tactile_sensor_version(self) -> str:
+        """Retrieve the tactile MCU version."""
+        return self._get_packed_version(REG_IN_TACTILE_SENSOR_VER)
+
+    def get_motor_driver_version(self) -> str:
+        """Retrieve the motor driver version."""
+        return self._get_packed_version(REG_IN_MOTOR_DRV_VER)
+
+    def get_thumb_tactile_sensor_version(self) -> str:
+        """Retrieve the thumb tactile sensor version."""
+        return self._get_packed_version(REG_IN_THUMB_TACTILE_SENSOR_VER)
+
+    def get_finger_tactile_sensor_version(self) -> str:
+        """Retrieve the finger tactile sensor version."""
+        return self._get_packed_version(REG_IN_FINGER_TACTILE_SENSOR_VER)
 
     # ===== Tactile sensor =====
 
@@ -538,7 +673,7 @@ class Rs485Comm(IComm):
 
     def clear_fault(self) -> bool:
         """Clear device faults."""
-        result = self._write_register(0x0001, 0x0100)
+        result = self._write_register(REG_CLEAR_FAULT, 0x0100)
         if result is None or result.isError():
             return False
         if not self._wait_holding_result(0x0001):
@@ -549,11 +684,40 @@ class Rs485Comm(IComm):
 
     def init_joint(self) -> bool:
         """Initialize joint positions."""
-        result = self._write_register(0x0002, 0x0001)
+        result = self._write_register(REG_INIT_JOINT, 0x0001)
         if result is None or result.isError():
             return False
         logger.info("Joint initialization completed")
         return True
+
+    # ===== Self-test error query =====
+
+    def _self_test_read_registers(self, address: int, count: int) -> list[int]:
+        result = self._read_holding_registers(address, count=count)
+        if result is None or result.isError():
+            raise RuntimeError(
+                f"RS485 self-test read failed at 0x{address:04X}"
+            )
+        return list(result.registers)
+
+    def _self_test_write_register(self, address: int, value: int) -> None:
+        result = self._write_register(address, value)
+        if result is None or result.isError():
+            raise RuntimeError(
+                f"RS485 self-test write failed at 0x{address:04X}"
+            )
+
+    def get_self_test_error_info(self) -> SelfTestErrorInfo:
+        """Query self-test error information via holding registers 0x0038~0x003F."""
+        return build_self_test_error_info(
+            self._config,
+            self._self_test_read_registers,
+            self._self_test_write_register,
+        )
+
+    def get_self_test_status(self) -> int:
+        """Read the current self-test status from holding register 0x0038 low byte."""
+        return self._self_test_read_registers(0x0038, 1)[0] & 0x00FF
 
     # ===== Subscription =====
 
@@ -573,11 +737,13 @@ class Rs485Comm(IComm):
             raise RuntimeError("Device is not connected")
 
         with self._lock:
-            if interval_ms is not None:
-                self._poll_interval_sec = interval_ms / 1000.0
+            interval_sec = (
+                interval_ms / 1000.0 if interval_ms is not None else None
+            )
             sub_id = self._next_sub_id
             self._next_sub_id += 1
-            self._callbacks[sub_id] = (callback, args, kwargs)
+            self._callbacks[sub_id] = (callback, args, kwargs, interval_sec)
+            self._recompute_poll_interval_locked()
             self._ensure_poll_started()
             return sub_id
 
@@ -594,6 +760,7 @@ class Rs485Comm(IComm):
             if sub_id not in self._callbacks:
                 return False
             del self._callbacks[sub_id]
+            self._recompute_poll_interval_locked()
             should_stop = not self._callbacks
         if should_stop:
             self._stop_poll()
@@ -618,6 +785,14 @@ class Rs485Comm(IComm):
         ):
             self._poll_thread.join(timeout=0.5)
         self._poll_thread = None
+
+    def _recompute_poll_interval_locked(self) -> None:
+        intervals = [
+            item[3] for item in self._callbacks.values() if item[3] is not None
+        ]
+        self._poll_interval_sec = (
+            min(intervals) if intervals else self._DEFAULT_POLL_INTERVAL_SEC
+        )
 
     def _poll_loop(self) -> None:
         """Poll device state every 10ms and dispatch to callbacks."""
@@ -660,7 +835,7 @@ class Rs485Comm(IComm):
                 with self._lock:
                     callbacks = list(self._callbacks.values())
 
-                for cb, cb_args, cb_kwargs in callbacks:
+                for cb, cb_args, cb_kwargs, _ in callbacks:
                     try:
                         cb(hand_state, joints, *cb_args, **cb_kwargs)
                     except Exception:
@@ -668,7 +843,7 @@ class Rs485Comm(IComm):
 
             except Exception as e:
                 logger.error("Subscription stopped: %s", e)
-                self.disconnect()
+                self._poll_stop.set()
                 break
 
             time.sleep(self._poll_interval_sec)

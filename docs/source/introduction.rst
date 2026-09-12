@@ -3,7 +3,7 @@
 Introduction
 ============
 
-The GHand Python SDK is the official development toolkit for the XiaoYao Dexterous Hand. It provides a complete Python API that allows developers to easily interact with the dexterous hand, enabling precise control and data acquisition for joints, sensors, and other core functions.
+The GHand Python SDK is the official development toolkit for the GHand. It provides a complete Python API that allows developers to easily interact with the dexterous hand, enabling precise control and data acquisition for joints, sensors, and other core functions.
 
 Key Features
 ------------

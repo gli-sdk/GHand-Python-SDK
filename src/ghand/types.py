@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
 # Copyright 2026 GLITech
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -48,14 +51,95 @@ class JointId(enum.IntEnum):
     LF_MCP = 17
 
 
-class State(enum.IntEnum):
+class RS485BaudRate(enum.IntEnum):
+    """Predefined RS485 baud rates mapped to GHand protocol gear values."""
+
+    BAUD_57600 = 0x00
+    BAUD_115200 = 0x01
+    BAUD_230400 = 0x02
+    BAUD_460800 = 0x03
+    BAUD_921600 = 0x04
+    BAUD_1000000 = 0x05
+
+
+class CANFDBitTiming(enum.IntEnum):
+    """Predefined CAN FD bit timing profiles.
+
+    Names use ``TIMING_<arbitration bitrate>_<data bitrate>``. Each value maps
+    directly to the protocol gear stored by the GHand device.
+    """
+
+    # Arbitration: 500 Kbps @ 80%; data: 1 Mbps @ 75%.
+    TIMING_500K_1M = 0x00
+    # Arbitration: 500 Kbps @ 80%; data: 2 Mbps @ 80%.
+    TIMING_500K_2M = 0x01
+    # Arbitration: 500 Kbps @ 80%; data: 4 Mbps @ 80%.
+    TIMING_500K_4M = 0x02
+    # Arbitration: 500 Kbps @ 80%; data: 5 Mbps @ 75%.
+    TIMING_500K_5M = 0x03
+    # Arbitration: 1 Mbps @ 75%; data: 4 Mbps @ 80%.
+    TIMING_1M_4M = 0x04
+    # Arbitration: 1 Mbps @ 75%; data: 5 Mbps @ 75%.
+    TIMING_1M_5M = 0x05
+
+
+def _unknown_member(cls, fallback, value):
+    """Build a pseudo-member named after *fallback* but carrying *value*.
+
+    Lets an unrecognized device code stay inside the enum type (so ``.name``
+    and ``.value`` always work) without discarding the number reported by the
+    device: ``ErrorCode(176)`` is ``<ErrorCode.UNKNOWN_ERROR: 176>``.
+    """
+    if type(value) is not int:
+        return None
+    pseudo = int.__new__(cls, value)
+    pseudo._name_ = fallback.name
+    pseudo._value_ = value
+    return pseudo
+
+
+_NUMERIC_FORMAT_TYPES = "bcdeEfFgGnoxX%"
+
+
+class DeviceCode(enum.IntEnum):
+    """IntEnum whose text form is ``NAME(value)`` rather than a bare number.
+
+    Device codes are reported as plain integers, and an unrecognized one is
+    folded into a catch-all member, so the numeric value has to travel
+    alongside the name to stay diagnosable.
+    """
+
+    def __str__(self):
+        return f"{self.name}({self.value})"
+
+    def __format__(self, format_spec):
+        # Numeric specs ("d", "03d") keep int semantics so existing callers
+        # that format these as numbers are unaffected; everything else pads
+        # the NAME(value) text.
+        if format_spec and format_spec[-1] in _NUMERIC_FORMAT_TYPES:
+            return int.__format__(self, format_spec)
+        return str.__format__(str(self), format_spec)
+
+
+class State(DeviceCode):
     STOPPED = 0
     RUNNING = 1
     ABNORMAL_RUNNING = 2
     PROTECTIVE_STOPPED = 3
+    UNKNOWN_STATE = 255
+
+    @classmethod
+    def _missing_(cls, value):
+        """Map any undefined state to UNKNOWN_STATE, keeping the raw value."""
+        return _unknown_member(cls, cls.UNKNOWN_STATE, value)
+
+    @property
+    def is_abnormal(self) -> bool:
+        """True for protective stop, abnormal running, or any undefined state."""
+        return self not in (State.STOPPED, State.RUNNING)
 
 
-class ErrorCode(enum.IntEnum):
+class ErrorCode(DeviceCode):
     NORMAL = 0
     MOTOR_HARDWARE_OVERCURRENT = 1
     MOTOR_SOFTWARE_OVERCURRENT = 2
@@ -79,9 +163,14 @@ class ErrorCode(enum.IntEnum):
     PARAM_ERROR = 101
     UNKNOWN_ERROR = 201
 
+    @classmethod
+    def _missing_(cls, value):
+        """Map any undefined code to UNKNOWN_ERROR, keeping the raw value."""
+        return _unknown_member(cls, cls.UNKNOWN_ERROR, value)
+
 
 class HandType(enum.Enum):
-    UNKNOWN = "unknown"
+    NONE = "none"
     LEFT_HAND = "left_hand"
     RIGHT_HAND = "right_hand"
 
@@ -120,6 +209,71 @@ class GestureType(enum.Enum):
     SIX_SIGN = "six_sign"
 
 
+class SelfTestError(enum.IntFlag):
+    """A0 summary bit mask. Multiple bits may be set simultaneously."""
+
+    NONE = 0x00
+    MOTOR = 0x01
+    POSITION_SENSOR_UNMAPPED = 0x02
+    ZEROING = 0x04
+    FAN = 0x08
+    TEMPERATURE_SENSOR = 0x10
+    TACTILE_SENSOR = 0x20
+    POSITION_SENSOR = 0x40
+    VERSION = 0x80
+
+
+class VersionCheckError(enum.IntFlag):
+    """A1 version-mismatch bit mask."""
+
+    NONE = 0x00
+    MOTOR_DRIVER = 0x20
+    TACTILE_SENSOR = 0x40
+    POSITION_SENSOR = 0x80
+
+
+class TactileCheckError(enum.IntFlag):
+    """A3 tactile-sensor bit mask per motor channel."""
+
+    NONE = 0x00
+    THUMB_TIP_DISCONNECTED = 0x01
+    FF_TIP_DISCONNECTED = 0x02
+    MF_TIP_DISCONNECTED = 0x04
+    RF_TIP_DISCONNECTED = 0x08
+    LF_TIP_DISCONNECTED = 0x10
+    COMMUNICATION_FAILED = 0x80
+
+
+class ZeroingError(enum.IntEnum):
+    """A6 zeroing error per motor channel (single-value enum)."""
+
+    NONE = 0x00
+    MOTOR_ABNORMAL = 0x01
+    JOINT_STALL = 0x02
+    BRAKE_TIMEOUT = 0x03
+    GLOBAL_TIMEOUT = 0x04
+    COMMUNICATION_FAULT = 0x05
+
+
+class MotorCheckError(enum.IntEnum):
+    """A8 motor-detection error per motor channel."""
+
+    NONE = 0x00
+    HARDWARE_OVER_CURRENT = 0x01
+    SOFTWARE_OVER_CURRENT = 0x02
+    BUS_OVER_CURRENT = 0x03
+    HARDWARE_OVER_VOLTAGE = 0x04
+    HARDWARE_UNDER_VOLTAGE = 0x05
+    PHASE_LOSS = 0x06
+    STALL = 0x07
+    HARDWARE_OVER_TEMPERATURE = 0x08
+    COMMUNICATION_LOST = 0x09
+    SOFTWARE_OVER_VOLTAGE = 0x0A
+    SOFTWARE_UNDER_VOLTAGE = 0x0B
+    SOFTWARE_OVER_TEMPERATURE = 0x0C
+    POSITION_SENSOR_ERROR = 0x0D
+
+
 # ============================================================================
 # Dataclasses
 # ============================================================================
@@ -139,7 +293,6 @@ class ProductConfig:
 
     name: str = ""
     model: str = ""
-    aliases: list[str] = field(default_factory=list)
     valid_joints: list[JointId] = field(default_factory=list)
     joint_limits: dict[JointId, tuple[float, float]] = field(default_factory=dict)
     has_tactile: bool = False
@@ -160,13 +313,13 @@ class HandFaultInfo:
         """Return a human-readable fault description."""
         if self.error_code != ErrorCode.NORMAL:
             base_msg = _ERROR_MESSAGES.get(
-                self.error_code, f"Unknown error: {self.error_code.name}"
+                self.error_code, _ERROR_MESSAGES[ErrorCode.UNKNOWN_ERROR]
             )
         else:
             base_msg = "Device operating normally"
 
-        if self.state in [State.PROTECTIVE_STOPPED, State.ABNORMAL_RUNNING]:
-            state_msg = _STATE_MESSAGES.get(self.state, f"Abnormal state: {self.state.name}")
+        if self.state.is_abnormal:
+            state_msg = _STATE_MESSAGES.get(self.state, _STATE_MESSAGES[State.UNKNOWN_STATE])
             if self.error_code == ErrorCode.NORMAL:
                 base_msg = f"{state_msg}, but error code is 0"
             else:
@@ -180,8 +333,7 @@ class HandFaultInfo:
         if parts:
             msg = f"{base_msg} ({', '.join(parts)})"
         return (
-            f"State: {self.state.name}, Error: {self.error_code.name} "
-            f"({self.error_code.value}) - {msg}"
+            f"State: {self.state}, Error: {self.error_code} - {msg}"
         )
 
 
@@ -195,7 +347,7 @@ class JointFaultInfo:
 
     def __str__(self):
         """Return a human-readable joint fault description."""
-        return f"{self.joint_id}: State={self.state.name}, " f"Error={self.error_code.name}"
+        return f"{self.joint_id}: State={self.state}, Error={self.error_code}"
 
 
 @dataclass
@@ -203,7 +355,7 @@ class HandState:
     """High-level status of the dexterous hand."""
 
     state: State = State.STOPPED
-    error: ErrorCode | int = ErrorCode.NORMAL
+    error: ErrorCode = ErrorCode.NORMAL
     temperature: int = 0
 
 
@@ -223,7 +375,7 @@ class JointData:
 
     id: int = JointId.THUMB_IP
     state: State = State.STOPPED
-    error: ErrorCode | int = ErrorCode.NORMAL
+    error: ErrorCode = ErrorCode.NORMAL
     angle: float = 0.0  # degrees
     speed: int = 0
     torque: int = 0
@@ -251,6 +403,118 @@ class DeviceData:
         for joint in self.joints:
             jid = JointId(joint.id)
             setattr(self, jid.name.lower(), joint)
+
+
+@dataclass
+class MotorDiagnosticError:
+    """Self-test error for a single 13-channel motor slot."""
+
+    motor_index: int
+    joint_id: JointId | None
+    error_code: int
+
+
+@dataclass
+class SelfTestErrorInfo:
+    """Structured result of the self-test error query (Command 0xA0)."""
+
+    summary: SelfTestError = SelfTestError.NONE
+    version: VersionCheckError = VersionCheckError.NONE
+    position_sensor: list[MotorDiagnosticError] = field(default_factory=list)
+    tactile_sensor: list[MotorDiagnosticError] = field(default_factory=list)
+    temperature: int = 0
+    fan: int = 0
+    zeroing: list[MotorDiagnosticError] = field(default_factory=list)
+    motor: list[MotorDiagnosticError] = field(default_factory=list)
+
+    @property
+    def has_error(self) -> bool:
+        return self.summary != SelfTestError.NONE
+
+    def describe(self) -> str:
+        """Return a human-readable description of all self-test errors."""
+        lines = [f"summary: 0x{int(self.summary):02X}"]
+
+        if self.summary != SelfTestError.NONE:
+            names = [
+                flag.name
+                for flag in SelfTestError
+                if flag != SelfTestError.NONE and self.summary & flag
+            ]
+            lines[0] += f" ({', '.join(names)})"
+
+        if self.summary & SelfTestError.POSITION_SENSOR_UNMAPPED:
+            lines.append("position_sensor_unmapped: position sensor unmapped")
+        if self.summary & SelfTestError.VERSION:
+            names = [
+                flag.name
+                for flag in VersionCheckError
+                if flag != VersionCheckError.NONE and self.version & flag
+            ]
+            lines.append(
+                f"version: 0x{int(self.version):02X} ({', '.join(names) or 'none'})"
+            )
+        if self.summary & SelfTestError.POSITION_SENSOR:
+            lines.append(
+                "position_sensor: "
+                + _describe_motor_errors(
+                    self.position_sensor,
+                    lambda c: "position sensor abnormal" if c else "unknown",
+                )
+            )
+        if self.summary & SelfTestError.TACTILE_SENSOR:
+            lines.append(
+                "tactile_sensor: "
+                + _describe_motor_errors(self.tactile_sensor, _describe_tactile_code)
+            )
+        if self.summary & SelfTestError.TEMPERATURE_SENSOR:
+            desc = "temperature sensor abnormal" if self.temperature else "none"
+            lines.append(f"temperature: 0x{self.temperature:02X} ({desc})")
+        if self.summary & SelfTestError.FAN:
+            desc = "fan abnormal" if self.fan else "none"
+            lines.append(f"fan: 0x{self.fan:02X} ({desc})")
+        if self.summary & SelfTestError.ZEROING:
+            lines.append(
+                "zeroing: "
+                + _describe_motor_errors(
+                    self.zeroing, lambda c: _enum_name_or_unknown(ZeroingError, c)
+                )
+            )
+        if self.summary & SelfTestError.MOTOR:
+            lines.append(
+                "motor: "
+                + _describe_motor_errors(
+                    self.motor, lambda c: _enum_name_or_unknown(MotorCheckError, c)
+                )
+            )
+        return "\n  ".join(lines)
+
+
+def _enum_name_or_unknown(enum_type, code: int) -> str:
+    try:
+        return enum_type(code).name
+    except ValueError:
+        return f"unknown (0x{code:02X})"
+
+
+def _describe_tactile_code(code: int) -> str:
+    names = [
+        flag.name
+        for flag in TactileCheckError
+        if flag != TactileCheckError.NONE and code & flag
+    ]
+    return ", ".join(names) if names else f"unknown (0x{code:02X})"
+
+
+def _describe_motor_errors(errors: list[MotorDiagnosticError], describe_code) -> str:
+    if not errors:
+        return "none"
+    return "; ".join(
+        f"motor={e.motor_index} "
+        f"joint={e.joint_id.name if e.joint_id is not None else 'unknown'} "
+        f"code=0x{e.error_code:02X} ({describe_code(e.error_code)})"
+        for e in errors
+    )
 
 
 # ============================================================================
@@ -283,4 +547,5 @@ _ERROR_MESSAGES = {
 _STATE_MESSAGES = {
     State.PROTECTIVE_STOPPED: "Device entered protective stop",
     State.ABNORMAL_RUNNING: "Device running abnormally",
+    State.UNKNOWN_STATE: "Device in unknown state",
 }

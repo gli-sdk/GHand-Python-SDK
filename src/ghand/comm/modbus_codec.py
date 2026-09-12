@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
 # Copyright 2026 GLITech
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -56,6 +59,30 @@ class ModbusRegisterProfile:
     canfd_connection_delete_values: tuple[int, ...] = (0x0000, 0x0000)
 
 
+# Baud rate configuration register (REG_HOLD_BAUD_CONFIG).
+# Writing a gear value saves to Flash and takes effect after next power-up.
+BAUDRATE_CONFIG_REGISTER = 0x002C
+
+# Common holding register addresses (device configuration / control).
+REG_SLAVE_ID = 0x0000
+REG_CLEAR_FAULT = 0x0001
+REG_INIT_JOINT = 0x0002
+
+# Common input register addresses (device info / status).
+REG_DEVICE_NAME = 0x1000
+REG_HARDWARE_VERSION = 0x1008
+REG_FIRMWARE_VERSION = 0x1010
+REG_SERIAL_NUMBER = 0x1018
+REG_HAND_TYPE = 0x1020
+REG_IN_FIRMWARE_PACKAGE_VER = 0x1185
+REG_IN_POSITION_SENSOR_VER = 0x1186
+REG_IN_TACTILE_SENSOR_VER = 0x1187
+REG_IN_MOTOR_DRV_VER = 0x1188
+REG_IN_THUMB_TACTILE_SENSOR_VER = 0x1189
+REG_IN_FINGER_TACTILE_SENSOR_VER = 0x118A
+REG_IN_SERIAL_NUMBER = 0x119A
+
+
 # GHand5 keeps the original SDK mapping: input joint blocks follow JointId values.
 GHAND5_JOINT_INPUT_REG_MAP = {
     joint_id: 0x1023 + joint_id.value * 3 for joint_id in JointId
@@ -84,9 +111,9 @@ HOLDING_REG_MAP = GHAND5_HOLDING_REG_MAP
 
 # GHandLite1 protocol: only these 11 joints are present in the Modbus table.
 GHAND_LITE1_JOINT_INPUT_REG_MAP = {
-    JointId.THUMB_TMC_FE: 0x1023,
-    JointId.THUMB_TMC_AA: 0x1026,
-    JointId.THUMB_TMC_PS: 0x1029,
+    JointId.THUMB_MCP: 0x1023,
+    JointId.THUMB_TMC_FE: 0x1026,
+    JointId.THUMB_TMC_AA: 0x1029,
     JointId.FF_PIP: 0x102C,
     JointId.FF_MCP: 0x102F,
     JointId.MF_PIP: 0x1032,
@@ -98,9 +125,9 @@ GHAND_LITE1_JOINT_INPUT_REG_MAP = {
 }
 
 GHAND_LITE1_HOLDING_REG_MAP = {
-    JointId.THUMB_TMC_FE: 0x0010,
-    JointId.THUMB_TMC_AA: 0x0013,
-    JointId.THUMB_TMC_PS: 0x0016,
+    JointId.THUMB_MCP: 0x0010,
+    JointId.THUMB_TMC_FE: 0x0013,
+    JointId.THUMB_TMC_AA: 0x0016,
     JointId.FF_PIP: 0x0019,
     JointId.FF_MCP: 0x001C,
     JointId.MF_PIP: 0x001F,
@@ -184,9 +211,26 @@ def parse_firmware_version(raw_bytes: bytes) -> str:
     return raw_bytes.decode("utf-8", errors="ignore").strip("\x00")
 
 
+def parse_packed_firmware_version(raw_bytes: bytes) -> str:
+    """Parse one packed firmware-version register."""
+    if len(raw_bytes) < 2:
+        raise ValueError("packed firmware version requires at least 2 bytes")
+    version_high = raw_bytes[0]
+    version_low = raw_bytes[1]
+    major = (version_high >> 5) & 0x07
+    minor = version_high & 0x1F
+    patch = (version_low >> 4) & 0x0F
+    return f"V{major}.{minor}.{patch}"
+
+
 def parse_serial_number(raw_bytes: bytes) -> int:
     """Parse serial number from 16 bytes (8 registers)."""
     return int.from_bytes(raw_bytes, byteorder="big")
+
+
+def parse_ascii_serial_number(raw_bytes: bytes) -> str:
+    """Parse the 19-byte ASCII product serial number."""
+    return raw_bytes[:19].decode("ascii", errors="ignore").strip("\x00")
 
 
 def parse_hand_type(raw_bytes: bytes) -> int:
@@ -203,11 +247,13 @@ def parse_hand_info(raw: list[int]) -> HandState:
 
     Args:
         raw: List of uint16 register values.  raw[0] = state+error,
-             raw[1] = temperature.
+             raw[1] = signed int16 temperature.
     """
     state_byte = (raw[0] >> 8) & 0xFF
     error_byte = raw[0] & 0xFF
     temperature = raw[1]
+    if temperature >= 32768:
+        temperature -= 65536
     return HandState(
         state=_parse_state(state_byte),
         error=_parse_error_code(error_byte),
@@ -219,7 +265,7 @@ def _parse_state(value: int) -> State:
     try:
         return State(value)
     except ValueError:
-        return State.ABNORMAL_RUNNING
+        return State.UNKNOWN_STATE
 
 
 def _parse_error_code(value: int) -> ErrorCode:
@@ -385,3 +431,50 @@ def build_tactile_info(
         resultant_force=resultant_force,
         distributed_force=distributed_force,
     )
+
+
+# ============================================================================
+# Self-test error registers (0x0038 ~ 0x003F, shared by RS485 and CANFD)
+# ============================================================================
+
+SELF_TEST_COMMAND_REGISTER = 0x0038
+SELF_TEST_DATA_REGISTER = 0x0039
+SELF_TEST_DATA_REGISTER_COUNT = 7  # 7 * 16 bits = 14 bytes (13 error + 1 result)
+
+SELF_TEST_STATE_IDLE = 0
+SELF_TEST_STATE_PROCESSING = 1
+SELF_TEST_STATE_SUCCESS = 2
+SELF_TEST_STATE_FAILED = 3
+
+
+def encode_self_test_command_register(command: int) -> int:
+    """Pack the self-test command byte into ``0x0038`` (high byte = command,
+    low byte = state; the state field is read-only from the master's side)."""
+    return (command & 0xFF) << 8
+
+
+def parse_self_test_state(register_value: int) -> int:
+    """Return the state byte contained in the low byte of ``0x0038``."""
+    return register_value & 0x00FF
+
+
+def parse_self_test_data_registers(
+    registers: list[int],
+) -> tuple[list[int], int]:
+    """Decode the 7 data registers into ``(error_code[13], result)``.
+
+    Modbus registers are big-endian: register N -> two bytes ``[hi, lo]``.
+    The 14-byte payload contains the 13 error bytes followed by the result.
+    """
+    if len(registers) < SELF_TEST_DATA_REGISTER_COUNT:
+        raise ValueError(
+            f"Self-test data must have {SELF_TEST_DATA_REGISTER_COUNT} "
+            f"registers, got {len(registers)}"
+        )
+    payload = bytearray()
+    for reg in registers[:SELF_TEST_DATA_REGISTER_COUNT]:
+        payload.append((reg >> 8) & 0xFF)
+        payload.append(reg & 0xFF)
+    error_codes = list(payload[:13])
+    result = payload[13]
+    return error_codes, result

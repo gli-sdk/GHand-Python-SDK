@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
 # Copyright 2026 GLITech
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,6 +23,7 @@ Wraps EthercatClient and handles PDO encoding/decoding.
 import logging
 import math
 import struct
+import time
 
 from .._subscription import SubscriptionManager
 from ..types import (
@@ -28,11 +32,17 @@ from ..types import (
     HandState,
     JointCommand,
     JointData,
+    JointId,
+    MotorCheckError,
+    MotorDiagnosticError,
     ProductConfig,
     ProductType,
+    SelfTestError,
+    SelfTestErrorInfo,
     State,
     TactileRegionConfig,
     TactileInfo,
+    VersionCheckError,
 )
 from .ethercat_client import EthercatClient
 from .ethercat_protocol import (
@@ -50,6 +60,7 @@ class EthercatComm(IComm):
     """IComm implementation for EtherCAT."""
 
     _COMPAT_THUMB_TACTILE_COUNT = 28
+    _SDO_WRITE_SETTLE_SEC = 0.02
 
     def __init__(self, config: ProductConfig):
         self._client = EthercatClient()
@@ -72,7 +83,6 @@ class EthercatComm(IComm):
         return ProductConfig(
             name=config.name,
             model=config.model,
-            aliases=list(config.aliases),
             valid_joints=list(config.valid_joints),
             joint_limits=config.joint_limits.copy(),
             has_tactile=config.has_tactile,
@@ -143,11 +153,20 @@ class EthercatComm(IComm):
         """
         return self._client.search()
 
-    def connect(self, device_name: str) -> bool:
+    def connect(
+        self,
+        device_name: str,
+        slave_id: int | None = None,
+        baudrate_gear: int | None = None,
+        quiet: bool = False,
+    ) -> bool:
         """Connect to the specified EtherCAT device.
 
         Args:
             device_name: Adapter ID to connect to.
+            slave_id: Ignored for EtherCAT.
+            baudrate_gear: Ignored for EtherCAT.
+            quiet: Ignored for EtherCAT; errors are always logged.
 
         Returns:
             True if the connection and SOEM startup succeed.
@@ -318,14 +337,14 @@ class EthercatComm(IComm):
         try:
             return State(value)
         except ValueError:
-            return State.ABNORMAL_RUNNING
+            return State.UNKNOWN_STATE
 
     @staticmethod
-    def _parse_error_code(value: int) -> ErrorCode | int:
+    def _parse_error_code(value: int) -> ErrorCode:
         try:
             return ErrorCode(value)
         except ValueError:
-            return value
+            return ErrorCode.UNKNOWN_ERROR
 
     def get_hand_info(self) -> HandState:
         """Retrieve high-level hand status from TPDO.
@@ -376,6 +395,7 @@ class EthercatComm(IComm):
             True on success, False if the device rejected the command.
         """
         self._client.sdo_write(0x2004, 0x01, b'\x01')
+        time.sleep(self._SDO_WRITE_SETTLE_SEC)
         result = self._client.sdo_read(0x2004, 0x03)
         if result != b'\x00':
             logger.error("Device rejected open_tactile command")
@@ -389,6 +409,7 @@ class EthercatComm(IComm):
             True on success, False if the device rejected the command.
         """
         self._client.sdo_write(0x2004, 0x01, b'\x02')
+        time.sleep(self._SDO_WRITE_SETTLE_SEC)
         result = self._client.sdo_read(0x2004, 0x03)
         if result != b'\x00':
             logger.error("Device rejected close_tactile command")
@@ -402,6 +423,7 @@ class EthercatComm(IComm):
             True on success, False if the device rejected the command.
         """
         self._client.sdo_write(0x2004, 0x01, b'\x04')
+        time.sleep(self._SDO_WRITE_SETTLE_SEC)
         result = self._client.sdo_read(0x2004, 0x03)
         if result != b'\x00':
             logger.error("Device rejected zero_tactile command")
@@ -432,38 +454,86 @@ class EthercatComm(IComm):
 
     def get_device_name(self) -> str:
         """Retrieve the device name via SDO."""
-        return self._client.sdo_read(0x1008, 0x00).decode("utf-8").strip("\x00")
+        return self._read_string_sdo(0x1008, 0x00)
 
     def get_hardware_version(self) -> str:
         """Retrieve the hardware version via SDO."""
-        return self._client.sdo_read(0x1009, 0x00).decode("utf-8").strip("\x00")
+        return self._read_string_sdo(0x1009, 0x00)
 
     def get_firmware_version(self) -> str:
         """Retrieve the firmware version via SDO."""
-        return self._client.sdo_read(0x100A, 0x00).decode("utf-8").strip("\x00")
+        return self._read_string_sdo(0x100A, 0x00)
 
-    def get_serial_number(self) -> int:
-        """Retrieve the product serial number via SDO."""
-        return int.from_bytes(self._client.sdo_read(0x1018, 0x04), byteorder="little")
+    def _read_string_sdo(self, index: int, subindex: int) -> str:
+        try:
+            return (
+                self._client.sdo_read(index, subindex)
+                .decode("utf-8", errors="ignore")
+                .strip("\x00")
+                or "N/A"
+            )
+        except Exception:
+            return "N/A"
 
-    def get_motor_driver_version(self) -> tuple:
+    def get_serial_number(self) -> str:
+        """Retrieve the 19-byte ASCII product serial number via SDO."""
+        try:
+            raw = self._client.sdo_read(0x200C, 0x01)
+            return raw[:19].decode("ascii", errors="ignore").strip("\x00")
+        except Exception:
+            return "N/A"
+
+    def _read_packed_firmware_version(self, mcu_id: int) -> str:
+        """Read a packed firmware version via SDO."""
+        try:
+            self._client.sdo_write(0x2007, 0x01, bytes([mcu_id]))
+            time.sleep(self._SDO_WRITE_SETTLE_SEC)
+            version_high = int.from_bytes(
+                self._client.sdo_read(0x2007, 0x02), byteorder="little"
+            )
+            version_low = int.from_bytes(
+                self._client.sdo_read(0x2007, 0x03), byteorder="little"
+            )
+        except Exception:
+            logger.info("Packed firmware version not available", exc_info=True)
+            return "N/A"
+
+        major = (version_high >> 5) & 0x07
+        minor = version_high & 0x1F
+        patch = (version_low >> 4) & 0x0F
+        return f"V{major}.{minor}.{patch}"
+
+    def get_firmware_package_version(self) -> str:
+        """Retrieve the firmware package version via SDO."""
+        return self._read_packed_firmware_version(0x05)
+
+    def get_position_sensor_version(self) -> str:
+        """Retrieve the position sensor version via SDO."""
+        return self._read_packed_firmware_version(0x02)
+
+    def get_tactile_sensor_version(self) -> str:
+        """Retrieve the tactile MCU version via SDO."""
+        return self._read_packed_firmware_version(0x03)
+
+    def get_motor_driver_version(self) -> str:
         """Retrieve the motor driver version via SDO.
 
         Writes the motor driver MCU id (0x04) to index 0x2007 sub-index 0x01,
         then reads version high/low from sub-indices 0x02/0x03 and parses the
         semantic version as (major, minor, patch).
+
+        Returns "N/A" if the motor driver version is not available, matching
+        the behaviour of CANFD and RS485 transports.
         """
-        self._client.sdo_write(0x2007, 0x01, b"\x04")
-        version_high = int.from_bytes(
-            self._client.sdo_read(0x2007, 0x02), byteorder="little"
-        )
-        version_low = int.from_bytes(
-            self._client.sdo_read(0x2007, 0x03), byteorder="little"
-        )
-        major = (version_high >> 5) & 0x07
-        minor = version_high & 0x1F
-        patch = (version_low >> 4) & 0x0F
-        return (major, minor, patch)
+        return self._read_packed_firmware_version(0x04)
+
+    def get_thumb_tactile_sensor_version(self) -> str:
+        """Retrieve the thumb tactile sensor version via SDO."""
+        return self._read_packed_firmware_version(0x06)
+
+    def get_finger_tactile_sensor_version(self) -> str:
+        """Retrieve the finger tactile sensor version via SDO."""
+        return self._read_packed_firmware_version(0x07)
 
     def get_hand_type(self) -> int:
         """Retrieve the hand type via SDO.
@@ -471,7 +541,229 @@ class EthercatComm(IComm):
         Returns:
             0 for unknown, 1 for left hand, 2 for right hand.
         """
-        return int.from_bytes(self._client.sdo_read(0x2001, 0x00), byteorder="little")
+        try:
+            return int.from_bytes(self._client.sdo_read(0x2001, 0x00), byteorder="little")
+        except Exception:
+            return 0
+
+    # ===== Self-test error query =====
+
+    _SELF_TEST_INDEX = 0x2008
+    _SELF_TEST_SUB_COMMAND = 0x01
+    _SELF_TEST_SUB_STATE = 0x02
+    _SELF_TEST_SUB_ERROR_CODE = 0x03
+
+    _SELF_TEST_STATE_IDLE = 0
+    _SELF_TEST_STATE_PROCESSING = 1
+    _SELF_TEST_STATE_SUCCESS = 2
+    _SELF_TEST_STATE_FAILED = 3
+
+    _SELF_TEST_POLL_INTERVAL_SEC = 0.01
+    _SELF_TEST_POLL_TIMEOUT_SEC = 1.0
+
+    def get_self_test_error_info(self) -> SelfTestErrorInfo:
+        """Query self-test error information via object dictionary 0x2008.
+
+        Reads the A0 summary and only dispatches the detailed A1~A8 queries for
+        error categories that are actually flagged. Does not trigger a
+        self-test or zeroing.
+        """
+        info = SelfTestErrorInfo()
+
+        summary_byte = self._get_self_test_summary_error_code()
+        info.summary = SelfTestError(summary_byte)
+        logger.debug("Self-test summary: 0x%02X", summary_byte)
+
+        if info.summary == SelfTestError.NONE:
+            return info
+
+        if info.summary & SelfTestError.VERSION:
+            info.version = VersionCheckError(self._get_version_check_error_code())
+            logger.info("Self-test error: version mismatch (0x%02X)", int(info.version))
+
+        if info.summary & SelfTestError.POSITION_SENSOR_UNMAPPED:
+            logger.info("Self-test error: position sensor unmapped")
+
+        if info.summary & SelfTestError.POSITION_SENSOR:
+            info.position_sensor = self._collect_motor_errors(
+                self._get_position_sensor_error_codes()
+            )
+            self._log_motor_errors("position sensor", info.position_sensor)
+
+        if info.summary & SelfTestError.TACTILE_SENSOR:
+            info.tactile_sensor = self._collect_motor_errors(
+                self._get_tactile_sensor_error_codes()
+            )
+            self._log_motor_errors("tactile sensor", info.tactile_sensor)
+
+        if info.summary & SelfTestError.TEMPERATURE_SENSOR:
+            info.temperature = self._get_temperature_sensor_error_code()
+            logger.info("Self-test error: temperature sensor (0x%02X)", info.temperature)
+
+        if info.summary & SelfTestError.FAN:
+            info.fan = self._get_fan_error_code()
+            logger.info("Self-test error: fan (0x%02X)", info.fan)
+
+        if info.summary & SelfTestError.ZEROING:
+            info.zeroing = self._collect_motor_errors(self._get_zeroing_error_codes())
+            self._log_motor_errors("zeroing", info.zeroing)
+
+        if info.summary & SelfTestError.MOTOR:
+            info.motor = self._collect_motor_errors(self._get_motor_error_codes())
+            self._log_motor_errors("motor check", info.motor)
+
+        return info
+
+    def get_self_test_status(self) -> int:
+        """Read the current self-test status from object dictionary 0x2008:0x02.
+
+        Status values: 0 idle, 1 processing, 2 command processed successfully,
+        3 failed.
+        """
+        raw = self._client.sdo_read(self._SELF_TEST_INDEX, self._SELF_TEST_SUB_STATE)
+        return raw[0] if raw else self._SELF_TEST_STATE_IDLE
+
+    def _read_diagnostic_error_codes(self, command: int) -> list[int]:
+        """Execute one 0x2008 read transaction and return the 13-byte error array.
+
+        The caller decides which slots of the returned list are meaningful.
+        Raises ``RuntimeError`` on transaction failure or timeout.
+        """
+        self._client.sdo_write(
+            self._SELF_TEST_INDEX,
+            self._SELF_TEST_SUB_COMMAND,
+            bytes([command & 0xFF]),
+        )
+        time.sleep(self._SDO_WRITE_SETTLE_SEC)
+
+        # State 只用于判断事务是否结束(2 或 3 都算结束);
+        # Result 不判断,只读取 error_code 数据。
+        self._poll_self_test_state(command)
+
+        raw = self._client.sdo_read(
+            self._SELF_TEST_INDEX, self._SELF_TEST_SUB_ERROR_CODE
+        )
+        codes = list(raw[:13])
+        if len(codes) < 13:
+            codes.extend([0] * (13 - len(codes)))
+        return codes
+
+    def _poll_self_test_state(self, command: int) -> int:
+        """Poll subindex 0x02 until state becomes success (2) or failed (3)."""
+        deadline = time.monotonic() + self._SELF_TEST_POLL_TIMEOUT_SEC
+        while True:
+            raw = self._client.sdo_read(
+                self._SELF_TEST_INDEX, self._SELF_TEST_SUB_STATE
+            )
+            state = raw[0] if raw else self._SELF_TEST_STATE_IDLE
+            if state in (
+                self._SELF_TEST_STATE_SUCCESS,
+                self._SELF_TEST_STATE_FAILED,
+            ):
+                return state
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"Self-test query 0x{command:02X} timed out (state={state})"
+                )
+            time.sleep(self._SELF_TEST_POLL_INTERVAL_SEC)
+
+    def _get_self_test_summary_error_code(self) -> int:
+        return self._read_diagnostic_error_codes(0xA0)[0]
+
+    def _get_version_check_error_code(self) -> int:
+        return self._read_diagnostic_error_codes(0xA1)[0]
+
+    def _get_position_sensor_error_codes(self) -> list[int]:
+        return self._read_diagnostic_error_codes(0xA2)
+
+    def _get_tactile_sensor_error_codes(self) -> list[int]:
+        return self._read_diagnostic_error_codes(0xA3)
+
+    def _get_temperature_sensor_error_code(self) -> int:
+        return self._read_diagnostic_error_codes(0xA4)[0]
+
+    def _get_fan_error_code(self) -> int:
+        return self._read_diagnostic_error_codes(0xA5)[0]
+
+    def _get_zeroing_error_codes(self) -> list[int]:
+        return self._read_diagnostic_error_codes(0xA6)
+
+    def _get_motor_error_codes(self) -> list[int]:
+        return self._read_diagnostic_error_codes(0xA8)
+
+    def _motor_index_to_joint(self, motor_index: int) -> JointId | None:
+        """Resolve a 13-channel motor slot to its ``JointId`` via the product config.
+
+        The mapping reuses ``self._controlled_joints``, which is the ordered list
+        of joints owning a motor for the active product profile.
+        """
+        if 0 <= motor_index < len(self._controlled_joints):
+            return self._controlled_joints[motor_index]
+        return None
+
+    def _collect_motor_errors(
+        self, error_codes: list[int]
+    ) -> list[MotorDiagnosticError]:
+        """Filter a 13-slot error array to structured non-zero entries."""
+        errors = []
+        for index, code in enumerate(error_codes):
+            if code == 0:
+                continue
+            errors.append(
+                MotorDiagnosticError(
+                    motor_index=index,
+                    joint_id=self._motor_index_to_joint(index),
+                    error_code=code,
+                )
+            )
+        return errors
+
+    def _log_motor_errors(
+        self, category: str, errors: list[MotorDiagnosticError]
+    ) -> None:
+        for err in errors:
+            joint = err.joint_id.name if err.joint_id is not None else "unknown"
+            description = self._motor_error_description(category, err.error_code)
+            logger.info(
+                "Self-test %s error: motor=%d joint=%s code=0x%02X (%s)",
+                category,
+                err.motor_index,
+                joint,
+                err.error_code,
+                description,
+            )
+
+    @staticmethod
+    def _motor_error_description(category: str, code: int) -> str:
+        if category == "motor check":
+            try:
+                return MotorCheckError(code).name
+            except ValueError:
+                return "unknown"
+        if category == "zeroing":
+            mapping = {
+                0x01: "motor abnormal",
+                0x02: "full-stroke check failed",
+                0x03: "zeroing timeout",
+            }
+            return mapping.get(code, "unknown")
+        if category == "position sensor":
+            return "position sensor abnormal" if code == 0x01 else "unknown"
+        if category == "tactile sensor":
+            parts = []
+            names = {
+                0x01: "thumb tip disconnected",
+                0x02: "ff tip disconnected",
+                0x04: "mf tip disconnected",
+                0x08: "rf tip disconnected",
+                0x10: "lf tip disconnected",
+                0x80: "communication failed",
+            }
+            for bit, name in names.items():
+                if code & bit:
+                    parts.append(name)
+            return ", ".join(parts) if parts else "unknown"
+        return "unknown"
 
     # ===== Subscription =====
 

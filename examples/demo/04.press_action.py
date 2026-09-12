@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 import time
 
 from ghand import ProductType, configure_logging
