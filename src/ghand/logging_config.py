@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
 # Copyright 2026 GLITech
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,8 +18,8 @@
 """GHand SDK logging configuration module.
 
 Provides SDK-standard logging setup:
-- Default output of WARNING and ERROR to stderr
-- Support for upgrading to INFO or DEBUG level
+- Default NullHandler for library-friendly imports
+- Explicit console/file configuration helpers
 - Optional file log output
 - Simple design with three fixed levels
 """
@@ -61,13 +64,22 @@ LOG_COLORS = {
 }
 
 
+def _refresh_logger_level(logger: logging.Logger) -> None:
+    levels = [
+        handler.level
+        for handler in logger.handlers
+        if not isinstance(handler, logging.NullHandler)
+    ]
+    logger.setLevel(min(levels) if levels else logging.NOTSET)
+
+
 def _init_package_loggers():
-    """Initialize the package logger with a default WARNING-level stderr handler.
+    """Initialize the package logger with a NullHandler.
 
     This ensures:
-    1. SDK defaults to emitting WARNING and ERROR to stderr.
+    1. SDK imports do not alter host application logging output.
     2. No "No handler found" warnings are produced.
-    3. Users can upgrade verbosity via ``configure_console()``.
+    3. Users can opt into console output via ``configure_console()``.
     """
     root_logger = logging.getLogger(ROOT_LOGGER_NAME)
     if hasattr(root_logger, "_ghand_initialized"):
@@ -75,12 +87,10 @@ def _init_package_loggers():
 
     root_logger._ghand_initialized = True
 
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setLevel(logging.WARNING)
-    handler.setFormatter(logging.Formatter(FORMAT_SIMPLE, DATEFMT_STANDARD))
+    handler = logging.NullHandler()
 
     root_logger.addHandler(handler)
-    root_logger._ghand_stderr_handler = handler
+    root_logger._ghand_null_handler = handler
 
 
 # ============================================================================
@@ -91,24 +101,14 @@ def _init_package_loggers():
 def configure_console(level: int | str) -> None:
     """Configure the console log level.
 
-    Only INFO and DEBUG are supported, intended to lower the verbosity
-    threshold from the default WARNING.
-
     Args:
-        level: Log level. Only ``logging.INFO`` or ``logging.DEBUG`` are accepted.
-
-    Raises:
-        ValueError: If a level other than INFO or DEBUG is provided.
+        level: Standard Python log level name or integer.
 
     Example:
         >>> from ghand.logging_config import configure_console
         >>> configure_console(level=logging.INFO)
     """
-    valid_levels = {logging.INFO, logging.DEBUG}
-    if level not in valid_levels:
-        raise ValueError(
-            f"Only INFO or DEBUG are supported (received: {logging.getLevelName(level)})"
-        )
+    level = logging._checkLevel(level)
 
     logger = logging.getLogger(ROOT_LOGGER_NAME)
 
@@ -121,10 +121,9 @@ def configure_console(level: int | str) -> None:
     else:
         handler = logger._ghand_stderr_handler
 
-    if level < handler.level:
-        handler.setLevel(level)
+    handler.setLevel(level)
 
-    logger.setLevel(level)
+    _refresh_logger_level(logger)
 
 
 def configure_file(filename: str, level: int | str = logging.DEBUG) -> None:
@@ -142,15 +141,20 @@ def configure_file(filename: str, level: int | str = logging.DEBUG) -> None:
         >>> configure_file("ghand.log", level=logging.DEBUG)
     """
     logger = logging.getLogger(ROOT_LOGGER_NAME)
+    level = logging._checkLevel(level)
+
+    existing_handler = getattr(logger, "_ghand_file_handler", None)
+    if existing_handler is not None:
+        logger.removeHandler(existing_handler)
+        existing_handler.close()
 
     handler = logging.FileHandler(filename, mode="a", encoding="utf-8")
     handler.setLevel(level)
     handler.setFormatter(logging.Formatter(FORMAT_VERBOSE, DATEFMT_ISO))
     logger.addHandler(handler)
+    logger._ghand_file_handler = handler
 
-    for h in logger.handlers:
-        if h.level < logger.level or logger.level == 0:
-            logger.setLevel(h.level)
+    _refresh_logger_level(logger)
 
 
 def get_logger(name: str = ROOT_LOGGER_NAME) -> logging.Logger:

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
 # Copyright 2026 GLITech
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,12 +15,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Product configuration loader and JSON search/parsing."""
+"""Product configuration loader and JSON search/parsing.
+
+External configuration directories override the configs bundled inside the
+``ghand`` package. The SDK ships ``config/*.json`` in the wheel, so product
+configs work out of the box after ``pip install``.
+"""
 
 import glob
 import json
 import logging
 import os
+from importlib.resources import files
 
 from .types import (
     JointId,
@@ -58,41 +67,45 @@ _JOINT_NAME_TO_ID = {
 
 
 def _get_config_search_paths() -> list[str]:
-    """Return the ordered list of directories to search for product configs."""
-    paths = []
+    """Return external directories used to override bundled configs."""
+    paths: list[str] = []
 
     env_path = os.environ.get("GHAND_SDK_CONFIG")
     if env_path:
-        paths.append(env_path)
+        paths.append(os.path.abspath(os.path.expanduser(env_path)))
 
-    pkg_dir = os.path.dirname(os.path.abspath(__file__))
-    src_dir = os.path.dirname(pkg_dir)
-    proj_root = os.path.dirname(src_dir)
-    paths.append(os.path.join(proj_root, "config") + os.sep)
+    paths.append(os.path.abspath(os.path.join(".", "config")))
 
-    paths.append("." + os.sep + "config" + os.sep)
-
-    home = os.path.expanduser("~")
-    paths.append(os.path.join(home, ".ghand", "config") + os.sep)
+    paths.append(
+        os.path.join(
+            os.path.expanduser("~"),
+            ".ghand",
+            "config",
+        )
+    )
 
     return paths
 
 
-def _find_config_file(file_name: str) -> str | None:
-    """Search for ``file_name`` across the configured search paths.
-
-    Args:
-        file_name: Name of the JSON config file.
-
-    Returns:
-        Absolute path if found, otherwise None.
-    """
+def _find_external_config_file(file_name: str) -> str | None:
+    """Search external override directories for a product config."""
     for search_dir in _get_config_search_paths():
-        full = os.path.join(search_dir, file_name)
-        if os.path.isfile(full):
-            logger.debug("Found config: %s", full)
-            return full
+        full_path = os.path.join(search_dir, file_name)
+        if os.path.isfile(full_path):
+            logger.debug("Found external config: %s", full_path)
+            return full_path
     return None
+
+
+def _load_bundled_config_data(file_name: str) -> dict | None:
+    """Load a product config bundled with the ghand package."""
+    try:
+        resource = files("ghand").joinpath("config", file_name)
+        with resource.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError, OSError) as exc:
+        logger.error("Failed to load bundled config '%s': %s", file_name, exc)
+        return None
 
 
 def _parse_joints(
@@ -164,54 +177,22 @@ def _parse_int_tuple(values) -> tuple[int, ...]:
     return tuple(result)
 
 
-def load_product_config(product_type: ProductType) -> ProductConfig:
-    """Load the product configuration for the given product type.
-
-    Args:
-        product_type: Product type enum value.
-
-    Returns:
-        Populated ``ProductConfig``, or empty ``ProductConfig`` on failure (error is logged).
-    """
-    file_name = _PRODUCT_TYPE_TO_FILE.get(product_type)
-    if not file_name:
-        logger.error("Unknown product type: %s", product_type)
-        return ProductConfig()
-
-    file_path = _find_config_file(file_name)
-    if not file_path:
-        logger.error("Config file '%s' not found", file_name)
-        return ProductConfig()
-
-    return _load_config_from_file(file_path, product_type=product_type)
-
-
-def _load_config_from_file(
-    file_path: str,
+def _parse_product_config(
+    data: dict,
+    *,
     product_type: ProductType | None = None,
+    source: str = "",
 ) -> ProductConfig:
-    """Parse a product configuration from disk.
-
-    Args:
-        file_path: Absolute path to the JSON config file.
-
-    Returns:
-        Parsed ``ProductConfig``, or empty ``ProductConfig`` on failure (error is logged).
-    """
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except (json.JSONDecodeError, OSError) as e:
-        logger.error("Failed to parse %s: %s", file_path, e)
-        return ProductConfig()
-
+    """Convert product config JSON data into ProductConfig."""
     valid_joints, joint_limits = _parse_joints(data.get("joints", []))
-    tactile_regions = _parse_tactile_regions(data.get("tactile_regions", []))
+
+    tactile_regions = _parse_tactile_regions(
+        data.get("tactile_regions", [])
+    )
 
     config = ProductConfig(
         name=data.get("name", ""),
         model=data.get("model", ""),
-        aliases=list(data.get("aliases", [])),
         valid_joints=valid_joints,
         joint_limits=joint_limits,
         has_tactile=data.get("has_tactile", False),
@@ -220,46 +201,147 @@ def _load_config_from_file(
     )
 
     if not config.name or not config.valid_joints:
-        logger.error("Product config in %s is missing required fields", file_path)
+        logger.error(
+            "Product config in %s is missing required fields",
+            source,
+        )
         return ProductConfig()
 
-    logger.info("Loaded product config: %s from %s", config.name, file_path)
+    logger.info(
+        "Loaded product config: %s from %s",
+        config.name,
+        source,
+    )
+
     return config
 
 
+def _load_config_from_file(
+    file_path: str,
+    product_type: ProductType | None = None,
+) -> ProductConfig:
+    """Load a product configuration from an external JSON file."""
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.error("Failed to parse %s: %s", file_path, exc)
+        return ProductConfig()
+
+    return _parse_product_config(
+        data,
+        product_type=product_type,
+        source=file_path,
+    )
+
+
+def load_product_config(product_type: ProductType) -> ProductConfig:
+    """Load configuration for the requested product type.
+
+    External configuration overrides bundled defaults.
+    """
+    file_name = _PRODUCT_TYPE_TO_FILE.get(product_type)
+
+    if not file_name:
+        logger.error("Unknown product type: %s", product_type)
+        return ProductConfig()
+
+    external_file = _find_external_config_file(file_name)
+
+    if external_file:
+        return _load_config_from_file(
+            external_file,
+            product_type=product_type,
+        )
+
+    data = _load_bundled_config_data(file_name)
+
+    if data is None:
+        logger.error(
+            "Config file '%s' not found",
+            file_name,
+        )
+        return ProductConfig()
+
+    return _parse_product_config(
+        data,
+        product_type=product_type,
+        source=f"ghand/config/{file_name}",
+    )
+
+
 def find_config_by_name(device_name: str) -> ProductConfig | None:
-    """Search all config paths for a product matching the given device name.
+    """Find a product configuration matching a device name.
 
-    Args:
-        device_name: Name string read from the device.
-
-    Returns:
-        Matching ``ProductConfig`` if found, otherwise None.
+    External configuration takes priority over bundled defaults.
     """
     if not device_name:
         return None
 
+    normalized_name = device_name.lower()
+
+    # 1. Search external override configs first.
     for search_dir in _get_config_search_paths():
         pattern = os.path.join(search_dir, "*.json")
+
         for file_path in glob.glob(pattern):
             try:
-                with open(file_path, "r", encoding="utf-8") as f:
+                with open(
+                    file_path,
+                    "r",
+                    encoding="utf-8",
+                ) as f:
                     data = json.load(f)
             except (json.JSONDecodeError, OSError):
                 continue
 
-            names = [data.get("name", ""), *data.get("aliases", [])]
-            if any(name.lower() == device_name.lower() for name in names if name):
-                logger.info("Auto-detected product config: %s -> %s", device_name, file_path)
+            names = [data.get("name", "")]
+
+            if any(
+                name.lower() == normalized_name
+                for name in names
+                if name
+            ):
                 product_type = next(
                     (
                         candidate
-                        for candidate, file_name in _PRODUCT_TYPE_TO_FILE.items()
-                        if os.path.basename(file_path) == file_name
+                        for candidate, expected_file
+                        in _PRODUCT_TYPE_TO_FILE.items()
+                        if os.path.basename(file_path)
+                        == expected_file
                     ),
                     None,
                 )
-                return _load_config_from_file(file_path, product_type=product_type)
 
-    logger.warning("No matching product config found for device: %s", device_name)
+                return _parse_product_config(
+                    data,
+                    product_type=product_type,
+                    source=file_path,
+                )
+
+    # 2. Search bundled product configs.
+    for product_type, file_name in _PRODUCT_TYPE_TO_FILE.items():
+        data = _load_bundled_config_data(file_name)
+
+        if data is None:
+            continue
+
+        names = [data.get("name", "")]
+
+        if any(
+            name.lower() == normalized_name
+            for name in names
+            if name
+        ):
+            return _parse_product_config(
+                data,
+                product_type=product_type,
+                source=f"ghand/config/{file_name}",
+            )
+
+    logger.warning(
+        "No matching product config found for device: %s",
+        device_name,
+    )
+
     return None

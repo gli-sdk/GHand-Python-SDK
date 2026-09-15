@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 import time
 
 from ghand import ProductType, CommType, GestureType, GHand, configure_logging, execute_gesture

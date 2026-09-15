@@ -1,5 +1,6 @@
-import sys
+﻿import sys
 import time
+import logging
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -7,13 +8,15 @@ SRC_ROOT = str(PROJECT_ROOT / "src")
 if SRC_ROOT not in sys.path:
     sys.path.insert(0, SRC_ROOT)
 
-from adaptive_grasp import AdaptiveGrasper
-from adaptive_grasp.demo_config import build_demo_runtime_config
+from ghand.adaptive_grasp import AdaptiveGrasper
+from ghand.adaptive_grasp.demo_config import build_demo_runtime_config
 from ghand import (
     CommType,
     GHand,
     ProductType,
+    configure_logging
 )
+configure_logging(level=logging.ERROR)
 
 def main() -> None:
     hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)

@@ -3,7 +3,7 @@
 Device Connection Guide
 =======================
 
-The XiaoYao Dexterous Hand supports multiple connection methods:
+The GHand supports multiple connection methods:
 
 EtherCAT Connection
 -------------------

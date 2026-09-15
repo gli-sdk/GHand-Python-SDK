@@ -1,11 +1,10 @@
-import logging
+﻿import logging
 
 from ghand import ProductType, configure_logging
 from ghand.ghand import CommType, GHand
 
 # Configure SDK logging (shows connection state, errors, etc.)
-configure_logging(level=logging.DEBUG)
-
+configure_logging(level=logging.INFO)
 
 def main():
     hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
@@ -20,14 +19,24 @@ def main():
     hand_hw_ver = hand.get_hardware_version()
     serial_num = hand.get_serial_number()
     hand_type = hand.get_hand_type()
+    firmware_package_ver = hand.get_firmware_package_version()
+    position_sensor_ver = hand.get_position_sensor_version()
+    tactile_sensor_ver = hand.get_tactile_sensor_version()
     motor_ver = hand.get_motor_driver_version()
+    thumb_tactile_sensor_ver = hand.get_thumb_tactile_sensor_version()
+    finger_tactile_sensor_ver = hand.get_finger_tactile_sensor_version()
 
     # Output device information
     print(f"\tDevice Name: {hand_name}")
     print(f"\tFirmware: {ver}, Hardware: {hand_hw_ver}")
     print(f"\tHand Type: {hand_type.value}")
     print(f"\tSerial Number: {serial_num}")
-    print(f"\tMotor Driver Version: {motor_ver[0]}.{motor_ver[1]}.{motor_ver[2]}")
+    print(f"\tFirmware Package Version: {firmware_package_ver}")
+    print(f"\tPosition Sensor Version: {position_sensor_ver}")
+    print(f"\tTactile Sensor Version: {tactile_sensor_ver}")
+    print(f"\tMotor Driver Version: {motor_ver}")
+    print(f"\tThumb Tactile Sensor Version: {thumb_tactile_sensor_ver}")
+    print(f"\tFinger Tactile Sensor Version: {finger_tactile_sensor_ver}")
     hand.close()
 
 

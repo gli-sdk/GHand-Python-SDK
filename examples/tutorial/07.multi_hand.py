@@ -1,4 +1,4 @@
-"""
+﻿"""
 Example: Control multiple dexterous hands simultaneously.
 
 This script discovers all available CANFD adapters, connects to each device,

@@ -6,7 +6,7 @@ Installation and Configuration Guide
 System Requirements
 -------------------
 - Python 3.10 to 3.13
-- Windows 10 / Linux Ubuntu 18.04+ / macOS 10.15+
+- Windows 10/11, Linux Ubuntu 22.04/24.04 LTS (x86_64/aarch64), macOS 12+ (Intel/Apple Silicon)
 - Recommended memory: 8GB+
 - Storage space: 1GB+
 

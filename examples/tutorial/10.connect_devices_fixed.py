@@ -1,4 +1,4 @@
-"""
+﻿"""
 Example: Connecting two dexterous hands
 
 Now that EthercatClient has removed the singleton pattern, you can directly
@@ -8,8 +8,14 @@ create multiple GHand instances to connect to multiple devices.
 import logging
 import time
 
-from ghand import ProductType, configure_logging
-from ghand.ghand import CommType, GHand, JointCommand, JointId
+from ghand import (
+    CommType,
+    GHand,
+    JointCommand,
+    JointId,
+    ProductType,
+    configure_logging,
+)
 
 # Configure SDK logging
 configure_logging(level=logging.INFO)

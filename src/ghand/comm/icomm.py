@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025-2026 GLITech
+# SPDX-License-Identifier: Apache-2.0
+
 # Copyright 2026 GLITech
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,11 +38,25 @@ class IComm(ABC):
     # ===== Connection management =====
 
     @abstractmethod
-    def connect(self, device_name: str) -> bool:
+    def connect(
+        self,
+        device_name: str,
+        slave_id: int | None = None,
+        baudrate_gear: int | None = None,
+        quiet: bool = False,
+    ) -> bool:
         """Connect to the specified device.
 
         Args:
             device_name: Identifier of the device to connect to.
+            slave_id: Optional RS485/CANFD slave ID override for this connection.
+                Implementations that do not use slave IDs may ignore it.
+            baudrate_gear: Optional baud rate gear value. For RS485 this selects
+                the serial baud rate; for CANFD it selects both the arbitration
+                and data phase bitrates. Other implementations may ignore it.
+            quiet: When True, suppress non-fatal failure logs. Useful for
+                auto-detection loops that are expected to try several ports
+                or baud rates before finding a device.
 
         Returns:
             True if the connection succeeds, False otherwise.
@@ -70,6 +87,21 @@ class IComm(ABC):
 
         Args:
             slave_id: New slave ID to write to the device.
+
+        Returns:
+            True if the command succeeds, False otherwise.
+        """
+        return False
+
+    def set_baudrate_config(
+        self,
+        baudrate_gear: int | None = None,
+    ) -> bool:
+        """Configure the RS485/CANFD baud rate gear (Flash, effective on reboot).
+
+        Args:
+            baudrate_gear: Protocol gear value written directly to holding
+                register 0x002C. When omitted the protocol default gear is used.
 
         Returns:
             True if the command succeeds, False otherwise.
@@ -202,15 +234,50 @@ class IComm(ABC):
         ...
 
     @abstractmethod
-    def get_serial_number(self) -> int:
+    def get_firmware_package_version(self) -> str:
+        """Retrieve the firmware package version.
+
+        """
+        ...
+
+    @abstractmethod
+    def get_position_sensor_version(self) -> str:
+        """Retrieve the position sensor version.
+
+        """
+        ...
+
+    @abstractmethod
+    def get_tactile_sensor_version(self) -> str:
+        """Retrieve the tactile MCU version.
+
+        """
+        ...
+
+    @abstractmethod
+    def get_serial_number(self) -> str:
         """Retrieve the product serial number.
 
         """
         ...
 
     @abstractmethod
-    def get_motor_driver_version(self) -> tuple:
+    def get_motor_driver_version(self) -> str:
         """Retrieve the motor driver version.
+
+        """
+        ...
+
+    @abstractmethod
+    def get_thumb_tactile_sensor_version(self) -> str:
+        """Retrieve the thumb tactile sensor version.
+
+        """
+        ...
+
+    @abstractmethod
+    def get_finger_tactile_sensor_version(self) -> str:
+        """Retrieve the finger tactile sensor version.
 
         """
         ...
@@ -224,6 +291,30 @@ class IComm(ABC):
 
         """
         ...
+
+    def get_self_test_error_info(self):
+        """Retrieve structured self-test error information.
+
+        Default implementation returns an empty ``SelfTestErrorInfo``. Backends
+        that support the self-test error query (object dictionary 0x2008)
+        should override this method.
+
+        Returns:
+            SelfTestErrorInfo instance.
+        """
+        from ..types import SelfTestErrorInfo
+
+        return SelfTestErrorInfo()
+
+    def get_self_test_status(self) -> int:
+        """Retrieve the self-test status byte.
+
+        Backends that expose a direct self-test status register should override
+        this method. Status values are: ``0`` idle, ``1`` processing,
+        ``2`` command processed successfully, ``3`` failed. The default ``0``
+        matches the idle/unknown status.
+        """
+        return 0
 
     # ===== Subscription =====
 

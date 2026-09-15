@@ -1,0 +1,32 @@
+{
+  "model": "G5-13A18D-S01",
+  "name": "GHand 5",
+  "joints": [
+    { "id": "THUMB_IP" },
+    { "id": "THUMB_MCP",  "min": 0.0,  "max": 66.0 },
+    { "id": "THUMB_TMC_FE",  "min": 0.0,  "max": 50.0 },
+    { "id": "THUMB_TMC_AA","min": 20.0, "max": 90.0 },
+    { "id": "THUMB_TMC_PS", "min": -10.0, "max": 60.0 },
+    { "id": "FF_DIP" },
+    { "id": "FF_PIP",    "min": 0.0,  "max": 80.0 },
+    { "id": "FF_MCP",    "min": 0.0,  "max": 90.0 },
+    { "id": "FF_MCP_AA",  "min": -8.0, "max": 8.0 },
+    { "id": "MF_DIP" },
+    { "id": "MF_PIP",    "min": 0.0,  "max": 90.0 },
+    { "id": "MF_MCP",    "min": 0.0,  "max": 90.0 },
+    { "id": "RF_DIP" },
+    { "id": "RF_PIP",    "min": 0.0,  "max": 90.0 },
+    { "id": "RF_MCP",    "min": 0.0,  "max": 90.0 },
+    { "id": "LF_DIP" },
+    { "id": "LF_PIP",    "min": 0.0,  "max": 74.0 },
+    { "id": "LF_MCP",    "min": 0.0,  "max": 90.0 }
+  ],
+  "has_tactile": true,
+  "tactile_regions": [
+    { "id": "THUMB", "count": 38 },
+    { "id": "FF",    "count": 31 },
+    { "id": "MF",    "count": 31 },
+    { "id": "RF",    "count": 31 },
+    { "id": "LF",    "count": 31 }
+  ]
+}
