@@ -400,6 +400,19 @@ class Rs485Comm(IComm):
             return False
         return result is not None and not result.isError()
 
+    def get_default_baudrate_gear(self) -> int | None:
+        """Return the RS485 default baud rate gear."""
+        return self._DEFAULT_BAUDRATE_GEAR
+
+    def describe_baudrate_config(self, baudrate_gear: int | None = None) -> str:
+        """Return a human-readable RS485 baud rate configuration description."""
+        gear = baudrate_gear if baudrate_gear is not None else self._DEFAULT_BAUDRATE_GEAR
+        baudrate = RS485_BAUDRATE_GEAR_MAP.get(gear)
+        return (
+            f"Baudrate config set to gear 0x{gear:02X} "
+            f"({baudrate} bps, effective after reboot)"
+        )
+
     # ===== Joint control (single register write) =====
 
     def move_joints(self, joints: list, mode) -> bool:

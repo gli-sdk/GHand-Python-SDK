@@ -108,6 +108,14 @@ class IComm(ABC):
         """
         return False
 
+    def get_default_baudrate_gear(self) -> int | None:
+        """Return the protocol default baud rate gear, if one exists."""
+        return None
+
+    def describe_baudrate_config(self, baudrate_gear: int | None = None) -> str:
+        """Return a human-readable baud rate configuration description."""
+        return "Baudrate config set (effective after reboot)"
+
     # ===== Joint control =====
 
     @abstractmethod
@@ -330,6 +338,26 @@ class IComm(ABC):
             Subscription ID that can be used to unsubscribe.
         """
         ...
+
+    def subscribe_device_data(
+        self,
+        callback,
+        *,
+        include_tactile: bool = False,
+        interval_ms: int | None = None,
+    ) -> int:
+        """Subscribe to unified ``DeviceData`` updates."""
+        from ..types import DeviceData
+
+        def adapter(hand_state, joints, *args, **kwargs):
+            tactile = None
+            if include_tactile:
+                tactile = self.get_tactile_data()
+                if not tactile:
+                    tactile = None
+            callback(DeviceData(hand=hand_state, joints=joints, tactile=tactile), *args, **kwargs)
+
+        return self.subscribe(adapter, interval_ms=interval_ms)
 
     @abstractmethod
     def unsubscribe(self, sub_id) -> bool:

@@ -17,7 +17,29 @@
 
 """Communication layer for the GHand SDK."""
 
-from .canfd_comm import CanfdComm
-from .ethercat_comm import EthercatComm
+from .factory import create_comm
 from .icomm import IComm
-from .rs485_comm import Rs485Comm
+
+__all__ = [
+    "IComm",
+    "create_comm",
+    "CanfdComm",
+    "EthercatComm",
+    "Rs485Comm",
+]
+
+
+def __getattr__(name: str):
+    if name == "CanfdComm":
+        from .canfd_comm import CanfdComm
+
+        return CanfdComm
+    if name == "EthercatComm":
+        from .ethercat_comm import EthercatComm
+
+        return EthercatComm
+    if name == "Rs485Comm":
+        from .rs485_comm import Rs485Comm
+
+        return Rs485Comm
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

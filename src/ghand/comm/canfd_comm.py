@@ -412,6 +412,22 @@ class CanfdComm(IComm):
             return False
         return True
 
+    def get_default_baudrate_gear(self) -> int | None:
+        """Return the CANFD default baud rate gear."""
+        return self._DEFAULT_BAUDRATE_GEAR
+
+    def describe_baudrate_config(self, baudrate_gear: int | None = None) -> str:
+        """Return a human-readable CANFD baud rate configuration description."""
+        gear = baudrate_gear if baudrate_gear is not None else self._DEFAULT_BAUDRATE_GEAR
+        (abit, abit_sample), (dbit, dbit_sample) = CANFD_BAUDRATE_GEAR_MAP.get(
+            gear, ((None, None), (None, None))
+        )
+        return (
+            f"Baudrate config set to gear 0x{gear:02X} "
+            f"(abit={abit}/{abit_sample}%, dbit={dbit}/{dbit_sample}%, "
+            "effective after reboot)"
+        )
+
     # ------------------------------------------------------------------
     # Joint control
     # ------------------------------------------------------------------

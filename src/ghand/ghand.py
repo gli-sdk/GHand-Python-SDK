@@ -23,10 +23,7 @@ import logging
 import time
 from typing import Any
 from ._config import load_product_config
-from .comm.canfd_comm import CanfdComm, CANFD_BAUDRATE_GEAR_MAP, CANFD_DEFAULT_BAUDRATE_GEAR
-from .comm.ethercat_comm import EthercatComm
-from .comm.ethercat_protocol import Tpdo
-from .comm.rs485_comm import Rs485Comm, RS485_BAUDRATE_GEAR_MAP, RS485_DEFAULT_BAUDRATE_GEAR
+from .comm import IComm, create_comm
 import numpy as np
 from ._converter import joints_to_nparray
 from ._converter import nparray_to_joints
@@ -45,22 +42,15 @@ from .types import (
     CANFDBitTiming,
     CommType,
     CtrlMode,
-    DeviceData,
-    ErrorCode,
     HandState,
     HandType,
     JointCommand,
     JointData,
-    JointErrorCode,
     JointId,
-    JointState,
     ProductConfig,
     ProductType,
     RS485BaudRate,
     SelfTestErrorInfo,
-    State,
-    TactileInfo,
-    TactileSensorId,
 )
 
 logger = logging.getLogger("ghand.ghand")
@@ -187,16 +177,9 @@ class GHand:
             return SubscriptionDiagnostics(active_subscriptions=len(callbacks))
         return SubscriptionDiagnostics()
 
-    def _create_comm(self, comm_type: CommType):
+    def _create_comm(self, comm_type: CommType) -> IComm:
         """Instantiate the appropriate IComm implementation."""
-        if comm_type == CommType.ETHERCAT:
-            return EthercatComm(self._product_config)
-        elif comm_type == CommType.CANFD:
-            return CanfdComm(self._product_config)
-        elif comm_type == CommType.RS485:
-            return Rs485Comm(self._product_config)
-        else:
-            raise ValueError(f"Unknown communication type: {comm_type}")
+        return create_comm(comm_type, self._product_config)
 
     def _apply_product_config(self, config: ProductConfig) -> None:
         """Apply a new product configuration.
@@ -351,10 +334,9 @@ class GHand:
         """
         if baudrate_gear is not None:
             return [baudrate_gear], False
-        if isinstance(self._comm, Rs485Comm):
-            return [self._comm._DEFAULT_BAUDRATE_GEAR], True
-        if isinstance(self._comm, CanfdComm):
-            return [self._comm._DEFAULT_BAUDRATE_GEAR], True
+        default_gear = self._comm.get_default_baudrate_gear()
+        if default_gear is not None:
+            return [default_gear], True
         return [None], False
 
     def _baud_rate_to_gear(self, baud_rate: BaudRateSelection | None) -> int | None:
@@ -530,29 +512,7 @@ class GHand:
         baudrate_gear = self._baud_rate_to_gear(baud_rate)
         result = self._comm.set_baudrate_config(baudrate_gear)
         if result:
-            if self._comm_type == CommType.RS485:
-                gear = baudrate_gear if baudrate_gear is not None else RS485_DEFAULT_BAUDRATE_GEAR
-                baudrate = RS485_BAUDRATE_GEAR_MAP.get(gear)
-                logger.info(
-                    "Baudrate config set to gear 0x%02X (%s bps, effective after reboot)",
-                    gear,
-                    baudrate,
-                )
-            elif self._comm_type == CommType.CANFD:
-                gear = baudrate_gear if baudrate_gear is not None else CANFD_DEFAULT_BAUDRATE_GEAR
-                (abit, abit_sample), (dbit, dbit_sample) = CANFD_BAUDRATE_GEAR_MAP.get(
-                    gear, ((None, None), (None, None))
-                )
-                logger.info(
-                    "Baudrate config set to gear 0x%02X (abit=%s/%s%%, dbit=%s/%s%%, effective after reboot)",
-                    gear,
-                    abit,
-                    abit_sample,
-                    dbit,
-                    dbit_sample,
-                )
-            else:
-                logger.info("Baudrate config set (effective after reboot)")
+            logger.info(self._comm.describe_baudrate_config(baudrate_gear))
             self._set_last_result(SdkError.OK)
         else:
             self._set_last_result(SdkError.DEVICE_REJECTED, "device rejected baudrate configuration")
@@ -609,61 +569,11 @@ class GHand:
             self._set_last_result(SdkError.NOT_CONNECTED, "device is not connected")
             raise RuntimeError("Device is not connected")
 
-        if isinstance(self._comm, EthercatComm):
-            def adapter(data_bytes, *args, **kwargs):
-                tpdo = Tpdo.from_bytes(data_bytes, self._product_config)
-                device_data = self._tpdo_to_device_data(tpdo)
-                callback(device_data, *args, **kwargs)
-        elif isinstance(self._comm, (CanfdComm, Rs485Comm)):
-            def adapter(hand_state, joints, *args, **kwargs):
-                tactile = None
-                if self._tactile_opened:
-                    tactile = self._comm.get_tactile_data()
-                    if not tactile:
-                        tactile = None
-                device_data = DeviceData(
-                    hand=hand_state, joints=joints, tactile=tactile
-                )
-                callback(device_data, *args, **kwargs)
-        else:
-            raise TypeError(f"Unsupported comm type: {type(self._comm)}")
-        return self._comm.subscribe(adapter, interval_ms=interval_ms)
-
-    def _tpdo_to_device_data(self, tpdo) -> DeviceData:
-        """Convert an EtherCAT Tpdo to a protocol-agnostic DeviceData."""
-        hand = HandState(
-            state=EthercatComm._parse_state(tpdo.hand.state),
-            error_warn=tpdo.hand.error_warn,
-            error_fault=tpdo.hand.error_fault,
-            error_critical=tpdo.hand.error_critical,
-            temperature=tpdo.hand.temperature,
+        return self._comm.subscribe_device_data(
+            callback,
+            include_tactile=self._tactile_opened,
+            interval_ms=interval_ms,
         )
-        joints = [
-            JointData(
-                id=jid.value,
-                state=JointState(jtpdo.state),
-                error=JointErrorCode(jtpdo.error),
-                mode=jtpdo.mode,
-                stop=jtpdo.stop,
-                angle=jtpdo.angle,
-                speed=jtpdo.speed,
-                current=jtpdo.current,
-            )
-            for jid, jtpdo in tpdo.joints.items()
-        ]
-        tactile = None
-        if self._product_config.has_tactile:
-            tactile = {}
-            for region in self._product_config.tactile_regions:
-                attr = f"{region.id.name.lower()}_tactile"
-                tdata = getattr(tpdo, attr, None)
-                if tdata is not None:
-                    tactile[region.id] = TactileInfo(
-                        state=bool(tpdo.tactile_state.state & (1 << region.id.value)),
-                        resultant_force=tdata.resultant_force,
-                        distributed_force=tdata.sample_force,
-                    )
-        return DeviceData(hand=hand, joints=joints, tactile=tactile)
 
     def unsubscribe(self, sub_id):
         """Unsubscribe from data updates.

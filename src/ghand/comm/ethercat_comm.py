@@ -27,6 +27,7 @@ import time
 from .._subscription import SubscriptionManager
 from ..types import (
     CtrlMode,
+    DeviceData,
     ErrorCode,
     HandState,
     JointCommand,
@@ -741,6 +742,53 @@ class EthercatComm(IComm):
             raise RuntimeError("Device is not connected")
 
         return self._sub_manager.subscribe(callback, *args, **kwargs)
+
+    def subscribe_device_data(
+        self,
+        callback,
+        *,
+        include_tactile: bool = False,
+        interval_ms: int | None = None,
+    ) -> int:
+        """Subscribe to unified ``DeviceData`` updates."""
+
+        def adapter(data_bytes, *args, **kwargs):
+            tpdo = Tpdo.from_bytes(data_bytes, self._config)
+            hand = HandState(
+                state=self._parse_state(tpdo.hand.state),
+                error_warn=tpdo.hand.error_warn,
+                error_fault=tpdo.hand.error_fault,
+                error_critical=tpdo.hand.error_critical,
+                temperature=tpdo.hand.temperature,
+            )
+            joints = [
+                JointData(
+                    id=jid.value,
+                    state=self._parse_joint_state(jtpdo.state),
+                    error=self._parse_joint_error_code(jtpdo.error),
+                    mode=jtpdo.mode,
+                    stop=jtpdo.stop,
+                    angle=jtpdo.angle,
+                    speed=jtpdo.speed,
+                    current=jtpdo.current,
+                )
+                for jid, jtpdo in tpdo.joints.items()
+            ]
+            tactile = None
+            if self._config.has_tactile:
+                tactile = {}
+                for region in self._config.tactile_regions:
+                    attr = f"{region.id.name.lower()}_tactile"
+                    tdata = getattr(tpdo, attr, None)
+                    if tdata is not None:
+                        tactile[region.id] = TactileInfo(
+                            state=bool(tpdo.tactile_state.state & (1 << region.id.value)),
+                            resultant_force=tdata.resultant_force,
+                            distributed_force=tdata.sample_force,
+                        )
+            callback(DeviceData(hand=hand, joints=joints, tactile=tactile), *args, **kwargs)
+
+        return self.subscribe(adapter, interval_ms=interval_ms)
 
     def unsubscribe(self, sub_id) -> bool:
         """Remove a previously registered subscription.
