@@ -83,8 +83,13 @@ GHand 灵巧手官方 Python SDK，提供 EtherCAT、CAN-FD、RS-485 通信接�
 ```bash
 git clone https://github.com/gli-sdk/GHand-Python-SDK.git
 cd GHand-Python-SDK
-pip install -r requirements.txt
 pip install -e .
+```
+
+仅在需要碰撞检测功能时安装对应依赖：
+
+```bash
+pip install -e ".[collision]"
 ```
 
 Gitee 镜像：
@@ -92,8 +97,13 @@ Gitee 镜像：
 ```bash
 git clone https://gitee.com/glitech/GHand-Python-SDK.git
 cd GHand-Python-SDK
-pip install -r requirements.txt
 pip install -e .
+```
+
+仅在需要碰撞检测功能时安装对应依赖：
+
+```bash
+pip install -e ".[collision]"
 ```
 
 ## 快速开始
@@ -328,9 +338,7 @@ GHand-Python-SDK/
 |-- examples/                   # 教程、演示和扩展示例
 |-- docs/                       # Sphinx 文档源码
 |-- tests/                      # 测试套件
-|-- requirements.txt            # 核心运行时依赖
 |-- pyproject.toml              # 构建配置
-|-- setup.cfg                   # 打包元数据
 |-- setup.py                    # setuptools 版本加载
 |-- LICENSE                     # Apache License 2.0
 |-- LICENSES/                   # 第三方许可证文本

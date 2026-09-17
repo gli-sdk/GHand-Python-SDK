@@ -8,7 +8,7 @@ from typing import Any, Callable, Mapping, Optional
 
 from ..types import JointId, TactileSensorId, CtrlMode, JointCommand
 from .config import AdaptiveGraspConfig
-from .ports import GraspSequenceHandPort, SensorFrameSource
+from .ports import HandCommandPort, SensorFrameSource
 from .runtime import GraspState
 from .safety import SafetyMonitor, SafetyReport, SafetyStatus
 from .joint_builder import JointCommandBuilder
@@ -63,7 +63,7 @@ class PhaseResult:
 class PhaseController:
     def __init__(
         self,
-        hand_port: GraspSequenceHandPort,
+        hand_port: HandCommandPort,
         sensor: SensorFrameSource,
         safety: SafetyMonitor,
         joint_builder: JointCommandBuilder,

@@ -30,14 +30,6 @@ def _get_default_stl_dir() -> Path:
     return _get_assets_dir() / "ghand5_system" / "meshes" / "hands" / "visual" / "right"
 
 
-DEFAULT_URDF_PATH: Path = _get_default_urdf_path()
-DEFAULT_STL_DIR: Path = _get_default_stl_dir()
-# Filesystem defaults used only when an explicit path is provided.
-#
-# When no path is passed to read_urdf_xml() or load_capsule_from_json(),
-# the values from collision_config.py are used instead of reading the disk.
-
-
 def _to_float(value: Any, default: float = 0.0) -> float:
     return float(value) if value is not None else default
 
@@ -117,10 +109,6 @@ def load_safe_angles(csv_path: str = 'Safe_Angles.csv') -> np.ndarray:
 
 def read_urdf_xml(xml_path: Optional[str] = None) -> List[Dict[str, Any]]:
     if xml_path is None:
-        # default_path = _get_default_urdf_path()
-        # if default_path.exists():
-        #     root = ET.parse(str(default_path)).getroot()
-        # else:
         root = ET.fromstring(collision_config.DEFAULT_URDF_XML)
     else:
         path = Path(xml_path)

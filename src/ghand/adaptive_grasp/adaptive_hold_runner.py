@@ -4,9 +4,9 @@
 import logging
 import threading
 import time
-from typing import Callable, Optional, Protocol
+from typing import Callable, Optional
 
-from .adaptive_hold_loop import HoldController, HoldResult, HoldStepResult
+from .adaptive_hold_loop import HoldController, HoldResult
 from .config import AdaptiveGraspConfig
 from .grasp_sequence import ContactSnapshot
 from .ports import SensorFrameSource
@@ -18,22 +18,6 @@ from .utils import join_thread_if_alive
 _logger = logging.getLogger("adaptive_grasp.adaptive_hold_runner")
 
 
-class _HoldControllerLike(Protocol):
-    def run_step(self, current_time: float) -> HoldStepResult:
-        ...
-
-
-class _ReleaseControllerLike(Protocol):
-    def release(
-        self,
-        *,
-        wait_control_thread: bool,
-        release_wait_s: Optional[float] = None,
-        control_thread: Optional[threading.Thread] = None,
-    ) -> bool:
-        ...
-
-
 class AdaptiveHoldRunner:
     """Runs adaptive-hold control cycles against shared runtime state."""
 
@@ -41,9 +25,9 @@ class AdaptiveHoldRunner:
         self,
         runtime: AdaptiveGraspRuntime,
         sensor: SensorFrameSource,
-        release_controller: ReleaseController | _ReleaseControllerLike,
+        release_controller: ReleaseController,
         config: AdaptiveGraspConfig,
-        hold_controller_factory: Callable[[ContactSnapshot], HoldController | _HoldControllerLike],
+        hold_controller_factory: Callable[[ContactSnapshot], HoldController],
         get_monotonic_time: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
     ):
@@ -54,7 +38,7 @@ class AdaptiveHoldRunner:
         self.hold_controller_factory = hold_controller_factory
         self.get_monotonic_time = get_monotonic_time
         self.sleep = sleep
-        self._hold_controller: Optional[HoldController | _HoldControllerLike] = None
+        self._hold_controller: Optional[HoldController] = None
         self._thread: Optional[threading.Thread] = None
 
     @property
@@ -62,13 +46,13 @@ class AdaptiveHoldRunner:
         return self._thread
 
     @property
-    def hold_controller(self) -> Optional[HoldController | _HoldControllerLike]:
+    def hold_controller(self) -> Optional[HoldController]:
         return self._hold_controller
 
     @hold_controller.setter
     def hold_controller(
         self,
-        value: Optional[HoldController | _HoldControllerLike],
+        value: Optional[HoldController],
     ) -> None:
         self._hold_controller = value
 

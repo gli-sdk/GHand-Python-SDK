@@ -10,7 +10,7 @@ from .grasp_presets import (
     build_pre_grasp_pose_from_preset,
     resolve_active_fingers,
 )
-from .object_profile import ObjectProfileRegistry
+from .object_profile import get_object_profile, list_object_profiles
 from ..types import JointId, TactileSensorId
 
 
@@ -570,7 +570,7 @@ class AdaptiveGraspConfig:
             pre_grasp_preset)
 
     def _validate_default_object(self) -> None:
-        if ObjectProfileRegistry.get(self.default_object) is not None:
+        if get_object_profile(self.default_object) is not None:
             return
-        supported = ", ".join(sorted(ObjectProfileRegistry.list_all()))
+        supported = ", ".join(sorted(list_object_profiles()))
         raise ValueError(f"default_object must be one of: {supported}")

@@ -17,8 +17,10 @@ You can obtain the GHand Python SDK in the following ways:
    cd GHand-Python-SDK
 
    # Install SDK
-   pip install -r requirements.txt
    pip install -e .
+
+   # Optional collision-detection dependencies
+   pip install -e ".[collision]"
 
 You can also install directly from Git:
 

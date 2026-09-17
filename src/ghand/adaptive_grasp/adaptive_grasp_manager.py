@@ -14,9 +14,9 @@ from .adaptive_hold_runner import AdaptiveHoldRunner
 from .config import AdaptiveGraspConfig
 from .grasp_sequence import ContactSnapshot, PhaseController
 from .hand_adapter import ensure_hand_command_port
-from .hold_planner_factory import HoldPlannerFactory
+from .hold_planner_factory import create_hold_planners
 from .joint_builder import JointCommandBuilder, CURRENT_CONTROL_JOINTS
-from .object_profile import ObjectProfile, ObjectProfileRegistry
+from .object_profile import ObjectProfile, get_object_profile
 from .ports import SensorFrameSource
 from .position_hold_planner import ForceDecision
 from .release_controller import ReleaseController
@@ -40,7 +40,6 @@ class AdaptiveGraspComponents:
     tactile: TactileAnalyzer
     safety: SafetyMonitor
     joint_builder: JointCommandBuilder
-    hold_planner_factory: HoldPlannerFactory
     visualizer: Optional["TactileVisualizer"]
 
 
@@ -74,7 +73,6 @@ def build_adaptive_grasp_components(
         tactile=TactileAnalyzer(config),
         safety=SafetyMonitor(config),
         joint_builder=JointCommandBuilder(config, current_joints),
-        hold_planner_factory=HoldPlannerFactory(config),
         visualizer=visualizer,
     )
 
@@ -112,7 +110,6 @@ class AdaptiveGrasper:
         self._tactile = self._components.tactile
         self._safety = self._components.safety
         self._joint_builder = self._components.joint_builder
-        self._hold_planner_factory = self._components.hold_planner_factory
         self._visualizer = self._components.visualizer
         self._current_joints = self._joint_builder.current_joints
 
@@ -289,7 +286,12 @@ class AdaptiveGrasper:
     def _build_hold_controller(
             self,
             contact_snapshot: Optional[ContactSnapshot]) -> HoldController:
-        planners = self._hold_planner_factory.create(
+        (
+            force_reference_planner,
+            position_hold_planner,
+            stiff_position_hold_planner,
+        ) = create_hold_planners(
+            self.config,
             self._runtime.object_profile,
             contact_snapshot,
         )
@@ -304,9 +306,9 @@ class AdaptiveGrasper:
             self.current_current,
             contact_joint_angles=(contact_snapshot.joint_angles
                                   if contact_snapshot is not None else None),
-            force_reference_planner=planners.force_reference_planner,
-            position_hold_planner=planners.position_hold_planner,
-            stiff_position_hold_planner=planners.stiff_position_hold_planner,
+            force_reference_planner=force_reference_planner,
+            position_hold_planner=position_hold_planner,
+            stiff_position_hold_planner=stiff_position_hold_planner,
             hold_target_force_n=self._hold_target_force_n,
         )
 
@@ -323,7 +325,7 @@ class AdaptiveGrasper:
         self._reset_runtime_components()
         self._control_thread_override = _NO_CONTROL_THREAD_OVERRIDE
         self._runtime.object_profile = (object_profile
-                                        or ObjectProfileRegistry.get(
+                                        or get_object_profile(
                                             self.config.default_object))
         self._tactile.set_friction_coeff(self._runtime_friction_coeff())
         self._start_sensor_subscription()

@@ -83,8 +83,13 @@ Additional local notes:
 ```bash
 git clone https://github.com/gli-sdk/GHand-Python-SDK.git
 cd GHand-Python-SDK
-pip install -r requirements.txt
 pip install -e .
+```
+
+Install collision-detection dependencies only when needed:
+
+```bash
+pip install -e ".[collision]"
 ```
 
 Gitee mirror:
@@ -92,8 +97,13 @@ Gitee mirror:
 ```bash
 git clone https://gitee.com/glitech/GHand-Python-SDK.git
 cd GHand-Python-SDK
-pip install -r requirements.txt
 pip install -e .
+```
+
+Install collision-detection dependencies only when needed:
+
+```bash
+pip install -e ".[collision]"
 ```
 
 ## Quick Start
@@ -326,9 +336,7 @@ GHand-Python-SDK/
 |-- examples/                   # Tutorial, demo, and extension examples
 |-- docs/                       # Sphinx documentation source
 |-- tests/                      # Test suite
-|-- requirements.txt            # Runtime dependencies
 |-- pyproject.toml              # Build configuration
-|-- setup.cfg                   # Packaging metadata
 |-- setup.py                    # Version loader for setuptools
 |-- LICENSE                     # Apache License 2.0
 |-- LICENSES/                   # Third-party license texts

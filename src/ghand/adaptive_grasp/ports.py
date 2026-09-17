@@ -16,11 +16,6 @@ class HandCommandPort(Protocol):
 
 
 @runtime_checkable
-class GraspSequenceHandPort(HandCommandPort, Protocol):
-    pass
-
-
-@runtime_checkable
 class SubscriptionPeriodConfigurator(Protocol):
     def configure_subscription_periods(
         self,

@@ -30,7 +30,13 @@ Use pip to install the required dependencies:
 
 .. code-block:: bash
 
-   pip install -r requirements.txt
+   pip install -e .
+
+Install collision-detection dependencies only when needed:
+
+.. code-block:: bash
+
+   pip install -e ".[collision]"
 
 Configure Development Environment
 ---------------------------------

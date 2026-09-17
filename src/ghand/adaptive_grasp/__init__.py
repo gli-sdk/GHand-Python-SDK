@@ -6,12 +6,16 @@ from .config import AdaptiveGraspConfig, HoldCommandMode
 from .adaptive_grasp_manager import AdaptiveGrasper
 from .sensor import SensorClient
 from .tactility import TactileAnalyzer, TactileAnalysis, PerFingerAnalysis
-from .object_profile import ObjectProfile, ObjectProfileRegistry
+from .object_profile import (
+    ObjectProfile,
+    OBJECT_PROFILES,
+    get_object_profile,
+    list_object_profiles,
+)
 from .force_reference_planner import ForceReferenceDecision, ForceReferencePlanner
-from .hold_planner_factory import HoldPlannerBundle, HoldPlannerFactory
+from .hold_planner_factory import create_hold_planners
 from .position_hold_planner import ForceDecision, PositionHoldPlanner
 from .ports import (
-    GraspSequenceHandPort,
     HandCommandPort,
     SensorFrameSource,
     SubscriptionPeriodConfigurator,
@@ -34,15 +38,15 @@ __all__ = [
     "TactileAnalysis",
     "PerFingerAnalysis",
     "ObjectProfile",
-    "ObjectProfileRegistry",
+    "OBJECT_PROFILES",
+    "get_object_profile",
+    "list_object_profiles",
     "ForceDecision",
     "ForceReferenceDecision",
     "ForceReferencePlanner",
-    "HoldPlannerBundle",
-    "HoldPlannerFactory",
+    "create_hold_planners",
     "PositionHoldPlanner",
     "HandCommandPort",
-    "GraspSequenceHandPort",
     "SubscriptionPeriodConfigurator",
     "SensorFrameSource",
     "GHandCommandPort",

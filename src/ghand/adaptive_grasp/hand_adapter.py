@@ -6,7 +6,7 @@ from typing import Any
 from ..gestures import _wait_for_completion
 from ..types import JointId, CtrlMode, JointCommand
 
-from .ports import GraspSequenceHandPort
+from .ports import HandCommandPort
 
 
 class GHandCommandPort:
@@ -58,7 +58,7 @@ class GHandCommandPort:
         )
 
 
-def ensure_hand_command_port(hand: Any) -> GraspSequenceHandPort:
+def ensure_hand_command_port(hand: Any) -> HandCommandPort:
     if isinstance(hand, GHandCommandPort):
         return hand
 

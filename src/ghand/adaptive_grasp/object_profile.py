@@ -31,24 +31,6 @@ class ObjectProfile:
     shape: Optional[str] = None
 
 
-class ObjectProfileRegistry:
-    """Simple object/material parameter registry."""
-
-    _profiles: dict[str, ObjectProfile] = {}
-
-    @classmethod
-    def register(cls, profile: ObjectProfile) -> None:
-        cls._profiles[profile.name] = profile
-
-    @classmethod
-    def get(cls, name: str) -> Optional[ObjectProfile]:
-        return cls._profiles.get(name)
-
-    @classmethod
-    def list_all(cls) -> list[str]:
-        return list(cls._profiles.keys())
-
-
 DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
     ObjectProfile(
         name="metal",
@@ -192,10 +174,14 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
     ),
 )
 
+OBJECT_PROFILES: dict[str, ObjectProfile] = {
+    profile.name: profile for profile in DEFAULT_OBJECT_PROFILES
+}
 
-def _register_default_profiles() -> None:
-    for profile in DEFAULT_OBJECT_PROFILES:
-        ObjectProfileRegistry.register(profile)
+
+def get_object_profile(name: str) -> Optional[ObjectProfile]:
+    return OBJECT_PROFILES.get(name)
 
 
-_register_default_profiles()
+def list_object_profiles() -> list[str]:
+    return list(OBJECT_PROFILES)
