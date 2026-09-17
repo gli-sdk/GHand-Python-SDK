@@ -27,6 +27,15 @@ class CtrlMode(enum.Enum):
     SPEED = 1
     CURRENT = 2
     MIT = 3
+    CUSTOM = 0x0F
+
+
+class JointControlState(enum.IntEnum):
+    """Per-joint control state sent to the device."""
+
+    DISABLED = 0
+    RUNNING = 1
+    STOPPED = 2
 
 
 class State(DeviceCode):

@@ -40,6 +40,7 @@ except ImportError:
 from ..types import (
     JointId,
     CtrlMode,
+    JointControlState,
     ProductConfig,
     HandState,
     JointData,
@@ -64,7 +65,9 @@ from .modbus_codec import (
     REG_IN_TACTILE_SENSOR_VER,
     REG_IN_THUMB_TACTILE_SENSOR_VER,
     build_tactile_info,
+    encode_hand_control,
     encode_joint_command,
+    encode_joint_mode_stop,
     get_joint_input_span,
     get_modbus_profile,
     parse_device_name,
@@ -112,6 +115,11 @@ class CanfdComm(IComm):
     def __init__(self, config: ProductConfig):
         self._config = config
         self._profile = get_modbus_profile(config)
+        self._hand_mode = CtrlMode.POSITION
+        self._joint_modes = {
+            joint_id: CtrlMode.POSITION.value
+            for joint_id in self._profile.joint_control_addresses
+        }
         self._transport: CanfdTransport | None = None
         self._src_id = 0x0A  # master node id
         self._slave_id = 0x00
@@ -128,6 +136,11 @@ class CanfdComm(IComm):
         """Update the cached product configuration."""
         self._config = config
         self._profile = get_modbus_profile(config)
+        self._hand_mode = CtrlMode.POSITION
+        self._joint_modes = {
+            joint_id: CtrlMode.POSITION.value
+            for joint_id in self._profile.joint_control_addresses
+        }
 
     def _cleanup_failed_connect(self) -> None:
         """Release transport state left by a failed connection attempt."""
@@ -439,7 +452,7 @@ class CanfdComm(IComm):
             return False
 
         if self._profile.mode_register is not None:
-            mode_value = (mode.value << 8) & 0xFF00
+            mode_value = encode_hand_control(mode, True)
             logger.debug(
                 "CANFD write mode register addr=0x%04X value=0x%04X",
                 self._profile.mode_register,
@@ -458,13 +471,16 @@ class CanfdComm(IComm):
                     self._profile.mode_register,
                 )
                 raise
+            self._hand_mode = mode
 
         for joint in joints:
             joint_id = JointId(joint.id)
             base_addr = self._profile.joint_control_addresses.get(joint_id)
             if base_addr is None:
                 continue
-            registers = encode_joint_command(joint, mode)
+            registers = encode_joint_command(
+                joint, mode, self._joint_modes.get(joint_id, CtrlMode.POSITION.value)
+            )
             logger.debug(
                 "CANFD write joint=%s addr=0x%04X registers=%s",
                 joint_id.name,
@@ -485,25 +501,40 @@ class CanfdComm(IComm):
                     base_addr,
                 )
                 raise
+            self._joint_modes[joint_id] = registers[0] & 0x0F
         return True
+
+    def _set_hand_enabled(self, enabled: bool) -> bool:
+        if self._profile.mode_register is None:
+            return False
+        self._transport.write_registers(
+            self._src_id,
+            self._slave_id,
+            self._profile.mode_register,
+            struct.pack(">H", encode_hand_control(self._hand_mode, enabled)),
+        )
+        return True
+
+    def disable_hand(self) -> bool:
+        """Disable all active joints at the hand-control level."""
+        return self._set_hand_enabled(False)
 
     def stop(self) -> bool:
         """Send an immediate stop command."""
-        if self._profile.stop_register is not None:
+        if not self._set_hand_enabled(True):
+            return False
+        for joint_id, base_addr in self._profile.joint_control_addresses.items():
             self._transport.write_registers(
                 self._src_id,
                 self._slave_id,
-                self._profile.stop_register,
-                struct.pack(">H", 0x0001),
-            )
-            return True
-
-        for joint_id in self._config.valid_joints:
-            base_addr = self._profile.joint_control_addresses.get(joint_id)
-            if base_addr is None:
-                continue
-            self._transport.write_registers(
-                self._src_id, self._slave_id, base_addr, struct.pack(">H", 0x0001)
+                base_addr,
+                struct.pack(
+                    ">H",
+                    encode_joint_mode_stop(
+                        self._joint_modes.get(joint_id, CtrlMode.POSITION.value),
+                        JointControlState.STOPPED,
+                    ),
+                ),
             )
         return True
 

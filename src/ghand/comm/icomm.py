@@ -141,6 +141,11 @@ class IComm(ABC):
         ...
 
     @abstractmethod
+    def disable_hand(self) -> bool:
+        """Disable all active joints at the hand-control level."""
+        ...
+
+    @abstractmethod
     def stop(self) -> bool:
         """Stop all joint motion.
 

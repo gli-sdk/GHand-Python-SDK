@@ -21,13 +21,13 @@ Wraps EthercatClient and handles PDO encoding/decoding.
 """
 
 import logging
-import math
 import time
 
 from .._subscription import SubscriptionManager
 from ..types import (
     JointId,
     CtrlMode,
+    JointControlState,
     JointState,
     State,
     ErrorCode,
@@ -115,7 +115,7 @@ class EthercatComm(IComm):
 
     def _expected_rpdo_bytes(self, config: ProductConfig) -> int:
         """Return the expected EtherCAT RPDO byte size for the product."""
-        return 2 + len(self._controlled_joints) * 6
+        return 2 + len(self._controlled_joints) * 12
 
     def _build_tpdo_layouts(self, config: ProductConfig) -> dict[int, ProductConfig]:
         """Build supported TPDO layouts keyed by mapped input size."""
@@ -155,6 +155,7 @@ class EthercatComm(IComm):
         )
         self._tpdo_size_selected = False
         self._controlled_joints = [j for j in config.valid_joints if j in config.joint_limits]
+        self._rpdo = Rpdo(self._controlled_joints)
         self._expected_rpdo_size = self._expected_rpdo_bytes(config)
 
     # ===== Connection management =====
@@ -218,22 +219,47 @@ class EthercatComm(IComm):
         Returns:
             True if the command is sent successfully.
         """
-        rpdo = Rpdo(self._controlled_joints)
-        rpdo.mode = mode.value
-        rpdo.stop = 0
+        self._rpdo.mode = mode.value
+        self._rpdo.stop = 1
 
         for joint in joints:
-            rpdo.joints[joint.id] = (math.radians(joint.angle), joint.speed, joint.current)
+            joint_id = JointId(joint.id)
+            if joint_id not in self._rpdo.joints:
+                raise ValueError(f"Joint {joint_id.name} is not controllable")
+            target = self._rpdo.joints[joint_id]
+            joint_mode = joint.mode
+            if joint_mode is None and mode != CtrlMode.CUSTOM:
+                joint_mode = mode
+            if joint_mode is not None:
+                if joint_mode == CtrlMode.CUSTOM:
+                    raise ValueError("Per-joint mode cannot be CUSTOM")
+                target.mode = (
+                    joint_mode.value
+                    if isinstance(joint_mode, CtrlMode)
+                    else int(joint_mode)
+                )
+            target.stop = JointControlState(joint.stop).value
+            target.angle = joint.angle
+            target.speed = joint.speed
+            target.current = joint.current
+            target.kp = joint.kp
+            target.kd = joint.kd
 
-        self._client.send_data(rpdo.to_bytes())
+        self._client.send_data(self._rpdo.to_bytes())
+        return True
+
+    def disable_hand(self) -> bool:
+        """Disable all active joints at the hand-control level."""
+        self._rpdo.stop = 0
+        self._client.send_data(self._rpdo.to_bytes())
         return True
 
     def stop(self) -> bool:
         """Send an immediate stop command to all joints."""
-        rpdo = Rpdo(self._controlled_joints)
-        rpdo.mode = 0
-        rpdo.stop = 1
-        self._client.send_data(rpdo.to_bytes())
+        self._rpdo.stop = 1
+        for joint in self._rpdo.joints.values():
+            joint.stop = JointControlState.STOPPED
+        self._client.send_data(self._rpdo.to_bytes())
         return True
 
     # ===== State retrieval =====

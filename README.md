@@ -131,6 +131,31 @@ print("Thumb tactile sensor:", hand.get_thumb_tactile_sensor_version())
 print("Finger tactile sensor:", hand.get_finger_tactile_sensor_version())
 ```
 
+Use the hand-level custom mode to control each joint's `mode` and `stop`
+independently:
+
+```python
+from ghand import CtrlMode, JointCommand, JointControlState, JointId
+
+hand.move_joints(
+    [
+        JointCommand(
+            id=JointId.THUMB_MCP,
+            mode=CtrlMode.POSITION,
+            stop=JointControlState.RUNNING,
+            angle=30,
+        ),
+        JointCommand(
+            id=JointId.FF_PIP,
+            mode=CtrlMode.CURRENT,
+            stop=JointControlState.STOPPED,
+        ),
+    ],
+    mode=CtrlMode.CUSTOM,
+)
+hand.disable_hand()
+```
+
 Minimal CAN-FD example:
 
 ```python

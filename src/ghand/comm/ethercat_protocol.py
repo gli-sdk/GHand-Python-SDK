@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import math
 import struct
 from dataclasses import dataclass, field
 
@@ -95,7 +94,7 @@ class JointTpdo:
         state, error, mode, stop, angle_raw, speed, current = struct.unpack_from(
             '<BBBBhhh', data, 0
         )
-        angle = math.degrees(angle_raw / 100.0)
+        angle = angle_raw * 0.1
         return cls(state, error, mode, stop, angle, speed, current)
 
     def __str__(self):
@@ -227,6 +226,19 @@ class Tpdo:
         return instance
 
 
+@dataclass
+class JointRpdo:
+    """Per-joint control fields within an RPDO frame."""
+
+    mode: int = 0
+    stop: int = 0
+    angle: float = 0.0
+    speed: int = 0
+    current: int = 0
+    kp: int = 0
+    kd: int = 0
+
+
 class Rpdo:
     """Full RPDO (Receive Process Data Object) frame.
 
@@ -237,8 +249,8 @@ class Rpdo:
     def __init__(self, controlled_joints: list[JointId]):
         self.mode: int = 0
         self.stop: int = 0
-        self.joints: dict[JointId, tuple[float, int, int]] = {
-            jid: (0.0, 0, 0) for jid in controlled_joints
+        self.joints: dict[JointId, JointRpdo] = {
+            jid: JointRpdo() for jid in controlled_joints
         }
 
     def to_bytes(self) -> bytes:
@@ -250,6 +262,17 @@ class Rpdo:
         data = bytearray()
         data.extend(struct.pack('<B', self.mode))
         data.extend(struct.pack('<B', self.stop))
-        for angle, speed, current in self.joints.values():
-            data.extend(struct.pack('<fbb', angle, speed, current))
+        for joint in self.joints.values():
+            data.extend(
+                struct.pack(
+                    '<BBhhhhh',
+                    joint.mode,
+                    joint.stop,
+                    int(joint.angle * 10),
+                    joint.speed,
+                    joint.current,
+                    joint.kp,
+                    joint.kd,
+                )
+            )
         return bytes(data)

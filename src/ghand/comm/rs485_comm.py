@@ -37,7 +37,16 @@ try:
 except ImportError:
     ModbusSerialClient = None  # type: ignore[misc,assignment]
     ModbusException = Exception  # type: ignore[misc,assignment]
-from ..types import JointId, ProductConfig, HandState, JointData, SelfTestErrorInfo, TactileData
+from ..types import (
+    CtrlMode,
+    HandState,
+    JointControlState,
+    JointData,
+    JointId,
+    ProductConfig,
+    SelfTestErrorInfo,
+    TactileData,
+)
 from .icomm import IComm
 from .modbus_codec import (
     BAUDRATE_CONFIG_REGISTER,
@@ -56,7 +65,9 @@ from .modbus_codec import (
     REG_IN_THUMB_TACTILE_SENSOR_VER,
     REG_SLAVE_ID,
     build_tactile_info,
+    encode_hand_control,
     encode_joint_command,
+    encode_joint_mode_stop,
     get_joint_input_span,
     get_modbus_profile,
     parse_device_name,
@@ -108,6 +119,11 @@ class Rs485Comm(IComm):
     def __init__(self, config: ProductConfig):
         self._config = config
         self._profile = get_modbus_profile(config)
+        self._hand_mode = CtrlMode.POSITION
+        self._joint_modes = {
+            joint_id: CtrlMode.POSITION.value
+            for joint_id in self._profile.joint_control_addresses
+        }
         self._slave_id = getattr(config, "slave_id", 0x31) or 0x31
         self._client: Any = None
         self._connected = False
@@ -123,6 +139,11 @@ class Rs485Comm(IComm):
         """Update the cached product configuration."""
         self._config = config
         self._profile = get_modbus_profile(config)
+        self._hand_mode = CtrlMode.POSITION
+        self._joint_modes = {
+            joint_id: CtrlMode.POSITION.value
+            for joint_id in self._profile.joint_control_addresses
+        }
         if not self._connected:
             self._slave_id = getattr(config, "slave_id", 0x31) or 0x31
 
@@ -421,42 +442,59 @@ class Rs485Comm(IComm):
             True if all commands are sent successfully.
         """
         if self._profile.mode_register is not None:
-            mode_value = (mode.value << 8) & 0xFF00
-            result = self._write_register(self._profile.mode_register, mode_value)
+            result = self._write_register(
+                self._profile.mode_register, encode_hand_control(mode, True)
+            )
             if result is None or result.isError():
                 raise RuntimeError("Failed to write mode register")
+            self._hand_mode = mode
 
         for joint in joints:
             joint_id = JointId(joint.id)
             base_addr = self._profile.joint_control_addresses.get(joint_id)
             if base_addr is None:
                 continue
-            registers = encode_joint_command(joint, mode)
+            registers = encode_joint_command(
+                joint, mode, self._joint_modes.get(joint_id, CtrlMode.POSITION.value)
+            )
 
             result = self._write_registers(base_addr, registers)
             if result is None or result.isError():
                 raise RuntimeError(
                     f"Failed to write joint {joint_id.name}"
                 )
+            self._joint_modes[joint_id] = registers[0] & 0x0F
 
         return True
 
+    def _set_hand_enabled(self, enabled: bool) -> bool:
+        if self._profile.mode_register is None:
+            return False
+        result = self._write_register(
+            self._profile.mode_register,
+            encode_hand_control(self._hand_mode, enabled),
+        )
+        return result is not None and not result.isError()
+
+    def disable_hand(self) -> bool:
+        """Disable all active joints at the hand-control level."""
+        return self._set_hand_enabled(False)
+
     def stop(self) -> bool:
         """Send an immediate stop command."""
-        if self._profile.stop_register is not None:
-            result = self._write_register(self._profile.stop_register, 0x0001)
-            return result is not None and not result.isError()
-
-        success = False
-        for joint_id in self._config.valid_joints:
-            base_addr = self._profile.joint_control_addresses.get(joint_id)
-            if base_addr is None:
-                continue
-            result = self._write_register(base_addr, 0x0001)
-            success = result is not None and not result.isError()
-            if not success:
+        if not self._set_hand_enabled(True):
+            return False
+        for joint_id, base_addr in self._profile.joint_control_addresses.items():
+            result = self._write_register(
+                base_addr,
+                encode_joint_mode_stop(
+                    self._joint_modes.get(joint_id, CtrlMode.POSITION.value),
+                    JointControlState.STOPPED,
+                ),
+            )
+            if result is None or result.isError():
                 return False
-        return success
+        return True
 
     # ===== State retrieval (batch read) =====
 

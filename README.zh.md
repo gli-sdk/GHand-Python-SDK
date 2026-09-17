@@ -131,6 +131,30 @@ print("Thumb tactile sensor:", hand.get_thumb_tactile_sensor_version())
 print("Finger tactile sensor:", hand.get_finger_tactile_sensor_version())
 ```
 
+混合关节控制使用整手自定义模式，各关节通过 `mode` 和 `stop` 独立控制：
+
+```python
+from ghand import CtrlMode, JointCommand, JointControlState, JointId
+
+hand.move_joints(
+    [
+        JointCommand(
+            id=JointId.THUMB_MCP,
+            mode=CtrlMode.POSITION,
+            stop=JointControlState.RUNNING,
+            angle=30,
+        ),
+        JointCommand(
+            id=JointId.FF_PIP,
+            mode=CtrlMode.CURRENT,
+            stop=JointControlState.STOPPED,
+        ),
+    ],
+    mode=CtrlMode.CUSTOM,
+)
+hand.disable_hand()
+```
+
 最小 CAN-FD 示例：
 
 ```python

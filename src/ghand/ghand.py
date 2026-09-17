@@ -830,10 +830,15 @@ class GHand:
                 kp=joint.kp,
                 kd=joint.kd,
             )
-            self._check_speed_limit(joint_cmd, mode)
-            self._check_current_limit(joint_cmd, mode)
+            effective_mode = mode
+            if mode == CtrlMode.CUSTOM and joint_cmd.mode is not None:
+                effective_mode = CtrlMode(joint_cmd.mode)
+            self._check_speed_limit(joint_cmd, effective_mode)
+            self._check_current_limit(joint_cmd, effective_mode)
             if joint.id in self._joint_limits:
-                self._check_joint_limit(joint_cmd, self._joint_limits[joint.id], mode)
+                self._check_joint_limit(
+                    joint_cmd, self._joint_limits[joint.id], effective_mode
+                )
             active_joints.append(joint_cmd)
 
         if not active_joints:
@@ -850,6 +855,23 @@ class GHand:
             return result
         except Exception as e:
             logger.error("Failed to move joints: %s", e)
+            self._set_last_result(SdkError.TRANSPORT_ERROR, str(e))
+            return False
+
+    def disable_hand(self) -> bool:
+        """Disable all active joints until the next move_joints command."""
+        if not self.is_connected():
+            self._set_last_result(SdkError.NOT_CONNECTED, "device is not connected")
+            return False
+        try:
+            result = self._comm.disable_hand()
+            self._set_last_result(
+                SdkError.OK if result else SdkError.TRANSPORT_ERROR,
+                "" if result else "disable_hand failed",
+            )
+            return result
+        except Exception as e:
+            logger.error("Failed to disable hand: %s", e)
             self._set_last_result(SdkError.TRANSPORT_ERROR, str(e))
             return False
 

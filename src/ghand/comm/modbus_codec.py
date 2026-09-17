@@ -29,6 +29,7 @@ from ..types import (
     ProductType,
     TactileSensorId,
     CtrlMode,
+    JointControlState,
     JointState,
     State,
     JointErrorCode,
@@ -418,7 +419,36 @@ def parse_tactile_distributed(data_bytes: bytes, count: int) -> list[float]:
     return distributed
 
 
-def encode_joint_command(joint, mode: CtrlMode) -> list[int]:
+def encode_hand_control(mode: CtrlMode, enabled: bool) -> int:
+    """Encode the shared hand mode/enable register."""
+    mode_value = mode.value if isinstance(mode, CtrlMode) else int(mode)
+    return ((mode_value & 0x0F) << 8) | int(enabled)
+
+
+def resolve_joint_mode(joint, mode: CtrlMode, default_mode: int = 0) -> int:
+    """Resolve the mode encoded in a per-joint control register."""
+    joint_mode = getattr(joint, "mode", None)
+    if joint_mode is None:
+        joint_mode = default_mode if mode == CtrlMode.CUSTOM else mode
+    mode_value = joint_mode.value if isinstance(joint_mode, CtrlMode) else int(joint_mode)
+    if mode_value not in (
+        CtrlMode.POSITION.value,
+        CtrlMode.SPEED.value,
+        CtrlMode.CURRENT.value,
+        CtrlMode.MIT.value,
+    ):
+        raise ValueError(f"Invalid per-joint control mode: {mode_value}")
+    return mode_value
+
+
+def encode_joint_mode_stop(mode: int, stop: JointControlState | int) -> int:
+    """Encode one joint's mode/stop register."""
+    return (JointControlState(stop).value << 8) | (mode & 0x0F)
+
+
+def encode_joint_command(
+    joint, mode: CtrlMode, default_mode: int = CtrlMode.POSITION.value
+) -> list[int]:
     """Encode a JointCommand into six holding-register values.
 
     Layout:
@@ -433,15 +463,8 @@ def encode_joint_command(joint, mode: CtrlMode) -> list[int]:
         [reg0, reg1, reg2, reg3, reg4, reg5]
     """
     angle_raw = int(joint.angle * 10)
-    joint_mode = getattr(joint, "mode", mode)
-    if joint_mode is None:
-        joint_mode = mode
-    if isinstance(joint_mode, CtrlMode):
-        mode_value = joint_mode.value
-    else:
-        mode_value = int(joint_mode)
-    stop = int(getattr(joint, "stop", 1))
-    mode_stop = ((stop & 0xFF) << 8) | (mode_value & 0x0F)
+    mode_value = resolve_joint_mode(joint, mode, default_mode)
+    mode_stop = encode_joint_mode_stop(mode_value, joint.stop)
     return [
         mode_stop,
         angle_raw & 0xFFFF,

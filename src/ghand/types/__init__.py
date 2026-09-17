@@ -61,6 +61,7 @@ from .errors import (
 from .states import (
     CtrlMode,
     HandType,
+    JointControlState,
     JointState,
     State,
 )
@@ -82,6 +83,7 @@ __all__ = [
     "HandType",
     "HandWarning",
     "JointCommand",
+    "JointControlState",
     "JointData",
     "JointErrorCode",
     "JointId",

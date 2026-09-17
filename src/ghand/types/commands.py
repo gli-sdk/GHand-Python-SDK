@@ -20,7 +20,7 @@
 from dataclasses import dataclass
 
 from .enums import JointId
-from .states import CtrlMode
+from .states import CtrlMode, JointControlState
 
 
 @dataclass
@@ -29,7 +29,7 @@ class JointCommand:
 
     id: int = JointId.THUMB_IP
     mode: CtrlMode | None = None
-    stop: int = 1
+    stop: JointControlState | int = JointControlState.RUNNING
     angle: float = 0.0  # degrees
     speed: int = 0
     current: int = 0
