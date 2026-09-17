@@ -107,7 +107,6 @@ The SDK provides the following device version query APIs:
 .. code-block:: python
 
    hand.get_firmware_version()
-   hand.get_hardware_version()
    hand.get_firmware_package_version()
    hand.get_position_sensor_version()
    hand.get_tactile_sensor_version()

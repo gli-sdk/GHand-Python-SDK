@@ -43,6 +43,7 @@ from ..types import (
     JointControlState,
     ProductConfig,
     HandState,
+    HandStateMachine,
     JointData,
     TactileData,
 )
@@ -51,17 +52,17 @@ from .icomm import IComm
 from .modbus_codec import (
     BAUDRATE_CONFIG_REGISTER,
     REG_CLEAR_FAULT,
+    REG_CONNECTION_CONTROL,
     REG_DEVICE_NAME,
     REG_FIRMWARE_VERSION,
     REG_HAND_TYPE,
-    REG_HARDWARE_VERSION,
-    REG_IN_FINGER_TACTILE_SENSOR_VER,
     REG_IN_FIRMWARE_PACKAGE_VER,
     REG_IN_MOTOR_DRV_VER,
     REG_IN_POSITION_SENSOR_VER,
-    REG_IN_SERIAL_NUMBER,
     REG_IN_TACTILE_SENSOR_VER,
-    REG_IN_THUMB_TACTILE_SENSOR_VER,
+    REG_HAND_STATE_MACHINE,
+    REG_SERIAL_NUMBER,
+    REG_SLAVE_ID,
     build_tactile_info,
     encode_hand_control,
     encode_joint_command,
@@ -69,10 +70,9 @@ from .modbus_codec import (
     get_joint_input_span,
     get_modbus_profile,
     parse_device_name,
-    parse_firmware_version,
     parse_hand_info,
+    parse_hand_state_machine,
     parse_hand_type,
-    parse_hardware_version,
     parse_ascii_serial_number,
     parse_packed_firmware_version,
     parse_joints,
@@ -264,7 +264,7 @@ class CanfdComm(IComm):
                 self._cleanup_failed_connect()
                 return False
 
-            # Establish connection: function code 0x02, write connection timer=0.
+            # Detect the node with FC44, then establish the connection via 0x0000.
             if not self._establish_connection(slave_id):
                 _log_error("Failed to establish CANFD connection at gear=0x%02X", gear)
                 self._cleanup_failed_connect()
@@ -318,27 +318,38 @@ class CanfdComm(IComm):
         return self._connected
 
     def _establish_connection(self, slave_id: int | None = None) -> bool:
-        """Send connection-establishment frame (FC 0x02), polling node IDs."""
+        """Detect node ID with FC44, then write 1 to connection control."""
         slave_ids = [slave_id] if slave_id is not None else [0x31, 0x32]
-        for slave_id in dict.fromkeys(slave_ids):
-            if slave_id is None:
+        candidates = [node_id for node_id in dict.fromkeys(slave_ids) if node_id is not None]
+
+        # V2.0 devices announce their node ID after power-up with a spontaneous
+        # FC44 frame: Src=Target=Node ID, ACK=0.
+        deadline = time.time() + 0.5
+        while time.time() < deadline:
+            result = self._transport.recv_frame(timeout_ms=50)
+            if result is None:
                 continue
-            timer_values = self._profile.canfd_connection_timer_values
-            data = (
-                struct.pack(
-                    ">HH",
-                    self._profile.canfd_connection_timer_address,
-                    self._profile.canfd_connection_timer_registers,
-                )
-                + struct.pack(f">{len(timer_values)}H", *timer_values)
-            )
+            resp_id, _ = result
+            arb = unpack_arbitration(resp_id)
+            if (
+                arb["ack"] == 0
+                and arb["func_code"] == 0x44
+                and arb["src_id"] == arb["dst_id"]
+                and arb["src_id"] in candidates
+            ):
+                return self._write_connection_control(arb["src_id"], 1)
+
+        # If the device has already left the power-up detection window, actively
+        # probe allowed node IDs with FC44.
+        for slave_id in candidates:
             can_id = pack_arbitration(
-                self._src_id, slave_id, ack=0, func_code=0x02,
+                self._src_id, slave_id, ack=0, func_code=0x44,
                 start=1, end=1, toggle=0, seg_num=0,
             )
-            self._transport.send_frame(can_id, data)
+            if not self._transport.send_frame(can_id, b""):
+                continue
 
-            # Wait for positive response.
+            # Wait for the FC44 response from this node.
             deadline = time.time() + 0.5
             while time.time() < deadline:
                 result = self._transport.recv_frame(timeout_ms=50)
@@ -347,39 +358,38 @@ class CanfdComm(IComm):
                 resp_id, _ = result
                 arb = unpack_arbitration(resp_id)
                 if arb["ack"] == 1 and arb["dst_id"] == self._src_id and arb["src_id"] == slave_id:
-                    if arb["func_code"] == 0x82:
+                    if arb["func_code"] == 0xC4:
                         break  # Exception: try next dst_id
-                    if arb["func_code"] == 0x02:
-                        self._slave_id = slave_id
-                        return True
+                    if arb["func_code"] == 0x44:
+                        if self._write_connection_control(slave_id, 1):
+                            return True
+                        break
         return False
 
+    def _write_connection_control(self, slave_id: int, value: int) -> bool:
+        if not self._transport.write_registers(
+            self._src_id,
+            slave_id,
+            REG_CONNECTION_CONTROL,
+            struct.pack(">H", value),
+        ):
+            return False
+        self._slave_id = slave_id
+        return True
+
     def _delete_connection(self) -> None:
-        """Send connection-deletion frame (FC 0x05)."""
-        delete_values = self._profile.canfd_connection_delete_values
-        data = (
-            struct.pack(
-                ">HH",
-                self._profile.canfd_connection_delete_address,
-                self._profile.canfd_connection_delete_registers,
-            )
-            + struct.pack(f">{len(delete_values)}H", *delete_values)
-        )
-        can_id = pack_arbitration(
-            self._src_id, self._slave_id, ack=0, func_code=0x05,
-            start=1, end=1, toggle=0, seg_num=0,
-        )
-        self._transport.send_frame(can_id, data)
+        """Write 2 to the connection-control register."""
+        self._write_connection_control(self._slave_id, 2)
 
     def set_slave_id(self, slave_id: int) -> bool:
-        """Write a new CANFD node/slave ID to holding register 0x0000."""
+        """Write a new CANFD node/slave ID to holding register 0x0003."""
         if not 0 < slave_id <= 0x3F:
             raise ValueError("CANFD slave_id must be in range 1..63")
         try:
             self._transport.write_registers(
                 self._src_id,
                 self._slave_id,
-                0x0000,
+                REG_SLAVE_ID,
                 struct.pack(">H", slave_id),
             )
         except Exception as exc:
@@ -564,6 +574,18 @@ class CanfdComm(IComm):
         raw = list(struct.unpack(">14H", raw_bytes[:28]))
         return parse_hand_info(raw)
 
+    def get_hand_state_machine(self) -> HandStateMachine:
+        """Retrieve the Modbus V2.0 whole-hand runtime state."""
+        raw_bytes = self._transport.read_registers(
+            self._src_id,
+            self._slave_id,
+            REG_HAND_STATE_MACHINE,
+            1,
+            func_code=0x04,
+        )
+        raw = list(struct.unpack(">H", raw_bytes[:2]))
+        return parse_hand_state_machine(raw)
+
     def get_tactile_data(self) -> dict:
         """Retrieve tactile sensor data."""
         if not self._config.has_tactile:
@@ -623,15 +645,12 @@ class CanfdComm(IComm):
     def get_device_name(self) -> str:
         return self._get_string_info(REG_DEVICE_NAME, 8, parse_device_name)
 
-    def get_hardware_version(self) -> str:
-        return self._get_string_info(REG_HARDWARE_VERSION, 8, parse_hardware_version)
-
     def get_firmware_version(self) -> str:
-        return self._get_string_info(REG_FIRMWARE_VERSION, 8, parse_firmware_version)
+        return self._get_packed_version(REG_FIRMWARE_VERSION)
 
     def get_serial_number(self) -> str:
         try:
-            return parse_ascii_serial_number(self._read_input_bytes(REG_IN_SERIAL_NUMBER, 10))
+            return parse_ascii_serial_number(self._read_input_bytes(REG_SERIAL_NUMBER, 10))
         except Exception:
             return "N/A"
 
@@ -663,10 +682,10 @@ class CanfdComm(IComm):
         return self._get_packed_version(REG_IN_MOTOR_DRV_VER)
 
     def get_thumb_tactile_sensor_version(self) -> str:
-        return self._get_packed_version(REG_IN_THUMB_TACTILE_SENSOR_VER)
+        return "N/A"
 
     def get_finger_tactile_sensor_version(self) -> str:
-        return self._get_packed_version(REG_IN_FINGER_TACTILE_SENSOR_VER)
+        return "N/A"
 
     # ------------------------------------------------------------------
     # Tactile sensor

@@ -56,7 +56,6 @@ logger = logging.getLogger("ghand.ethercat_comm")
 
 # EtherCAT SDO object dictionary indices
 SDO_DEVICE_NAME = 0x1008
-SDO_HARDWARE_VERSION = 0x1009
 SDO_FIRMWARE_VERSION = 0x100A
 SDO_SERIAL_NUMBER_LEGACY = 0x1018
 SDO_HAND_TYPE = 0x2001
@@ -465,13 +464,9 @@ class EthercatComm(IComm):
         """Retrieve the device name via SDO."""
         return self._read_string_sdo(SDO_DEVICE_NAME, 0x00)
 
-    def get_hardware_version(self) -> str:
-        """Retrieve the hardware version via SDO."""
-        return self._read_string_sdo(SDO_HARDWARE_VERSION, 0x00)
-
     def get_firmware_version(self) -> str:
         """Retrieve the firmware version via SDO."""
-        return self._read_string_sdo(SDO_FIRMWARE_VERSION, 0x00)
+        return self._read_packed_firmware_version(0x01)
 
     def _read_string_sdo(self, index: int, subindex: int) -> str:
         try:
@@ -564,29 +559,27 @@ class EthercatComm(IComm):
             )
         return HandStateMachine(raw[0])
 
-    def _read_packed_firmware_version(self, mcu_id: int) -> str:
-        """Read a packed firmware version via SDO."""
+    def _read_packed_firmware_version(self, subindex: int) -> str:
+        """Read a packed firmware version from SDO 0x2007."""
         try:
-            self._client.sdo_write(SDO_FIRMWARE_INFO, SDO_SUB_COMMAND, bytes([mcu_id]))
-            time.sleep(self._SDO_WRITE_SETTLE_SEC)
-            version_high = int.from_bytes(
-                self._client.sdo_read(SDO_FIRMWARE_INFO, SDO_SUB_STATE), byteorder="little"
-            )
-            version_low = int.from_bytes(
-                self._client.sdo_read(SDO_FIRMWARE_INFO, SDO_SUB_RESULT), byteorder="little"
-            )
+            raw = self._client.sdo_read(SDO_FIRMWARE_INFO, subindex)
         except Exception:
             logger.info("Packed firmware version not available", exc_info=True)
             return "N/A"
 
+        if len(raw) < 2 or raw[:2] == b"\x00\x00":
+            return "N/A"
+        value = int.from_bytes(raw[:2], byteorder="little")
+        version_high = (value >> 8) & 0xFF
+        version_low = value & 0xFF
         major = (version_high >> 5) & 0x07
         minor = version_high & 0x1F
         patch = (version_low >> 4) & 0x0F
         return f"V{major}.{minor}.{patch}"
 
     def get_firmware_package_version(self) -> str:
-        """Retrieve the firmware package version via SDO."""
-        return self._read_packed_firmware_version(0x05)
+        """Firmware package version is not exposed by EtherCAT V2.1."""
+        return "N/A"
 
     def get_position_sensor_version(self) -> str:
         """Retrieve the position sensor version via SDO."""
@@ -599,22 +592,17 @@ class EthercatComm(IComm):
     def get_motor_driver_version(self) -> str:
         """Retrieve the motor driver version via SDO.
 
-        Writes the motor driver MCU id (0x04) to index 0x2007 sub-index 0x01,
-        then reads version high/low from sub-indices 0x02/0x03 and parses the
-        semantic version as (major, minor, patch).
-
-        Returns "N/A" if the motor driver version is not available, matching
-        the behaviour of CANFD and RS485 transports.
+        Returns "N/A" if the motor driver version is not available.
         """
         return self._read_packed_firmware_version(0x04)
 
     def get_thumb_tactile_sensor_version(self) -> str:
-        """Retrieve the thumb tactile sensor version via SDO."""
-        return self._read_packed_firmware_version(0x06)
+        """Per-finger tactile versions are not exposed by EtherCAT V2.1."""
+        return "N/A"
 
     def get_finger_tactile_sensor_version(self) -> str:
-        """Retrieve the finger tactile sensor version via SDO."""
-        return self._read_packed_firmware_version(0x07)
+        """Per-finger tactile versions are not exposed by EtherCAT V2.1."""
+        return "N/A"
 
     def get_hand_type(self) -> int:
         """Retrieve the hand type via SDO.

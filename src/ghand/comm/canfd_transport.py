@@ -558,10 +558,21 @@ class CanfdTransport:
 
                 # Multi-frame response: first segment carries byte-count prefix
                 seg_num = arb["seg_num"]
+                if arb["start"] == 1 and seg_num != 0:
+                    continue
+                if seg_num == 0 and arb["start"] != 1:
+                    continue
+                if arb["toggle"] != seg_num % 2:
+                    continue
+                if seg_num > 0 and (seg_num - 1) not in segments:
+                    continue
                 if seg_num == 0 and resp_data:
                     resp_data = resp_data[1:]
                 segments[seg_num] = resp_data
                 if arb["end"] == 1:
+                    expected = list(range(seg_num + 1))
+                    if sorted(segments) != expected:
+                        continue
                     break
 
             # Reassemble

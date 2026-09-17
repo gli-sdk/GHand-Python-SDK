@@ -34,6 +34,7 @@ from ..types import (
     State,
     JointErrorCode,
     HandState,
+    HandStateMachine,
     JointData,
     TactileData,
 )
@@ -49,16 +50,10 @@ class ModbusRegisterProfile:
     control_layout: str
     mode_register: int | None = 0x0260
     stop_register: int | None = 0x0260
-    hand_info_address: int = 0x1047
+    hand_info_address: int = 0x1051
     tactile_state_address: int = 0x1110
     tactile_control_address: int = 0x0020
     tactile_resultant_register_count: int = 16
-    canfd_connection_timer_address: int = 0x0001
-    canfd_connection_timer_registers: int = 2
-    canfd_connection_timer_values: tuple[int, ...] = (0x0000, 0x0000)
-    canfd_connection_delete_address: int = 0x0000
-    canfd_connection_delete_registers: int = 1
-    canfd_connection_delete_values: tuple[int, ...] = (0x0000,)
 
 
 # Baud rate configuration register (REG_HOLD_BAUD_CONFIG).
@@ -71,18 +66,15 @@ REG_SLAVE_ID = 0x0003
 REG_CLEAR_FAULT = 0x001F
 
 # Common input register addresses (device info / status).
-REG_DEVICE_NAME = 0x1000
-REG_HARDWARE_VERSION = 0x1008
-REG_FIRMWARE_VERSION = 0x1010
-REG_SERIAL_NUMBER = 0x1018
-REG_HAND_TYPE = 0x1020
-REG_IN_FIRMWARE_PACKAGE_VER = 0x1185
-REG_IN_POSITION_SENSOR_VER = 0x1186
-REG_IN_TACTILE_SENSOR_VER = 0x1187
-REG_IN_MOTOR_DRV_VER = 0x1188
-REG_IN_THUMB_TACTILE_SENSOR_VER = 0x1189
-REG_IN_FINGER_TACTILE_SENSOR_VER = 0x118A
-REG_IN_SERIAL_NUMBER = 0x119A
+REG_SERIAL_NUMBER = 0x1000
+REG_DEVICE_NAME = 0x100A
+REG_HAND_TYPE = 0x1012
+REG_FIRMWARE_VERSION = 0x1019
+REG_IN_POSITION_SENSOR_VER = 0x101A
+REG_IN_TACTILE_SENSOR_VER = 0x101B
+REG_IN_MOTOR_DRV_VER = 0x101C
+REG_IN_FIRMWARE_PACKAGE_VER = 0x101D
+REG_HAND_STATE_MACHINE = 0x1048
 
 
 def build_controllable_joint_addresses(
@@ -127,7 +119,7 @@ def build_modbus_profile_from_config(config) -> ModbusRegisterProfile:
         Dynamically generated Modbus register profile.
     """
     joint_input_addresses = {
-        joint_id: 0x1023 + joint_id.value * 5 for joint_id in config.valid_joints
+        joint_id: 0x105F + joint_id.value * 5 for joint_id in config.valid_joints
     }
 
     joint_control_addresses = build_controllable_joint_addresses(
@@ -195,18 +187,12 @@ def registers_to_bytes(registers: list[int]) -> bytes:
     return b"".join(struct.pack(">H", reg) for reg in registers)
 
 
+def _to_int16(value: int) -> int:
+    return value - 0x10000 if value & 0x8000 else value
+
+
 def parse_device_name(raw_bytes: bytes) -> str:
     """Parse device name from 16 bytes (8 registers)."""
-    return raw_bytes.decode("utf-8", errors="ignore").strip("\x00")
-
-
-def parse_hardware_version(raw_bytes: bytes) -> str:
-    """Parse hardware version from 16 bytes (8 registers)."""
-    return raw_bytes.decode("utf-8", errors="ignore").strip("\x00")
-
-
-def parse_firmware_version(raw_bytes: bytes) -> str:
-    """Parse firmware version from 16 bytes (8 registers)."""
     return raw_bytes.decode("utf-8", errors="ignore").strip("\x00")
 
 
@@ -220,11 +206,6 @@ def parse_packed_firmware_version(raw_bytes: bytes) -> str:
     minor = version_high & 0x1F
     patch = (version_low >> 4) & 0x0F
     return f"V{major}.{minor}.{patch}"
-
-
-def parse_serial_number(raw_bytes: bytes) -> int:
-    """Parse serial number from 16 bytes (8 registers)."""
-    return int.from_bytes(raw_bytes, byteorder="big")
 
 
 def parse_ascii_serial_number(raw_bytes: bytes) -> str:
@@ -242,7 +223,7 @@ def parse_hand_type(raw_bytes: bytes) -> int:
 
 
 def parse_hand_info(raw: list[int]) -> HandState:
-    """Parse 14 input registers (0x1047~0x1054) into HandState.
+    """Parse 14 input registers (0x1051~0x105E) into HandState.
 
     Args:
         raw: raw[0] = uint16 hand state, raw[1:4] = warn bitfield,
@@ -303,8 +284,8 @@ def parse_joint_data(raw: list[int], offset: int, joint_id: int) -> JointData:
 
     Layout:
         Register N:   [error uint8][state uint8]
-        Register N+1: [reserved uint8][mode uint8]
-        Register N+2: angle int16, unit 0.01 deg
+        Register N+1: [stop uint8][mode uint8]
+        Register N+2: angle int16, unit 0.1 deg
         Register N+3: speed int16, unit 1%
         Register N+4: current int16, unit 1%
 
@@ -316,10 +297,11 @@ def parse_joint_data(raw: list[int], offset: int, joint_id: int) -> JointData:
     status_byte = raw[offset] & 0xFF
     error_byte = (raw[offset] >> 8) & 0xFF
     mode = raw[offset + 1] & 0xFF
+    stop = (raw[offset + 1] >> 8) & 0xFF
     angle_raw = raw[offset + 2]
     if angle_raw >= 32768:
         angle_raw -= 65536
-    angle = angle_raw / 100.0
+    angle = angle_raw / 10.0
 
     speed = raw[offset + 3]
     if speed >= 32768:
@@ -334,6 +316,7 @@ def parse_joint_data(raw: list[int], offset: int, joint_id: int) -> JointData:
         state=_parse_joint_state(status_byte),
         error=_parse_joint_error_code(error_byte),
         mode=mode,
+        stop=stop,
         angle=angle,
         speed=speed,
         current=current,
@@ -344,7 +327,7 @@ def parse_joints(
     raw: list[int],
     valid_joints: list[JointId],
     profile: ModbusRegisterProfile | None = None,
-    start_address: int = 0x1023,
+    start_address: int = 0x105F,
 ) -> list[JointData]:
     """Parse joint data for all valid joints from a contiguous register block.
 
@@ -384,14 +367,7 @@ def parse_tactile_resultant(raw: list[int], region_index: int) -> list[float]:
         [Fx, Fy, Fz] in Newtons (divided by 10).
     """
     base = 1 + region_index * 3
-    raw_fx = (raw[base] >> 8) & 0xFF
-    fx = (raw_fx - 0x100) / 10.0 if raw_fx >= 0x80 else raw_fx / 10.0
-
-    raw_fy = (raw[base + 1] >> 8) & 0xFF
-    fy = (raw_fy - 0x100) / 10.0 if raw_fy >= 0x80 else raw_fy / 10.0
-
-    fz = ((raw[base + 2] >> 8) & 0xFF) / 10.0
-    return [fx, fy, fz]
+    return [_to_int16(raw[base + i]) / 10.0 for i in range(3)]
 
 
 def parse_tactile_distributed(data_bytes: bytes, count: int) -> list[float]:
@@ -421,7 +397,7 @@ def parse_tactile_distributed(data_bytes: bytes, count: int) -> list[float]:
 def encode_hand_control(mode: CtrlMode, enabled: bool) -> int:
     """Encode the shared hand mode/enable register."""
     mode_value = mode.value if isinstance(mode, CtrlMode) else int(mode)
-    return ((mode_value & 0x0F) << 8) | int(enabled)
+    return (int(enabled) << 8) | (mode_value & 0x0F)
 
 
 def resolve_joint_mode(joint, mode: CtrlMode, default_mode: int = 0) -> int:
@@ -430,7 +406,7 @@ def resolve_joint_mode(joint, mode: CtrlMode, default_mode: int = 0) -> int:
     if joint_mode is None:
         joint_mode = default_mode if mode == CtrlMode.CUSTOM else mode
     mode_value = joint_mode.value if isinstance(joint_mode, CtrlMode) else int(joint_mode)
-    if mode_value not in (
+    if (mode_value & 0x0F) not in (
         CtrlMode.POSITION.value,
         CtrlMode.SPEED.value,
         CtrlMode.CURRENT.value,
@@ -442,7 +418,12 @@ def resolve_joint_mode(joint, mode: CtrlMode, default_mode: int = 0) -> int:
 
 def encode_joint_mode_stop(mode: int, stop: JointControlState | int) -> int:
     """Encode one joint's mode/stop register."""
-    return (JointControlState(stop).value << 8) | (mode & 0x0F)
+    return (JointControlState(stop).value << 8) | (mode & 0xFF)
+
+
+def parse_hand_state_machine(raw: list[int]) -> HandStateMachine:
+    """Parse one input register containing the whole-hand state machine."""
+    return HandStateMachine(raw[0] & 0xFF)
 
 
 def encode_joint_command(

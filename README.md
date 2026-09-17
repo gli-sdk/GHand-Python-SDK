@@ -113,7 +113,6 @@ hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
 
 if hand.open("auto"):
     print("Firmware:", hand.get_firmware_version())
-    print("Hardware:", hand.get_hardware_version())
     print("Device:", hand.get_device_name())
     hand.close()
 else:
@@ -123,12 +122,9 @@ else:
 Additional device version APIs:
 
 ```python
-print("Firmware package:", hand.get_firmware_package_version())
 print("Position sensor:", hand.get_position_sensor_version())
 print("Tactile MCU:", hand.get_tactile_sensor_version())
 print("Motor driver:", hand.get_motor_driver_version())
-print("Thumb tactile sensor:", hand.get_thumb_tactile_sensor_version())
-print("Finger tactile sensor:", hand.get_finger_tactile_sensor_version())
 ```
 
 Use the hand-level custom mode to control each joint's `mode` and `stop`

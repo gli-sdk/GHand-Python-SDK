@@ -47,10 +47,9 @@ def main():
     try:
         ver1 = hand1.get_firmware_version()
         name1 = hand1.get_device_name()
-        hw_ver1 = hand1.get_hardware_version()
         serial1 = hand1.get_serial_number()
         type1 = hand1.get_hand_type()
-        print(f"First hand - Name: {name1}, HW: {hw_ver1}, "
+        print(f"First hand - Name: {name1}, "
               f"FW: {ver1}, Type: {type1.value}, "
               f"SN: {serial1}")
     except Exception as e:
@@ -60,10 +59,9 @@ def main():
     try:
         ver2 = hand2.get_firmware_version()
         name2 = hand2.get_device_name()
-        hw_ver2 = hand2.get_hardware_version()
         serial2 = hand2.get_serial_number()
         type2 = hand2.get_hand_type()
-        print(f"Second hand - Name: {name2}, HW: {hw_ver2}, "
+        print(f"Second hand - Name: {name2}, "
               f"FW: {ver2}, Type: {type2.value}, "
               f"SN: {serial2}")
     except Exception as e:

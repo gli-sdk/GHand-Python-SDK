@@ -28,7 +28,7 @@ GHand 灵巧手官方 Python SDK，提供 EtherCAT、CAN-FD、RS-485 通信接�
 
 - **设备控制**
   - 通过 EtherCAT、CAN-FD 或 RS-485 打开和关闭 GHand 设备。
-  - 读取固件、硬件、序列号、产品名称、左右手类型和电机驱动版本。
+  - 读取固件、固件包、序列号、产品名称、左右手类型和组件版本。
   - 清除故障、初始化关节、停止运动，并执行常用设备操作。
 
 - **关节控制**
@@ -113,7 +113,6 @@ hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
 
 if hand.open("auto"):
     print("Firmware:", hand.get_firmware_version())
-    print("Hardware:", hand.get_hardware_version())
     print("Device:", hand.get_device_name())
     hand.close()
 else:

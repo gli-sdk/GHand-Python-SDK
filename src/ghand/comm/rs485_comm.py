@@ -40,6 +40,7 @@ except ImportError:
 from ..types import (
     CtrlMode,
     HandState,
+    HandStateMachine,
     JointControlState,
     JointData,
     JointId,
@@ -53,14 +54,12 @@ from .modbus_codec import (
     REG_DEVICE_NAME,
     REG_FIRMWARE_VERSION,
     REG_HAND_TYPE,
-    REG_HARDWARE_VERSION,
-    REG_IN_FINGER_TACTILE_SENSOR_VER,
     REG_IN_FIRMWARE_PACKAGE_VER,
     REG_IN_MOTOR_DRV_VER,
     REG_IN_POSITION_SENSOR_VER,
-    REG_IN_SERIAL_NUMBER,
     REG_IN_TACTILE_SENSOR_VER,
-    REG_IN_THUMB_TACTILE_SENSOR_VER,
+    REG_HAND_STATE_MACHINE,
+    REG_SERIAL_NUMBER,
     REG_SLAVE_ID,
     build_tactile_info,
     encode_hand_control,
@@ -69,10 +68,9 @@ from .modbus_codec import (
     get_joint_input_span,
     get_modbus_profile,
     parse_device_name,
-    parse_firmware_version,
     parse_hand_info,
+    parse_hand_state_machine,
     parse_hand_type,
-    parse_hardware_version,
     parse_ascii_serial_number,
     parse_packed_firmware_version,
     parse_joints,
@@ -530,6 +528,13 @@ class Rs485Comm(IComm):
         raw = result.registers
         return parse_hand_info(raw)
 
+    def get_hand_state_machine(self) -> HandStateMachine:
+        """Retrieve the Modbus V2.0 whole-hand runtime state."""
+        result = self._read_input_registers(REG_HAND_STATE_MACHINE, count=1)
+        if result is None or result.isError():
+            raise RuntimeError("Failed to read hand state machine register")
+        return parse_hand_state_machine(list(result.registers))
+
     def get_tactile_data(self) -> dict:
         """Retrieve tactile sensor data.
 
@@ -593,13 +598,9 @@ class Rs485Comm(IComm):
         """Retrieve the device name."""
         return self._get_string_info(REG_DEVICE_NAME, 8, parse_device_name)
 
-    def get_hardware_version(self) -> str:
-        """Retrieve the hardware version."""
-        return self._get_string_info(REG_HARDWARE_VERSION, 8, parse_hardware_version)
-
     def get_firmware_version(self) -> str:
         """Retrieve the firmware version."""
-        return self._get_string_info(REG_FIRMWARE_VERSION, 8, parse_firmware_version)
+        return self._get_packed_version(REG_FIRMWARE_VERSION)
 
     def _get_string_info(self, register: int, count: int, parse) -> str:
         try:
@@ -611,7 +612,7 @@ class Rs485Comm(IComm):
         """Retrieve the product serial number."""
         try:
             return parse_ascii_serial_number(
-                self._read_input_registers_bytes(REG_IN_SERIAL_NUMBER, 10)
+                self._read_input_registers_bytes(REG_SERIAL_NUMBER, 10)
             )
         except Exception:
             return "N/A"
@@ -653,12 +654,12 @@ class Rs485Comm(IComm):
         return self._get_packed_version(REG_IN_MOTOR_DRV_VER)
 
     def get_thumb_tactile_sensor_version(self) -> str:
-        """Retrieve the thumb tactile sensor version."""
-        return self._get_packed_version(REG_IN_THUMB_TACTILE_SENSOR_VER)
+        """Per-finger tactile versions are not exposed by Modbus V2.0."""
+        return "N/A"
 
     def get_finger_tactile_sensor_version(self) -> str:
-        """Retrieve the finger tactile sensor version."""
-        return self._get_packed_version(REG_IN_FINGER_TACTILE_SENSOR_VER)
+        """Per-finger tactile versions are not exposed by Modbus V2.0."""
+        return "N/A"
 
     # ===== Tactile sensor =====
 

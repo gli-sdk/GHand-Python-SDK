@@ -613,17 +613,6 @@ class GHand:
         """
         return self._comm.get_device_name()
 
-    def get_hardware_version(self) -> str:
-        """Retrieve the hardware version.
-
-        Returns:
-            Hardware version string.
-
-        Raises:
-            RuntimeError: If communication fails.
-        """
-        return self._comm.get_hardware_version()
-
     def get_firmware_package_version(self) -> str:
         """Retrieve the firmware package version.
 
@@ -668,12 +657,21 @@ class GHand:
         """
         return self._comm.get_serial_number()
 
+    def set_serial_number(self, serial_number: str) -> bool:
+        """Set the product serial number when supported by the active protocol."""
+        result = self._comm.set_serial_number(serial_number)
+        self._set_last_result(
+            SdkError.OK if result else SdkError.DEVICE_REJECTED,
+            "" if result else "device rejected serial number configuration",
+        )
+        return result
+
     def get_stall_tolerances(self) -> dict[JointId, int]:
-        """Retrieve EtherCAT V2.1 stall tolerances for all 13 active joints."""
+        """Retrieve per-joint stall tolerances when supported."""
         return self._comm.get_stall_tolerances()
 
     def set_stall_tolerances(self, tolerances: dict[JointId, int]) -> bool:
-        """Set EtherCAT V2.1 stall tolerances for all 13 active joints."""
+        """Set per-joint stall tolerances when supported."""
         result = self._comm.set_stall_tolerances(tolerances)
         self._set_last_result(
             SdkError.OK if result else SdkError.DEVICE_REJECTED,
@@ -682,11 +680,11 @@ class GHand:
         return result
 
     def get_pid_parameters(self) -> list[int]:
-        """Retrieve the raw EtherCAT V2.1 39-value PID parameter array."""
+        """Retrieve the raw closed-loop PID parameter array when supported."""
         return self._comm.get_pid_parameters()
 
     def set_pid_parameters(self, parameters: list[int]) -> bool:
-        """Set the raw EtherCAT V2.1 39-value PID parameter array."""
+        """Set the raw closed-loop PID parameter array when supported."""
         result = self._comm.set_pid_parameters(parameters)
         self._set_last_result(
             SdkError.OK if result else SdkError.DEVICE_REJECTED,
@@ -695,7 +693,7 @@ class GHand:
         return result
 
     def get_hand_state_machine(self) -> HandStateMachine:
-        """Retrieve the EtherCAT V2.1 whole-hand runtime state."""
+        """Retrieve the whole-hand runtime state."""
         return self._comm.get_hand_state_machine()
 
     def get_motor_driver_version(self) -> str:
@@ -847,7 +845,12 @@ class GHand:
             )
             effective_mode = mode
             if mode == CtrlMode.CUSTOM and joint_cmd.mode is not None:
-                effective_mode = CtrlMode(joint_cmd.mode)
+                joint_mode_value = (
+                    joint_cmd.mode.value
+                    if isinstance(joint_cmd.mode, CtrlMode)
+                    else int(joint_cmd.mode)
+                )
+                effective_mode = CtrlMode(joint_mode_value & 0x0F)
             self._check_speed_limit(joint_cmd, effective_mode)
             self._check_current_limit(joint_cmd, effective_mode)
             if joint.id in self._joint_limits:

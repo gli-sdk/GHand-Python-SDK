@@ -223,13 +223,6 @@ class IComm(ABC):
         ...
 
     @abstractmethod
-    def get_hardware_version(self) -> str:
-        """Retrieve the hardware version.
-
-        """
-        ...
-
-    @abstractmethod
     def get_firmware_version(self) -> str:
         """Retrieve the firmware version.
 
@@ -263,6 +256,10 @@ class IComm(ABC):
 
         """
         ...
+
+    def set_serial_number(self, serial_number: str) -> bool:
+        """Set the product serial number when supported."""
+        raise NotImplementedError("serial number configuration is not supported")
 
     def get_stall_tolerances(self) -> dict:
         """Retrieve per-joint stall tolerances when supported."""
