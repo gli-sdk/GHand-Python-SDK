@@ -35,6 +35,9 @@ from .types import (
     CommunicationError,
     GHandError,
     HandStateError,
+    HandCriticalError,
+    HandFault,
+    HandWarning,
     OperationResult,
     SdkError,
     CommType,
@@ -81,6 +84,9 @@ __all__ = [
     # Enums
     "State",
     "ErrorCode",
+    "HandCriticalError",
+    "HandFault",
+    "HandWarning",
     # Version
     "__version__",
     # Gestures

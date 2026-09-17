@@ -81,6 +81,8 @@ class EthercatComm(IComm):
 
     _COMPAT_THUMB_TACTILE_COUNT = 28
     _SDO_WRITE_SETTLE_SEC = 0.02
+    _SDO_POLL_INTERVAL_SEC = 0.01
+    _SDO_POLL_TIMEOUT_SEC = 1.0
 
     def __init__(self, config: ProductConfig):
         self._client = EthercatClient()
@@ -355,19 +357,33 @@ class EthercatComm(IComm):
 
     # ===== Tactile sensor =====
 
+    def _execute_sdo_command(self, index: int, command: int) -> bool:
+        self._client.sdo_write(index, SDO_SUB_COMMAND, bytes([command]))
+        time.sleep(self._SDO_WRITE_SETTLE_SEC)
+
+        deadline = time.monotonic() + self._SDO_POLL_TIMEOUT_SEC
+        while time.monotonic() < deadline:
+            state_raw = self._client.sdo_read(index, SDO_SUB_STATE)
+            state = state_raw[0] if state_raw else 0
+            if state == 0:
+                result_raw = self._client.sdo_read(index, SDO_SUB_RESULT)
+                result = result_raw[0] if result_raw else 0
+                if result:
+                    if result != 1:
+                        logger.error("SDO command 0x%04X failed with result %d", index, result)
+                    return result == 1
+            time.sleep(self._SDO_POLL_INTERVAL_SEC)
+
+        logger.error("SDO command 0x%04X timed out", index)
+        return False
+
     def open_tactile(self) -> bool:
         """Enable the tactile sensors.
 
         Returns:
             True on success, False if the device rejected the command.
         """
-        self._client.sdo_write(SDO_TACTILE_CONTROL, SDO_SUB_COMMAND, b'\x01')
-        time.sleep(self._SDO_WRITE_SETTLE_SEC)
-        result = self._client.sdo_read(SDO_TACTILE_CONTROL, SDO_SUB_RESULT)
-        if result != b'\x00':
-            logger.error("Device rejected open_tactile command")
-            return False
-        return True
+        return self._execute_sdo_command(SDO_TACTILE_CONTROL, 0x01)
 
     def close_tactile(self) -> bool:
         """Disable the tactile sensors.
@@ -375,13 +391,7 @@ class EthercatComm(IComm):
         Returns:
             True on success, False if the device rejected the command.
         """
-        self._client.sdo_write(SDO_TACTILE_CONTROL, SDO_SUB_COMMAND, b'\x02')
-        time.sleep(self._SDO_WRITE_SETTLE_SEC)
-        result = self._client.sdo_read(SDO_TACTILE_CONTROL, SDO_SUB_RESULT)
-        if result != b'\x00':
-            logger.error("Device rejected close_tactile command")
-            return False
-        return True
+        return self._execute_sdo_command(SDO_TACTILE_CONTROL, 0x02)
 
     def zero_tactile(self) -> bool:
         """Zero-calibrate the tactile sensors.
@@ -389,13 +399,7 @@ class EthercatComm(IComm):
         Returns:
             True on success, False if the device rejected the command.
         """
-        self._client.sdo_write(SDO_TACTILE_CONTROL, SDO_SUB_COMMAND, b'\x04')
-        time.sleep(self._SDO_WRITE_SETTLE_SEC)
-        result = self._client.sdo_read(SDO_TACTILE_CONTROL, SDO_SUB_RESULT)
-        if result != b'\x00':
-            logger.error("Device rejected zero_tactile command")
-            return False
-        return True
+        return self._execute_sdo_command(SDO_TACTILE_CONTROL, 0x04)
 
     # ===== Device operations =====
 
@@ -405,9 +409,10 @@ class EthercatComm(IComm):
         Returns:
             True on success, False if the device rejected the command.
         """
-        self._client.sdo_write(SDO_FAULT_CLEAR, SDO_SUB_COMMAND, b'\x01')
-        logger.info("Fault cleared")
-        return True
+        success = self._execute_sdo_command(SDO_FAULT_CLEAR, 0x01)
+        if success:
+            logger.info("Fault cleared")
+        return success
 
     def init_joint(self) -> bool:
         """Initialize joint positions.

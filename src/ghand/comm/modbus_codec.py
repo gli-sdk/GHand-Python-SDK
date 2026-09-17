@@ -242,22 +242,30 @@ def parse_hand_type(raw_bytes: bytes) -> int:
 
 
 def parse_hand_info(raw: list[int]) -> HandState:
-    """Parse 11 input registers (0x1047~0x1051) into HandState.
+    """Parse 14 input registers (0x1047~0x1054) into HandState.
 
     Args:
-        raw: raw[0] = state in low byte, raw[1:4] = warn bitfield,
-             raw[4:7] = fault bitfield, raw[7:10] = critical bitfield,
-             raw[10] = signed int16 temperature in 0.1 degC units.
+        raw: raw[0] = uint16 hand state, raw[1:4] = warn bitfield,
+             raw[4:10] = fault bitfield, raw[10:13] = critical bitfield,
+             raw[13] = signed int16 temperature in degrees Celsius.
     """
-    state_byte = raw[0] & 0xFF
-    error_warn = _registers_to_bytes_low_high(raw[1:4]) if len(raw) >= 4 else b"\x00" * 6
-    error_fault = _registers_to_bytes_low_high(raw[4:7]) if len(raw) >= 7 else b"\x00" * 6
-    error_critical = _registers_to_bytes_low_high(raw[7:10]) if len(raw) >= 10 else b"\x00" * 6
-    temperature = raw[10] if len(raw) >= 11 else 0
+    state = raw[0] & 0xFFFF
+    error_warn = (
+        _registers_to_bytes_low_high(raw[1:4]) if len(raw) >= 4 else b"\x00" * 6
+    )
+    error_fault = (
+        _registers_to_bytes_low_high(raw[4:10]) if len(raw) >= 10 else b"\x00" * 12
+    )
+    error_critical = (
+        _registers_to_bytes_low_high(raw[10:13])
+        if len(raw) >= 13
+        else b"\x00" * 6
+    )
+    temperature = raw[13] if len(raw) >= 14 else 0
     if temperature >= 32768:
         temperature -= 65536
     return HandState(
-        state=_parse_state(state_byte),
+        state=_parse_state(state),
         error_warn=error_warn,
         error_fault=error_fault,
         error_critical=error_critical,

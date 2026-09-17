@@ -489,7 +489,7 @@ class Rs485Comm(IComm):
         Returns:
             HandState instance.
         """
-        result = self._read_input_registers(self._profile.hand_info_address, count=11)
+        result = self._read_input_registers(self._profile.hand_info_address, count=14)
         if result is None or result.isError():
             raise RuntimeError("Failed to read hand info registers")
 
@@ -813,7 +813,7 @@ class Rs485Comm(IComm):
                     continue
                 start = min(self._profile.hand_info_address, joint_start)
                 end = max(
-                    self._profile.hand_info_address + 10,
+                    self._profile.hand_info_address + 13,
                     joint_start + joint_count - 1,
                 )
                 count = end - start + 1
@@ -823,7 +823,7 @@ class Rs485Comm(IComm):
 
                 raw = list(result.registers)
                 hand_offset = self._profile.hand_info_address - start
-                hand_state = parse_hand_info(raw[hand_offset:hand_offset + 11])
+                hand_state = parse_hand_info(raw[hand_offset:hand_offset + 14])
                 joints = parse_joints(
                     raw,
                     self._config.valid_joints,

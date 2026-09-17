@@ -20,7 +20,7 @@
 from dataclasses import dataclass
 
 from .enums import JointId, TactileSensorId
-from .errors import JointErrorCode
+from .errors import HandCriticalError, HandFault, HandWarning, JointErrorCode
 from .states import JointState, State
 
 
@@ -28,11 +28,46 @@ from .states import JointState, State
 class HandState:
     """High-level status of the dexterous hand."""
 
-    state: State = State.STOPPED
+    state: State = State.DISABLED
     error_warn: bytes = b"\x00" * 6
-    error_fault: bytes = b"\x00" * 6
+    error_fault: bytes = b"\x00" * 12
     error_critical: bytes = b"\x00" * 6
     temperature: int = 0
+
+    @property
+    def warnings(self) -> HandWarning:
+        """Return the warning bitfield as a typed flag set."""
+        return HandWarning(int.from_bytes(self.error_warn, "little"))
+
+    @property
+    def faults(self) -> HandFault:
+        """Return categories that contain at least one active fault."""
+        raw = int.from_bytes(self.error_fault, "little")
+        categories = HandFault.NONE
+        for category, offset, _, _ in _HAND_FAULT_LAYOUT:
+            if raw & (_HAND_FAULT_CHANNEL_MASK << offset):
+                categories |= category
+        return categories
+
+    def fault_indices(self, category: HandFault) -> list[int]:
+        """Return active 0-based channel indices for one fault category."""
+        try:
+            offset = next(
+                offset
+                for candidate, offset, _, _ in _HAND_FAULT_LAYOUT
+                if candidate == category
+            )
+        except StopIteration as exc:
+            raise ValueError("category must be one HandFault member") from exc
+
+        bits = (int.from_bytes(self.error_fault, "little") >> offset)
+        bits &= _HAND_FAULT_CHANNEL_MASK
+        return [index for index in range(13) if bits & (1 << index)]
+
+    @property
+    def critical_errors(self) -> HandCriticalError:
+        """Return the critical-error bitfield as a typed flag set."""
+        return HandCriticalError(int.from_bytes(self.error_critical, "little"))
 
     def active_errors(self) -> list[tuple[str, int, int, str]]:
         """Return active hand-level warn/fault/critical bit descriptions."""
@@ -81,54 +116,62 @@ _HAND_WARN_MESSAGES = {
     (0, 0): "Temperature sensor 1 abnormal",
     (0, 1): "Temperature sensor 2 abnormal",
     (0, 2): "Fan abnormal",
+    (0, 3): "Tactile board communication abnormal",
+    (0, 4): "Thumb tactile sensor disconnected",
+    (0, 5): "Forefinger tactile sensor disconnected",
+    (0, 6): "Middle finger tactile sensor disconnected",
+    (0, 7): "Ring finger tactile sensor disconnected",
+    (1, 0): "Little finger tactile sensor disconnected",
 }
 
 
+_ACTIVE_JOINT_NAMES = (
+    "Thumb2",
+    "Thumb3",
+    "Thumb4",
+    "Thumb5",
+    "FF2",
+    "FF3",
+    "FF4",
+    "MF2",
+    "MF3",
+    "RF2",
+    "RF3",
+    "LF2",
+    "LF3",
+)
+
+
+_HAND_FAULT_CHANNEL_MASK = (1 << 13) - 1
+_HAND_FAULT_LAYOUT = (
+    (HandFault.JOINT_MOTOR, 0, "Joint motor fault", _ACTIVE_JOINT_NAMES),
+    (
+        HandFault.POSITION_SENSOR_ABNORMAL,
+        13,
+        "Position sensor abnormal",
+        _ACTIVE_JOINT_NAMES,
+    ),
+    (
+        HandFault.POSITION_SENSOR_UNCALIBRATED,
+        26,
+        "Position sensor uncalibrated",
+        _ACTIVE_JOINT_NAMES,
+    ),
+    (HandFault.ZEROING_JOINT_STALL, 39, "Zeroing joint stalled", _ACTIVE_JOINT_NAMES),
+    (HandFault.ZEROING_BRAKE_TIMEOUT, 52, "Zeroing brake timeout", _ACTIVE_JOINT_NAMES),
+    (
+        HandFault.ZEROING_MOTOR_COMMUNICATION,
+        65,
+        "Zeroing motor communication fault",
+        tuple(f"Motor{index}" for index in range(13)),
+    ),
+)
+
+
 _HAND_FAULT_MESSAGES = {
-    (0, 0): "Joint motor fault - Thumb2",
-    (0, 1): "Joint motor fault - Thumb3",
-    (0, 2): "Joint motor fault - Thumb4",
-    (0, 3): "Joint motor fault - Thumb5",
-    (0, 4): "Joint motor fault - FF2",
-    (0, 5): "Joint motor fault - FF3",
-    (0, 6): "Joint motor fault - FF4",
-    (0, 7): "Joint motor fault - MF2",
-    (1, 0): "Joint motor fault - MF3",
-    (1, 1): "Joint motor fault - RF2",
-    (1, 2): "Joint motor fault - RF3",
-    (1, 3): "Joint motor fault - LF2",
-    (1, 4): "Joint motor fault - LF3",
-    (1, 5): "Thumb tactile sensor abnormal",
-    (1, 6): "Index finger tactile sensor abnormal",
-    (1, 7): "Middle finger tactile sensor abnormal",
-    (2, 0): "Ring finger tactile sensor abnormal",
-    (2, 1): "Little finger tactile sensor abnormal",
-    (2, 2): "Position sensor abnormal - Thumb2",
-    (2, 3): "Position sensor abnormal - Thumb3",
-    (2, 4): "Position sensor abnormal - Thumb4",
-    (2, 5): "Position sensor abnormal - Thumb5",
-    (2, 6): "Position sensor abnormal - FF2",
-    (2, 7): "Position sensor abnormal - FF3",
-    (3, 0): "Position sensor abnormal - FF4",
-    (3, 1): "Position sensor abnormal - MF2",
-    (3, 2): "Position sensor abnormal - MF3",
-    (3, 3): "Position sensor abnormal - RF2",
-    (3, 4): "Position sensor abnormal - RF3",
-    (3, 5): "Position sensor abnormal - LF2",
-    (3, 6): "Position sensor abnormal - LF3",
-    (3, 7): "Position sensor uncalibrated - Thumb2",
-    (4, 0): "Position sensor uncalibrated - Thumb3",
-    (4, 1): "Position sensor uncalibrated - Thumb4",
-    (4, 2): "Position sensor uncalibrated - Thumb5",
-    (4, 3): "Position sensor uncalibrated - FF2",
-    (4, 4): "Position sensor uncalibrated - FF3",
-    (4, 5): "Position sensor uncalibrated - FF4",
-    (4, 6): "Position sensor uncalibrated - MF2",
-    (4, 7): "Position sensor uncalibrated - MF3",
-    (5, 0): "Position sensor uncalibrated - RF2",
-    (5, 1): "Position sensor uncalibrated - RF3",
-    (5, 2): "Position sensor uncalibrated - LF2",
-    (5, 3): "Position sensor uncalibrated - LF3",
+    divmod(offset + index, 8): f"{message} - {name}"
+    for _, offset, message, names in _HAND_FAULT_LAYOUT
+    for index, name in enumerate(names)
 }
 
 
@@ -138,6 +181,10 @@ _HAND_CRITICAL_MESSAGES = {
     (0, 2): "Position sensor version mismatch",
     (0, 3): "Tactile sensor version mismatch",
     (0, 4): "Motor driver version mismatch",
+    (0, 5): "Position board detection abnormal",
+    (0, 6): "Temperature too high",
+    (0, 7): "Temperature too low",
+    (1, 0): "Zeroing global timeout",
 }
 
 

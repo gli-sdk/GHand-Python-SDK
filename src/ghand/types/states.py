@@ -30,10 +30,8 @@ class CtrlMode(enum.Enum):
 
 
 class State(DeviceCode):
-    STOPPED = 0
-    RUNNING = 1
-    ABNORMAL_RUNNING = 2
-    PROTECTIVE_STOPPED = 3
+    DISABLED = 0
+    ENABLED = 1
     UNKNOWN_STATE = 255
 
     @classmethod
@@ -43,8 +41,8 @@ class State(DeviceCode):
 
     @property
     def is_abnormal(self) -> bool:
-        """True for protective stop, abnormal running, or any undefined state."""
-        return self not in (State.STOPPED, State.RUNNING)
+        """True for values outside the defined hand states."""
+        return self not in (State.DISABLED, State.ENABLED)
 
 
 class HandType(enum.Enum):

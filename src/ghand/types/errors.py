@@ -70,12 +70,55 @@ class JointErrorCode(DeviceCode):
     MOTOR_SOFTWARE_OVERVOLTAGE = 10
     MOTOR_SOFTWARE_UNDERVOLTAGE = 11
     MOTOR_OVERTEMPERATURE = 12
+    MOTOR_WINDING_OVERTEMPERATURE = 13
     UNKNOWN_ERROR = 255
 
     @classmethod
     def _missing_(cls, value):
         """Map undefined joint error codes to UNKNOWN_ERROR, keeping the raw value."""
         return unknown_member(cls, cls.UNKNOWN_ERROR, value)
+
+
+class HandWarning(enum.IntFlag):
+    """Hand-level warning bits from the EtherCAT V2.1 TPDO."""
+
+    NONE = 0
+    TEMPERATURE_SENSOR_1_ABNORMAL = 1 << 0
+    TEMPERATURE_SENSOR_2_ABNORMAL = 1 << 1
+    FAN_ABNORMAL = 1 << 2
+    TACTILE_BOARD_COMMUNICATION_ABNORMAL = 1 << 3
+    THUMB_TACTILE_SENSOR_DISCONNECTED = 1 << 4
+    FOREFINGER_TACTILE_SENSOR_DISCONNECTED = 1 << 5
+    MIDDLE_FINGER_TACTILE_SENSOR_DISCONNECTED = 1 << 6
+    RING_FINGER_TACTILE_SENSOR_DISCONNECTED = 1 << 7
+    LITTLE_FINGER_TACTILE_SENSOR_DISCONNECTED = 1 << 8
+
+
+class HandFault(enum.IntFlag):
+    """Hand-level fault categories from the EtherCAT V2.1 TPDO."""
+
+    NONE = 0
+    JOINT_MOTOR = 1 << 0
+    POSITION_SENSOR_ABNORMAL = 1 << 1
+    POSITION_SENSOR_UNCALIBRATED = 1 << 2
+    ZEROING_JOINT_STALL = 1 << 3
+    ZEROING_BRAKE_TIMEOUT = 1 << 4
+    ZEROING_MOTOR_COMMUNICATION = 1 << 5
+
+
+class HandCriticalError(enum.IntFlag):
+    """Hand-level critical-error bits from the EtherCAT V2.1 TPDO."""
+
+    NONE = 0
+    UNKNOWN_ERROR = 1 << 0
+    SELF_TEST_ERROR = 1 << 1
+    POSITION_SENSOR_VERSION_MISMATCH = 1 << 2
+    TACTILE_SENSOR_VERSION_MISMATCH = 1 << 3
+    MOTOR_DRIVER_VERSION_MISMATCH = 1 << 4
+    POSITION_BOARD_DETECTION_ABNORMAL = 1 << 5
+    TEMPERATURE_TOO_HIGH = 1 << 6
+    TEMPERATURE_TOO_LOW = 1 << 7
+    ZEROING_GLOBAL_TIMEOUT = 1 << 8
 
 
 class SelfTestError(enum.IntFlag):

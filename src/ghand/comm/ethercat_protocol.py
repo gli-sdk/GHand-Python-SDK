@@ -19,10 +19,10 @@ import math
 import struct
 from dataclasses import dataclass, field
 
-from ..types import JointId, State, ErrorCode, ProductConfig
+from ..types import JointErrorCode, JointId, JointState, State, ProductConfig
 
 # TPDO component byte sizes
-_HAND_TPDO_SIZE = struct.calcsize('<H6s6s6sh')  # 22
+_HAND_TPDO_SIZE = struct.calcsize('<H6s12s6sh')  # 28
 _JOINT_TPDO_SIZE = struct.calcsize('<BBBBhhh')  # 10
 _TACTILE_STATE_SIZE = 2  # BB
 _TACTILE_RESULTANT_SIZE = 6  # resultant xyz (int16[3], low byte valid)
@@ -59,13 +59,13 @@ class HandTpdo:
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        expected_size = struct.calcsize('<H6s6s6sh')
+        expected_size = struct.calcsize('<H6s12s6sh')
         if len(data) < expected_size:
-            return cls(0, b"\x00" * 6, b"\x00" * 6, b"\x00" * 6, 0)
-        state, error_warn, error_fault, error_critical, temperature = struct.unpack_from(
-            '<H6s6s6sh', data, 0
+            return cls(0, b"\x00" * 6, b"\x00" * 12, b"\x00" * 6, 0)
+        state, error_warn, error_fault, error_critical, temperature = (
+            struct.unpack_from('<H6s12s6sh', data, 0)
         )
-        return cls(state & 0xFF, error_warn, error_fault, error_critical, temperature)
+        return cls(state, error_warn, error_fault, error_critical, temperature)
 
     def __str__(self):
         return (
@@ -100,7 +100,8 @@ class JointTpdo:
 
     def __str__(self):
         return (
-            f"JointTpdo(state={State(self.state)}, error={ErrorCode(self.error)}, "
+            f"JointTpdo(state={JointState(self.state)}, "
+            f"error={JointErrorCode(self.error)}, "
             f"mode={self.mode}, stop={self.stop}, angle={self.angle:.3f}, "
             f"speed={self.speed}, current={self.current})"
         )
@@ -163,7 +164,7 @@ class Tpdo:
     """Full TPDO (Transmit Process Data Object) frame."""
 
     def __init__(self, config: ProductConfig):
-        self.hand = HandTpdo(0, b"\x00" * 6, b"\x00" * 6, b"\x00" * 6, 0)
+        self.hand = HandTpdo(0, b"\x00" * 6, b"\x00" * 12, b"\x00" * 6, 0)
         self.joints: dict[JointId, JointTpdo] = {}
         self.tactile_state = TactileSensorState()
 

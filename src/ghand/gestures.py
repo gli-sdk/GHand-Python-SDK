@@ -26,7 +26,7 @@ import time
 from typing import Dict
 
 from .ghand import GHand
-from .types import GestureType, JointId, State, JointCommand
+from .types import GestureType, JointId, JointState, JointCommand
 
 logger = logging.getLogger("ghand.gestures")
 
@@ -154,7 +154,7 @@ def _wait_for_completion(
 ) -> bool:
     """Wait for the hand motion to complete and verify the final state.
 
-    A single ``get_hand_info()`` failure is tolerated: EtherCAT can briefly
+    A single state-read failure is tolerated: EtherCAT can briefly
     return no fresh TPDO frame during a bad cycle, and treating that as a
     fatal test error causes false negatives. We keep retrying until either
     we get a fresh reading, the transient-error grace period elapses, or
@@ -167,7 +167,7 @@ def _wait_for_completion(
         warmup_s: Grace period during which we allow the hand to not yet
             report RUNNING before we assume the command produced no motion.
         transient_error_grace_s: Contiguous duration for which
-            ``get_hand_info()`` may fail before we give up.
+            state reads may fail before we give up.
 
     Returns:
         True if the hand ends in a normal state, False otherwise.
@@ -176,12 +176,14 @@ def _wait_for_completion(
     start_time = time.monotonic()
     has_been_running = False
     hand_info = None
+    joints = []
     last_error = None
     first_error_time = None
 
     while True:
         try:
             hand_info = hand.get_hand_info()
+            joints = hand.get_joints()
             last_error = None
             first_error_time = None
         except Exception as exc:
@@ -193,7 +195,7 @@ def _wait_for_completion(
             last_error = exc
             if now - first_error_time >= transient_error_grace_s:
                 logger.error(
-                    "get_hand_info() failed for %.3fs while waiting for motion: %s",
+                    "State read failed for %.3fs while waiting for motion: %s",
                     now - first_error_time,
                     exc,
                 )
@@ -206,11 +208,11 @@ def _wait_for_completion(
             time.sleep(poll_period_s)
             continue
 
-        if hand_info.state == State.RUNNING:
+        if any(joint.state == JointState.RUNNING for joint in joints):
             has_been_running = True
-        elif has_been_running and hand_info.state == State.STOPPED:
+        elif has_been_running:
             break
-        elif hand_info.state.is_abnormal:
+        elif any(joint.state.is_abnormal for joint in joints):
             break
         elif not has_been_running and time.monotonic() - start_time >= warmup_s:
             break
@@ -229,7 +231,7 @@ def _wait_for_completion(
         return False
     if hand_info.state.is_abnormal or any(
         hand_info.error_warn + hand_info.error_fault + hand_info.error_critical
-    ):
+    ) or any(joint.state.is_abnormal for joint in joints):
         logger.warning("Action completed with error state. Please clear fault and retry.")
         return False
     return True
