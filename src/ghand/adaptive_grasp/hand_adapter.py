@@ -4,7 +4,7 @@
 from typing import Any
 
 from ..gestures import _wait_for_completion
-from ..types import CtrlMode, JointCommand, JointId
+from ..types import JointId, CtrlMode, JointCommand
 
 from .ports import GraspSequenceHandPort
 

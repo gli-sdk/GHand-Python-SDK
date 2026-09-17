@@ -38,13 +38,13 @@ except ImportError:
     list_ports = None  # type: ignore[assignment]
 
 from ..types import (
+    JointId,
     CtrlMode,
+    ProductConfig,
     HandState,
     JointData,
-    JointId,
-    ProductConfig,
     SelfTestErrorInfo,
-    TactileInfo,
+    TactileData,
 )
 from .canfd_transport import CanfdTransport, pack_arbitration, unpack_arbitration
 from .icomm import IComm

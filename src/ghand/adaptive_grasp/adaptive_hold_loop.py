@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING, Any, Optional, Protocol
 
-from ..types import CtrlMode, JointCommand, JointId, TactileSensorId
+from ..types import JointId, TactileSensorId, CtrlMode, JointCommand
 from .config import AdaptiveGraspConfig, HoldCommandMode
 from .force_reference_planner import ForceReferencePlanner
 from .incremental_position_hold_planner import IncrementalPositionHoldPlanner

@@ -5,7 +5,7 @@ import logging
 import time
 from typing import Any, Optional
 
-from ..types import JointData, TactileInfo, TactileSensorId
+from ..types import TactileSensorId, JointData, TactileData
 from .utils import active_finger_normal_forces, normal_force_z, normalize_joint_id
 
 _logger = logging.getLogger("ghand.sensor")

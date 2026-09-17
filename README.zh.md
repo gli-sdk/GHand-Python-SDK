@@ -286,7 +286,14 @@ GHand-Python-SDK/
 |-- src/
 |   |-- ghand/                  # SDK 包
 |   |   |-- ghand.py            # GHand 主类和公开 API
-|   |   |-- types.py            # 数据类型、枚举和结构体
+|   |   |-- types/              # 类型枚举、数据对象和配置模型
+|   |   |   |-- __init__.py      # 统一导出公开类型
+|   |   |   |-- enums.py         # 产品、协议、关节和传感器枚举
+|   |   |   |-- states.py        # 状态与控制模式枚举
+|   |   |   |-- errors.py        # 错误码、诊断结果和异常类型
+|   |   |   |-- commands.py      # 命令数据类
+|   |   |   |-- data.py          # 设备反馈数据类
+|   |   |   `-- config.py        # 产品配置数据类
 |   |   |-- gestures.py         # 预定义手势工具
 |   |   |-- config/             # 内置产品 JSON 配置
 |   |   |   |-- ghand5.json

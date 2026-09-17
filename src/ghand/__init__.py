@@ -30,31 +30,29 @@ from . import logging_config  # auto-initialize logging handlers
 from ._converter import JointConverter, joints_to_nparray, nparray_to_joints
 from .gestures import execute_gesture, get_all_gestures
 from .ghand import GHand
-from .errors import (
+from .diagnostics import Diagnostics
+from .types import (
     CommunicationError,
     GHandError,
     HandStateError,
     OperationResult,
     SdkError,
-)
-from .diagnostics import Diagnostics
-from .types import (
     CommType,
-    CtrlMode,
     CANFDBitTiming,
-    DeviceData,
-    ErrorCode,
     GestureType,
-    HandState,
-    HandType,
-    JointCommand,
-    JointData,
     JointId,
     ProductType,
     RS485BaudRate,
-    State,
-    TactileInfo,
     TactileSensorId,
+    CtrlMode,
+    HandType,
+    State,
+    ErrorCode,
+    JointCommand,
+    DeviceData,
+    HandState,
+    JointData,
+    TactileData,
 )
 from .version import __version__
 
@@ -71,7 +69,7 @@ __all__ = [
     "HandState",
     "HandType",
     "TactileSensorId",
-    "TactileInfo",
+    "TactileData",
     "CommType",
     "CtrlMode",
     "SdkError",

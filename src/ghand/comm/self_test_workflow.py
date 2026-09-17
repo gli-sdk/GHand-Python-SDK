@@ -24,12 +24,11 @@ import time
 from typing import Callable
 
 from ..types import (
-    JointId,
-    MotorDiagnosticError,
-    ProductConfig,
     SelfTestError,
-    SelfTestErrorInfo,
     VersionCheckError,
+    ProductConfig,
+    MotorDiagnosticError,
+    SelfTestErrorInfo,
 )
 from .modbus_codec import (
     SELF_TEST_COMMAND_REGISTER,

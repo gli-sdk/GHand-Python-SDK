@@ -21,7 +21,7 @@ from typing import Optional
 
 import numpy as np
 
-from .types import JointCommand, JointData, JointId
+from .types import JointId, JointCommand, JointData
 
 
 class JointConverter:

@@ -3,7 +3,7 @@
 
 from typing import Mapping, Optional
 
-from ..types import JointCommand, JointId
+from ..types import JointId, JointCommand
 from .config import AdaptiveGraspConfig
 from .utils import clip
 

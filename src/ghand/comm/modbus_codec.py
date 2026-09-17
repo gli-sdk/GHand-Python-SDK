@@ -25,16 +25,16 @@ import struct
 from dataclasses import dataclass
 
 from ..types import (
+    JointId,
+    ProductType,
+    TactileSensorId,
     CtrlMode,
+    JointState,
+    State,
+    JointErrorCode,
     HandState,
     JointData,
-    JointErrorCode,
-    JointId,
-    JointState,
-    ProductType,
-    State,
-    TactileInfo,
-    TactileSensorId,
+    TactileData,
 )
 
 
@@ -457,9 +457,9 @@ def build_tactile_info(
     state_bit: bool,
     resultant_force: list[float],
     distributed_force: list[float] | None,
-) -> TactileInfo:
-    """Convenience wrapper to build a TactileInfo dataclass."""
-    return TactileInfo(
+) -> TactileData:
+    """Convenience wrapper to build a TactileData dataclass."""
+    return TactileData(
         state=state_bit,
         resultant_force=resultant_force,
         distributed_force=distributed_force,

@@ -286,7 +286,14 @@ GHand-Python-SDK/
 |-- src/
 |   |-- ghand/                  # Core SDK package
 |   |   |-- ghand.py            # Main GHand class and public API
-|   |   |-- types.py            # Data types, enums, and structures
+|   |   |-- types/              # Typed enums, DTOs, and configuration models
+|   |   |   |-- __init__.py      # Public type exports
+|   |   |   |-- enums.py         # Product, protocol, joint, and sensor enums
+|   |   |   |-- states.py        # State and control-mode enums
+|   |   |   |-- errors.py        # Error codes, diagnostic results, and exceptions
+|   |   |   |-- commands.py      # Command dataclasses
+|   |   |   |-- data.py          # Device feedback dataclasses
+|   |   |   `-- config.py        # Product configuration dataclasses
 |   |   |-- gestures.py         # Predefined gesture utilities
 |   |   |-- config/             # Bundled product JSON configurations
 |   |   |   |-- ghand5.json

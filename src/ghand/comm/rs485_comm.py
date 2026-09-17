@@ -37,14 +37,7 @@ try:
 except ImportError:
     ModbusSerialClient = None  # type: ignore[misc,assignment]
     ModbusException = Exception  # type: ignore[misc,assignment]
-from ..types import (
-    HandState,
-    JointData,
-    JointId,
-    ProductConfig,
-    SelfTestErrorInfo,
-    TactileInfo,
-)
+from ..types import JointId, ProductConfig, HandState, JointData, SelfTestErrorInfo, TactileData
 from .icomm import IComm
 from .modbus_codec import (
     BAUDRATE_CONFIG_REGISTER,
@@ -507,7 +500,7 @@ class Rs485Comm(IComm):
         """Retrieve tactile sensor data.
 
         Returns:
-            Dictionary mapping TactileSensorId to TactileInfo.
+            Dictionary mapping TactileSensorId to TactileData.
             Returns empty dict if product has no tactile support.
         """
         if not self._config.has_tactile:

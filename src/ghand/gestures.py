@@ -26,7 +26,7 @@ import time
 from typing import Dict
 
 from .ghand import GHand
-from .types import GestureType, JointCommand, JointId, State
+from .types import GestureType, JointId, State, JointCommand
 
 logger = logging.getLogger("ghand.gestures")
 

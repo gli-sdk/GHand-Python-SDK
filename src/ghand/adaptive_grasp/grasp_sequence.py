@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Optional
 
-from ..types import CtrlMode, JointCommand, JointId, TactileSensorId
+from ..types import JointId, TactileSensorId, CtrlMode, JointCommand
 from .config import AdaptiveGraspConfig
 from .ports import GraspSequenceHandPort, SensorFrameSource
 from .runtime import GraspState

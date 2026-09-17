@@ -37,19 +37,20 @@ from .diagnostics import (
     IdentityDiagnostics,
     SubscriptionDiagnostics,
 )
-from .errors import OperationResult, SdkError
 from .types import (
+    OperationResult,
+    SdkError,
     CANFDBitTiming,
     CommType,
-    CtrlMode,
-    HandState,
-    HandType,
-    JointCommand,
-    JointData,
     JointId,
-    ProductConfig,
     ProductType,
     RS485BaudRate,
+    CtrlMode,
+    HandType,
+    ProductConfig,
+    JointCommand,
+    HandState,
+    JointData,
     SelfTestErrorInfo,
 )
 
@@ -916,7 +917,7 @@ class GHand:
         """Retrieve tactile sensor data.
 
         Returns:
-            Dictionary mapping TactileSensorId to TactileInfo.
+            Dictionary mapping TactileSensorId to TactileData.
         """
         if not self._has_tactile:
             logger.warning("This product does not support tactile sensors")

@@ -3,7 +3,7 @@
 
 from typing import Any, Optional, Protocol, runtime_checkable
 
-from ..types import CtrlMode, JointCommand, TactileSensorId
+from ..types import TactileSensorId, CtrlMode, JointCommand
 
 
 @runtime_checkable

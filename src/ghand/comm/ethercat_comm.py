@@ -26,24 +26,24 @@ import time
 
 from .._subscription import SubscriptionManager
 from ..types import (
-    CtrlMode,
-    DeviceData,
-    ErrorCode,
-    HandState,
-    JointCommand,
-    JointData,
-    JointErrorCode,
     JointId,
+    CtrlMode,
     JointState,
-    MotorCheckError,
-    MotorDiagnosticError,
-    ProductConfig,
-    SelfTestError,
-    SelfTestErrorInfo,
     State,
-    TactileRegionConfig,
-    TactileInfo,
+    ErrorCode,
+    JointErrorCode,
+    MotorCheckError,
+    SelfTestError,
     VersionCheckError,
+    ProductConfig,
+    TactileRegionConfig,
+    JointCommand,
+    DeviceData,
+    HandState,
+    JointData,
+    MotorDiagnosticError,
+    SelfTestErrorInfo,
+    TactileData,
 )
 from .ethercat_client import EthercatClient
 from .ethercat_protocol import (
@@ -332,7 +332,7 @@ class EthercatComm(IComm):
         """Retrieve tactile sensor data from TPDO.
 
         Returns:
-            Dictionary mapping TactileSensorId to TactileInfo.
+            Dictionary mapping TactileSensorId to TactileData.
         """
         data = self._recv_tpdo_data()
         if len(data) < self._expected_tpdo_size:
@@ -346,7 +346,7 @@ class EthercatComm(IComm):
         result = {}
         for region in self._config.tactile_regions:
             tactile = getattr(tpdo, f"{region.id.name.lower()}_tactile")
-            result[region.id] = TactileInfo(
+            result[region.id] = TactileData(
                 state=bool(tpdo.tactile_state.state & (1 << region.id.value)),
                 resultant_force=tactile.resultant_force,
                 distributed_force=tactile.sample_force,
@@ -781,7 +781,7 @@ class EthercatComm(IComm):
                     attr = f"{region.id.name.lower()}_tactile"
                     tdata = getattr(tpdo, attr, None)
                     if tdata is not None:
-                        tactile[region.id] = TactileInfo(
+                        tactile[region.id] = TactileData(
                             state=bool(tpdo.tactile_state.state & (1 << region.id.value)),
                             resultant_force=tdata.resultant_force,
                             distributed_force=tdata.sample_force,

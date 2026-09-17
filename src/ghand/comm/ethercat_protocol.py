@@ -19,7 +19,7 @@ import math
 import struct
 from dataclasses import dataclass, field
 
-from ..types import ErrorCode, JointId, ProductConfig, State
+from ..types import JointId, State, ErrorCode, ProductConfig
 
 # TPDO component byte sizes
 _HAND_TPDO_SIZE = struct.calcsize('<H6s6s6sh')  # 22
