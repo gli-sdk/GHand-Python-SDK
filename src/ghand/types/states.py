@@ -30,6 +30,19 @@ class CtrlMode(enum.Enum):
     CUSTOM = 0x0F
 
 
+class ClosedLoopType(DeviceCode):
+    """Feedback loop type encoded in the high nibble of TPDO joint mode."""
+
+    SEMI_CLOSED_LOOP = 0
+    CLOSED_LOOP = 1
+    UNKNOWN_TYPE = 255
+
+    @classmethod
+    def _missing_(cls, value):
+        """Map undefined device values to UNKNOWN_TYPE while preserving the value."""
+        return unknown_member(cls, cls.UNKNOWN_TYPE, value)
+
+
 class JointControlState(enum.IntEnum):
     """Per-joint control state sent to the device."""
 
@@ -52,6 +65,24 @@ class State(DeviceCode):
     def is_abnormal(self) -> bool:
         """True for values outside the defined hand states."""
         return self not in (State.DISABLED, State.ENABLED)
+
+
+class HandStateMachine(DeviceCode):
+    """Whole-hand runtime state reported by EtherCAT SDO 0x200A."""
+
+    INITIALIZED = 0
+    POWER_ON_SELF_TEST = 1
+    IDLE = 2
+    MOVING = 3
+    FAULT = 4
+    LOW_POWER = 5
+    FIRMWARE_UPGRADE = 6
+    UNKNOWN_STATE = 255
+
+    @classmethod
+    def _missing_(cls, value):
+        """Map undefined device values to UNKNOWN_STATE while preserving the value."""
+        return unknown_member(cls, cls.UNKNOWN_STATE, value)
 
 
 class HandType(enum.Enum):

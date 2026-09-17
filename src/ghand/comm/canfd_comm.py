@@ -44,7 +44,6 @@ from ..types import (
     ProductConfig,
     HandState,
     JointData,
-    SelfTestErrorInfo,
     TactileData,
 )
 from .canfd_transport import CanfdTransport, pack_arbitration, unpack_arbitration
@@ -56,7 +55,6 @@ from .modbus_codec import (
     REG_FIRMWARE_VERSION,
     REG_HAND_TYPE,
     REG_HARDWARE_VERSION,
-    REG_INIT_JOINT,
     REG_IN_FINGER_TACTILE_SENSOR_VER,
     REG_IN_FIRMWARE_PACKAGE_VER,
     REG_IN_MOTOR_DRV_VER,
@@ -83,8 +81,6 @@ from .modbus_codec import (
     parse_tactile_state_error,
     registers_to_bytes,
 )
-from .self_test_workflow import build_self_test_error_info
-
 # CANFD baud rate gear map per protocol documentation.
 # Writing a gear value to BAUDRATE_CONFIG_REGISTER selects both the arbitration
 # phase bitrate/data-phase bitrate and their sample points; the new
@@ -727,40 +723,6 @@ class CanfdComm(IComm):
             return False
         logger.info("Fault cleared")
         return True
-
-    def init_joint(self) -> bool:
-        self._transport.write_registers(
-            self._src_id, self._slave_id, REG_INIT_JOINT, struct.pack(">H", 0x0001)
-        )
-        logger.info("Joint initialization completed")
-        return True
-
-    # ------------------------------------------------------------------
-    # Self-test error query (registers 0x0038 ~ 0x003F)
-    # ------------------------------------------------------------------
-
-    def _self_test_read_registers(self, address: int, count: int) -> list[int]:
-        raw = self._transport.read_registers(
-            self._src_id, self._slave_id, address, count, func_code=0x03
-        )
-        return list(struct.unpack(f">{count}H", raw[: count * 2]))
-
-    def _self_test_write_register(self, address: int, value: int) -> None:
-        self._transport.write_registers(
-            self._src_id, self._slave_id, address, struct.pack(">H", value)
-        )
-
-    def get_self_test_error_info(self) -> SelfTestErrorInfo:
-        """Query self-test error information via CANFD-mapped registers 0x0038~0x003F."""
-        return build_self_test_error_info(
-            self._config,
-            self._self_test_read_registers,
-            self._self_test_write_register,
-        )
-
-    def get_self_test_status(self) -> int:
-        """Read the current self-test status from holding register 0x0038 low byte."""
-        return self._self_test_read_registers(0x0038, 1)[0] & 0x00FF
 
     # ------------------------------------------------------------------
     # Subscription (polling-based)

@@ -44,7 +44,6 @@ from ..types import (
     JointData,
     JointId,
     ProductConfig,
-    SelfTestErrorInfo,
     TactileData,
 )
 from .icomm import IComm
@@ -55,7 +54,6 @@ from .modbus_codec import (
     REG_FIRMWARE_VERSION,
     REG_HAND_TYPE,
     REG_HARDWARE_VERSION,
-    REG_INIT_JOINT,
     REG_IN_FINGER_TACTILE_SENSOR_VER,
     REG_IN_FIRMWARE_PACKAGE_VER,
     REG_IN_MOTOR_DRV_VER,
@@ -83,8 +81,6 @@ from .modbus_codec import (
     parse_tactile_state_error,
     registers_to_bytes,
 )
-from .self_test_workflow import build_self_test_error_info
-
 # RS485 baud rate gear map per protocol documentation.
 # Writing a gear value to BAUDRATE_CONFIG_REGISTER selects the serial baud rate;
 # the new configuration takes effect after the next power-up.
@@ -718,43 +714,6 @@ class Rs485Comm(IComm):
             return False
         logger.info("Fault cleared")
         return True
-
-    def init_joint(self) -> bool:
-        """Initialize joint positions."""
-        result = self._write_register(REG_INIT_JOINT, 0x0001)
-        if result is None or result.isError():
-            return False
-        logger.info("Joint initialization completed")
-        return True
-
-    # ===== Self-test error query =====
-
-    def _self_test_read_registers(self, address: int, count: int) -> list[int]:
-        result = self._read_holding_registers(address, count=count)
-        if result is None or result.isError():
-            raise RuntimeError(
-                f"RS485 self-test read failed at 0x{address:04X}"
-            )
-        return list(result.registers)
-
-    def _self_test_write_register(self, address: int, value: int) -> None:
-        result = self._write_register(address, value)
-        if result is None or result.isError():
-            raise RuntimeError(
-                f"RS485 self-test write failed at 0x{address:04X}"
-            )
-
-    def get_self_test_error_info(self) -> SelfTestErrorInfo:
-        """Query self-test error information via holding registers 0x0038~0x003F."""
-        return build_self_test_error_info(
-            self._config,
-            self._self_test_read_registers,
-            self._self_test_write_register,
-        )
-
-    def get_self_test_status(self) -> int:
-        """Read the current self-test status from holding register 0x0038 low byte."""
-        return self._self_test_read_registers(0x0038, 1)[0] & 0x00FF
 
     # ===== Subscription =====
 

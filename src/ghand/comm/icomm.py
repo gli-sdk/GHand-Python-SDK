@@ -20,7 +20,7 @@
 Error handling contract:
 - A. Connection management (connect/disconnect/search_adapters): return bool,
   do NOT raise on normal failure.
-- B. State-change operations (clear_fault/init_joint/tactile_*): return bool
+- B. State-change operations (clear_fault/tactile_*): return bool
   to indicate device confirmation; return False when the device rejects the
   command. Underlying exceptions bubble up naturally.
 - C. Critical control / data retrieval (move_joints/stop/get_*/get_joints):
@@ -216,16 +216,6 @@ class IComm(ABC):
         ...
 
     @abstractmethod
-    def init_joint(self) -> bool:
-        """Initialize joint positions.
-
-        Returns:
-            True on success, False if the device rejected the command.
-
-        """
-        ...
-
-    @abstractmethod
     def get_device_name(self) -> str:
         """Retrieve the device name.
 
@@ -274,6 +264,26 @@ class IComm(ABC):
         """
         ...
 
+    def get_stall_tolerances(self) -> dict:
+        """Retrieve per-joint stall tolerances when supported."""
+        raise NotImplementedError("stall tolerance configuration is not supported")
+
+    def set_stall_tolerances(self, tolerances: dict) -> bool:
+        """Set per-joint stall tolerances when supported."""
+        raise NotImplementedError("stall tolerance configuration is not supported")
+
+    def get_pid_parameters(self) -> list[int]:
+        """Retrieve the raw closed-loop PID parameter array when supported."""
+        raise NotImplementedError("PID parameter configuration is not supported")
+
+    def set_pid_parameters(self, parameters: list[int]) -> bool:
+        """Set the raw closed-loop PID parameter array when supported."""
+        raise NotImplementedError("PID parameter configuration is not supported")
+
+    def get_hand_state_machine(self):
+        """Retrieve the whole-hand runtime state machine value when supported."""
+        raise NotImplementedError("hand state machine query is not supported")
+
     @abstractmethod
     def get_motor_driver_version(self) -> str:
         """Retrieve the motor driver version.
@@ -304,30 +314,6 @@ class IComm(ABC):
 
         """
         ...
-
-    def get_self_test_error_info(self):
-        """Retrieve structured self-test error information.
-
-        Default implementation returns an empty ``SelfTestErrorInfo``. Backends
-        that support the self-test error query (object dictionary 0x2008)
-        should override this method.
-
-        Returns:
-            SelfTestErrorInfo instance.
-        """
-        from ..types import SelfTestErrorInfo
-
-        return SelfTestErrorInfo()
-
-    def get_self_test_status(self) -> int:
-        """Retrieve the self-test status byte.
-
-        Backends that expose a direct self-test status register should override
-        this method. Status values are: ``0`` idle, ``1`` processing,
-        ``2`` command processed successfully, ``3`` failed. The default ``0``
-        matches the idle/unknown status.
-        """
-        return 0
 
     # ===== Subscription =====
 

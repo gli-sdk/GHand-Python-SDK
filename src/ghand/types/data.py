@@ -21,7 +21,7 @@ from dataclasses import dataclass
 
 from .enums import JointId, TactileSensorId
 from .errors import HandCriticalError, HandFault, HandWarning, JointErrorCode
-from .states import JointState, State
+from .states import ClosedLoopType, CtrlMode, JointState, State
 
 
 @dataclass
@@ -86,6 +86,19 @@ class JointData:
     angle: float = 0.0  # degrees
     speed: int = 0
     current: int = 0
+
+    @property
+    def control_mode(self) -> CtrlMode | None:
+        """Return the control mode encoded in bits 0..3 of ``mode``."""
+        try:
+            return CtrlMode(self.mode & 0x0F)
+        except ValueError:
+            return None
+
+    @property
+    def closed_loop_type(self) -> ClosedLoopType:
+        """Return the feedback loop type encoded in bits 4..7 of ``mode``."""
+        return ClosedLoopType((self.mode >> 4) & 0x0F)
 
 
 @dataclass

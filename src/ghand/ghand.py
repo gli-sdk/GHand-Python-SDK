@@ -50,8 +50,8 @@ from .types import (
     ProductConfig,
     JointCommand,
     HandState,
+    HandStateMachine,
     JointData,
-    SelfTestErrorInfo,
 )
 
 logger = logging.getLogger("ghand.ghand")
@@ -668,6 +668,36 @@ class GHand:
         """
         return self._comm.get_serial_number()
 
+    def get_stall_tolerances(self) -> dict[JointId, int]:
+        """Retrieve EtherCAT V2.1 stall tolerances for all 13 active joints."""
+        return self._comm.get_stall_tolerances()
+
+    def set_stall_tolerances(self, tolerances: dict[JointId, int]) -> bool:
+        """Set EtherCAT V2.1 stall tolerances for all 13 active joints."""
+        result = self._comm.set_stall_tolerances(tolerances)
+        self._set_last_result(
+            SdkError.OK if result else SdkError.DEVICE_REJECTED,
+            "" if result else "device rejected stall tolerance configuration",
+        )
+        return result
+
+    def get_pid_parameters(self) -> list[int]:
+        """Retrieve the raw EtherCAT V2.1 39-value PID parameter array."""
+        return self._comm.get_pid_parameters()
+
+    def set_pid_parameters(self, parameters: list[int]) -> bool:
+        """Set the raw EtherCAT V2.1 39-value PID parameter array."""
+        result = self._comm.set_pid_parameters(parameters)
+        self._set_last_result(
+            SdkError.OK if result else SdkError.DEVICE_REJECTED,
+            "" if result else "device rejected PID parameter configuration",
+        )
+        return result
+
+    def get_hand_state_machine(self) -> HandStateMachine:
+        """Retrieve the EtherCAT V2.1 whole-hand runtime state."""
+        return self._comm.get_hand_state_machine()
+
     def get_motor_driver_version(self) -> str:
         """Retrieve the motor driver version.
 
@@ -714,21 +744,6 @@ class GHand:
         else:
             logger.error("Failed to clear fault")
             self._set_last_result(SdkError.DEVICE_REJECTED, "failed to clear fault")
-        return result
-
-    def joint_init(self) -> bool:
-        """Initialize joint positions.
-
-        Returns:
-            True on success, False on failure.
-        """
-        result = self._comm.init_joint()
-        if result:
-            logger.info("Joint initialization completed successfully")
-            self._set_last_result(SdkError.OK)
-        else:
-            logger.error("Failed to initialize joints")
-            self._set_last_result(SdkError.DEVICE_REJECTED, "failed to initialize joints")
         return result
 
     def tactile_open(self) -> bool:
@@ -905,35 +920,6 @@ class GHand:
             HandState instance.
         """
         return self._comm.get_hand_info()
-
-    def get_self_test_error_info(self) -> SelfTestErrorInfo:
-        """Read structured self-test error information from the device.
-
-        Reads only the already-latched self-test result stored on the device
-        (object dictionary ``0x2008``). This method does NOT trigger a manual
-        self-test (``0x01``) or manual zeroing (``0x02``).
-
-        Returns:
-            ``SelfTestErrorInfo`` populated only for the error categories
-            actually flagged by the A0 summary.
-        """
-        if not self.is_connected():
-            raise RuntimeError("Device is not connected")
-        return self._comm.get_self_test_error_info()
-
-    def get_self_test_status(self) -> int:
-        """Read the current self-test status from the device.
-
-        EtherCAT reads object ``0x2008:0x02``. CANFD and RS485 read the low
-        byte of holding register ``0x0038``.
-
-        Returns:
-            Status byte reported by the device: ``0`` idle, ``1`` processing,
-            ``2`` command processed successfully, ``3`` failed.
-        """
-        if not self.is_connected():
-            raise RuntimeError("Device is not connected")
-        return self._comm.get_self_test_status()
 
     def get_tactile_data(self) -> dict:
         """Retrieve tactile sensor data.
