@@ -455,6 +455,62 @@ def encode_joint_command(
     ]
 
 
+def encode_hand_command_frame(
+    joints,
+    mode: CtrlMode,
+    profile: ModbusRegisterProfile,
+    joint_modes: dict[JointId, int],
+) -> tuple[int, list[int], dict[JointId, int]]:
+    """Encode one complete, contiguous whole-hand control frame."""
+    commands = {}
+    updated_modes = {}
+    for joint in joints:
+        joint_id = JointId(joint.id)
+        if joint_id not in profile.joint_control_addresses:
+            continue
+        registers = encode_joint_command(
+            joint, mode, joint_modes.get(joint_id, CtrlMode.POSITION.value)
+        )
+        commands[joint_id] = registers
+        updated_modes[joint_id] = registers[0] & 0x0F
+
+    ordered_joints = sorted(
+        profile.joint_control_addresses.items(), key=lambda item: item[1]
+    )
+    if profile.mode_register is not None:
+        start_address = profile.mode_register
+        registers = [encode_hand_control(mode, True)]
+    elif ordered_joints:
+        start_address = ordered_joints[0][1]
+        registers = []
+    else:
+        raise ValueError("No joint control registers configured")
+
+    for joint_id, address in ordered_joints:
+        offset = address - start_address
+        if offset < len(registers):
+            raise ValueError("Joint control registers overlap")
+        registers.extend([0] * (offset - len(registers)))
+        registers.extend(
+            commands.get(
+                joint_id,
+                [
+                    encode_joint_mode_stop(
+                        joint_modes.get(joint_id, CtrlMode.POSITION.value),
+                        JointControlState.STOPPED,
+                    ),
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                ],
+            )
+        )
+
+    return start_address, registers, updated_modes
+
+
 def encode_joint_command_registers(
     joint,
     mode: CtrlMode,

@@ -62,8 +62,8 @@ from .modbus_codec import (
     REG_SERIAL_NUMBER,
     REG_SLAVE_ID,
     build_tactile_info,
+    encode_hand_command_frame,
     encode_hand_control,
-    encode_joint_command,
     encode_joint_mode_stop,
     get_joint_input_span,
     get_modbus_profile,
@@ -421,44 +421,27 @@ class Rs485Comm(IComm):
             f"({baudrate} bps, effective after reboot)"
         )
 
-    # ===== Joint control (single register write) =====
+    # ===== Joint control =====
 
     def move_joints(self, joints: list, mode) -> bool:
-        """Send joint control commands via single register writes.
-
-        Only writes registers for joints that are explicitly provided.
+        """Send one complete whole-hand joint control command.
 
         Args:
             joints: List of JointCommand objects.
             mode: Control mode (position, speed, or current).
 
         Returns:
-            True if all commands are sent successfully.
+            True if the command is sent successfully.
         """
-        if self._profile.mode_register is not None:
-            result = self._write_register(
-                self._profile.mode_register, encode_hand_control(mode, True)
-            )
-            if result is None or result.isError():
-                raise RuntimeError("Failed to write mode register")
-            self._hand_mode = mode
+        address, registers, updated_modes = encode_hand_command_frame(
+            joints, mode, self._profile, self._joint_modes
+        )
+        result = self._write_registers(address, registers)
+        if result is None or result.isError():
+            raise RuntimeError("Failed to write whole-hand joint command")
 
-        for joint in joints:
-            joint_id = JointId(joint.id)
-            base_addr = self._profile.joint_control_addresses.get(joint_id)
-            if base_addr is None:
-                continue
-            registers = encode_joint_command(
-                joint, mode, self._joint_modes.get(joint_id, CtrlMode.POSITION.value)
-            )
-
-            result = self._write_registers(base_addr, registers)
-            if result is None or result.isError():
-                raise RuntimeError(
-                    f"Failed to write joint {joint_id.name}"
-                )
-            self._joint_modes[joint_id] = registers[0] & 0x0F
-
+        self._hand_mode = mode
+        self._joint_modes.update(updated_modes)
         return True
 
     def _set_hand_enabled(self, enabled: bool) -> bool:
