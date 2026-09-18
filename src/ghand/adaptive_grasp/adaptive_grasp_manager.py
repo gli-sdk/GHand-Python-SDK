@@ -310,6 +310,7 @@ class AdaptiveGrasper:
             position_hold_planner=position_hold_planner,
             stiff_position_hold_planner=stiff_position_hold_planner,
             hold_target_force_n=self._hold_target_force_n,
+            move_joints=self._release_controller.move_hold_joints,
         )
 
     def _start_adaptive_control(self) -> None:

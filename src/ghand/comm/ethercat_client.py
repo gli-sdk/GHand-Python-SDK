@@ -93,12 +93,14 @@ class EthercatClient:
         self._ch_thread_stop_event = threading.Event()
         self._connected = False
         self._slave = None
-        # A single WKC miss is not a disconnect: we track four orthogonal
+        # A single WKC miss is not a disconnect: we track orthogonal
         # states so callers and the rest of the driver can react proportionately.
         # - _connection_lost: sustained WKC failure has been observed and the
         #   client has been (or is being) torn down. Terminal.
         # - _has_valid_process_data: at least one good cycle has been seen since
         #   the client entered OP. Reset on cleanup.
+        # - _pdo_ready: the master is in OP and the latest cycle returned the
+        #   complete expected WKC. Used to prevent stale RPDO replay on recovery.
         # - _last_valid_process_time: monotonic timestamp of the most recent
         #   good cycle. Used both for freshness checks and to age out the
         #   cached snapshot.
@@ -106,6 +108,7 @@ class EthercatClient:
         #   Drives log tiering and the disconnect trigger.
         self._connection_lost = False
         self._has_valid_process_data = False
+        self._pdo_ready = False
         self._last_valid_process_time = None
         self._consecutive_wkc_errors = 0
         self._wkc_validity_window = deque(maxlen=self._WKC_WINDOW_SIZE)
@@ -193,9 +196,11 @@ class EthercatClient:
             else:
                 import fcntl
 
-                self._lock_file = open(lock_path, 'w')
+                self._lock_file = open(lock_path, 'a+')
                 try:
                     fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    self._lock_file.seek(0)
+                    self._lock_file.truncate()
                     self._lock_file.write(f"{os.getpid()}\n{adapter_name}\n")
                     self._lock_file.flush()
                     self._lock_file_path = lock_path
@@ -214,12 +219,16 @@ class EthercatClient:
             return False
 
     def _release_lock(self):
-        """Release the exclusive adapter lock and clean up the lock file."""
+        """Release the exclusive adapter lock."""
         if self._lock_file is not None:
             try:
                 lock_path = self._lock_file_path
                 self._lock_file.close()
-                if lock_path and os.path.exists(lock_path):
+                if (
+                    platform.system() == "Windows"
+                    and lock_path
+                    and os.path.exists(lock_path)
+                ):
                     try:
                         os.remove(lock_path)
                     except (OSError, IOError):
@@ -282,6 +291,7 @@ class EthercatClient:
             self._expected_wkc = 0
             self._connection_lost = False
             self._has_valid_process_data = False
+            self._pdo_ready = False
             self._last_valid_process_time = None
             self._consecutive_wkc_errors = 0
             self._wkc_validity_window.clear()
@@ -330,6 +340,7 @@ class EthercatClient:
                     self._wkc_validity_window.append(valid)
                     if valid:
                         self._has_valid_process_data = True
+                        self._pdo_ready = bool(self._master.in_op)
                         self._last_valid_process_time = time.monotonic()
                         self._consecutive_wkc_errors = 0
                         # Snapshot the freshly-received TPDO so callers can be
@@ -338,6 +349,8 @@ class EthercatClient:
                         if self._slave is not None:
                             self._last_valid_tpdo_snapshot = bytes(self._slave.input)
                     else:
+                        self._pdo_ready = False
+                        self._master.do_check_state = True
                         self._consecutive_wkc_errors += 1
                 if not valid:
                     # Tiered logging: single misses are noise on a healthy bus,
@@ -382,6 +395,9 @@ class EthercatClient:
                         self._pd_thread_stop_event.set()
                         break
             except Exception as e:
+                with self._data_lock:
+                    self._pdo_ready = False
+                    self._master.do_check_state = True
                 logger.error("Error in process data thread: %s", e)
             time.sleep(0.01)
 
@@ -392,7 +408,9 @@ class EthercatClient:
                 need_check = False
                 with self._data_lock:
                     if self._master.in_op and (
-                        self._actual_wkc < 1 or self._master.do_check_state
+                        self._actual_wkc < self._expected_wkc
+                        or self._actual_wkc < 1
+                        or self._master.do_check_state
                     ):
                         self._master.do_check_state = False
                         self._master.read_state()
@@ -402,6 +420,7 @@ class EthercatClient:
                     with self._data_lock:
                         for i, slave in enumerate(self._master.slaves):
                             if slave.state != pysoem.OP_STATE:
+                                self._pdo_ready = False
                                 self._master.do_check_state = True
                                 self._check_slave(slave)
             except Exception as e:
@@ -444,7 +463,7 @@ class EthercatClient:
             data: Raw output process data.
 
         Raises:
-            RuntimeError: If the device is disconnected.
+            RuntimeError: If the device is disconnected or PDO is not operational.
         """
         with self._data_lock:
             if self._connection_lost:
@@ -453,6 +472,15 @@ class EthercatClient:
                 raise RuntimeError(
                     f"Cannot send command without valid EtherCAT process data "
                     f"(WKC={self._actual_wkc})"
+                )
+            if (
+                not self._pdo_ready
+                or self._actual_wkc < self._expected_wkc
+                or self._actual_wkc < 1
+            ):
+                raise RuntimeError(
+                    "Cannot send command while EtherCAT PDO is not operational "
+                    f"(WKC={self._actual_wkc}, expected={self._expected_wkc})"
                 )
             if self._slave is not None:
                 hex_str = ' '.join(f'{b:02x}' for b in data)

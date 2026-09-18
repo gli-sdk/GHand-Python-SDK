@@ -4,7 +4,7 @@
 import logging
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import TYPE_CHECKING, Any, Optional, Protocol
+from typing import TYPE_CHECKING, Any, Callable, Optional, Protocol
 
 from ..types import JointId, TactileSensorId, CtrlMode, JointCommand
 from .config import AdaptiveGraspConfig, HoldCommandMode
@@ -12,7 +12,7 @@ from .force_reference_planner import ForceReferencePlanner
 from .incremental_position_hold_planner import IncrementalPositionHoldPlanner
 from .joint_builder import JointCommandBuilder
 from .position_hold_planner import ForceDecision, PositionHoldPlanner
-from .ports import HandCommandPort, SensorFrameSource
+from .ports import HandCommandPort, SensorFrameSource, read_sensor_frame
 from .safety import SafetyMonitor, SafetyReport, SafetyStatus
 from .runtime import GraspState
 from .tactility import TactileAnalyzer, TactileAnalysis
@@ -130,6 +130,7 @@ class HoldController:
             IncrementalPositionHoldPlanner] = None,
         observer: Optional[HoldObserver] = None,
         hold_target_force_n: Optional[float] = None,
+        move_joints: Optional[Callable[[list[JointCommand], CtrlMode], bool]] = None,
     ):
         self.hand = hand
         self._sensor = sensor
@@ -144,6 +145,7 @@ class HoldController:
         self._position_hold_planner = position_hold_planner
         self._stiff_position_hold_planner = stiff_position_hold_planner
         self._hold_target_force_n = hold_target_force_n
+        self._move_joints = move_joints or hand.move_joints
         self._observer = observer or (_VisualizerHoldObserver(visualizer)
                                       if visualizer is not None else None)
         self._last_sample_time_s: Optional[float] = None
@@ -191,9 +193,10 @@ class HoldController:
         )
 
     def _read_hold_frame(self) -> _HoldSensorFrame:
-        tactile_data = self._sensor.tactile_data
-        joint_feedback = self._sensor.joint_feedback
-        sample_time_s = self._sensor.sample_time_s
+        sensor_frame = read_sensor_frame(self._sensor)
+        tactile_data = sensor_frame.tactile_data
+        joint_feedback = sensor_frame.joint_feedback
+        sample_time_s = sensor_frame.sample_time_s
         return _HoldSensorFrame(
             tactile_data=tactile_data,
             joint_feedback=joint_feedback,
@@ -346,7 +349,7 @@ class HoldController:
         safety: SafetyReport,
     ) -> Optional[HoldStepResult]:
         joints, mode, next_current = self._build_hold_payload(command)
-        ok = self.hand.move_joints(joints, mode=mode)
+        ok = self._move_joints(joints, mode)
         if ok:
             self._consecutive_move_failures = 0
             self._current_current = next_current

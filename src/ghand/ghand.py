@@ -126,6 +126,27 @@ class GHand:
     def _set_last_result(self, code: SdkError, message: str = "") -> None:
         self._last_result = OperationResult(code, message, self._comm_type)
 
+    def _comm_read(self, operation: str, call):
+        try:
+            return call()
+        except Exception as e:
+            logger.error("%s failed: %s", operation, e)
+            self._set_last_result(SdkError.TRANSPORT_ERROR, str(e))
+            raise RuntimeError("communication failed") from e
+
+    def _comm_write_bool(self, operation: str, call, rejected_message: str) -> bool:
+        try:
+            result = call()
+            self._set_last_result(
+                SdkError.OK if result else SdkError.DEVICE_REJECTED,
+                "" if result else rejected_message,
+            )
+            return result
+        except Exception as e:
+            logger.error("%s failed: %s", operation, e)
+            self._set_last_result(SdkError.TRANSPORT_ERROR, str(e))
+            return False
+
     def get_last_result(self) -> OperationResult:
         """Return the latest SDK operation result."""
         return self._last_result
@@ -393,6 +414,8 @@ class GHand:
                 logger.exception("Failed to query connection state before reopen")
             logger.warning("Connection state is stale; resetting before reopening")
             self._opened = False
+            self._firmware_version = ""
+            self._hand_type = HandType.NONE
 
         if id == "auto":
             adapters = self._comm.search_adapters()
@@ -477,7 +500,12 @@ class GHand:
             self._set_last_result(SdkError.NOT_CONNECTED, "device is not connected")
             raise RuntimeError("Device is not connected")
 
-        result = self._comm.set_slave_id(slave_id)
+        try:
+            result = self._comm.set_slave_id(slave_id)
+        except Exception as e:
+            logger.error("set_slave_id failed: %s", e)
+            self._set_last_result(SdkError.TRANSPORT_ERROR, str(e))
+            return False
         if result:
             self._product_config.slave_id = slave_id
             logger.info("Slave ID set to 0x%02X", slave_id)
@@ -511,7 +539,12 @@ class GHand:
             raise RuntimeError("Device is not connected")
 
         baudrate_gear = self._baud_rate_to_gear(baud_rate)
-        result = self._comm.set_baudrate_config(baudrate_gear)
+        try:
+            result = self._comm.set_baudrate_config(baudrate_gear)
+        except Exception as e:
+            logger.error("set_baudrate_config failed: %s", e)
+            self._set_last_result(SdkError.TRANSPORT_ERROR, str(e))
+            return False
         if result:
             logger.info(self._comm.describe_baudrate_config(baudrate_gear))
             self._set_last_result(SdkError.OK)
@@ -526,14 +559,19 @@ class GHand:
             True.
         """
         connected = self._opened
+        self._firmware_version = ""
+        self._hand_type = HandType.NONE
         try:
             connected = connected or self._comm.is_connected()
         except Exception:
             logger.exception("Failed to query connection state before close")
 
         if connected:
-            self._comm.stop()
-            time.sleep(1)
+            try:
+                self._comm.stop()
+                time.sleep(1)
+            except Exception as exc:
+                logger.warning("Failed to stop device before disconnect: %s", exc)
             self._comm.disconnect()
             logger.info("Disconnected from device")
         self._opened = False
@@ -551,6 +589,8 @@ class GHand:
         except Exception:
             logger.exception("Failed to query connection state")
         self._opened = False
+        self._firmware_version = ""
+        self._hand_type = HandType.NONE
         return False
 
     def subscribe(self, callback, interval_ms: int | None = None):
@@ -599,7 +639,12 @@ class GHand:
             Firmware version string (e.g., "v1.0.0").
         """
         if self._firmware_version == "":
-            self._firmware_version = self._comm.get_firmware_version()
+            version = self._comm_read(
+                "get_firmware_version", self._comm.get_firmware_version
+            )
+            if version not in ("", "N/A"):
+                self._firmware_version = version
+            return version
         return self._firmware_version
 
     def get_device_name(self) -> str:
@@ -611,7 +656,7 @@ class GHand:
         Raises:
             RuntimeError: If communication fails.
         """
-        return self._comm.get_device_name()
+        return self._comm_read("get_device_name", self._comm.get_device_name)
 
     def get_firmware_package_version(self) -> str:
         """Retrieve the firmware package version.
@@ -622,7 +667,9 @@ class GHand:
         Raises:
             RuntimeError: If communication fails.
         """
-        return self._comm.get_firmware_package_version()
+        return self._comm_read(
+            "get_firmware_package_version", self._comm.get_firmware_package_version
+        )
 
     def get_position_sensor_version(self) -> str:
         """Retrieve the position sensor version.
@@ -633,7 +680,9 @@ class GHand:
         Raises:
             RuntimeError: If communication fails.
         """
-        return self._comm.get_position_sensor_version()
+        return self._comm_read(
+            "get_position_sensor_version", self._comm.get_position_sensor_version
+        )
 
     def get_tactile_sensor_version(self) -> str:
         """Retrieve the tactile MCU version.
@@ -644,7 +693,9 @@ class GHand:
         Raises:
             RuntimeError: If communication fails.
         """
-        return self._comm.get_tactile_sensor_version()
+        return self._comm_read(
+            "get_tactile_sensor_version", self._comm.get_tactile_sensor_version
+        )
 
     def get_serial_number(self) -> str:
         """Retrieve the product serial number.
@@ -655,46 +706,45 @@ class GHand:
         Raises:
             RuntimeError: If communication fails.
         """
-        return self._comm.get_serial_number()
+        return self._comm_read("get_serial_number", self._comm.get_serial_number)
 
     def set_serial_number(self, serial_number: str) -> bool:
         """Set the product serial number when supported by the active protocol."""
-        result = self._comm.set_serial_number(serial_number)
-        self._set_last_result(
-            SdkError.OK if result else SdkError.DEVICE_REJECTED,
-            "" if result else "device rejected serial number configuration",
+        return self._comm_write_bool(
+            "set_serial_number",
+            lambda: self._comm.set_serial_number(serial_number),
+            "device rejected serial number configuration",
         )
-        return result
 
     def get_stall_tolerances(self) -> dict[JointId, int]:
         """Retrieve per-joint stall tolerances when supported."""
-        return self._comm.get_stall_tolerances()
+        return self._comm_read("get_stall_tolerances", self._comm.get_stall_tolerances)
 
     def set_stall_tolerances(self, tolerances: dict[JointId, int]) -> bool:
         """Set per-joint stall tolerances when supported."""
-        result = self._comm.set_stall_tolerances(tolerances)
-        self._set_last_result(
-            SdkError.OK if result else SdkError.DEVICE_REJECTED,
-            "" if result else "device rejected stall tolerance configuration",
+        return self._comm_write_bool(
+            "set_stall_tolerances",
+            lambda: self._comm.set_stall_tolerances(tolerances),
+            "device rejected stall tolerance configuration",
         )
-        return result
 
     def get_pid_parameters(self) -> list[int]:
         """Retrieve the raw closed-loop PID parameter array when supported."""
-        return self._comm.get_pid_parameters()
+        return self._comm_read("get_pid_parameters", self._comm.get_pid_parameters)
 
     def set_pid_parameters(self, parameters: list[int]) -> bool:
         """Set the raw closed-loop PID parameter array when supported."""
-        result = self._comm.set_pid_parameters(parameters)
-        self._set_last_result(
-            SdkError.OK if result else SdkError.DEVICE_REJECTED,
-            "" if result else "device rejected PID parameter configuration",
+        return self._comm_write_bool(
+            "set_pid_parameters",
+            lambda: self._comm.set_pid_parameters(parameters),
+            "device rejected PID parameter configuration",
         )
-        return result
 
     def get_hand_state_machine(self) -> HandStateMachine:
         """Retrieve the whole-hand runtime state."""
-        return self._comm.get_hand_state_machine()
+        return self._comm_read(
+            "get_hand_state_machine", self._comm.get_hand_state_machine
+        )
 
     def get_motor_driver_version(self) -> str:
         """Retrieve the motor driver version.
@@ -705,7 +755,9 @@ class GHand:
         Raises:
             RuntimeError: If communication fails.
         """
-        return self._comm.get_motor_driver_version()
+        return self._comm_read(
+            "get_motor_driver_version", self._comm.get_motor_driver_version
+        )
 
     def get_thumb_tactile_sensor_version(self) -> str:
         """Retrieve the thumb tactile sensor version.
@@ -716,7 +768,10 @@ class GHand:
         Raises:
             RuntimeError: If communication fails.
         """
-        return self._comm.get_thumb_tactile_sensor_version()
+        return self._comm_read(
+            "get_thumb_tactile_sensor_version",
+            self._comm.get_thumb_tactile_sensor_version,
+        )
 
     def get_finger_tactile_sensor_version(self) -> str:
         """Retrieve the finger tactile sensor version.
@@ -727,7 +782,10 @@ class GHand:
         Raises:
             RuntimeError: If communication fails.
         """
-        return self._comm.get_finger_tactile_sensor_version()
+        return self._comm_read(
+            "get_finger_tactile_sensor_version",
+            self._comm.get_finger_tactile_sensor_version,
+        )
 
     def fault_clearance(self) -> bool:
         """Clear device faults.
@@ -735,7 +793,12 @@ class GHand:
         Returns:
             True on success, False on failure.
         """
-        result = self._comm.clear_fault()
+        try:
+            result = self._comm.clear_fault()
+        except Exception as e:
+            logger.error("fault_clearance failed: %s", e)
+            self._set_last_result(SdkError.TRANSPORT_ERROR, str(e))
+            return False
         if result:
             logger.info("Fault cleared successfully")
             self._set_last_result(SdkError.OK)
@@ -753,7 +816,12 @@ class GHand:
         if not self._has_tactile:
             logger.warning("This product does not support tactile sensors")
             return False
-        result = self._comm.open_tactile()
+        try:
+            result = self._comm.open_tactile()
+        except Exception as e:
+            logger.error("tactile_open failed: %s", e)
+            self._set_last_result(SdkError.TRANSPORT_ERROR, str(e))
+            return False
         if result:
             self._tactile_opened = True
             self._set_last_result(SdkError.OK)
@@ -770,7 +838,12 @@ class GHand:
         if not self._has_tactile:
             logger.warning("This product does not support tactile sensors")
             return False
-        result = self._comm.close_tactile()
+        try:
+            result = self._comm.close_tactile()
+        except Exception as e:
+            logger.error("tactile_close failed: %s", e)
+            self._set_last_result(SdkError.TRANSPORT_ERROR, str(e))
+            return False
         if result:
             self._tactile_opened = False
             self._set_last_result(SdkError.OK)
@@ -787,7 +860,12 @@ class GHand:
         if not self._has_tactile:
             logger.warning("This product does not support tactile sensors")
             return False
-        result = self._comm.zero_tactile()
+        try:
+            result = self._comm.zero_tactile()
+        except Exception as e:
+            logger.error("tactile_zero failed: %s", e)
+            self._set_last_result(SdkError.TRANSPORT_ERROR, str(e))
+            return False
         if result:
             logger.debug("Tactile zero calibration successful")
             self._set_last_result(SdkError.OK)
@@ -806,7 +884,7 @@ class GHand:
             RuntimeError: If communication fails.
         """
         if self._hand_type == HandType.NONE:
-            htype = self._comm.get_hand_type()
+            htype = self._comm_read("get_hand_type", self._comm.get_hand_type)
             if htype == 1:
                 self._hand_type = HandType.LEFT_HAND
             elif htype == 2:
@@ -902,7 +980,7 @@ class GHand:
                 "" if result else "stop failed",
             )
             return result
-        except RuntimeError as e:
+        except Exception as e:
             logger.error("Failed to stop joints: %s", e)
             self._set_last_result(SdkError.TRANSPORT_ERROR, str(e))
             return False
@@ -913,8 +991,7 @@ class GHand:
         Returns:
             List of JointData objects.
         """
-        joints = self._comm.get_joints()
-        return joints
+        return self._comm_read("get_joints", self._comm.get_joints)
 
     def get_hand_info(self) -> HandState:
         """Retrieve high-level hand status information.
@@ -922,7 +999,7 @@ class GHand:
         Returns:
             HandState instance.
         """
-        return self._comm.get_hand_info()
+        return self._comm_read("get_hand_info", self._comm.get_hand_info)
 
     def get_tactile_data(self) -> dict:
         """Retrieve tactile sensor data.
@@ -933,8 +1010,7 @@ class GHand:
         if not self._has_tactile:
             logger.warning("This product does not support tactile sensors")
             return {}
-        data = self._comm.get_tactile_data()
-        return data
+        return self._comm_read("get_tactile_data", self._comm.get_tactile_data)
 
     def set_safety_margin(self, margin: float) -> None:
         """Set the collision detection safety margin.

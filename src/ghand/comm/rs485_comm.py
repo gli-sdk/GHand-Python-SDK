@@ -356,8 +356,11 @@ class Rs485Comm(IComm):
 
     def disconnect(self) -> bool:
         """Disconnect from the RS485 device and stop subscriptions."""
-        self._stop_poll()
-        self._callbacks.clear()
+        with self._lock:
+            poll_thread = self._stop_poll_locked()
+            self._callbacks.clear()
+            self._recompute_poll_interval_locked()
+        self._join_poll_thread(poll_thread)
         if self._client:
             with self._io_lock:
                 self._client.close()
@@ -724,7 +727,7 @@ class Rs485Comm(IComm):
             self._next_sub_id += 1
             self._callbacks[sub_id] = (callback, args, kwargs, interval_sec)
             self._recompute_poll_interval_locked()
-            self._ensure_poll_started()
+            self._ensure_poll_started_locked()
             return sub_id
 
     def unsubscribe(self, sub_id) -> bool:
@@ -741,30 +744,41 @@ class Rs485Comm(IComm):
                 return False
             del self._callbacks[sub_id]
             self._recompute_poll_interval_locked()
-            should_stop = not self._callbacks
-        if should_stop:
-            self._stop_poll()
+            poll_thread = self._stop_poll_locked() if not self._callbacks else None
+        self._join_poll_thread(poll_thread)
         return True
 
-    def _ensure_poll_started(self) -> None:
+    def _ensure_poll_started_locked(self) -> None:
         """Start the polling thread if not already running."""
         if self._poll_thread is None or not self._poll_thread.is_alive():
-            self._poll_stop.clear()
-            self._poll_thread = threading.Thread(
-                target=self._poll_loop, daemon=True
+            stop_event = threading.Event()
+            poll_thread = threading.Thread(
+                target=self._poll_loop, args=(stop_event,), daemon=True
             )
-            self._poll_thread.start()
+            self._poll_stop = stop_event
+            self._poll_thread = poll_thread
+            poll_thread.start()
 
     def _stop_poll(self) -> None:
         """Signal the polling thread to stop."""
+        with self._lock:
+            poll_thread = self._stop_poll_locked()
+        self._join_poll_thread(poll_thread)
+
+    def _stop_poll_locked(self):
         self._poll_stop.set()
-        if (
-            self._poll_thread
-            and self._poll_thread.is_alive()
-            and self._poll_thread is not threading.current_thread()
-        ):
-            self._poll_thread.join(timeout=0.5)
+        poll_thread = self._poll_thread
         self._poll_thread = None
+        return poll_thread
+
+    @staticmethod
+    def _join_poll_thread(poll_thread) -> None:
+        if (
+            poll_thread
+            and poll_thread.is_alive()
+            and poll_thread is not threading.current_thread()
+        ):
+            poll_thread.join(timeout=0.5)
 
     def _recompute_poll_interval_locked(self) -> None:
         intervals = [
@@ -774,9 +788,9 @@ class Rs485Comm(IComm):
             min(intervals) if intervals else self._DEFAULT_POLL_INTERVAL_SEC
         )
 
-    def _poll_loop(self) -> None:
+    def _poll_loop(self, stop_event: threading.Event) -> None:
         """Poll device state every 10ms and dispatch to callbacks."""
-        while not self._poll_stop.is_set():
+        while not stop_event.is_set():
             try:
                 if not self._connected or self._client is None:
                     break
@@ -812,6 +826,8 @@ class Rs485Comm(IComm):
                     start,
                 )
 
+                if stop_event.is_set():
+                    break
                 with self._lock:
                     callbacks = list(self._callbacks.values())
 
@@ -823,7 +839,7 @@ class Rs485Comm(IComm):
 
             except Exception as e:
                 logger.error("Subscription stopped: %s", e)
-                self._poll_stop.set()
+                stop_event.set()
                 break
 
             time.sleep(self._poll_interval_sec)

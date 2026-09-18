@@ -8,7 +8,7 @@ from typing import Any, Callable, Mapping, Optional
 
 from ..types import JointId, TactileSensorId, CtrlMode, JointCommand
 from .config import AdaptiveGraspConfig
-from .ports import HandCommandPort, SensorFrameSource
+from .ports import HandCommandPort, SensorFrameSource, read_sensor_frame
 from .runtime import GraspState
 from .safety import SafetyMonitor, SafetyReport, SafetyStatus
 from .joint_builder import JointCommandBuilder
@@ -289,8 +289,9 @@ class PhaseController:
         return False
 
     def _read_closing_sensor_frame(self) -> Optional[ClosingSensorFrame]:
-        tactile_data = self._sensor.tactile_data
-        joint_feedback = self._sensor.joint_feedback
+        sensor_frame = read_sensor_frame(self._sensor)
+        tactile_data = sensor_frame.tactile_data
+        joint_feedback = sensor_frame.joint_feedback
         if tactile_data is None or joint_feedback is None:
             _logger.error(
                 "CLOSING phase: failed to get %s",
@@ -300,8 +301,8 @@ class PhaseController:
         return ClosingSensorFrame(
             tactile_data=tactile_data,
             joint_feedback=joint_feedback,
-            total_fz=self._sensor.sum_active_finger_normal_force(),
-            touch_flags=self._sensor.active_finger_touch_flag(),
+            total_fz=sensor_frame.total_normal_force,
+            touch_flags=sensor_frame.touch_flags or {},
         )
 
     def _is_empty_grasp(self, joint_feedback: list[JointCommand]) -> bool:

@@ -30,6 +30,7 @@ class SubscriptionManager:
 
     def __init__(self, client, is_connected=None):
         self._lock = threading.Lock()
+        self._stop_event = threading.Event()
         self._running = False
         self._thread = None
         self._dispatcher_thread = None
@@ -44,39 +45,62 @@ class SubscriptionManager:
 
     def start(self):
         """Start the background producer and dispatcher threads."""
-        if not self._running:
-            self._running = True
-            self._thread = threading.Thread(target=self._data_producer, daemon=True)
-            self._thread.start()
-            self._dispatcher_thread = threading.Thread(
-                target=self._data_dispatcher, daemon=True
-            )
-            self._dispatcher_thread.start()
+        with self._lock:
+            self._start_locked()
+
+    def _start_locked(self) -> None:
+        if self._running:
+            return
+        stop_event = threading.Event()
+        producer = threading.Thread(
+            target=self._data_producer, args=(stop_event,), daemon=True
+        )
+        dispatcher = threading.Thread(
+            target=self._data_dispatcher, args=(stop_event,), daemon=True
+        )
+        self._stop_event = stop_event
+        self._thread = producer
+        self._dispatcher_thread = dispatcher
+        self._running = True
+        producer.start()
+        dispatcher.start()
 
     def stop(self):
         """Stop the background threads and clear subscription state."""
-        self._running = False
-        current = threading.current_thread()
-        if self._thread and self._thread is not current:
-            self._thread.join(timeout=1)
-            if self._thread.is_alive():
-                logger.warning("Subscription producer thread did not stop within timeout")
-        self._thread = None
-        if self._dispatcher_thread and self._dispatcher_thread is not current:
-            self._dispatcher_thread.join(timeout=1)
-            if self._dispatcher_thread.is_alive():
-                logger.warning("Subscription dispatcher thread did not stop within timeout")
-        self._dispatcher_thread = None
         with self._lock:
-            self._data = None
-            self._data_seq = 0
-            self._dispatched_seq = 0
+            threads = self._stop_locked(clear_subscribers=True)
+        self._join_threads(threads)
+
+    def _stop_locked(self, *, clear_subscribers: bool) -> tuple:
+        self._stop_event.set()
+        self._running = False
+        threads = (self._thread, self._dispatcher_thread)
+        self._thread = None
+        self._dispatcher_thread = None
+        self._data = None
+        self._data_seq = 0
+        self._dispatched_seq = 0
+        if clear_subscribers:
             self._subscribers.clear()
             self._interval_sec = self._DEFAULT_INTERVAL_SEC
+        return threads
 
-    def _request_stop_from_worker(self) -> None:
+    @staticmethod
+    def _join_threads(threads: tuple) -> None:
+        current = threading.current_thread()
+        for name, thread in zip(("producer", "dispatcher"), threads):
+            if thread is None or thread is current:
+                continue
+            thread.join(timeout=1)
+            if thread.is_alive():
+                logger.warning("Subscription %s thread did not stop within timeout", name)
+
+    def _request_stop_from_worker(self, stop_event: threading.Event) -> None:
         """Signal worker shutdown without joining from inside a worker thread."""
-        self._running = False
+        stop_event.set()
+        with self._lock:
+            if self._stop_event is stop_event:
+                self._running = False
 
     def _recompute_interval_locked(self) -> None:
         intervals = [
@@ -84,28 +108,35 @@ class SubscriptionManager:
         ]
         self._interval_sec = min(intervals) if intervals else self._DEFAULT_INTERVAL_SEC
 
-    def _data_producer(self):
+    def _data_producer(self, stop_event: threading.Event):
         """Background thread that continuously receives data from the device."""
-        while self._running:
+        while not stop_event.is_set():
             try:
                 data = self._client.recv_data()
+                if stop_event.is_set():
+                    break
                 with self._lock:
+                    if self._stop_event is not stop_event:
+                        break
                     self._data = data
                     self._data_seq += 1
             except Exception as e:
                 with self._lock:
-                    self._data = None
+                    if self._stop_event is stop_event:
+                        self._data = None
                 if self._is_connected is not None and not self._is_connected():
                     logger.error("Subscription stopped: %s", e)
-                    self._request_stop_from_worker()
+                    self._request_stop_from_worker(stop_event)
                     break
                 logger.error("Error receiving data: %s", e)
             time.sleep(self._interval_sec)
 
-    def _data_dispatcher(self):
+    def _data_dispatcher(self, stop_event: threading.Event):
         """Background thread that dispatches received data to all subscribers."""
-        while self._running:
+        while not stop_event.is_set():
             with self._lock:
+                if self._stop_event is not stop_event:
+                    break
                 data = self._data
                 data_seq = self._data_seq
                 subscribers_copy = self._subscribers.copy()
@@ -115,7 +146,7 @@ class SubscriptionManager:
                     self._dispatched_seq = data_seq
             if data:
                 for sub_id, (callback, args, kwargs, _) in subscribers_copy.items():
-                    if not self._running:
+                    if stop_event.is_set():
                         break
                     if callback:
                         try:
@@ -151,8 +182,7 @@ class SubscriptionManager:
             sub_id = self._sub_id_counter
             self._subscribers[sub_id] = (callback, args, kwargs, interval_sec)
             self._recompute_interval_locked()
-        if not self._running:
-            self.start()
+            self._start_locked()
         return sub_id
 
     def unsubscribe(self, sub_id):
@@ -169,7 +199,6 @@ class SubscriptionManager:
                 return False
             del self._subscribers[sub_id]
             self._recompute_interval_locked()
-            should_stop = not self._subscribers
-        if should_stop:
-            self.stop()
+            threads = self._stop_locked(clear_subscribers=False) if not self._subscribers else ()
+        self._join_threads(threads)
         return True

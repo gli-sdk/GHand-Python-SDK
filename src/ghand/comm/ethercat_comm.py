@@ -22,6 +22,7 @@ Wraps EthercatClient and handles PDO encoding/decoding.
 
 import logging
 import struct
+import threading
 import time
 
 from .._subscription import SubscriptionManager
@@ -100,7 +101,23 @@ class EthercatComm(IComm):
     def __init__(self, config: ProductConfig):
         self._client = EthercatClient()
         self._sub_manager = SubscriptionManager(self._client, self.is_connected)
+        self._static_sdo_cache = {}
+        self._static_sdo_cache_lock = threading.Lock()
         self.update_config(config)
+
+    def _clear_static_sdo_cache(self) -> None:
+        with self._static_sdo_cache_lock:
+            self._static_sdo_cache.clear()
+
+    def _read_static_sdo_once(self, key: str, reader):
+        """Cache one successful static SDO value for the current connection."""
+        with self._static_sdo_cache_lock:
+            if key in self._static_sdo_cache:
+                return self._static_sdo_cache[key]
+            value = reader()
+            if value not in (None, "", "N/A", 0):
+                self._static_sdo_cache[key] = value
+            return value
 
     @property
     def config(self) -> ProductConfig:
@@ -199,6 +216,7 @@ class EthercatComm(IComm):
         Returns:
             True if the connection and SOEM startup succeed.
         """
+        self._clear_static_sdo_cache()
         connected = self._client.connect(device_name)
         if connected and self._client.run(self._expected_tpdo_sizes, self._expected_rpdo_size):
             self._select_tpdo_layout(self._client.input_size)
@@ -211,6 +229,7 @@ class EthercatComm(IComm):
 
     def disconnect(self) -> bool:
         """Disconnect from the EtherCAT device and stop subscriptions."""
+        self._clear_static_sdo_cache()
         self._sub_manager.stop()
         self._client.disconnect()
         logger.info("Device disconnected")
@@ -462,11 +481,15 @@ class EthercatComm(IComm):
 
     def get_device_name(self) -> str:
         """Retrieve the device name via SDO."""
-        return self._read_string_sdo(SDO_DEVICE_NAME, 0x00)
+        return self._read_static_sdo_once(
+            "device_name", lambda: self._read_string_sdo(SDO_DEVICE_NAME, 0x00)
+        )
 
     def get_firmware_version(self) -> str:
         """Retrieve the firmware version via SDO."""
-        return self._read_packed_firmware_version(0x01)
+        return self._read_static_sdo_once(
+            "firmware_version", lambda: self._read_packed_firmware_version(0x01)
+        )
 
     def _read_string_sdo(self, index: int, subindex: int) -> str:
         try:
@@ -481,11 +504,14 @@ class EthercatComm(IComm):
 
     def get_serial_number(self) -> str:
         """Retrieve the 19-byte ASCII product serial number via SDO."""
-        try:
-            raw = self._client.sdo_read(SDO_SERIAL_NUMBER, 0x01)
-            return raw[:19].decode("ascii", errors="ignore").strip("\x00")
-        except Exception:
-            return "N/A"
+        def read_serial_number() -> str:
+            try:
+                raw = self._client.sdo_read(SDO_SERIAL_NUMBER, 0x01)
+                return raw[:19].decode("ascii", errors="ignore").strip("\x00")
+            except Exception:
+                return "N/A"
+
+        return self._read_static_sdo_once("serial_number", read_serial_number)
 
     @staticmethod
     def _pack_uint_array(values: list[int], count: int, item_format: str) -> bytes:
@@ -583,18 +609,24 @@ class EthercatComm(IComm):
 
     def get_position_sensor_version(self) -> str:
         """Retrieve the position sensor version via SDO."""
-        return self._read_packed_firmware_version(0x02)
+        return self._read_static_sdo_once(
+            "position_sensor_version", lambda: self._read_packed_firmware_version(0x02)
+        )
 
     def get_tactile_sensor_version(self) -> str:
         """Retrieve the tactile MCU version via SDO."""
-        return self._read_packed_firmware_version(0x03)
+        return self._read_static_sdo_once(
+            "tactile_sensor_version", lambda: self._read_packed_firmware_version(0x03)
+        )
 
     def get_motor_driver_version(self) -> str:
         """Retrieve the motor driver version via SDO.
 
         Returns "N/A" if the motor driver version is not available.
         """
-        return self._read_packed_firmware_version(0x04)
+        return self._read_static_sdo_once(
+            "motor_driver_version", lambda: self._read_packed_firmware_version(0x04)
+        )
 
     def get_thumb_tactile_sensor_version(self) -> str:
         """Per-finger tactile versions are not exposed by EtherCAT V2.1."""
@@ -610,10 +642,15 @@ class EthercatComm(IComm):
         Returns:
             0 for unknown, 1 for left hand, 2 for right hand.
         """
-        try:
-            return int.from_bytes(self._client.sdo_read(SDO_HAND_TYPE, 0x00), byteorder="little")
-        except Exception:
-            return 0
+        def read_hand_type() -> int:
+            try:
+                return int.from_bytes(
+                    self._client.sdo_read(SDO_HAND_TYPE, 0x00), byteorder="little"
+                )
+            except Exception:
+                return 0
+
+        return self._read_static_sdo_once("hand_type", read_hand_type)
 
     # ===== Subscription =====
 
