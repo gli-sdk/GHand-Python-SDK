@@ -135,6 +135,7 @@ _HAND_WARN_MESSAGES = {
     (0, 6): "Middle finger tactile sensor disconnected",
     (0, 7): "Ring finger tactile sensor disconnected",
     (1, 0): "Little finger tactile sensor disconnected",
+    (1, 1): "Self-test error",
 }
 
 
@@ -190,7 +191,6 @@ _HAND_FAULT_MESSAGES = {
 
 _HAND_CRITICAL_MESSAGES = {
     (0, 0): "Unknown error",
-    (0, 1): "Self-test error",
     (0, 2): "Position sensor version mismatch",
     (0, 3): "Tactile sensor version mismatch",
     (0, 4): "Motor driver version mismatch",

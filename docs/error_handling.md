@@ -30,6 +30,8 @@ from ghand import HandCriticalError, HandFault, HandWarning
 state = hand.get_hand_info()
 if state.warnings & HandWarning.FAN_ABNORMAL:
     print("Fan warning")
+if state.warnings & HandWarning.SELF_TEST_ERROR:
+    print("Self-test warning")
 if state.faults & HandFault.POSITION_SENSOR_ABNORMAL:
     print("Affected joint slots:", state.fault_indices(HandFault.POSITION_SENSOR_ABNORMAL))
 if state.critical_errors & HandCriticalError.TEMPERATURE_TOO_HIGH:
