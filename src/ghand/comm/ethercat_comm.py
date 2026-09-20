@@ -60,6 +60,7 @@ class EthercatComm(IComm):
     """IComm implementation for EtherCAT."""
 
     _COMPAT_THUMB_TACTILE_COUNT = 28
+    _LITE1_JOINT_TPDO_SIZE = 6
     _SDO_WRITE_SETTLE_SEC = 0.02
 
     def __init__(self, config: ProductConfig):
@@ -105,14 +106,25 @@ class EthercatComm(IComm):
     def _build_tpdo_layouts(self, config: ProductConfig) -> dict[int, ProductConfig]:
         """Build supported TPDO layouts keyed by mapped input size."""
         tactile_counts = [r.count for r in config.tactile_regions] if config.has_tactile else None
+        joint_size = (
+            self._LITE1_JOINT_TPDO_SIZE
+            if self._uses_per_joint_control_layout(config)
+            else 8
+        )
         layouts = {
-            compute_tpdo_size(len(config.valid_joints), tactile_counts): config
+            compute_tpdo_size(
+                len(config.valid_joints), tactile_counts, joint_size=joint_size
+            ): config
         }
         if config.has_tactile and tactile_counts and tactile_counts[0] > self._COMPAT_THUMB_TACTILE_COUNT:
             compat_counts = list(tactile_counts)
             compat_counts[0] = self._COMPAT_THUMB_TACTILE_COUNT
             compat_config = self._clone_config_with_tactile_counts(config, compat_counts)
-            layouts[compute_tpdo_size(len(config.valid_joints), compat_counts)] = compat_config
+            layouts[
+                compute_tpdo_size(
+                    len(config.valid_joints), compat_counts, joint_size=joint_size
+                )
+            ] = compat_config
         return layouts
 
     def _select_tpdo_layout(self, input_size: int) -> None:
@@ -137,6 +149,11 @@ class EthercatComm(IComm):
         self._expected_tpdo_size = compute_tpdo_size(
             len(config.valid_joints),
             [r.count for r in config.tactile_regions] if config.has_tactile else None,
+            joint_size=(
+                self._LITE1_JOINT_TPDO_SIZE
+                if self._uses_per_joint_control_layout(config)
+                else 8
+            ),
         )
         self._tpdo_size_selected = False
         self._controlled_joints = [j for j in config.valid_joints if j in config.joint_limits]
