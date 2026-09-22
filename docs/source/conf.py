@@ -11,9 +11,9 @@ author = 'glitech'
 autodoc_member_order = 'bysource'
 
 # The short X.Y version
-version = '2.2'
+version = '3.0'
 # The full version, including alpha/beta/rc tags
-release = '2.2.1'
+release = '3.0.0'
 
 # -- General configuration ---------------------------------------------------
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.viewcode', 'sphinx.ext.napoleon']

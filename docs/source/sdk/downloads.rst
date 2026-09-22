@@ -13,7 +13,7 @@ You can obtain the GHand Python SDK in the following ways:
 .. code-block:: bash
 
    # Clone the repository
-   git clone -b v2.2.1 https://github.com/gli-sdk/GHand-Python-SDK
+   git clone -b v3.0.0 https://github.com/gli-sdk/GHand-Python-SDK
    cd GHand-Python-SDK
 
    # Install SDK
@@ -26,11 +26,11 @@ You can also install directly from Git:
 
 .. code-block:: bash
 
-   pip install "ghand_python_sdk @ git+https://github.com/gli-sdk/GHand-Python-SDK.git@v2.2.1"
+   pip install "ghand_python_sdk @ git+https://github.com/gli-sdk/GHand-Python-SDK.git@v3.0.0"
 
 **Current Version**
 
-- Latest version: v2.2.1
+- Latest version: v3.0.0
 - Python requirement: 3.10 or higher
 - Supported platforms: Windows 10/11, Linux Ubuntu 22.04/24.04 LTS (x86_64/aarch64), macOS 12+ (Intel/Apple Silicon)
 - RS485/CANFD default baud-rate gear: ``0x05``
