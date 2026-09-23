@@ -743,21 +743,21 @@ class Rs485Comm(IComm):
 
     def open_tactile(self) -> bool:
         """Enable the tactile sensors."""
-        return self._write_tactile_control(0x0100)
+        return self._write_tactile_control(0x0001)
 
     def close_tactile(self) -> bool:
         """Disable the tactile sensors."""
-        return self._write_tactile_control(0x0200)
+        return self._write_tactile_control(0x0002)
 
     def zero_tactile(self) -> bool:
         """Zero-calibrate the tactile sensors."""
-        return self._write_tactile_control(0x0400)
+        return self._write_tactile_control(0x0004)
 
     def _write_tactile_control(self, command: int) -> bool:
         """Write tactile control command to the product-specific register.
 
         Args:
-            command: High byte command value.
+            command: Command value in the low byte (1 open, 2 close, 4 zero).
         """
         result = self._write_register(self._profile.tactile_control_address, command)
         return result is not None and not result.isError()

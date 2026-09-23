@@ -114,6 +114,7 @@ class CanfdComm(IComm):
     _DELETE_CONNECTION_SETTLE_SEC = 0.1
     _MIN_REOPEN_INTERVAL_SEC = 0.5
     _DEFAULT_POLL_INTERVAL_SEC = 0.03
+    _KEEPALIVE_INTERVAL_SEC = 0.2
     _DEFAULT_BAUDRATE_GEAR = CANFD_DEFAULT_BAUDRATE_GEAR
     COMMON_BAUDRATE_GEARS = tuple(sorted(CANFD_BAUDRATE_GEAR_MAP.keys(), reverse=True))
 
@@ -131,6 +132,8 @@ class CanfdComm(IComm):
         self._connected = False
         self._poll_thread: threading.Thread | None = None
         self._poll_stop = threading.Event()
+        self._keepalive_thread: threading.Thread | None = None
+        self._keepalive_stop = threading.Event()
         self._callbacks: dict[int, tuple] = {}
         self._next_sub_id = 1
         self._lock = threading.Lock()
@@ -280,6 +283,8 @@ class CanfdComm(IComm):
                 return False
 
             self._connected = True
+            with self._lock:
+                self._start_keepalive_locked()
             logger.info(
                 "CANFD device connected (%s, slave_id=0x%02X, gear=0x%02X, abit=%s/%s%%, dbit=%s/%s%%)",
                 device_name,
@@ -300,8 +305,10 @@ class CanfdComm(IComm):
         """Disconnect from the CANFD device."""
         with self._lock:
             poll_thread = self._stop_poll_locked()
+            keepalive_thread = self._stop_keepalive_locked()
             self._callbacks.clear()
             self._recompute_poll_interval_locked()
+        self._join_poll_thread(keepalive_thread)
         self._join_poll_thread(poll_thread)
         delete_sent = False
         if self._connected and self._transport is not None:
@@ -328,6 +335,44 @@ class CanfdComm(IComm):
     def is_connected(self) -> bool:
         """Return whether the CANFD device is connected."""
         return self._connected
+
+    def _start_keepalive_locked(self) -> None:
+        """Start the keep-alive thread if it is not already running."""
+        if self._keepalive_thread is None or not self._keepalive_thread.is_alive():
+            stop_event = threading.Event()
+            keepalive_thread = threading.Thread(
+                target=self._keepalive_loop, args=(stop_event,), daemon=True
+            )
+            self._keepalive_stop = stop_event
+            self._keepalive_thread = keepalive_thread
+            keepalive_thread.start()
+
+    def _stop_keepalive_locked(self):
+        self._keepalive_stop.set()
+        keepalive_thread = self._keepalive_thread
+        self._keepalive_thread = None
+        return keepalive_thread
+
+    def _keepalive_loop(self, stop_event: threading.Event) -> None:
+        """Read the connection state periodically to keep an idle master connected.
+
+        The device drops the connection when no frame arrives within its watchdog
+        window (0x0001~0x0002, 500 ms by default), so an app that idles between
+        API calls would otherwise lose the link. Subscription polling already
+        generates traffic, so skip the tick while it runs.
+        """
+        while not stop_event.wait(self._KEEPALIVE_INTERVAL_SEC):
+            if not self._connected or self._transport is None:
+                break
+            poll_thread = self._poll_thread
+            if poll_thread is not None and poll_thread.is_alive():
+                continue
+            try:
+                self._transport.read_registers(
+                    self._src_id, self._slave_id, REG_HOST_CONN_STATE, 1, func_code=0x04
+                )
+            except Exception as exc:
+                logger.debug("CANFD keep-alive read failed: %s", exc)
 
     def _establish_connection(self, slave_id: int | None = None) -> bool:
         """Detect node ID with FC44, then write 1 to connection control."""
@@ -360,7 +405,9 @@ class CanfdComm(IComm):
                 self._src_id, slave_id, ack=0, func_code=0x44,
                 start=1, end=1, toggle=0, seg_num=0,
             )
-            if not self._transport.send_frame(can_id, b""):
+            # V2.1 firmware answers FC44 only when PDU[4] equals its own node ID.
+            probe = struct.pack(">HH", 0x0000, 1) + bytes([slave_id, 0, 0, 0])
+            if not self._transport.send_frame(can_id, probe):
                 continue
 
             # Wait for the FC44 response from this node.
@@ -738,13 +785,13 @@ class CanfdComm(IComm):
     # ------------------------------------------------------------------
 
     def open_tactile(self) -> bool:
-        return self._write_tactile_control(0x0100)
+        return self._write_tactile_control(0x0001)
 
     def close_tactile(self) -> bool:
-        return self._write_tactile_control(0x0200)
+        return self._write_tactile_control(0x0002)
 
     def zero_tactile(self) -> bool:
-        return self._write_tactile_control(0x0400)
+        return self._write_tactile_control(0x0004)
 
     def _write_tactile_control(self, command: int) -> bool:
         self._transport.write_registers(

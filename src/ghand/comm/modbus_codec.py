@@ -51,7 +51,7 @@ class ModbusRegisterProfile:
     mode_register: int | None = 0x0260
     stop_register: int | None = 0x0260
     hand_info_address: int = 0x1051
-    tactile_state_address: int = 0x1110
+    tactile_state_address: int = 0x111A
     tactile_control_address: int = 0x0020
     tactile_resultant_register_count: int = 16
 
@@ -362,19 +362,22 @@ def parse_joints(
 
 
 def parse_tactile_state_error(raw: list[int]) -> tuple[int, int]:
-    """Parse tactile state and error from the first register (0x1110).
+    """Parse tactile state and error from the first register (0x111A).
+
+    The state byte occupies the low byte (bit0~4 finger link, bit7 online),
+    the error byte the high byte.
 
     Returns:
         (state_byte, error_byte)
     """
-    return (raw[0] >> 8) & 0xFF, raw[0] & 0xFF
+    return raw[0] & 0xFF, (raw[0] >> 8) & 0xFF
 
 
 def parse_tactile_resultant(raw: list[int], region_index: int) -> list[float]:
     """Parse resultant force (Fx, Fy, Fz) for a tactile region.
 
     Args:
-        raw: First 16 registers starting at 0x1110.
+        raw: First 16 registers starting at 0x111A.
         region_index: 0=THUMB, 1=FF, 2=MF, 3=RF, 4=LF.
 
     Returns:
