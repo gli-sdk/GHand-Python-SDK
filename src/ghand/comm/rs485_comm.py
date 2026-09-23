@@ -50,7 +50,14 @@ from ..types import (
 from .icomm import IComm
 from .modbus_codec import (
     BAUDRATE_CONFIG_REGISTER,
+    CONN_STATE_CONNECTED,
+    CONN_STATE_ERROR,
+    MAILBOX_FAILED,
+    MAILBOX_INVALID,
+    MAILBOX_OK,
     REG_CLEAR_FAULT,
+    REG_CONNECTION_CONTROL,
+    REG_CONNECTION_STATUS,
     REG_DEVICE_NAME,
     REG_FIRMWARE_VERSION,
     REG_HAND_TYPE,
@@ -59,6 +66,9 @@ from .modbus_codec import (
     REG_IN_POSITION_SENSOR_VER,
     REG_IN_TACTILE_SENSOR_VER,
     REG_HAND_STATE_MACHINE,
+    REG_HOST_CONN_STATE,
+    REG_MODIFY_BAUD_STATUS,
+    REG_MODIFY_ID_STATUS,
     REG_SERIAL_NUMBER,
     REG_SLAVE_ID,
     build_tactile_info,
@@ -337,6 +347,14 @@ class Rs485Comm(IComm):
                 if not quiet:
                     logger.error("No RS485 device responded on %s", device_name)
                 return False
+            if not self._establish_connection():
+                self._client.close()
+                self._client = None
+                if not quiet:
+                    logger.error(
+                        "Failed to establish RS485 connection on %s", device_name
+                    )
+                return False
             self._connected = True
             return True
         except ModbusException as e:
@@ -354,6 +372,59 @@ class Rs485Comm(IComm):
                 self._client = None
             return False
 
+    def _establish_connection(self) -> bool:
+        """Write 1 to the connection-control register and await the result."""
+        result = self._write_register(REG_CONNECTION_CONTROL, 1)
+        if result is None or result.isError():
+            return False
+        if not self._wait_connection_state():
+            return False
+        return self._wait_command_result(REG_CONNECTION_STATUS)
+
+    def _read_input_word(self, address: int, device_id: int | None = None) -> int | None:
+        """Read one input register; None when the device does not answer."""
+        try:
+            result = self._read_input_registers(address, count=1, device_id=device_id)
+        except ModbusException:
+            return None
+        if result is None or result.isError():
+            return None
+        return result.registers[0]
+
+    def _wait_connection_state(
+        self, timeout_sec: float = 2.0, interval_sec: float = 0.05
+    ) -> bool:
+        """Poll the host connection state until the device reports connected."""
+        deadline = time.time() + timeout_sec
+        while time.time() < deadline:
+            state = self._read_input_word(REG_HOST_CONN_STATE)
+            if state is not None:
+                if state & 0xFF == CONN_STATE_CONNECTED:
+                    return True
+                if state & 0xFF == CONN_STATE_ERROR:
+                    return False
+            time.sleep(interval_sec)
+        return False
+
+    def _wait_command_result(
+        self,
+        address: int,
+        device_id: int | None = None,
+        timeout_sec: float = 2.0,
+        interval_sec: float = 0.05,
+    ) -> bool:
+        """Poll a command mailbox until the device reports success or failure."""
+        deadline = time.time() + timeout_sec
+        while time.time() < deadline:
+            value = self._read_input_word(address, device_id=device_id)
+            if value is not None:
+                if value == MAILBOX_OK:
+                    return True
+                if value in (MAILBOX_FAILED, MAILBOX_INVALID):
+                    return False
+            time.sleep(interval_sec)
+        return False
+
     def disconnect(self) -> bool:
         """Disconnect from the RS485 device and stop subscriptions."""
         with self._lock:
@@ -362,6 +433,11 @@ class Rs485Comm(IComm):
             self._recompute_poll_interval_locked()
         self._join_poll_thread(poll_thread)
         if self._client:
+            if self._connected:
+                try:
+                    self._write_register(REG_CONNECTION_CONTROL, 2)
+                except Exception:
+                    logger.exception("Error while deleting RS485 connection")
             with self._io_lock:
                 self._client.close()
             self._client = None
@@ -375,15 +451,22 @@ class Rs485Comm(IComm):
         return self._connected
 
     def set_slave_id(self, slave_id: int) -> bool:
-        """Write a new Modbus slave ID to holding register 0x0000."""
-        if not 0 < slave_id <= 0xFF:
-            raise ValueError("slave_id must be in range 1..255")
+        """Write a new Modbus slave ID to holding register 0x0003.
+
+        The register carries the target ID in the high byte and the execute
+        bit in the low byte; the new ID answers as soon as it is applied.
+        """
+        if not 0 < slave_id <= 0x3F:
+            raise ValueError("slave_id must be in range 1..63")
         try:
-            result = self._write_register(REG_SLAVE_ID, slave_id)
+            result = self._write_register(REG_SLAVE_ID, (slave_id << 8) | 0x01)
         except Exception as exc:
             logger.error("Failed to set RS485 slave ID to 0x%02X: %s", slave_id, exc)
             return False
         if result is None or result.isError():
+            return False
+        if not self._wait_command_result(REG_MODIFY_ID_STATUS, device_id=slave_id):
+            logger.error("Device rejected RS485 slave ID 0x%02X", slave_id)
             return False
         self._slave_id = slave_id
         return True
@@ -394,22 +477,31 @@ class Rs485Comm(IComm):
     ) -> bool:
         """Write the baud rate gear to holding register 0x0004.
 
-        The value is saved to Flash and takes effect after the next power-up.
+        The register carries the gear in the high byte and the execute bit in
+        the low byte. The value is saved to Flash and takes effect after the
+        next power-up.
 
         Args:
-            baudrate_gear: Gear value written directly to the register. When
-                omitted the default gear (0x05) is used.
+            baudrate_gear: Gear value (0x00~0x05). When omitted the default
+                gear (0x05) is used.
 
         Returns:
             True if the device accepted the configuration.
         """
         gear = baudrate_gear if baudrate_gear is not None else RS485_DEFAULT_BAUDRATE_GEAR
+        if gear not in RS485_BAUDRATE_GEAR_MAP:
+            logger.error("Invalid RS485 baudrate gear: %s", gear)
+            return False
         try:
-            result = self._write_register(BAUDRATE_CONFIG_REGISTER, gear)
+            result = self._write_register(
+                BAUDRATE_CONFIG_REGISTER, (gear << 8) | 0x01
+            )
         except Exception as exc:
             logger.error("Failed to set RS485 baudrate config to gear 0x%02X: %s", gear, exc)
             return False
-        return result is not None and not result.isError()
+        if result is None or result.isError():
+            return False
+        return self._wait_command_result(REG_MODIFY_BAUD_STATUS)
 
     def get_default_baudrate_gear(self) -> int | None:
         """Return the RS485 default baud rate gear."""

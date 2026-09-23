@@ -51,8 +51,14 @@ from .canfd_transport import CanfdTransport, pack_arbitration, unpack_arbitratio
 from .icomm import IComm
 from .modbus_codec import (
     BAUDRATE_CONFIG_REGISTER,
+    CONN_STATE_CONNECTED,
+    CONN_STATE_ERROR,
+    MAILBOX_FAILED,
+    MAILBOX_INVALID,
+    MAILBOX_OK,
     REG_CLEAR_FAULT,
     REG_CONNECTION_CONTROL,
+    REG_CONNECTION_STATUS,
     REG_DEVICE_NAME,
     REG_FIRMWARE_VERSION,
     REG_HAND_TYPE,
@@ -61,6 +67,9 @@ from .modbus_codec import (
     REG_IN_POSITION_SENSOR_VER,
     REG_IN_TACTILE_SENSOR_VER,
     REG_HAND_STATE_MACHINE,
+    REG_HOST_CONN_STATE,
+    REG_MODIFY_BAUD_STATUS,
+    REG_MODIFY_ID_STATUS,
     REG_SERIAL_NUMBER,
     REG_SLAVE_ID,
     build_tactile_info,
@@ -340,7 +349,9 @@ class CanfdComm(IComm):
                 and arb["src_id"] == arb["dst_id"]
                 and arb["src_id"] in candidates
             ):
-                return self._write_connection_control(arb["src_id"], 1)
+                if self._write_connection_control(arb["src_id"], 1):
+                    return self._verify_connection()
+                return False
 
         # If the device has already left the power-up detection window, actively
         # probe allowed node IDs with FC44.
@@ -365,8 +376,61 @@ class CanfdComm(IComm):
                         break  # Exception: try next dst_id
                     if arb["func_code"] == 0x44:
                         if self._write_connection_control(slave_id, 1):
-                            return True
+                            return self._verify_connection()
                         break
+        return False
+
+    def _verify_connection(self) -> bool:
+        """Confirm the connect command via link state and command mailbox."""
+        if not self._wait_connection_state():
+            return False
+        return self._wait_command_result(REG_CONNECTION_STATUS)
+
+    def _read_input_word(self, address: int, device_id: int | None = None) -> int | None:
+        """Read one input register; None when the device does not answer."""
+        target_id = self._slave_id if device_id is None else device_id
+        try:
+            raw = self._transport.read_registers(
+                self._src_id, target_id, address, 1, func_code=0x04
+            )
+        except Exception:
+            return None
+        if len(raw) < 2:
+            return None
+        return struct.unpack(">H", raw[:2])[0]
+
+    def _wait_connection_state(
+        self, timeout_sec: float = 2.0, interval_sec: float = 0.05
+    ) -> bool:
+        """Poll the host connection state until the device reports connected."""
+        deadline = time.time() + timeout_sec
+        while time.time() < deadline:
+            state = self._read_input_word(REG_HOST_CONN_STATE)
+            if state is not None:
+                if state & 0xFF == CONN_STATE_CONNECTED:
+                    return True
+                if state & 0xFF == CONN_STATE_ERROR:
+                    return False
+            time.sleep(interval_sec)
+        return False
+
+    def _wait_command_result(
+        self,
+        address: int,
+        device_id: int | None = None,
+        timeout_sec: float = 2.0,
+        interval_sec: float = 0.05,
+    ) -> bool:
+        """Poll a command mailbox until the device reports success or failure."""
+        deadline = time.time() + timeout_sec
+        while time.time() < deadline:
+            value = self._read_input_word(address, device_id=device_id)
+            if value is not None:
+                if value == MAILBOX_OK:
+                    return True
+                if value in (MAILBOX_FAILED, MAILBOX_INVALID):
+                    return False
+            time.sleep(interval_sec)
         return False
 
     def _write_connection_control(self, slave_id: int, value: int) -> bool:
@@ -385,7 +449,11 @@ class CanfdComm(IComm):
         self._write_connection_control(self._slave_id, 2)
 
     def set_slave_id(self, slave_id: int) -> bool:
-        """Write a new CANFD node/slave ID to holding register 0x0003."""
+        """Write a new CANFD node/slave ID to holding register 0x0003.
+
+        The register carries the target ID in the high byte and the execute
+        bit in the low byte; the new node ID answers as soon as it is applied.
+        """
         if not 0 < slave_id <= 0x3F:
             raise ValueError("CANFD slave_id must be in range 1..63")
         try:
@@ -393,10 +461,13 @@ class CanfdComm(IComm):
                 self._src_id,
                 self._slave_id,
                 REG_SLAVE_ID,
-                struct.pack(">H", slave_id),
+                struct.pack(">H", (slave_id << 8) | 0x01),
             )
         except Exception as exc:
             logger.error("Failed to set CANFD slave ID to 0x%02X: %s", slave_id, exc)
+            return False
+        if not self._wait_command_result(REG_MODIFY_ID_STATUS, device_id=slave_id):
+            logger.error("Device rejected CANFD node ID 0x%02X", slave_id)
             return False
         self._slave_id = slave_id
         return True
@@ -422,17 +493,20 @@ class CanfdComm(IComm):
             True if the device accepted the configuration.
         """
         gear = baudrate_gear if baudrate_gear is not None else CANFD_DEFAULT_BAUDRATE_GEAR
+        if gear not in CANFD_BAUDRATE_GEAR_MAP:
+            logger.error("Invalid CANFD baudrate gear: %s", gear)
+            return False
         try:
             self._transport.write_registers(
                 self._src_id,
                 self._slave_id,
                 BAUDRATE_CONFIG_REGISTER,
-                struct.pack(">H", gear),
+                struct.pack(">H", (gear << 8) | 0x01),
             )
         except Exception as exc:
             logger.error("Failed to set CANFD baudrate config to gear 0x%02X: %s", gear, exc)
             return False
-        return True
+        return self._wait_command_result(REG_MODIFY_BAUD_STATUS)
 
     def get_default_baudrate_gear(self) -> int | None:
         """Return the CANFD default baud rate gear."""

@@ -223,7 +223,7 @@ class EthercatComm(IComm):
             logger.info("Device connected via EtherCAT (%s)", device_name)
             return True
 
-        logger.error("Failed to connect EtherCAT device %s", device_name)
+        # logger.error("Failed to connect EtherCAT device %s", device_name)
         self._client.disconnect()
         return False
 

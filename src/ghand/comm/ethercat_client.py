@@ -50,6 +50,8 @@ class EthercatClient:
     # A single stale snapshot is still returned to callers when the current
     # cycle's WKC is bad, as long as the last valid frame is fresher than this.
     _PROCESS_DATA_TIMEOUT_SEC = 0.1
+    # run() waits this long for the first valid PDO cycle after entering OP.
+    _PDO_READY_TIMEOUT_SEC = 0.5
     # Number of consecutive invalid-WKC cycles before we escalate the log tier
     # from debug to warning. Below this we treat single misses as expected jitter.
     _WKC_DEGRADED_THRESHOLD = 3
@@ -109,6 +111,11 @@ class EthercatClient:
         self._connection_lost = False
         self._has_valid_process_data = False
         self._pdo_ready = False
+        # Diagnostic: who cleared _pdo_ready last and when. Surfaced in
+        # send_data's error so a startup/recovery race can be told apart from
+        # a bus that is actually down.
+        self._pdo_ready_cleared = "init"
+        self._pdo_ready_cleared_at = time.monotonic()
         self._last_valid_process_time = None
         self._consecutive_wkc_errors = 0
         self._wkc_validity_window = deque(maxlen=self._WKC_WINDOW_SIZE)
@@ -122,6 +129,12 @@ class EthercatClient:
         # Exclusive adapter lock
         self._lock_file = None
         self._lock_file_path = None
+
+    def _clear_pdo_ready(self, reason: str) -> None:
+        """Clear _pdo_ready, recording the reason for diagnostics."""
+        self._pdo_ready = False
+        self._pdo_ready_cleared = reason
+        self._pdo_ready_cleared_at = time.monotonic()
 
     def _create_master(self):
         """Create a fresh SOEM master with SDK-owned runtime flags."""
@@ -281,7 +294,7 @@ class EthercatClient:
             if old_master:
                 try:
                     old_master.close()
-                    logger.info("Master closed")
+                    # logger.info("Master closed")
                 except Exception as e:
                     logger.warning("Failed to close master: %s", e)
 
@@ -291,7 +304,7 @@ class EthercatClient:
             self._expected_wkc = 0
             self._connection_lost = False
             self._has_valid_process_data = False
-            self._pdo_ready = False
+            self._clear_pdo_ready("cleanup")
             self._last_valid_process_time = None
             self._consecutive_wkc_errors = 0
             self._wkc_validity_window.clear()
@@ -307,8 +320,14 @@ class EthercatClient:
         Args:
             slave: pysoem slave object.
         """
-        if slave.state == (pysoem.SAFEOP_STATE + pysoem.STATE_ERROR):
-            slave.state = pysoem.SAFEOP_STATE + pysoem.STATE_ACK
+        if slave.state & pysoem.STATE_ERROR:
+            # Any state read with the error bit set (0x14 = SAFEOP+ERROR,
+            # 0x18 = OP+ERROR) must be acknowledged in place. The ACK bit is
+            # the same bit as the error bit, so re-writing the reported state
+            # requests that state again and clears the error. Falling through
+            # to reconfig() below would tear down a slave that is still
+            # operational and break process data for many cycles.
+            slave.state = (slave.state & ~pysoem.STATE_ERROR) | pysoem.STATE_ACK
             slave.write_state()
         elif slave.state == pysoem.SAFEOP_STATE:
             slave.state = pysoem.OP_STATE
@@ -340,7 +359,11 @@ class EthercatClient:
                     self._wkc_validity_window.append(valid)
                     if valid:
                         self._has_valid_process_data = True
-                        self._pdo_ready = bool(self._master.in_op)
+                        if self._master.in_op:
+                            self._pdo_ready = True
+                            self._pdo_ready_cleared = None
+                        else:
+                            self._clear_pdo_ready("valid-cycle-before-in-op")
                         self._last_valid_process_time = time.monotonic()
                         self._consecutive_wkc_errors = 0
                         # Snapshot the freshly-received TPDO so callers can be
@@ -349,7 +372,10 @@ class EthercatClient:
                         if self._slave is not None:
                             self._last_valid_tpdo_snapshot = bytes(self._slave.input)
                     else:
-                        self._pdo_ready = False
+                        self._clear_pdo_ready(
+                            f"pd-invalid-cycle(WKC={self._actual_wkc},"
+                            f"expected={self._expected_wkc})"
+                        )
                         self._master.do_check_state = True
                         self._consecutive_wkc_errors += 1
                 if not valid:
@@ -396,7 +422,7 @@ class EthercatClient:
                         break
             except Exception as e:
                 with self._data_lock:
-                    self._pdo_ready = False
+                    self._clear_pdo_ready(f"pd-exception({type(e).__name__})")
                     self._master.do_check_state = True
                 logger.error("Error in process data thread: %s", e)
             time.sleep(0.01)
@@ -420,7 +446,9 @@ class EthercatClient:
                     with self._data_lock:
                         for i, slave in enumerate(self._master.slaves):
                             if slave.state != pysoem.OP_STATE:
-                                self._pdo_ready = False
+                                self._clear_pdo_ready(
+                                    f"check-slave-state(slave={i},state={slave.state})"
+                                )
                                 self._master.do_check_state = True
                                 self._check_slave(slave)
             except Exception as e:
@@ -480,7 +508,9 @@ class EthercatClient:
             ):
                 raise RuntimeError(
                     "Cannot send command while EtherCAT PDO is not operational "
-                    f"(WKC={self._actual_wkc}, expected={self._expected_wkc})"
+                    f"(WKC={self._actual_wkc}, expected={self._expected_wkc}, "
+                    f"cleared_by={self._pdo_ready_cleared}, "
+                    f"cleared={time.monotonic() - self._pdo_ready_cleared_at:.3f}s ago)"
                 )
             if self._slave is not None:
                 hex_str = ' '.join(f'{b:02x}' for b in data)
@@ -544,6 +574,21 @@ class EthercatClient:
             self._cleanup_connection(switch_to_init=False)
             return False
 
+    def _log_slave_states(self, expected_state, headline: str) -> None:
+        """Dump per-slave state details after a failed state transition."""
+        logger.error("%s", headline)
+        for i, slave in enumerate(self._master.slaves):
+            logger.error("Slave %s: %s", i, slave.name)
+            logger.error("  Current state: %s", slave.state)
+            logger.error("  Expected state: %s", expected_state)
+            logger.error(
+                "  AL status code: %s (%s)",
+                hex(slave.al_status),
+                pysoem.al_status_code_to_string(slave.al_status),
+            )
+            logger.error("  Input size: %s bytes", len(slave.input))
+            logger.error("  Output size: %s bytes", len(slave.output))
+
     def run(
         self,
         expected_input_size: int | None = None,
@@ -556,7 +601,8 @@ class EthercatClient:
             expected_output_size: Expected RPDO size in bytes. If None, size check is skipped.
 
         Returns:
-            True if the master reaches OP state successfully.
+            True if the master reaches OP state and the first valid PDO cycle
+            has been observed.
         """
         if not self._connected or self._slave is None:
             logger.error("Not connected or no slave configured")
@@ -628,21 +674,16 @@ class EthercatClient:
             return False
 
         if self._master.state_check(pysoem.SAFEOP_STATE, timeout=500_000) != pysoem.SAFEOP_STATE:
-
-            logger.error("Failed to enter SAFEOP state")
-            for i, slave in enumerate(self._master.slaves):
-                logger.error("Slave %s: %s", i, slave.name)
-                logger.error("  Current state: %s", slave.state)
-                logger.error("  Expected state: %s", pysoem.SAFEOP_STATE)
-                logger.error(
-                    "  AL status code: %s (%s)",
-                    hex(slave.al_status),
-                    pysoem.al_status_code_to_string(slave.al_status),
-                )
-                logger.error("  Input size: %s bytes", len(slave.input))
-                logger.error("  Output size: %s bytes", len(slave.output))
+            self._log_slave_states(pysoem.SAFEOP_STATE, "Failed to enter SAFEOP state")
             self._cleanup_connection(switch_to_init=False)
             return False
+
+        # A slave whose output SM has never been written can refuse the OP
+        # transition, so send one valid process-data cycle first. This mirrors
+        # SOEM's reference sequence ("send one valid process data to make
+        # outputs in slaves happy") before requesting OP.
+        self._master.send_processdata()
+        self._master.receive_processdata(15_000)
 
         self._master.state = pysoem.OP_STATE
         self._master.write_state()
@@ -658,11 +699,34 @@ class EthercatClient:
 
         self._master.read_state()
         if self._master.state_check(pysoem.OP_STATE, timeout=500_000) != pysoem.OP_STATE:
-            logger.error("Failed to reach OP state")
+            self._log_slave_states(pysoem.OP_STATE, "Failed to reach OP state")
             self._cleanup_connection(switch_to_init=True)
             return False
 
         self._master.in_op = True
+
+        # The process-data thread only sets _pdo_ready on a valid cycle seen
+        # while in_op was already true, so the flag is still false here. Return
+        # only after one such cycle: otherwise a command sent right after run()
+        # (e.g. the post-connect stop in GHand.open) falls into this window and
+        # is rejected as "PDO is not operational" despite a healthy bus.
+        deadline = time.monotonic() + self._PDO_READY_TIMEOUT_SEC
+        while not self._pdo_ready and self._connected and not self._connection_lost:
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(0.001)
+
+        if not self._pdo_ready:
+            logger.error(
+                "EtherCAT PDO is not operational after entering OP "
+                "(WKC=%s, expected=%s, connected=%s)",
+                self._actual_wkc,
+                self._expected_wkc,
+                self._connected,
+            )
+            if self._connected:
+                self._cleanup_connection(switch_to_init=True)
+            return False
 
         return True
 

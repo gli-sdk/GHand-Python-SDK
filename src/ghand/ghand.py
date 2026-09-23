@@ -452,8 +452,8 @@ class GHand:
                         SdkError.DEVICE_REJECTED,
                         f"device verification failed: {adapter}",
                     )
-                else:
-                    logger.error("Failed to open device (ID: %s)", adapter)
+                # else:
+                #     logger.error("Failed to open device (ID: %s)", adapter)
             self._set_last_result(SdkError.TRANSPORT_ERROR, "failed to open device")
             return False
         else:
@@ -461,8 +461,8 @@ class GHand:
                 id, slave_id=slave_id, baudrate_gear=baudrate_gear,
             )
             if not connected:
-                logger.error("Failed to open device (ID: %s)", id)
-                self._set_last_result(SdkError.TRANSPORT_ERROR, f"failed to open {id}")
+                # logger.error("Failed to open device (ID: %s)", id)
+                # self._set_last_result(SdkError.TRANSPORT_ERROR, f"failed to open {id}")
                 return False
             self._opened = True
             logger.info("Device opened successfully (ID: %s)", id)
@@ -487,7 +487,7 @@ class GHand:
         """Set the connected RS485/CANFD device slave ID.
 
         Args:
-            slave_id: New slave ID written to holding register ``0x0000``.
+            slave_id: New slave ID written to holding register ``0x0003``.
 
         Returns:
             True if the device accepted the new ID.
