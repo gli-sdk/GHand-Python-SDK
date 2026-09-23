@@ -5,7 +5,7 @@ from ghand import ProductType, configure_logging
 from ghand.ghand import CommType, CtrlMode, GHand, JointCommand, JointId
 
 # Configure SDK logging (shows connection state, warnings, errors)
-configure_logging(level=logging.DEBUG)
+configure_logging(level=logging.INFO)
 
 
 def main():

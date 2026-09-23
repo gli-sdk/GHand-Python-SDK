@@ -206,6 +206,57 @@ class CanfdComm(IComm):
             return CanfdTransport(channel=device_name)
         return CanfdTransport()
 
+    def prepare_baudrate_listener(
+        self,
+        device_name: str,
+        baudrate_gear: int | None = None,
+        quiet: bool = False,
+    ) -> bool:
+        """Open the ZQWL adapter at a CANFD baud rate without handshaking."""
+        self._wait_for_reopen_window()
+        if self._transport is None:
+            self._transport = self._create_transport(device_name)
+
+        gear = (
+            baudrate_gear
+            if baudrate_gear is not None
+            else self._DEFAULT_BAUDRATE_GEAR
+        )
+        pair = CANFD_BAUDRATE_GEAR_MAP.get(gear)
+        if pair is None:
+            if quiet:
+                logger.debug("Invalid CANFD baudrate gear: %s", baudrate_gear)
+            else:
+                logger.error("Invalid CANFD baudrate gear: %s", baudrate_gear)
+            self._cleanup_failed_connect()
+            return False
+
+        (abit_baud, abit_sample), (dbit_baud, dbit_sample) = pair
+        if not self._transport.open(
+            abit_baud=abit_baud,
+            dbit_baud=dbit_baud,
+            abit_sample=abit_sample,
+            dbit_sample=dbit_sample,
+            quiet=quiet,
+        ):
+            if quiet:
+                logger.debug("Failed to open CANFD listener at gear=0x%02X", gear)
+            else:
+                logger.error("Failed to open CANFD listener at gear=0x%02X", gear)
+            self._cleanup_failed_connect()
+            return False
+
+        logger.info(
+            "CANFD adapter listening (%s, gear=0x%02X, abit=%s/%s%%, dbit=%s/%s%%)",
+            device_name,
+            gear,
+            abit_baud,
+            abit_sample,
+            dbit_baud,
+            dbit_sample,
+        )
+        return True
+
     def connect(
         self,
         device_name: str,

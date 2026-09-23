@@ -10,7 +10,7 @@
     { "id": "FF_DIP" },
     { "id": "FF_PIP",    "min": 0.0,  "max": 80.0 },
     { "id": "FF_MCP",    "min": 0.0,  "max": 90.0 },
-    { "id": "FF_MCP_AA",  "min": -10.0, "max": 10.0 },
+    { "id": "FF_MCP_AA",  "min": -8.0, "max": 8.0 },
     { "id": "MF_DIP" },
     { "id": "MF_PIP",    "min": 0.0,  "max": 90.0 },
     { "id": "MF_MCP",    "min": 0.0,  "max": 90.0 },

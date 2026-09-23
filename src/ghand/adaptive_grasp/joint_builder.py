@@ -29,19 +29,19 @@ class JointCommandBuilder:
 
     def open_pose(self) -> dict[JointId, float]:
         return {
-            JointId.THUMB_MCP: 0.0,
-            JointId.THUMB_TMC_FE: 0.0,
+            JointId.THUMB_MCP: 2.0,
+            JointId.THUMB_TMC_FE: 2.0,
             JointId.THUMB_TMC_AA: 80.0,
-            JointId.THUMB_TMC_PS: 0.0,
-            JointId.FF_PIP: 0.0,
-            JointId.FF_MCP: 0.0,
-            JointId.FF_MCP_AA: 0.0,
-            JointId.MF_PIP: 0.0,
-            JointId.MF_MCP: 0.0,
-            JointId.RF_PIP: 0.0,
-            JointId.RF_MCP: 0.0,
-            JointId.LF_PIP: 0.0,
-            JointId.LF_MCP: 0.0,
+            JointId.THUMB_TMC_PS: 2.0,
+            JointId.FF_PIP: 2.0,
+            JointId.FF_MCP: 2.0,
+            JointId.FF_MCP_AA: 2.0,
+            JointId.MF_PIP: 2.0,
+            JointId.MF_MCP: 2.0,
+            JointId.RF_PIP: 2.0,
+            JointId.RF_MCP: 2.0,
+            JointId.LF_PIP: 2.0,
+            JointId.LF_MCP: 2.0,
         }
 
     def init_hold_angles(self) -> dict[JointId, float]:

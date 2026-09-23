@@ -1,5 +1,6 @@
 ﻿import sys
 import time
+import logging
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -13,7 +14,9 @@ from ghand import (
     CommType,
     GHand,
     ProductType,
+    configure_logging
 )
+configure_logging(level=logging.ERROR)
 
 def main() -> None:
     hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)

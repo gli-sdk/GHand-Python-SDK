@@ -20,6 +20,7 @@ docs/build/
 .codex/
 .agents/
 .worktrees/
+.codegraph/
 
 openspec/
 scan_code.py
