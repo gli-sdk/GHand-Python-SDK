@@ -29,7 +29,6 @@ from ..types import (
     ProductConfig,
     SelfTestError,
     SelfTestErrorInfo,
-    VersionCheckError,
 )
 from .modbus_codec import (
     SELF_TEST_COMMAND_REGISTER,
@@ -110,7 +109,7 @@ def build_self_test_error_info(
     read_registers: ReadRegisters,
     write_register: WriteRegister,
 ) -> SelfTestErrorInfo:
-    """Execute the A0 summary + on-demand A1~A8 flow and build the result.
+    """Execute the A0 summary + on-demand A2/A6/A8 flow and build the result.
 
     Only categories flagged by the A0 summary are queried in detail. The
     13-channel motor slots are resolved back to ``JointId`` via the ordered
@@ -149,43 +148,21 @@ def build_self_test_error_info(
             )
         return entries
 
-    if info.summary & SelfTestError.VERSION:
-        info.version = VersionCheckError(
-            read_diagnostic_error_codes(0xA1, read_registers, write_register)[0]
-        )
-        logger.info("Self-test error: version mismatch (0x%02X)", int(info.version))
-    if info.summary & SelfTestError.POSITION_SENSOR_UNMAPPED:
-        logger.info("Self-test error: position sensor unmapped")
-    if info.summary & SelfTestError.POSITION_SENSOR:
-        info.position_sensor = collect(
-            read_diagnostic_error_codes(0xA2, read_registers, write_register)
-        )
-        _log_motor_errors("position sensor", info.position_sensor)
-    if info.summary & SelfTestError.TACTILE_SENSOR:
-        info.tactile_sensor = collect(
-            read_diagnostic_error_codes(0xA3, read_registers, write_register)
-        )
-        _log_motor_errors("tactile sensor", info.tactile_sensor)
-    if info.summary & SelfTestError.TEMPERATURE_SENSOR:
-        info.temperature = read_diagnostic_error_codes(
-            0xA4, read_registers, write_register
-        )[0]
-        logger.info("Self-test error: temperature (0x%02X)", info.temperature)
-    if info.summary & SelfTestError.FAN:
-        info.fan = read_diagnostic_error_codes(
-            0xA5, read_registers, write_register
-        )[0]
-        logger.info("Self-test error: fan (0x%02X)", info.fan)
-    if info.summary & SelfTestError.ZEROING:
-        info.zeroing = collect(
-            read_diagnostic_error_codes(0xA6, read_registers, write_register)
-        )
-        _log_motor_errors("zeroing", info.zeroing)
     if info.summary & SelfTestError.MOTOR:
         info.motor = collect(
             read_diagnostic_error_codes(0xA8, read_registers, write_register)
         )
-        _log_motor_errors("motor check", info.motor)
+        _log_motor_errors("motor", info.motor)
+    if info.summary & SelfTestError.SENSOR:
+        info.sensor = collect(
+            read_diagnostic_error_codes(0xA2, read_registers, write_register)
+        )
+        _log_motor_errors("sensor", info.sensor)
+    if info.summary & SelfTestError.JOINT:
+        info.joint = collect(
+            read_diagnostic_error_codes(0xA6, read_registers, write_register)
+        )
+        _log_motor_errors("joint", info.joint)
 
     return info
 

@@ -32,6 +32,7 @@ from ..types import (
     HandState,
     JointCommand,
     JointData,
+    JointError,
     JointId,
     MotorCheckError,
     MotorDiagnosticError,
@@ -39,10 +40,10 @@ from ..types import (
     ProductType,
     SelfTestError,
     SelfTestErrorInfo,
+    SensorError,
     State,
     TactileRegionConfig,
     TactileInfo,
-    VersionCheckError,
 )
 from .ethercat_client import EthercatClient
 from .ethercat_protocol import (
@@ -54,6 +55,15 @@ from .ethercat_protocol import (
 from .icomm import IComm
 
 logger = logging.getLogger("ghand.ethercat_comm")
+
+
+def _flag_names(enum_type, code: int) -> str:
+    names = [
+        flag.name
+        for flag in enum_type
+        if flag != enum_type.NONE and code & flag
+    ]
+    return ", ".join(names) if names else "unknown"
 
 
 class EthercatComm(IComm):
@@ -581,9 +591,9 @@ class EthercatComm(IComm):
     def get_self_test_error_info(self) -> SelfTestErrorInfo:
         """Query self-test error information via object dictionary 0x2008.
 
-        Reads the A0 summary and only dispatches the detailed A1~A8 queries for
-        error categories that are actually flagged. Does not trigger a
-        self-test or zeroing.
+        Reads the A0 module error bit mask and only dispatches the detailed
+        A2/A6/A8 queries for error categories that are actually flagged. Does
+        not trigger a self-test or zeroing.
         """
         info = SelfTestErrorInfo()
 
@@ -594,40 +604,17 @@ class EthercatComm(IComm):
         if info.summary == SelfTestError.NONE:
             return info
 
-        if info.summary & SelfTestError.VERSION:
-            info.version = VersionCheckError(self._get_version_check_error_code())
-            logger.info("Self-test error: version mismatch (0x%02X)", int(info.version))
-
-        if info.summary & SelfTestError.POSITION_SENSOR_UNMAPPED:
-            logger.info("Self-test error: position sensor unmapped")
-
-        if info.summary & SelfTestError.POSITION_SENSOR:
-            info.position_sensor = self._collect_motor_errors(
-                self._get_position_sensor_error_codes()
-            )
-            self._log_motor_errors("position sensor", info.position_sensor)
-
-        if info.summary & SelfTestError.TACTILE_SENSOR:
-            info.tactile_sensor = self._collect_motor_errors(
-                self._get_tactile_sensor_error_codes()
-            )
-            self._log_motor_errors("tactile sensor", info.tactile_sensor)
-
-        if info.summary & SelfTestError.TEMPERATURE_SENSOR:
-            info.temperature = self._get_temperature_sensor_error_code()
-            logger.info("Self-test error: temperature sensor (0x%02X)", info.temperature)
-
-        if info.summary & SelfTestError.FAN:
-            info.fan = self._get_fan_error_code()
-            logger.info("Self-test error: fan (0x%02X)", info.fan)
-
-        if info.summary & SelfTestError.ZEROING:
-            info.zeroing = self._collect_motor_errors(self._get_zeroing_error_codes())
-            self._log_motor_errors("zeroing", info.zeroing)
-
         if info.summary & SelfTestError.MOTOR:
             info.motor = self._collect_motor_errors(self._get_motor_error_codes())
-            self._log_motor_errors("motor check", info.motor)
+            self._log_motor_errors("motor", info.motor)
+
+        if info.summary & SelfTestError.SENSOR:
+            info.sensor = self._collect_motor_errors(self._get_sensor_error_codes())
+            self._log_motor_errors("sensor", info.sensor)
+
+        if info.summary & SelfTestError.JOINT:
+            info.joint = self._collect_motor_errors(self._get_joint_error_codes())
+            self._log_motor_errors("joint", info.joint)
 
         return info
 
@@ -687,22 +674,10 @@ class EthercatComm(IComm):
     def _get_self_test_summary_error_code(self) -> int:
         return self._read_diagnostic_error_codes(0xA0)[0]
 
-    def _get_version_check_error_code(self) -> int:
-        return self._read_diagnostic_error_codes(0xA1)[0]
-
-    def _get_position_sensor_error_codes(self) -> list[int]:
+    def _get_sensor_error_codes(self) -> list[int]:
         return self._read_diagnostic_error_codes(0xA2)
 
-    def _get_tactile_sensor_error_codes(self) -> list[int]:
-        return self._read_diagnostic_error_codes(0xA3)
-
-    def _get_temperature_sensor_error_code(self) -> int:
-        return self._read_diagnostic_error_codes(0xA4)[0]
-
-    def _get_fan_error_code(self) -> int:
-        return self._read_diagnostic_error_codes(0xA5)[0]
-
-    def _get_zeroing_error_codes(self) -> list[int]:
+    def _get_joint_error_codes(self) -> list[int]:
         return self._read_diagnostic_error_codes(0xA6)
 
     def _get_motor_error_codes(self) -> list[int]:
@@ -740,7 +715,7 @@ class EthercatComm(IComm):
     ) -> None:
         for err in errors:
             joint = err.joint_id.name if err.joint_id is not None else "unknown"
-            description = self._motor_error_description(category, err.error_code)
+            description = self._error_description(category, err.error_code)
             logger.info(
                 "Self-test %s error: motor=%d joint=%s code=0x%02X (%s)",
                 category,
@@ -751,35 +726,16 @@ class EthercatComm(IComm):
             )
 
     @staticmethod
-    def _motor_error_description(category: str, code: int) -> str:
-        if category == "motor check":
+    def _error_description(category: str, code: int) -> str:
+        if category == "motor":
             try:
                 return MotorCheckError(code).name
             except ValueError:
                 return "unknown"
-        if category == "zeroing":
-            mapping = {
-                0x01: "motor abnormal",
-                0x02: "full-stroke check failed",
-                0x03: "zeroing timeout",
-            }
-            return mapping.get(code, "unknown")
-        if category == "position sensor":
-            return "position sensor abnormal" if code == 0x01 else "unknown"
-        if category == "tactile sensor":
-            parts = []
-            names = {
-                0x01: "thumb tip disconnected",
-                0x02: "ff tip disconnected",
-                0x04: "mf tip disconnected",
-                0x08: "rf tip disconnected",
-                0x10: "lf tip disconnected",
-                0x80: "communication failed",
-            }
-            for bit, name in names.items():
-                if code & bit:
-                    parts.append(name)
-            return ", ".join(parts) if parts else "unknown"
+        if category == "sensor":
+            return _flag_names(SensorError, code)
+        if category == "joint":
+            return _flag_names(JointError, code)
         return "unknown"
 
     # ===== Subscription =====
