@@ -319,6 +319,24 @@ class EthercatClient:
             else:
                 slave.is_lost = False
 
+    def _recover_slaves(self) -> None:
+        """Read slave states and try to bring any slave that left OP back to OP.
+
+        Must be called with ``_data_lock`` held. Called from the process-data
+        thread on a bad WKC cycle and from the state-check thread.
+        """
+        self._master.read_state()
+        for i, slave in enumerate(self._master.slaves):
+            if slave.state != pysoem.OP_STATE:
+                logger.warning(
+                    "Slave %s not in OP state: state=%s al_status=%s; attempting recovery",
+                    i,
+                    slave.state,
+                    hex(slave.al_status),
+                )
+                self._master.do_check_state = True
+                self._check_slave(slave)
+
     def _processdata_thread(self):
         """Background thread that sends and receives cyclic process data."""
         while not self._pd_thread_stop_event.is_set():
@@ -340,6 +358,12 @@ class EthercatClient:
                     else:
                         self._consecutive_wkc_errors += 1
                 if not valid:
+                    # A WKC shortfall means a slave stopped processing its data
+                    # (e.g. its SM watchdog tripped while the host was paused).
+                    # Recover it in this thread, right when the fault is seen —
+                    # waiting for the state-check thread can be too slow.
+                    with self._data_lock:
+                        self._recover_slaves()
                     # Tiered logging: single misses are noise on a healthy bus,
                     # a small run is a warning, and sustained failure is an
                     # error that also trips connection_lost below.
@@ -391,19 +415,19 @@ class EthercatClient:
             try:
                 need_check = False
                 with self._data_lock:
+                    # Shortfall below expected WKC means a slave stopped
+                    # processing its data (e.g. dropped to SAFEOP), not that the
+                    # bus is gone — try to bring it back instead of giving up.
+                    required_wkc = max(1, self._expected_wkc)
                     if self._master.in_op and (
-                        self._actual_wkc < 1 or self._master.do_check_state
+                        self._actual_wkc < required_wkc or self._master.do_check_state
                     ):
                         self._master.do_check_state = False
-                        self._master.read_state()
                         need_check = True
 
                 if need_check:
                     with self._data_lock:
-                        for i, slave in enumerate(self._master.slaves):
-                            if slave.state != pysoem.OP_STATE:
-                                self._master.do_check_state = True
-                                self._check_slave(slave)
+                        self._recover_slaves()
             except Exception as e:
                 logger.error("Error in check thread: %s", e)
             time.sleep(0.01)
