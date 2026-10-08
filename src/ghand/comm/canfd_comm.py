@@ -413,7 +413,7 @@ class CanfdComm(IComm):
         if not self._transport.send_frame(can_id, data):
             raise ConnectionError("Failed to send CANFD connection deletion frame")
 
-        deadline = time.time() + 0.5
+        deadline = time.time() + 2.0
         while time.time() < deadline:
             result = self._transport.recv_frame(timeout_ms=50)
             if result is None:
