@@ -28,6 +28,7 @@ _TACTILE_STATE_SIZE = 2  # BB
 _TACTILE_RESULTANT_SIZE = 6  # resultant xyz (int16[3], low byte valid)
 _TACTILE_SAMPLE_PER_GROUP = 3  # xyz per sample group
 
+
 def compute_tpdo_size(joint_count: int, tactile_region_counts: list[int] | None = None) -> int:
     """Calculate the total TPDO byte size based on joint count and tactile sample groups.
 
@@ -64,10 +65,8 @@ class HandTpdo:
         return cls(state, error, temperature)
 
     def __str__(self):
-        return (
-            f"HandTpdo(state={State(self.state)}, error={ErrorCode(self.error)}, "
-            f"temperature={self.temperature})"
-        )
+        return (f"HandTpdo(state={State(self.state)}, error={ErrorCode(self.error)}, "
+                f"temperature={self.temperature})")
 
 
 @dataclass
@@ -89,11 +88,9 @@ class JointTpdo:
         return cls(state, error, math.degrees(angle), speed, torque)
 
     def __str__(self):
-        return (
-            f"JointTpdo(state={State(self.state)}, error={ErrorCode(self.error)}, "
-            f"angle={self.angle:.3f}, speed={self.speed}, "
-            f"torque={self.torque})"
-        )
+        return (f"JointTpdo(state={State(self.state)}, error={ErrorCode(self.error)}, "
+                f"angle={self.angle:.3f}, speed={self.speed}, "
+                f"torque={self.torque})")
 
 
 @dataclass
@@ -198,9 +195,8 @@ class Tpdo:
         if not config.has_tactile:
             return instance
 
-        instance.tactile_state = TactileSensorState.from_bytes(
-            data[offset:offset + _TACTILE_STATE_SIZE]
-        )
+        instance.tactile_state = TactileSensorState.from_bytes(data[offset:offset +
+                                                                    _TACTILE_STATE_SIZE])
         offset += _TACTILE_STATE_SIZE
 
         for region in config.tactile_regions:
@@ -227,7 +223,8 @@ class Rpdo:
         self.mode: int = 0
         self.stop: int = 0
         self.joints: dict[JointId, tuple[float, int, int]] = {
-            jid: (0.0, 0, 0) for jid in controlled_joints
+            jid: (0.0, 0, 0)
+            for jid in controlled_joints
         }
 
     def to_bytes(self) -> bytes:

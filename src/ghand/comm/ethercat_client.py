@@ -31,7 +31,6 @@ try:
 except ImportError:
     psutil = None
 
-
 logger = logging.getLogger("ghand.ethercat_client")
 
 
@@ -237,17 +236,11 @@ class EthercatClient:
         thread_join_timeout = 5.0
         current = threading.current_thread()
 
-        if (
-            hasattr(self, 'proc_thread')
-            and self.proc_thread.is_alive()
-            and self.proc_thread is not current
-        ):
+        if (hasattr(self, 'proc_thread') and self.proc_thread.is_alive()
+                and self.proc_thread is not current):
             self.proc_thread.join(timeout=thread_join_timeout)
-        if (
-            hasattr(self, 'check_thread')
-            and self.check_thread.is_alive()
-            and self.check_thread is not current
-        ):
+        if (hasattr(self, 'check_thread') and self.check_thread.is_alive()
+                and self.check_thread is not current):
             self.check_thread.join(timeout=thread_join_timeout)
 
     def _cleanup_connection(self, switch_to_init: bool = True) -> None:
@@ -390,8 +383,8 @@ class EthercatClient:
                             len(self._wkc_validity_window),
                         )
                     if self._master.in_op and self._wkc_is_unhealthy(
-                        self._consecutive_wkc_errors,
-                        self._wkc_validity_window,
+                            self._consecutive_wkc_errors,
+                            self._wkc_validity_window,
                     ):
                         logger.error(
                             "Unhealthy EtherCAT process data: consecutive_wkc_errors=%s, "
@@ -419,9 +412,8 @@ class EthercatClient:
                     # processing its data (e.g. dropped to SAFEOP), not that the
                     # bus is gone — try to bring it back instead of giving up.
                     required_wkc = max(1, self._expected_wkc)
-                    if self._master.in_op and (
-                        self._actual_wkc < required_wkc or self._master.do_check_state
-                    ):
+                    if self._master.in_op and (self._actual_wkc < required_wkc
+                                               or self._master.do_check_state):
                         self._master.do_check_state = False
                         need_check = True
 
@@ -451,14 +443,11 @@ class EthercatClient:
             if self._connection_lost:
                 raise RuntimeError("Device disconnected")
             if not self._has_valid_process_data or self._last_valid_tpdo_snapshot is None:
-                raise RuntimeError(
-                    f"No valid EtherCAT process data yet (WKC={self._actual_wkc})"
-                )
+                raise RuntimeError(f"No valid EtherCAT process data yet (WKC={self._actual_wkc})")
             age = time.monotonic() - (self._last_valid_process_time or 0.0)
             if age > self._PROCESS_DATA_TIMEOUT_SEC:
                 raise RuntimeError(
-                    f"EtherCAT process data timeout: last valid frame {age * 1000:.1f} ms old"
-                )
+                    f"EtherCAT process data timeout: last valid frame {age * 1000:.1f} ms old")
             return self._last_valid_tpdo_snapshot
 
     def send_data(self, data: bytes):
@@ -474,10 +463,8 @@ class EthercatClient:
             if self._connection_lost:
                 raise RuntimeError("Device disconnected")
             if not self._has_valid_process_data:
-                raise RuntimeError(
-                    f"Cannot send command without valid EtherCAT process data "
-                    f"(WKC={self._actual_wkc})"
-                )
+                raise RuntimeError(f"Cannot send command without valid EtherCAT process data "
+                                   f"(WKC={self._actual_wkc})")
             if self._slave is not None:
                 hex_str = ' '.join(f'{b:02x}' for b in data)
                 logger.debug("Sending %d bytes:\n%s", len(data), hex_str)

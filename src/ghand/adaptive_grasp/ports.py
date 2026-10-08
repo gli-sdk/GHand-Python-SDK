@@ -8,6 +8,7 @@ from ..types import CtrlMode, JointCommand, TactileSensorId
 
 @runtime_checkable
 class HandCommandPort(Protocol):
+
     def move_joints(self, joints: list[JointCommand], mode: CtrlMode) -> bool:
         ...
 
@@ -22,6 +23,7 @@ class GraspSequenceHandPort(HandCommandPort, Protocol):
 
 @runtime_checkable
 class SubscriptionPeriodConfigurator(Protocol):
+
     def configure_subscription_periods(
         self,
         *,
@@ -33,6 +35,7 @@ class SubscriptionPeriodConfigurator(Protocol):
 
 @runtime_checkable
 class SensorFrameSource(Protocol):
+
     def start(self) -> None:
         ...
 

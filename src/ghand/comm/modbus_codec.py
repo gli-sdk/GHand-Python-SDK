@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Shared ModBus register codec for CANFD and RS485.
 
 Pure functions that convert between raw register bytes/lists and structured
@@ -53,7 +52,7 @@ class ModbusRegisterProfile:
     tactile_resultant_register_count: int = 16
     canfd_connection_timer_address: int = 0x0031
     canfd_connection_timer_registers: int = 1
-    canfd_connection_timer_values: tuple[int, ...] = (0x0000,)
+    canfd_connection_timer_values: tuple[int, ...] = (0x0000, )
     canfd_connection_delete_address: int = 0x0030
     canfd_connection_delete_registers: int = 2
     canfd_connection_delete_values: tuple[int, ...] = (0x0000, 0x0000)
@@ -82,11 +81,8 @@ REG_IN_THUMB_TACTILE_SENSOR_VER = 0x1189
 REG_IN_FINGER_TACTILE_SENSOR_VER = 0x118A
 REG_IN_SERIAL_NUMBER = 0x119A
 
-
 # GHand5 keeps the original SDK mapping: input joint blocks follow JointId values.
-GHAND5_JOINT_INPUT_REG_MAP = {
-    joint_id: 0x1023 + joint_id.value * 3 for joint_id in JointId
-}
+GHAND5_JOINT_INPUT_REG_MAP = {joint_id: 0x1023 + joint_id.value * 3 for joint_id in JointId}
 
 # Mapping from controlled GHand5 joint ID to holding-register base address.
 GHAND5_HOLDING_REG_MAP = {
@@ -107,7 +103,6 @@ GHAND5_HOLDING_REG_MAP = {
 
 # Backwards-compatible alias for existing imports.
 HOLDING_REG_MAP = GHAND5_HOLDING_REG_MAP
-
 
 # GHandLite1 protocol: only these 11 joints are present in the Modbus table.
 GHAND_LITE1_JOINT_INPUT_REG_MAP = {
@@ -139,7 +134,8 @@ GHAND_LITE1_HOLDING_REG_MAP = {
 }
 
 PRODUCT_TYPE_TO_MODBUS_PROFILE = {
-    ProductType.GHand5: ModbusRegisterProfile(
+    ProductType.GHand5:
+    ModbusRegisterProfile(
         product_type=ProductType.GHand5,
         joint_input_addresses=GHAND5_JOINT_INPUT_REG_MAP,
         joint_control_addresses=GHAND5_HOLDING_REG_MAP,
@@ -148,7 +144,8 @@ PRODUCT_TYPE_TO_MODBUS_PROFILE = {
         stop_register=0x0010,
         tactile_control_address=0x002B,
     ),
-    ProductType.GHandLite1: ModbusRegisterProfile(
+    ProductType.GHandLite1:
+    ModbusRegisterProfile(
         product_type=ProductType.GHandLite1,
         joint_input_addresses=GHAND_LITE1_JOINT_INPUT_REG_MAP,
         joint_control_addresses=GHAND_LITE1_HOLDING_REG_MAP,
@@ -175,13 +172,11 @@ def get_modbus_profile(config_or_name=None) -> ModbusRegisterProfile:
     )
 
 
-def get_joint_input_span(
-    valid_joints: list[JointId], profile: ModbusRegisterProfile
-) -> tuple[int, int]:
+def get_joint_input_span(valid_joints: list[JointId],
+                         profile: ModbusRegisterProfile) -> tuple[int, int]:
     """Return the smallest contiguous input-register span covering valid joints."""
     addresses = [
-        profile.joint_input_addresses[joint_id]
-        for joint_id in valid_joints
+        profile.joint_input_addresses[joint_id] for joint_id in valid_joints
         if joint_id in profile.joint_input_addresses
     ]
     if not addresses:
@@ -376,9 +371,10 @@ def parse_tactile_distributed(data_bytes: bytes, count: int) -> list[float]:
 
     Returns:
         Flat list of [fx1, fy1, fz1, fx2, fy2, fz2, ...].
-        Each component is an int8 (signed) or uint8 (unsigned for Fz).
+        Each component is returned as a float parsed from an int8 (signed) or
+        uint8 (unsigned for Fz).
     """
-    distributed = []
+    distributed: list[float] = []
     for i in range(0, len(data_bytes) - 2, 3):
         fx_d = data_bytes[i]
         fy_d = data_bytes[i + 1]
@@ -387,7 +383,7 @@ def parse_tactile_distributed(data_bytes: bytes, count: int) -> list[float]:
             fx_d -= 0x100
         if fy_d >= 0x80:
             fy_d -= 0x100
-        distributed.extend([fx_d, fy_d, fz_d])
+        distributed.extend([float(fx_d), float(fy_d), float(fz_d)])
     return distributed
 
 
@@ -458,19 +454,15 @@ def parse_self_test_state(register_value: int) -> int:
     return register_value & 0x00FF
 
 
-def parse_self_test_data_registers(
-    registers: list[int],
-) -> tuple[list[int], int]:
+def parse_self_test_data_registers(registers: list[int], ) -> tuple[list[int], int]:
     """Decode the 7 data registers into ``(error_code[13], result)``.
 
     Modbus registers are big-endian: register N -> two bytes ``[hi, lo]``.
     The 14-byte payload contains the 13 error bytes followed by the result.
     """
     if len(registers) < SELF_TEST_DATA_REGISTER_COUNT:
-        raise ValueError(
-            f"Self-test data must have {SELF_TEST_DATA_REGISTER_COUNT} "
-            f"registers, got {len(registers)}"
-        )
+        raise ValueError(f"Self-test data must have {SELF_TEST_DATA_REGISTER_COUNT} "
+                         f"registers, got {len(registers)}")
     payload = bytearray()
     for reg in registers[:SELF_TEST_DATA_REGISTER_COUNT]:
         payload.append((reg >> 8) & 0xFF)

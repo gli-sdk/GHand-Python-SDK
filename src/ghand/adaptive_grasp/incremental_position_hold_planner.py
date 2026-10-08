@@ -36,8 +36,7 @@ class IncrementalPositionHoldPlanner:
         self._max_delta = max_delta_deg
         self._active_fingers = set(active_fingers)
         self._active_joint_ids = set(active_joint_ids)
-        self.contact_joint_angles = normalize_joint_angles(
-            contact_joint_angles or {})
+        self.contact_joint_angles = normalize_joint_angles(contact_joint_angles or {})
         self._hold_speed = hold_speed
         self._hold_torque = hold_torque
         self._default_target_force_n = default_target_force_n
@@ -61,14 +60,10 @@ class IncrementalPositionHoldPlanner:
 
         try:
             if self._is_contact_lost(total_fz):
-                return self._hold_decisions(current_angles,
-                                            speed=100,
-                                            torque=self._hold_torque)
+                return self._hold_decisions(current_angles, speed=100, torque=self._hold_torque)
 
             if total_fz >= target_force:
-                return self._hold_decisions(current_angles,
-                                            speed=100,
-                                            torque=self._hold_torque)
+                return self._hold_decisions(current_angles, speed=100, torque=self._hold_torque)
 
             next_angles = self._increment_angles(current_angles)
             return self._hold_decisions(next_angles,
@@ -82,8 +77,7 @@ class IncrementalPositionHoldPlanner:
             return False
         if self._previous_total_fz <= 0.0:
             return False
-        threshold = self._previous_total_fz * (
-            1.0 - self._stiff_position_force_drop_ratio)
+        threshold = self._previous_total_fz * (1.0 - self._stiff_position_force_drop_ratio)
         return total_fz < threshold
 
     def _increment_angles(self, current_angles: JointAngles) -> JointAngles:
@@ -124,4 +118,3 @@ class IncrementalPositionHoldPlanner:
             )
             for finger in self._active_fingers
         }
-

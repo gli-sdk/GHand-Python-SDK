@@ -44,7 +44,7 @@ class SensorClient:
         """Start subscribing sensor data and clear stale caches."""
         self._latest_tactile_data = None
         self._latest_joint_feedback = None
-        self._sub_id = self._hand.subscribe(self._on_data,interval_ms = 20)
+        self._sub_id = self._hand.subscribe(self._on_data, interval_ms=20)
 
     def stop(self, clear_joint_feedback: bool = False) -> None:
         """Stop subscription and optionally clear cached joint feedback."""
@@ -101,11 +101,8 @@ class SensorClient:
         touch_flag: dict[TactileSensorId, bool] = {}
         for finger in self._active_fingers:
             info = self._latest_tactile_data.get(finger)
-            touch_flag[finger] = (
-                info is not None
-                and info.state
-                and normal_force_z(info) >= self._finger_touch_threshold_n
-            )
+            touch_flag[finger] = (info is not None and info.state
+                                  and normal_force_z(info) >= self._finger_touch_threshold_n)
         return touch_flag
 
     # ------------------------------------------------------------------
@@ -113,10 +110,8 @@ class SensorClient:
     # ------------------------------------------------------------------
     def _on_data(self, data: Any) -> None:
         if not (hasattr(data, "tactile") and hasattr(data, "joints")):
-            raise TypeError(
-                "SensorClient subscription callback expects ghand.DeviceData; "
-                "legacy TPDO parsing is not supported."
-            )
+            raise TypeError("SensorClient subscription callback expects ghand.DeviceData; "
+                            "legacy TPDO parsing is not supported.")
 
         tactile = getattr(data, "tactile", None)
         if tactile is None:
@@ -137,6 +132,5 @@ class SensorClient:
                 angle=joint_data.angle,
                 speed=joint_data.speed,
                 torque=joint_data.torque,
-            )
-            for joint_data in getattr(data, "joints", ())
+            ) for joint_data in getattr(data, "joints", ())
         ]

@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Predefined gesture module.
 
 Provides joint-angle definitions and a unified execution interface for
@@ -29,7 +28,6 @@ from .ghand import GHand
 from .types import ErrorCode, GestureType, JointCommand, JointId, State
 
 logger = logging.getLogger("ghand.gestures")
-
 
 # Gesture definitions: joint angles in degrees.
 # Key is GestureType, value is a dict of {JointId: angle(degrees)}.
@@ -112,9 +110,11 @@ GESTURE_DEFINITIONS: Dict[GestureType, Dict[JointId, float]] = {
 }
 
 
-def execute_gesture(
-    hand: GHand, gesture: GestureType, speed: int = 100, torque: int = 100, wait: bool = True
-) -> bool:
+def execute_gesture(hand: GHand,
+                    gesture: GestureType,
+                    speed: int = 100,
+                    torque: int = 100,
+                    wait: bool = True) -> bool:
     """Execute a predefined gesture.
 
     Args:
@@ -199,9 +199,7 @@ def _wait_for_completion(
                 )
                 return False
             if now >= deadline:
-                logger.error(
-                    "Timed out waiting for motion; last error: %s", exc
-                )
+                logger.error("Timed out waiting for motion; last error: %s", exc)
                 return False
             time.sleep(poll_period_s)
             continue

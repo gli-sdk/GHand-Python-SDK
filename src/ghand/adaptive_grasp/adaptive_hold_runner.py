@@ -19,11 +19,13 @@ _logger = logging.getLogger("adaptive_grasp.adaptive_hold_runner")
 
 
 class _HoldControllerLike(Protocol):
+
     def run_step(self, current_time: float) -> HoldStepResult:
         ...
 
 
 class _ReleaseControllerLike(Protocol):
+
     def release(
         self,
         *,

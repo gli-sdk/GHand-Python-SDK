@@ -1,6 +1,5 @@
 # SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
-
 """Meshcat-based visualization drop-in replacement for src/collision_detect/visualization.py."""
 
 import copy
@@ -14,9 +13,7 @@ try:
     import meshcat
     from meshcat import geometry as g
 except ImportError as exc:
-    raise ImportError(
-        "meshcat is required. Install it via: pip install meshcat"
-    ) from exc
+    raise ImportError("meshcat is required. Install it via: pip install meshcat") from exc
 
 from . import angle_mapping as ang_mp
 from . import pose_evaluator as pose_eval
@@ -43,11 +40,8 @@ def _translation_matrix(xyz: Sequence[float]) -> np.ndarray:
 
 def _set_default_camera(vis: meshcat.Visualizer) -> None:
     vis['/Cameras/default/rotated'].set_object(
-        g.PerspectiveCamera(fov=MESHCAT_CAMERA_FOV, near=0.001, far=100.0)
-    )
-    vis['/Cameras/default'].set_transform(
-        _translation_matrix(MESHCAT_CAMERA_TARGET)
-    )
+        g.PerspectiveCamera(fov=MESHCAT_CAMERA_FOV, near=0.001, far=100.0))
+    vis['/Cameras/default'].set_transform(_translation_matrix(MESHCAT_CAMERA_TARGET))
     vis['/Cameras/default/rotated/<object>'].set_property(
         'position',
         MESHCAT_CAMERA_POSITION,
@@ -55,11 +49,11 @@ def _set_default_camera(vis: meshcat.Visualizer) -> None:
 
 
 def add_xy_grid(
-    scene,
-    x_range: Sequence[float] = (-0.1, 0.2),
-    y_range: Sequence[float] = (-0.2, 0.1),
-    z_height: float = -0.05,
-    step: float = 0.05,
+        scene,
+        x_range: Sequence[float] = (-0.1, 0.2),
+        y_range: Sequence[float] = (-0.2, 0.1),
+        z_height: float = -0.05,
+        step: float = 0.05,
 ):
     """No-op for API compatibility - Meshcat displays a built-in grid by default."""
     logger.info('Meshcat visualizer uses its built-in grid; add_xy_grid is a no-op.')
@@ -114,7 +108,8 @@ def _add_palm_plane(
         logger.warning('Skipped palm plane visualization: plane boundary data is incomplete.')
         return
 
-    translation = np.zeros(3, dtype=float) if translation is None else np.asarray(translation, dtype=float)
+    translation = np.zeros(3, dtype=float) if translation is None else np.asarray(translation,
+                                                                                  dtype=float)
     quad = _plane_quad_vertices(plane) + translation
     center = _plane_center(plane) + translation
 
@@ -137,10 +132,14 @@ def _add_palm_plane(
 
     edge_vertices = np.asarray(
         [
-            quad[0], quad[1],
-            quad[1], quad[2],
-            quad[2], quad[3],
-            quad[3], quad[0],
+            quad[0],
+            quad[1],
+            quad[1],
+            quad[2],
+            quad[2],
+            quad[3],
+            quad[3],
+            quad[0],
         ],
         dtype=np.float32,
     ).T
@@ -148,8 +147,7 @@ def _add_palm_plane(
         g.LineSegments(
             g.PointsGeometry(edge_vertices),
             g.LineBasicMaterial(color=0x003B8E, linewidth=4.0),
-        )
-    )
+        ))
 
     center_marker = trimesh.creation.icosphere(radius=0.003, subdivisions=2)
     center_marker.apply_translation(center)
@@ -196,21 +194,14 @@ def _add_pose_geometry(
             if link_name not in joints_info or link_name not in stl_data:
                 continue
             is_collision_link = link_name in collision_link_set
-            current_mesh_color = (
-                [1.0, 0.0, 0.0, 0.85]
-                if is_collision_link
-                else list(mesh_color)
-            )
+            current_mesh_color = ([1.0, 0.0, 0.0, 0.85] if is_collision_link else list(mesh_color))
             if is_collision_link:
                 highlighted_mesh_links.append(link_name)
-            mesh_obj = create_trimesh_from_joint(
-                joints_info[link_name], stl_data[link_name], current_mesh_color
-            )
+            mesh_obj = create_trimesh_from_joint(joints_info[link_name], stl_data[link_name],
+                                                 current_mesh_color)
             mesh_obj.apply_translation(translation)
             geom, color_int, alpha = _trimesh_to_meshcat(mesh_obj)
-            material = g.MeshPhongMaterial(
-                color=color_int, transparent=alpha < 1.0, opacity=alpha
-            )
+            material = g.MeshPhongMaterial(color=color_int, transparent=alpha < 1.0, opacity=alpha)
             vis[path_prefix][link_name].set_object(geom, material)
             total_faces += len(mesh_obj.faces)
 
@@ -222,19 +213,14 @@ def _add_pose_geometry(
             if data.p1 is None or data.p2 is None or data.r is None:
                 continue
             is_collision_link = link_name in collision_link_set
-            current_capsule_color = (
-                [1.0, 0.0, 0.0, 0.7]
-                if is_collision_link
-                else list(capsule_color)
-            )
+            current_capsule_color = ([1.0, 0.0, 0.0, 0.7]
+                                     if is_collision_link else list(capsule_color))
             if is_collision_link:
                 highlighted_capsule_links.append(link_name)
             mesh_obj = create_capsule_mesh(data.p1, data.p2, data.r, current_capsule_color)
             mesh_obj.apply_translation(translation)
             geom, color_int, alpha = _trimesh_to_meshcat(mesh_obj)
-            material = g.MeshPhongMaterial(
-                color=color_int, transparent=alpha < 1.0, opacity=alpha
-            )
+            material = g.MeshPhongMaterial(color=color_int, transparent=alpha < 1.0, opacity=alpha)
             vis[path_prefix][f"capsule_{link_name}"].set_object(geom, material)
             capsule_count += 1
 
@@ -407,7 +393,8 @@ def plot_pose_compare(
     safe_stl_data = None
     safe_collision_links = None
     if safe_sdk_angles is not None:
-        safe_full_angles = np.asarray(ang_mp.sdk_degrees_to_internal_radians(safe_sdk_angles), dtype=float)
+        safe_full_angles = np.asarray(ang_mp.sdk_degrees_to_internal_radians(safe_sdk_angles),
+                                      dtype=float)
         safe_full_angles = apply_passive_dip_mapping(safe_full_angles)
         safe_joints_info, safe_stl_data, _, safe_collision_links = pose_eval.evaluate_pose(
             angles=safe_full_angles,

@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """GHand SDK type definitions.
 
 All enums, dataclasses, and exceptions are centralized here to avoid
@@ -312,9 +311,8 @@ class HandFaultInfo:
     def __str__(self):
         """Return a human-readable fault description."""
         if self.error_code != ErrorCode.NORMAL:
-            base_msg = _ERROR_MESSAGES.get(
-                self.error_code, _ERROR_MESSAGES[ErrorCode.UNKNOWN_ERROR]
-            )
+            base_msg = _ERROR_MESSAGES.get(self.error_code,
+                                           _ERROR_MESSAGES[ErrorCode.UNKNOWN_ERROR])
         else:
             base_msg = "Device operating normally"
 
@@ -332,9 +330,7 @@ class HandFaultInfo:
         msg = base_msg
         if parts:
             msg = f"{base_msg} ({', '.join(parts)})"
-        return (
-            f"State: {self.state}, Error: {self.error_code} - {msg}"
-        )
+        return (f"State: {self.state}, Error: {self.error_code} - {msg}")
 
 
 @dataclass
@@ -437,9 +433,8 @@ class SelfTestErrorInfo:
 
         if self.summary != SelfTestError.NONE:
             names = [
-                flag.name
-                for flag in SelfTestError
-                if flag != SelfTestError.NONE and self.summary & flag
+                flag.name for flag in SelfTestError
+                if flag.name is not None and flag != SelfTestError.NONE and self.summary & flag
             ]
             lines[0] += f" ({', '.join(names)})"
 
@@ -447,26 +442,18 @@ class SelfTestErrorInfo:
             lines.append("position_sensor_unmapped: position sensor unmapped")
         if self.summary & SelfTestError.VERSION:
             names = [
-                flag.name
-                for flag in VersionCheckError
-                if flag != VersionCheckError.NONE and self.version & flag
+                flag.name for flag in VersionCheckError
+                if flag.name is not None and flag != VersionCheckError.NONE and self.version & flag
             ]
-            lines.append(
-                f"version: 0x{int(self.version):02X} ({', '.join(names) or 'none'})"
-            )
+            lines.append(f"version: 0x{int(self.version):02X} ({', '.join(names) or 'none'})")
         if self.summary & SelfTestError.POSITION_SENSOR:
-            lines.append(
-                "position_sensor: "
-                + _describe_motor_errors(
-                    self.position_sensor,
-                    lambda c: "position sensor abnormal" if c else "unknown",
-                )
-            )
+            lines.append("position_sensor: " + _describe_motor_errors(
+                self.position_sensor,
+                lambda c: "position sensor abnormal" if c else "unknown",
+            ))
         if self.summary & SelfTestError.TACTILE_SENSOR:
-            lines.append(
-                "tactile_sensor: "
-                + _describe_motor_errors(self.tactile_sensor, _describe_tactile_code)
-            )
+            lines.append("tactile_sensor: " +
+                         _describe_motor_errors(self.tactile_sensor, _describe_tactile_code))
         if self.summary & SelfTestError.TEMPERATURE_SENSOR:
             desc = "temperature sensor abnormal" if self.temperature else "none"
             lines.append(f"temperature: 0x{self.temperature:02X} ({desc})")
@@ -474,19 +461,11 @@ class SelfTestErrorInfo:
             desc = "fan abnormal" if self.fan else "none"
             lines.append(f"fan: 0x{self.fan:02X} ({desc})")
         if self.summary & SelfTestError.ZEROING:
-            lines.append(
-                "zeroing: "
-                + _describe_motor_errors(
-                    self.zeroing, lambda c: _enum_name_or_unknown(ZeroingError, c)
-                )
-            )
+            lines.append("zeroing: " + _describe_motor_errors(
+                self.zeroing, lambda c: _enum_name_or_unknown(ZeroingError, c)))
         if self.summary & SelfTestError.MOTOR:
-            lines.append(
-                "motor: "
-                + _describe_motor_errors(
-                    self.motor, lambda c: _enum_name_or_unknown(MotorCheckError, c)
-                )
-            )
+            lines.append("motor: " + _describe_motor_errors(
+                self.motor, lambda c: _enum_name_or_unknown(MotorCheckError, c)))
         return "\n  ".join(lines)
 
 
@@ -499,9 +478,8 @@ def _enum_name_or_unknown(enum_type, code: int) -> str:
 
 def _describe_tactile_code(code: int) -> str:
     names = [
-        flag.name
-        for flag in TactileCheckError
-        if flag != TactileCheckError.NONE and code & flag
+        flag.name for flag in TactileCheckError
+        if flag.name is not None and flag != TactileCheckError.NONE and code & flag
     ]
     return ", ".join(names) if names else f"unknown (0x{code:02X})"
 
@@ -509,12 +487,9 @@ def _describe_tactile_code(code: int) -> str:
 def _describe_motor_errors(errors: list[MotorDiagnosticError], describe_code) -> str:
     if not errors:
         return "none"
-    return "; ".join(
-        f"motor={e.motor_index} "
-        f"joint={e.joint_id.name if e.joint_id is not None else 'unknown'} "
-        f"code=0x{e.error_code:02X} ({describe_code(e.error_code)})"
-        for e in errors
-    )
+    return "; ".join(f"motor={e.motor_index} "
+                     f"joint={e.joint_id.name if e.joint_id is not None else 'unknown'} "
+                     f"code=0x{e.error_code:02X} ({describe_code(e.error_code)})" for e in errors)
 
 
 # ============================================================================

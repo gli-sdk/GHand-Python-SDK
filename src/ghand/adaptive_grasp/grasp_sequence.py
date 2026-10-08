@@ -45,6 +45,7 @@ class ClosingSensorFrame:
 
 
 class PhaseResult:
+
     def __init__(
         self,
         success: bool,
@@ -61,6 +62,7 @@ class PhaseResult:
 
 
 class PhaseController:
+
     def __init__(
         self,
         hand_port: GraspSequenceHandPort,
@@ -91,8 +93,8 @@ class PhaseController:
 
     @staticmethod
     def _normalize_joint_limits(
-        joint_limits: Mapping[JointId, tuple[float, float]],
-    ) -> dict[JointId, tuple[float, float]]:
+        joint_limits: Mapping[JointId, tuple[float,
+                                             float]], ) -> dict[JointId, tuple[float, float]]:
         normalized_limits = {}
         for raw_joint_id, limit in joint_limits.items():
             joint_id = normalize_joint_id(raw_joint_id)
@@ -139,11 +141,8 @@ class PhaseController:
         self._on_state_change(state)
 
     def _phase_closing_torque(self) -> int:
-        torque = (
-            self._object_profile.phase_closing_torque
-            if self._object_profile is not None
-            else 30
-        )
+        torque = (self._object_profile.phase_closing_torque
+                  if self._object_profile is not None else 30)
         return int(clip(torque, -100.0, self.config.max_torque))
 
     def _execute_position_phase(
@@ -159,7 +158,7 @@ class PhaseController:
         ok = self.hand_port.move_joints(joints, mode=CtrlMode.POSITION)
         if not ok:
             return False
-        
+
         return self._wait_until_position_reached(
             state,
             pose,
@@ -181,16 +180,12 @@ class PhaseController:
             feedback = self._sensor.joint_feedback
             if feedback:
                 latest_feedback = feedback
-                current_angles = {
-                    normalize_joint_id(joint.id): joint.angle
-                    for joint in feedback
-                }
+                current_angles = {normalize_joint_id(joint.id): joint.angle for joint in feedback}
                 reached = True
                 for joint_id, target_angle in pose.items():
                     current_angle = current_angles.get(joint_id)
-                    if current_angle is None or abs(
-                            current_angle - target_angle
-                    ) > _POSITION_REACHED_TOLERANCE_DEG:
+                    if current_angle is None or abs(current_angle -
+                                                    target_angle) > _POSITION_REACHED_TOLERANCE_DEG:
                         reached = False
                 if reached:
                     return True
@@ -261,7 +256,8 @@ class PhaseController:
                 _logger.error("CLOSING phase timeout")
                 return False
 
-            self.hand_port.move_joints(self._joint_builder.torque_command(self.current_torque), mode=CtrlMode.TORQUE)
+            self.hand_port.move_joints(self._joint_builder.torque_command(self.current_torque),
+                                       mode=CtrlMode.TORQUE)
             time.sleep(self.config.closing_period_s)
 
             frame = self._read_closing_sensor_frame()
@@ -274,10 +270,7 @@ class PhaseController:
             if self._try_confirm_force_contact(frame):
                 return True
 
-            current_angles = {
-                normalize_joint_id(j.id): j.angle
-                for j in frame.joint_feedback
-            }
+            current_angles = {normalize_joint_id(j.id): j.angle for j in frame.joint_feedback}
             if self._is_joints_stalled(prev_angles, current_angles):
                 stall_counter += 1
                 if self._try_confirm_stall_contact(stall_counter, frame):

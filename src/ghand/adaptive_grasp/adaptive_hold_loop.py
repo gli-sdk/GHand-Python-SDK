@@ -126,8 +126,7 @@ class HoldController:
         contact_joint_angles: Optional[JointAngles] = None,
         force_reference_planner: Optional[ForceReferencePlanner] = None,
         position_hold_planner: Optional[PositionHoldPlanner] = None,
-        stiff_position_hold_planner: Optional[
-            IncrementalPositionHoldPlanner] = None,
+        stiff_position_hold_planner: Optional[IncrementalPositionHoldPlanner] = None,
         observer: Optional[HoldObserver] = None,
         hold_target_force_n: Optional[float] = None,
     ):
@@ -138,8 +137,7 @@ class HoldController:
         self._joint_builder = joint_builder
         self.config = config
         self._current_torque = current_torque
-        self._contact_joint_angles = normalize_joint_angles(
-            contact_joint_angles or {})
+        self._contact_joint_angles = normalize_joint_angles(contact_joint_angles or {})
         self._force_reference_planner = force_reference_planner
         self._position_hold_planner = position_hold_planner
         self._stiff_position_hold_planner = stiff_position_hold_planner
@@ -217,8 +215,7 @@ class HoldController:
 
     def _fault_result(self, safety: SafetyReport) -> HoldStepResult:
         result = (HoldResult.FAULT_RELEASE
-                  if self.config.enable_fault_release_fallback else
-                  HoldResult.ERROR)
+                  if self.config.enable_fault_release_fallback else HoldResult.ERROR)
         return HoldStepResult(
             result=result,
             safety_report=safety,
@@ -250,12 +247,10 @@ class HoldController:
         dt: float,
     ) -> HoldCommand:
         if self._can_plan_stiff_position_hold():
-            return self._plan_stiff_position_hold_command(
-                analysis, current_angles)
+            return self._plan_stiff_position_hold_command(analysis, current_angles)
 
         if self._can_plan_position_hold():
-            return self._plan_position_hold_command(analysis, current_angles,
-                                                    dt)
+            return self._plan_position_hold_command(analysis, current_angles, dt)
 
         return PositionHoldCommand(
             angles=current_angles,
@@ -298,8 +293,7 @@ class HoldController:
         current_angles: JointAngles,
         dt: float,
     ) -> PositionHoldCommand:
-        force_reference = self._force_reference_planner.compute(analysis,
-                                                                dt=dt)
+        force_reference = self._force_reference_planner.compute(analysis, dt=dt)
         decisions = self._position_hold_planner.compute(
             analysis,
             current_angles,
@@ -368,9 +362,7 @@ class HoldController:
             current_torque=self._current_torque,
         )
 
-    def _build_hold_payload(
-            self,
-            command: HoldCommand) -> tuple[list[JointCommand], CtrlMode, int]:
+    def _build_hold_payload(self, command: HoldCommand) -> tuple[list[JointCommand], CtrlMode, int]:
         angles = self._clamp_to_contact_window(command.angles)
         joints = self._joint_builder.hold_position_command(
             command.torque,
@@ -415,16 +407,13 @@ class HoldController:
         for joint_id, base_angle in self._contact_joint_angles.items():
             if joint_id not in clamped_angles:
                 continue
-            guard_margin = (
-                self.config.position_hold_contact_angle_guard_margin_deg)
+            guard_margin = (self.config.position_hold_contact_angle_guard_margin_deg)
             lower = base_angle - guard_margin
             upper = base_angle + guard_margin
-            clamped_angles[joint_id] = max(
-                lower, min(clamped_angles[joint_id], upper))
+            clamped_angles[joint_id] = max(lower, min(clamped_angles[joint_id], upper))
         return clamped_angles
 
-    def _get_current_angles(
-            self, joint_feedback: Optional[list[JointCommand]]) -> JointAngles:
+    def _get_current_angles(self, joint_feedback: Optional[list[JointCommand]]) -> JointAngles:
         if joint_feedback:
             return {normalize_joint_id(j.id): j.angle for j in joint_feedback}
         if self._contact_joint_angles:

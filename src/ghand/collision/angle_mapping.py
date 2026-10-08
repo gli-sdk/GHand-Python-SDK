@@ -1,6 +1,5 @@
 # SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
-
 """A7 SDK angle validation and unit conversion helpers."""
 
 from __future__ import annotations
@@ -14,7 +13,6 @@ import numpy as np
 from .datatypes import JOINT_NAMES
 from .passive_dip_mapping import JOINT_ORDER
 from .read_data import read_urdf_xml
-
 
 SDK_JOINT_ORDER = JOINT_ORDER
 EXTERNAL_JOINT_ORDER = SDK_JOINT_ORDER
@@ -106,8 +104,7 @@ def sdk_degrees_to_internal_radians(angles_deg: Iterable[float]) -> np.ndarray:
             raise ValueError(
                 f"sdk_angles[{index}] ({joint_name}) is out of range: "
                 f"got {value:.4f} deg, expected [{tolerance_lower:.4f}, {tolerance_upper:.4f}] deg "
-                f"with {LIMIT_TOLERANCE_DEG:.1f} deg tolerance"
-            )
+                f"with {LIMIT_TOLERANCE_DEG:.1f} deg tolerance")
         if value < lower - _LIMIT_EPS_DEG or value > upper + _LIMIT_EPS_DEG:
             clamped_value = min(max(value, lower), upper)
             message = (
@@ -145,7 +142,6 @@ def internal_to_external_angles(angles: Sequence[float]) -> list[float]:
 EXTERNAL_TO_INTERNAL_NAME_MAP = {name: name for name in SDK_JOINT_ORDER}
 EXTERNAL_TO_INTERNAL_INDEX_MAP = tuple(range(len(SDK_JOINT_ORDER)))
 INTERNAL_TO_EXTERNAL_INDEX_MAP = tuple(range(len(SDK_JOINT_ORDER)))
-
 
 __all__ = [
     "SDK_JOINT_ORDER",

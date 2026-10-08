@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """EtherCAT communication implementation.
 
 Wraps EthercatClient and handles PDO encoding/decoding.
@@ -72,9 +71,8 @@ class EthercatComm(IComm):
         """Return the active product config selected for the mapped PDO layout."""
         return self._config
 
-    def _clone_config_with_tactile_counts(
-        self, config: ProductConfig, tactile_counts: list[int]
-    ) -> ProductConfig:
+    def _clone_config_with_tactile_counts(self, config: ProductConfig,
+                                          tactile_counts: list[int]) -> ProductConfig:
         """Clone product config while replacing tactile region sample counts."""
         tactile_regions = [
             TactileRegionConfig(id=region.id, count=count)
@@ -105,10 +103,9 @@ class EthercatComm(IComm):
     def _build_tpdo_layouts(self, config: ProductConfig) -> dict[int, ProductConfig]:
         """Build supported TPDO layouts keyed by mapped input size."""
         tactile_counts = [r.count for r in config.tactile_regions] if config.has_tactile else None
-        layouts = {
-            compute_tpdo_size(len(config.valid_joints), tactile_counts): config
-        }
-        if config.has_tactile and tactile_counts and tactile_counts[0] > self._COMPAT_THUMB_TACTILE_COUNT:
+        layouts = {compute_tpdo_size(len(config.valid_joints), tactile_counts): config}
+        if config.has_tactile and tactile_counts and tactile_counts[
+                0] > self._COMPAT_THUMB_TACTILE_COUNT:
             compat_counts = list(tactile_counts)
             compat_counts[0] = self._COMPAT_THUMB_TACTILE_COUNT
             compat_config = self._clone_config_with_tactile_counts(config, compat_counts)
@@ -220,7 +217,8 @@ class EthercatComm(IComm):
     def stop(self) -> bool:
         """Send an immediate stop command to all joints."""
         if self._uses_per_joint_control_pdo_layout:
-            self._client.send_data(self._build_per_joint_control_rpdo([], CtrlMode.POSITION, stop=1))
+            self._client.send_data(self._build_per_joint_control_rpdo([], CtrlMode.POSITION,
+                                                                      stop=1))
         else:
             rpdo = Rpdo(self._controlled_joints)
             rpdo.mode = 0
@@ -255,24 +253,18 @@ class EthercatComm(IComm):
                     position,
                     speed,
                     torque,
-                )
-            )
+                ))
         return bytes(data)
 
     # ===== State retrieval =====
 
     def _validate_tpdo_data(self, data: bytes) -> bytes:
         """Validate a TPDO frame before any protocol fields are decoded."""
-        expected_sizes = (
-            (self._expected_tpdo_size,)
-            if self._tpdo_size_selected
-            else self._expected_tpdo_sizes
-        )
+        expected_sizes = ((self._expected_tpdo_size, )
+                          if self._tpdo_size_selected else self._expected_tpdo_sizes)
         if len(data) not in expected_sizes:
-            raise RuntimeError(
-                "Invalid EtherCAT TPDO length: "
-                f"expected one of {expected_sizes}, got {len(data)}"
-            )
+            raise RuntimeError("Invalid EtherCAT TPDO length: "
+                               f"expected one of {expected_sizes}, got {len(data)}")
         return data
 
     def _recv_tpdo_data(self) -> bytes:
@@ -305,8 +297,7 @@ class EthercatComm(IComm):
                     torque=joint_tpdo.torque,
                     state=self._parse_state(joint_tpdo.state),
                     error=self._parse_error_code(joint_tpdo.error),
-                )
-            )
+                ))
         return joints
 
     def _parse_per_joint_control_joints(self, data: bytes) -> list[JointData]:
@@ -316,9 +307,7 @@ class EthercatComm(IComm):
         for joint_id in self._config.valid_joints:
             if len(data) < offset + 6:
                 break
-            state, error, angle_raw, speed, torque = struct.unpack_from(
-                "<BBHbb", data, offset
-            )
+            state, error, angle_raw, speed, torque = struct.unpack_from("<BBHbb", data, offset)
             joints.append(
                 JointData(
                     id=joint_id,
@@ -327,8 +316,7 @@ class EthercatComm(IComm):
                     torque=torque,
                     state=self._parse_state(state),
                     error=self._parse_error_code(error),
-                )
-            )
+                ))
             offset += 6
         return joints
 
@@ -466,12 +454,8 @@ class EthercatComm(IComm):
 
     def _read_string_sdo(self, index: int, subindex: int) -> str:
         try:
-            return (
-                self._client.sdo_read(index, subindex)
-                .decode("utf-8", errors="ignore")
-                .strip("\x00")
-                or "N/A"
-            )
+            return (self._client.sdo_read(index, subindex).decode(
+                "utf-8", errors="ignore").strip("\x00") or "N/A")
         except Exception:
             return "N/A"
 
@@ -488,12 +472,8 @@ class EthercatComm(IComm):
         try:
             self._client.sdo_write(0x2007, 0x01, bytes([mcu_id]))
             time.sleep(self._SDO_WRITE_SETTLE_SEC)
-            version_high = int.from_bytes(
-                self._client.sdo_read(0x2007, 0x02), byteorder="little"
-            )
-            version_low = int.from_bytes(
-                self._client.sdo_read(0x2007, 0x03), byteorder="little"
-            )
+            version_high = int.from_bytes(self._client.sdo_read(0x2007, 0x02), byteorder="little")
+            version_low = int.from_bytes(self._client.sdo_read(0x2007, 0x03), byteorder="little")
         except Exception:
             logger.info("Packed firmware version not available", exc_info=True)
             return "N/A"
@@ -586,14 +566,11 @@ class EthercatComm(IComm):
 
         if info.summary & SelfTestError.POSITION_SENSOR:
             info.position_sensor = self._collect_motor_errors(
-                self._get_position_sensor_error_codes()
-            )
+                self._get_position_sensor_error_codes())
             self._log_motor_errors("position sensor", info.position_sensor)
 
         if info.summary & SelfTestError.TACTILE_SENSOR:
-            info.tactile_sensor = self._collect_motor_errors(
-                self._get_tactile_sensor_error_codes()
-            )
+            info.tactile_sensor = self._collect_motor_errors(self._get_tactile_sensor_error_codes())
             self._log_motor_errors("tactile sensor", info.tactile_sensor)
 
         if info.summary & SelfTestError.TEMPERATURE_SENSOR:
@@ -640,9 +617,7 @@ class EthercatComm(IComm):
         # Result 不判断,只读取 error_code 数据。
         self._poll_self_test_state(command)
 
-        raw = self._client.sdo_read(
-            self._SELF_TEST_INDEX, self._SELF_TEST_SUB_ERROR_CODE
-        )
+        raw = self._client.sdo_read(self._SELF_TEST_INDEX, self._SELF_TEST_SUB_ERROR_CODE)
         codes = list(raw[:13])
         if len(codes) < 13:
             codes.extend([0] * (13 - len(codes)))
@@ -652,19 +627,15 @@ class EthercatComm(IComm):
         """Poll subindex 0x02 until state becomes success (2) or failed (3)."""
         deadline = time.monotonic() + self._SELF_TEST_POLL_TIMEOUT_SEC
         while True:
-            raw = self._client.sdo_read(
-                self._SELF_TEST_INDEX, self._SELF_TEST_SUB_STATE
-            )
+            raw = self._client.sdo_read(self._SELF_TEST_INDEX, self._SELF_TEST_SUB_STATE)
             state = raw[0] if raw else self._SELF_TEST_STATE_IDLE
             if state in (
-                self._SELF_TEST_STATE_SUCCESS,
-                self._SELF_TEST_STATE_FAILED,
+                    self._SELF_TEST_STATE_SUCCESS,
+                    self._SELF_TEST_STATE_FAILED,
             ):
                 return state
             if time.monotonic() >= deadline:
-                raise TimeoutError(
-                    f"Self-test query 0x{command:02X} timed out (state={state})"
-                )
+                raise TimeoutError(f"Self-test query 0x{command:02X} timed out (state={state})")
             time.sleep(self._SELF_TEST_POLL_INTERVAL_SEC)
 
     def _get_self_test_summary_error_code(self) -> int:
@@ -701,9 +672,7 @@ class EthercatComm(IComm):
             return self._controlled_joints[motor_index]
         return None
 
-    def _collect_motor_errors(
-        self, error_codes: list[int]
-    ) -> list[MotorDiagnosticError]:
+    def _collect_motor_errors(self, error_codes: list[int]) -> list[MotorDiagnosticError]:
         """Filter a 13-slot error array to structured non-zero entries."""
         errors = []
         for index, code in enumerate(error_codes):
@@ -714,13 +683,10 @@ class EthercatComm(IComm):
                     motor_index=index,
                     joint_id=self._motor_index_to_joint(index),
                     error_code=code,
-                )
-            )
+                ))
         return errors
 
-    def _log_motor_errors(
-        self, category: str, errors: list[MotorDiagnosticError]
-    ) -> None:
+    def _log_motor_errors(self, category: str, errors: list[MotorDiagnosticError]) -> None:
         for err in errors:
             joint = err.joint_id.name if err.joint_id is not None else "unknown"
             description = self._motor_error_description(category, err.error_code)

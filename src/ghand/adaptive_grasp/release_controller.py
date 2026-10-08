@@ -19,6 +19,7 @@ _logger = logging.getLogger("adaptive_grasp.release_controller")
 
 
 class ReleaseController:
+
     def __init__(
         self,
         hand: HandCommandPort,

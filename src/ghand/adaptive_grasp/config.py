@@ -30,8 +30,7 @@ def _validate_range(
 ) -> None:
     if greater_than is not None and value <= greater_than:
         raise ValueError(f"{name} must be > {greater_than}")
-    if (greater_than_or_equal_to is not None
-            and value < greater_than_or_equal_to):
+    if (greater_than_or_equal_to is not None and value < greater_than_or_equal_to):
         raise ValueError(f"{name} must be >= {greater_than_or_equal_to}")
     if less_than is not None and value >= less_than:
         raise ValueError(f"{name} must be < {less_than}")
@@ -47,11 +46,9 @@ class AdaptiveGraspConfig:
     pre_grasp_preset: str  # Named pre-grasp pose preset; callers must provide it explicitly.
     default_object: str = "balloon"  # Object profile name used when no object is selected by the caller.
     pre_grasp_pose: dict[JointId, float] = field(
-        default_factory=dict
-    )  # JointCommand target pose in degrees before closing.
+        default_factory=dict)  # JointCommand target pose in degrees before closing.
     active_fingers: set[TactileSensorId] = field(
-        default_factory=set
-    )  # Fingers used for contact, tactile analysis, and hold control.
+        default_factory=set)  # Fingers used for contact, tactile analysis, and hold control.
     # Open, pre-grasp, and closing-to-contact phases.
     open_speed: int = 100  # Speed command used when opening the hand.
     open_torque: int = 100  # Torque/current limit used when opening the hand.
@@ -272,8 +269,7 @@ class AdaptiveGraspConfig:
             greater_than_or_equal_to=0,
         )
         if self.slip_variance_baseline >= self.slip_variance_threshold:
-            raise ValueError(
-                "slip_variance_baseline must be < slip_variance_threshold")
+            raise ValueError("slip_variance_baseline must be < slip_variance_threshold")
         _validate_range(
             "slip_variance_weight",
             self.slip_variance_weight,
@@ -293,8 +289,7 @@ class AdaptiveGraspConfig:
             less_than_or_equal_to=1.0,
         )
         if not math.isclose(
-                self.slip_variance_weight + self.slip_direction_weight +
-                self.slip_friction_weight,
+                self.slip_variance_weight + self.slip_direction_weight + self.slip_friction_weight,
                 1.0,
                 abs_tol=1e-6,
         ):
@@ -320,10 +315,8 @@ class AdaptiveGraspConfig:
 
     def _validate_hold_command_mode(self) -> None:
         if not isinstance(self.hold_command_mode, HoldCommandMode):
-            raise ValueError(
-                "hold_command_mode must be HoldCommandMode.POSITION, "
-                "or HoldCommandMode.STIFF_POSITION"
-            )
+            raise ValueError("hold_command_mode must be HoldCommandMode.POSITION, "
+                             "or HoldCommandMode.STIFF_POSITION")
 
     def _validate_fragile_object_params(self) -> None:
         _validate_range(
@@ -388,11 +381,9 @@ class AdaptiveGraspConfig:
             greater_than_or_equal_to=0.0,
             less_than_or_equal_to=1.0,
         )
-        if (self.force_reference_min_contact_ratio *
-                len(self.active_fingers) > 1.0):
+        if (self.force_reference_min_contact_ratio * len(self.active_fingers) > 1.0):
             raise ValueError(
-                "force_reference_min_contact_ratio * active_finger_count must be <= 1.0"
-            )
+                "force_reference_min_contact_ratio * active_finger_count must be <= 1.0")
 
     def _validate_position_hold_params(self) -> None:
         if not isinstance(self.enable_position_hold_force_control, bool):
@@ -461,8 +452,7 @@ class AdaptiveGraspConfig:
             greater_than_or_equal_to=0.0,
             less_than_or_equal_to=1.0,
         )
-        if (self.position_hold_slip_risk_deadband >=
-                self.position_hold_slip_risk_full):
+        if (self.position_hold_slip_risk_deadband >= self.position_hold_slip_risk_full):
             raise ValueError(
                 "position_hold_slip_risk_deadband must be < position_hold_slip_risk_full")
         _validate_range(
@@ -554,20 +544,14 @@ class AdaptiveGraspConfig:
 
     def _resolve_pre_grasp_pose(self, pre_grasp_preset: str) -> None:
         if self.pre_grasp_pose:
-            passive_joints = sorted(
-                joint_id.name
-                for joint_id in self.pre_grasp_pose
-                if joint_id in PASSIVE_DIP_JOINTS
-            )
+            passive_joints = sorted(joint_id.name for joint_id in self.pre_grasp_pose
+                                    if joint_id in PASSIVE_DIP_JOINTS)
             if passive_joints:
                 joints = ", ".join(passive_joints)
-                raise ValueError(
-                    f"pre_grasp_pose cannot include passive DIP joints: {joints}"
-                )
+                raise ValueError(f"pre_grasp_pose cannot include passive DIP joints: {joints}")
             return
 
-        self.pre_grasp_pose = build_pre_grasp_pose_from_preset(
-            pre_grasp_preset)
+        self.pre_grasp_pose = build_pre_grasp_pose_from_preset(pre_grasp_preset)
 
     def _validate_default_object(self) -> None:
         if ObjectProfileRegistry.get(self.default_object) is not None:

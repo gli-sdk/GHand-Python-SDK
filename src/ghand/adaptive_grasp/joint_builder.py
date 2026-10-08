@@ -7,14 +7,19 @@ from ..types import JointCommand, JointId
 from .config import AdaptiveGraspConfig
 from .utils import clip
 
-
 TORQUE_CONTROL_JOINTS = (
-    JointId.THUMB_MCP, JointId.THUMB_TMC_FE,
-    JointId.FF_PIP, JointId.FF_MCP,
-    JointId.MF_PIP, JointId.MF_MCP,
-    JointId.RF_PIP, JointId.RF_MCP,
-    JointId.LF_PIP, JointId.LF_MCP,
+    JointId.THUMB_MCP,
+    JointId.THUMB_TMC_FE,
+    JointId.FF_PIP,
+    JointId.FF_MCP,
+    JointId.MF_PIP,
+    JointId.MF_MCP,
+    JointId.RF_PIP,
+    JointId.RF_MCP,
+    JointId.LF_PIP,
+    JointId.LF_MCP,
 )
+
 
 class JointCommandBuilder:
     _TORQUE_JOINTS = TORQUE_CONTROL_JOINTS
@@ -50,7 +55,8 @@ class JointCommandBuilder:
             for joint_id in self._torque_joints
         }
 
-    def position_command(self, angles: dict[JointId, float], speed: int, torque: int) -> list[JointCommand]:
+    def position_command(self, angles: dict[JointId, float], speed: int,
+                         torque: int) -> list[JointCommand]:
         return [
             JointCommand(id=joint_id, angle=angle, speed=speed, torque=torque)
             for joint_id, angle in angles.items()
@@ -61,8 +67,7 @@ class JointCommandBuilder:
         active = set(self._torque_joints)
         joints = [
             JointCommand(id=joint_id, torque=torque)
-            if joint_id in active
-            else JointCommand(id=joint_id, angle=0.0, speed=0, torque=0)
+            if joint_id in active else JointCommand(id=joint_id, angle=0.0, speed=0, torque=0)
             for joint_id in TORQUE_CONTROL_JOINTS
         ]
         joints += [
@@ -86,6 +91,5 @@ class JointCommandBuilder:
                 angle=hold_angles.get(joint_id, 0.0),
                 speed=limited_speed,
                 torque=limited_torque,
-            )
-            for joint_id in self._torque_joints
+            ) for joint_id in self._torque_joints
         ]

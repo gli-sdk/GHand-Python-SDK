@@ -5,7 +5,6 @@
 # You may obtain a copy of the License at
 #
 #     https://www.apache.org/licenses/LICENSE-2.0
-
 """Shared self-test error query workflow for register-based transports.
 
 RS485 and CANFD both expose the object dictionary as Modbus holding registers.
@@ -47,7 +46,6 @@ logger = logging.getLogger("ghand.self_test_workflow")
 _POLL_INTERVAL_SEC = 0.01
 _POLL_TIMEOUT_SEC = 1.0
 
-
 # Type aliases for the transport primitives supplied by each backend.
 # ``read_registers`` returns a list of 16-bit register values.
 ReadRegisters = Callable[[int, int], list[int]]
@@ -83,9 +81,7 @@ def read_diagnostic_error_codes(
     # Result 不判断,只读取 error_code 数据。
     _poll_state(command, read_registers)
 
-    registers = read_registers(
-        SELF_TEST_DATA_REGISTER, SELF_TEST_DATA_REGISTER_COUNT
-    )
+    registers = read_registers(SELF_TEST_DATA_REGISTER, SELF_TEST_DATA_REGISTER_COUNT)
     error_codes, _ = parse_self_test_data_registers(registers)
     return error_codes
 
@@ -99,9 +95,7 @@ def _poll_state(command: int, read_registers: ReadRegisters) -> int:
         if state in (SELF_TEST_STATE_SUCCESS, SELF_TEST_STATE_FAILED):
             return state
         if time.monotonic() >= deadline:
-            raise TimeoutError(
-                f"Self-test query 0x{command:02X} timed out (state={state})"
-            )
+            raise TimeoutError(f"Self-test query 0x{command:02X} timed out (state={state})")
         time.sleep(_POLL_INTERVAL_SEC)
 
 
@@ -119,72 +113,49 @@ def build_self_test_error_info(
     """
     info = SelfTestErrorInfo()
 
-    summary_byte = read_diagnostic_error_codes(
-        0xA0, read_registers, write_register
-    )[0]
+    summary_byte = read_diagnostic_error_codes(0xA0, read_registers, write_register)[0]
     info.summary = SelfTestError(summary_byte)
     logger.debug("Self-test summary: 0x%02X", summary_byte)
 
     if info.summary == SelfTestError.NONE:
         return info
 
-    controlled_joints = [
-        j for j in config.valid_joints if j in config.joint_limits
-    ]
+    controlled_joints = [j for j in config.valid_joints if j in config.joint_limits]
 
     def collect(codes: list[int]) -> list[MotorDiagnosticError]:
         entries = []
         for index, code in enumerate(codes):
             if code == 0:
                 continue
-            joint = (
-                controlled_joints[index]
-                if 0 <= index < len(controlled_joints)
-                else None
-            )
-            entries.append(
-                MotorDiagnosticError(
-                    motor_index=index, joint_id=joint, error_code=code
-                )
-            )
+            joint = (controlled_joints[index] if 0 <= index < len(controlled_joints) else None)
+            entries.append(MotorDiagnosticError(motor_index=index, joint_id=joint, error_code=code))
         return entries
 
     if info.summary & SelfTestError.VERSION:
         info.version = VersionCheckError(
-            read_diagnostic_error_codes(0xA1, read_registers, write_register)[0]
-        )
+            read_diagnostic_error_codes(0xA1, read_registers, write_register)[0])
         logger.info("Self-test error: version mismatch (0x%02X)", int(info.version))
     if info.summary & SelfTestError.POSITION_SENSOR_UNMAPPED:
         logger.info("Self-test error: position sensor unmapped")
     if info.summary & SelfTestError.POSITION_SENSOR:
         info.position_sensor = collect(
-            read_diagnostic_error_codes(0xA2, read_registers, write_register)
-        )
+            read_diagnostic_error_codes(0xA2, read_registers, write_register))
         _log_motor_errors("position sensor", info.position_sensor)
     if info.summary & SelfTestError.TACTILE_SENSOR:
         info.tactile_sensor = collect(
-            read_diagnostic_error_codes(0xA3, read_registers, write_register)
-        )
+            read_diagnostic_error_codes(0xA3, read_registers, write_register))
         _log_motor_errors("tactile sensor", info.tactile_sensor)
     if info.summary & SelfTestError.TEMPERATURE_SENSOR:
-        info.temperature = read_diagnostic_error_codes(
-            0xA4, read_registers, write_register
-        )[0]
+        info.temperature = read_diagnostic_error_codes(0xA4, read_registers, write_register)[0]
         logger.info("Self-test error: temperature (0x%02X)", info.temperature)
     if info.summary & SelfTestError.FAN:
-        info.fan = read_diagnostic_error_codes(
-            0xA5, read_registers, write_register
-        )[0]
+        info.fan = read_diagnostic_error_codes(0xA5, read_registers, write_register)[0]
         logger.info("Self-test error: fan (0x%02X)", info.fan)
     if info.summary & SelfTestError.ZEROING:
-        info.zeroing = collect(
-            read_diagnostic_error_codes(0xA6, read_registers, write_register)
-        )
+        info.zeroing = collect(read_diagnostic_error_codes(0xA6, read_registers, write_register))
         _log_motor_errors("zeroing", info.zeroing)
     if info.summary & SelfTestError.MOTOR:
-        info.motor = collect(
-            read_diagnostic_error_codes(0xA8, read_registers, write_register)
-        )
+        info.motor = collect(read_diagnostic_error_codes(0xA8, read_registers, write_register))
         _log_motor_errors("motor check", info.motor)
 
     return info

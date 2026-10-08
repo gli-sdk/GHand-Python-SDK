@@ -22,6 +22,7 @@ class GraspState(Enum):
 
 
 class _HoldStepSensor(Protocol):
+
     @property
     def tactile_data(self) -> Optional[Any]:
         ...
@@ -85,8 +86,5 @@ class AdaptiveGraspRuntime:
         if step.current_torque is not None:
             self.current_torque = step.current_torque
 
-        self.last_tactile_data_age_s = (
-            sensor.data_age_s(step_start)
-            if sensor.tactile_data is not None
-            else None
-        )
+        self.last_tactile_data_age_s = (sensor.data_age_s(step_start)
+                                        if sensor.tactile_data is not None else None)

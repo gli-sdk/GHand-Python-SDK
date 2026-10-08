@@ -17,8 +17,7 @@ from .utils import JOINT_TO_FINGER
 class HoldPlannerBundle:
     force_reference_planner: Optional[ForceReferencePlanner] = None
     position_hold_planner: Optional[PositionHoldPlanner] = None
-    stiff_position_hold_planner: Optional[
-        IncrementalPositionHoldPlanner] = None
+    stiff_position_hold_planner: Optional[IncrementalPositionHoldPlanner] = None
 
 
 class HoldPlannerFactory:
@@ -42,23 +41,20 @@ class HoldPlannerFactory:
         if self.config.hold_command_mode is HoldCommandMode.POSITION:
             return HoldPlannerBundle(
                 force_reference_planner=force_reference_planner,
-                position_hold_planner=self._create_position_hold_planner(
-                    profile),
+                position_hold_planner=self._create_position_hold_planner(profile),
             )
 
         if self.config.hold_command_mode is HoldCommandMode.STIFF_POSITION:
             return HoldPlannerBundle(
                 force_reference_planner=force_reference_planner,
-                stiff_position_hold_planner=self.
-                _create_stiff_position_hold_planner(
+                stiff_position_hold_planner=self._create_stiff_position_hold_planner(
                     profile,
                     contact_snapshot,
                 ),
             )
 
-        raise ValueError(
-            "hold_command_mode must be HoldCommandMode.POSITION "
-            "or HoldCommandMode.STIFF_POSITION")
+        raise ValueError("hold_command_mode must be HoldCommandMode.POSITION "
+                         "or HoldCommandMode.STIFF_POSITION")
 
     def _create_stiff_position_hold_planner(
         self,
@@ -67,8 +63,7 @@ class HoldPlannerFactory:
     ) -> Optional[IncrementalPositionHoldPlanner]:
         active_joint_ids = {
             joint_id
-            for joint_id, finger in JOINT_TO_FINGER.items()
-            if finger in self.config.active_fingers
+            for joint_id, finger in JOINT_TO_FINGER.items() if finger in self.config.active_fingers
         }
         return IncrementalPositionHoldPlanner(
             step_deg=self.config.stiff_position_step_deg,
@@ -78,18 +73,15 @@ class HoldPlannerFactory:
             contact_joint_angles=contact_snapshot.joint_angles,
             hold_speed=self._resolve_stiff_position_hold_speed(profile),
             hold_torque=self._resolve_stiff_position_hold_torque(profile),
-            default_target_force_n=self._resolve_stiff_position_target_force(
-                profile),
-            stiff_position_force_drop_ratio=(
-                self.config.stiff_position_force_drop_ratio),
+            default_target_force_n=self._resolve_stiff_position_target_force(profile),
+            stiff_position_force_drop_ratio=(self.config.stiff_position_force_drop_ratio),
         )
 
     def _resolve_stiff_position_hold_speed(
         self,
         profile: Optional[ObjectProfile],
     ) -> int:
-        if (profile is not None
-                and profile.stiff_position_hold_speed is not None):
+        if (profile is not None and profile.stiff_position_hold_speed is not None):
             return profile.stiff_position_hold_speed
         return self.config.stiff_position_hold_speed
 
@@ -97,8 +89,7 @@ class HoldPlannerFactory:
         self,
         profile: Optional[ObjectProfile],
     ) -> int:
-        if (profile is not None
-                and profile.stiff_position_hold_torque is not None):
+        if (profile is not None and profile.stiff_position_hold_torque is not None):
             return profile.stiff_position_hold_torque
         return self.config.stiff_position_hold_torque
 

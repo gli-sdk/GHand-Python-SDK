@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """High-level API for the GHand dexterous hand."""
 
 from __future__ import annotations
@@ -90,9 +89,7 @@ _COLLISION_JOINT_ORDER = (
 class GHand:
     """High-level API for the GHand dexterous hand."""
 
-    def __init__(
-        self, product_type: ProductType, comm_type: CommType
-    ):
+    def __init__(self, product_type: ProductType, comm_type: CommType):
         """Initialize the GHand instance.
 
         Args:
@@ -104,8 +101,7 @@ class GHand:
         self._product_config = load_product_config(product_type)
         self._joint_limits = self._product_config.joint_limits.copy()
         self._passive_joints = set(self._product_config.valid_joints) - set(
-            self._joint_limits.keys()
-        )
+            self._joint_limits.keys())
         self._has_tactile = self._product_config.has_tactile
         self._comm = self._create_comm(comm_type)
         self._hand_type = HandType.NONE
@@ -113,7 +109,7 @@ class GHand:
         self._opened = False
         self._tactile_opened = False
         self._safety_margin = 0.0
-        self._collision_checker = None
+        self._collision_checker: CollisionClient | None = None
         self._last_result = OperationResult(SdkError.OK, "", comm_type)
 
     def __enter__(self):
@@ -232,22 +228,21 @@ class GHand:
         if mode == CtrlMode.SPEED or mode == CtrlMode.TORQUE:
             logger.warning(
                 "[Joint] ID: %s angle input is invalid in %s mode and will be ignored",
-                JointId(joint.id).name, mode.name,
+                JointId(joint.id).name,
+                mode.name,
             )
         if joint.angle < limit[0]:
             joint.angle = limit[0]
             if mode == CtrlMode.POSITION:
                 logger.warning(
                     "[Joint] ID: %s angle below limit, clamped to min value %.1f degrees",
-                    JointId(joint.id).name, limit[0]
-                )
+                    JointId(joint.id).name, limit[0])
         elif joint.angle > limit[1]:
             joint.angle = limit[1]
             if mode == CtrlMode.POSITION:
                 logger.warning(
                     "[Joint] ID: %s angle above limit, clamped to max value %.1f degrees",
-                    JointId(joint.id).name, limit[1]
-                )
+                    JointId(joint.id).name, limit[1])
 
     @staticmethod
     def _check_speed_limit(joint: JointCommand, mode: CtrlMode):
@@ -337,9 +332,7 @@ class GHand:
             return False
         return True
 
-    def _bitrate_units_to_try(
-        self, baudrate_gear: int | None
-    ) -> tuple[list[int | None], bool]:
+    def _bitrate_units_to_try(self, baudrate_gear: int | None) -> tuple[list[int | None], bool]:
         """Return baud rate gears to try and a quiet flag.
 
         When no gear is provided, the protocol default gear is used. Auto-scan
@@ -408,9 +401,10 @@ class GHand:
             gears, quiet = self._bitrate_units_to_try(baudrate_gear)
             for adapter in adapters:
                 for gear in gears:
-                    connected = self._comm.connect(
-                        adapter, slave_id=slave_id, baudrate_gear=gear, quiet=quiet
-                    )
+                    connected = self._comm.connect(adapter,
+                                                   slave_id=slave_id,
+                                                   baudrate_gear=gear,
+                                                   quiet=quiet)
                     if not connected:
                         continue
 
@@ -443,7 +437,9 @@ class GHand:
             return False
         else:
             connected = self._comm.connect(
-                id, slave_id=slave_id, baudrate_gear=baudrate_gear,
+                id,
+                slave_id=slave_id,
+                baudrate_gear=baudrate_gear,
             )
             if not connected:
                 logger.error("Failed to open device (ID: %s)", id)
@@ -462,7 +458,7 @@ class GHand:
             return False
 
         self._sync_product_config_from_comm()
-        
+
         self._comm.stop()
         time.sleep(0.1)
         self._set_last_result(SdkError.OK)
@@ -479,7 +475,8 @@ class GHand:
         """
         if self._comm_type not in (CommType.CANFD, CommType.RS485):
             logger.error("set_slave_id is only supported for CANFD and RS485")
-            self._set_last_result(SdkError.NOT_SUPPORTED, "set_slave_id is only supported for CANFD and RS485")
+            self._set_last_result(SdkError.NOT_SUPPORTED,
+                                  "set_slave_id is only supported for CANFD and RS485")
             return False
         if not self.is_connected():
             self._set_last_result(SdkError.NOT_CONNECTED, "device is not connected")
@@ -512,7 +509,8 @@ class GHand:
         """
         if self._comm_type not in (CommType.CANFD, CommType.RS485):
             logger.error("set_baudrate_config is only supported for CANFD and RS485")
-            self._set_last_result(SdkError.NOT_SUPPORTED, "set_baudrate_config is only supported for CANFD and RS485")
+            self._set_last_result(SdkError.NOT_SUPPORTED,
+                                  "set_baudrate_config is only supported for CANFD and RS485")
             return False
         if not self.is_connected():
             self._set_last_result(SdkError.NOT_CONNECTED, "device is not connected")
@@ -532,8 +530,7 @@ class GHand:
             elif self._comm_type == CommType.CANFD:
                 gear = baudrate_gear if baudrate_gear is not None else CANFD_DEFAULT_BAUDRATE_GEAR
                 (abit, abit_sample), (dbit, dbit_sample) = CANFD_BAUDRATE_GEAR_MAP.get(
-                    gear, ((None, None), (None, None))
-                )
+                    gear, ((None, None), (None, None)))
                 logger.info(
                     "Baudrate config set to gear 0x%02X (abit=%s/%s%%, dbit=%s/%s%%, effective after reboot)",
                     gear,
@@ -546,7 +543,8 @@ class GHand:
                 logger.info("Baudrate config set (effective after reboot)")
             self._set_last_result(SdkError.OK)
         else:
-            self._set_last_result(SdkError.DEVICE_REJECTED, "device rejected baudrate configuration")
+            self._set_last_result(SdkError.DEVICE_REJECTED,
+                                  "device rejected baudrate configuration")
         return result
 
     def prepare_canfd_baudrate_listener(
@@ -584,7 +582,8 @@ class GHand:
 
         if not self._comm.prepare_baudrate_listener(id, baudrate_gear):
             logger.error("Failed to prepare CANFD listener (ID: %s)", id)
-            self._set_last_result(SdkError.TRANSPORT_ERROR, f"failed to prepare CANFD listener {id}")
+            self._set_last_result(SdkError.TRANSPORT_ERROR,
+                                  f"failed to prepare CANFD listener {id}")
             return False
 
         self._opened = True
@@ -643,20 +642,20 @@ class GHand:
             raise RuntimeError("Device is not connected")
 
         if isinstance(self._comm, EthercatComm):
+
             def adapter(data_bytes, *args, **kwargs):
                 tpdo = Tpdo.from_bytes(data_bytes, self._product_config)
                 device_data = self._tpdo_to_device_data(tpdo)
                 callback(device_data, *args, **kwargs)
         elif isinstance(self._comm, (CanfdComm, Rs485Comm)):
+
             def adapter(hand_state, joints, *args, **kwargs):
                 tactile = None
                 if self._tactile_opened:
                     tactile = self._comm.get_tactile_data()
                     if not tactile:
                         tactile = None
-                device_data = DeviceData(
-                    hand=hand_state, joints=joints, tactile=tactile
-                )
+                device_data = DeviceData(hand=hand_state, joints=joints, tactile=tactile)
                 callback(device_data, *args, **kwargs)
         else:
             raise TypeError(f"Unsupported comm type: {type(self._comm)}")
@@ -677,8 +676,7 @@ class GHand:
                 angle=jtpdo.angle,
                 speed=jtpdo.speed,
                 torque=jtpdo.torque,
-            )
-            for jid, jtpdo in tpdo.joints.items()
+            ) for jid, jtpdo in tpdo.joints.items()
         ]
         tactile = None
         if self._product_config.has_tactile:
@@ -1112,14 +1110,14 @@ class GHand:
                 target_angles[int(joint.id)] = float(joint.angle)
 
         collision_angles = np.asarray(
-            [target_angles[int(joint_id)] for joint_id in _COLLISION_JOINT_ORDER]
-        )
+            [target_angles[int(joint_id)] for joint_id in _COLLISION_JOINT_ORDER])
 
-        result = collision_checker.collision_check(
-            target_angles=collision_angles, safety_margin=self._safety_margin
-        )
+        result = collision_checker.collision_check(target_angles=collision_angles,
+                                                   safety_margin=self._safety_margin)
 
         if result.has_collision:
+            if result.safe_angles is None:
+                raise RuntimeError("Collision checker reported a collision without safe angles")
             safe_angles = target_angles.copy()
             for index, joint_id in enumerate(_COLLISION_JOINT_ORDER):
                 safe_angles[int(joint_id)] = result.safe_angles[index]
@@ -1130,9 +1128,8 @@ class GHand:
         return result
 
     @staticmethod
-    def _joints_to_angles(
-        joints: list[JointCommand], current_joints: list[JointData] | None = None
-    ) -> Any:
+    def _joints_to_angles(joints: list[JointCommand],
+                          current_joints: list[JointData] | None = None) -> Any:
         """Convert a list of Joints to a numpy array.
 
         Args:
@@ -1146,9 +1143,7 @@ class GHand:
         return joints_to_nparray(joints, current_joints)
 
     @staticmethod
-    def _angles_to_joints(
-        angles: Any, speed: int = 100, torque: int = 100
-    ) -> list[JointCommand]:
+    def _angles_to_joints(angles: Any, speed: int = 100, torque: int = 100) -> list[JointCommand]:
         """Convert a numpy array to a list of JointCommand objects.
 
         Args:

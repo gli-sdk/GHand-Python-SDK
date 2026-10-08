@@ -13,7 +13,6 @@ from .pid_controller import LowPassFilter
 from .tactility import TactileAnalysis
 from .utils import FINGER_TO_MCP_PIP, JOINT_TO_FINGER, clip, normalize_joint_id
 
-
 JointAngles = dict[JointId, float]
 FingerForces = dict[TactileSensorId, float]
 
@@ -101,7 +100,7 @@ class PositionHoldPlanner:
         u_boost = self._compute_confirmed_slip_boost_u(slip_confirmed)
         u_over = self._compute_overlimit_control_u(fz_filtered, fz_limit)
         u_ff = self._compute_feedforward_control_u(fz_filtered, finger_count)
-        
+
         control_u = u_slip + u_boost + u_over + u_ff
         if self.is_fragile_mode and fz >= fz_limit:
             control_u = min(control_u, 0.0)
@@ -125,7 +124,7 @@ class PositionHoldPlanner:
             0.0,
             1.0,
         )
-        return cfg.position_hold_max_step_deg * (normalized_risk ** cfg.position_hold_slip_risk_gamma)
+        return cfg.position_hold_max_step_deg * (normalized_risk**cfg.position_hold_slip_risk_gamma)
 
     def _compute_confirmed_slip_boost_u(self, slip_confirmed: bool) -> float:
         if not slip_confirmed:
@@ -195,19 +194,14 @@ class PositionHoldPlanner:
 
     def _get_effective_contact_count(self, finger_fz: FingerForces) -> int:
         active_finger_count = max(len(self.config.active_fingers), 1)
-        contacting_fingers = sum(
-            1
-            for finger in self.config.active_fingers
-            if finger_fz.get(finger, 0.0) > self.config.numeric_epsilon
-        )
+        contacting_fingers = sum(1 for finger in self.config.active_fingers
+                                 if finger_fz.get(finger, 0.0) > self.config.numeric_epsilon)
         return contacting_fingers or active_finger_count
 
     def _is_near_limit(self, finger_fz: FingerForces, finger_count: int) -> bool:
-        threshold = self.config.position_hold_force_limit_slowdown_ratio * self._get_max_normal_force_per_finger(finger_count)
-        return any(
-            finger_fz.get(finger, 0.0) >= threshold
-            for finger in self.config.active_fingers
-        )
+        threshold = self.config.position_hold_force_limit_slowdown_ratio * self._get_max_normal_force_per_finger(
+            finger_count)
+        return any(finger_fz.get(finger, 0.0) >= threshold for finger in self.config.active_fingers)
 
     def _get_max_normal_force_per_finger(self, finger_count: int) -> float:
         if self.profile is not None:
@@ -216,7 +210,8 @@ class PositionHoldPlanner:
 
     def _compute_next_torque(self) -> int:
         if self.profile is None or self.profile.position_hold_torque is None:
-            raise ValueError("ObjectProfile.position_hold_torque is required for position hold mode")
+            raise ValueError(
+                "ObjectProfile.position_hold_torque is required for position hold mode")
         next_torque = self.profile.position_hold_torque
         if self.is_fragile_mode:
             next_torque = int(next_torque * self.config.fragile_torque_reduction)

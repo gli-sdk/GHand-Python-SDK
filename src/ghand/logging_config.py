@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """GHand SDK logging configuration module.
 
 Provides SDK-standard logging setup:
@@ -38,19 +37,16 @@ MODULE_LOGGERS = {
     "ethercat_client": f"{ROOT_LOGGER_NAME}.ethercat_client",
 }
 
-
 # ============================================================================
 # Log formats
 # ============================================================================
 
 FORMAT_SIMPLE = "%(asctime)s [%(levelname)s] %(message)s"
 FORMAT_VERBOSE = "%(asctime)s [%(levelname)s] [%(name)s:%(lineno)d] %(message)s"
-FORMAT_COLOR = (
-    "%(log_color)s%(asctime)s%(reset)s "
-    "[%(log_color)s%(levelname)s%(reset)s] "
-    "[%(cyan)s%(name)s:%(lineno)d%(reset)s] "
-    "%(message)s"
-)
+FORMAT_COLOR = ("%(log_color)s%(asctime)s%(reset)s "
+                "[%(log_color)s%(levelname)s%(reset)s] "
+                "[%(cyan)s%(name)s:%(lineno)d%(reset)s] "
+                "%(message)s")
 
 DATEFMT_STANDARD = "%Y-%m-%d %H:%M:%S"
 DATEFMT_ISO = "%Y-%m-%dT%H:%M:%S"
@@ -66,8 +62,7 @@ LOG_COLORS = {
 
 def _refresh_logger_level(logger: logging.Logger) -> None:
     levels = [
-        handler.level
-        for handler in logger.handlers
+        handler.level for handler in logger.handlers
         if not isinstance(handler, logging.NullHandler)
     ]
     logger.setLevel(min(levels) if levels else logging.NOTSET)
