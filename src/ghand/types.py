@@ -209,53 +209,37 @@ class GestureType(enum.Enum):
 
 
 class SelfTestError(enum.IntFlag):
-    """A0 summary bit mask. Multiple bits may be set simultaneously."""
+    """A0 module error bit mask. Multiple bits may be set simultaneously.
+
+    Each set bit selects the follow-up query: ``MOTOR`` reads A8,
+    ``SENSOR`` reads A2, ``JOINT`` reads A6.
+    """
 
     NONE = 0x00
     MOTOR = 0x01
-    POSITION_SENSOR_UNMAPPED = 0x02
-    ZEROING = 0x04
-    FAN = 0x08
-    TEMPERATURE_SENSOR = 0x10
-    TACTILE_SENSOR = 0x20
-    POSITION_SENSOR = 0x40
-    VERSION = 0x80
+    SENSOR = 0x02
+    JOINT = 0x04
 
 
-class VersionCheckError(enum.IntFlag):
-    """A1 version-mismatch bit mask."""
+class SensorError(enum.IntFlag):
+    """A2 sensor error bit mask per channel."""
 
     NONE = 0x00
-    MOTOR_DRIVER = 0x20
-    TACTILE_SENSOR = 0x40
-    POSITION_SENSOR = 0x80
+    SELF_CHECK_FAILED = 0x01
+    MAPPING_FAILED = 0x02
+    TRAVEL_DEVIATION = 0x04
 
 
-class TactileCheckError(enum.IntFlag):
-    """A3 tactile-sensor bit mask per motor channel."""
-
-    NONE = 0x00
-    THUMB_TIP_DISCONNECTED = 0x01
-    FF_TIP_DISCONNECTED = 0x02
-    MF_TIP_DISCONNECTED = 0x04
-    RF_TIP_DISCONNECTED = 0x08
-    LF_TIP_DISCONNECTED = 0x10
-    COMMUNICATION_FAILED = 0x80
-
-
-class ZeroingError(enum.IntEnum):
-    """A6 zeroing error per motor channel (single-value enum)."""
+class JointError(enum.IntFlag):
+    """A6 joint error bit mask per channel."""
 
     NONE = 0x00
-    MOTOR_ABNORMAL = 0x01
-    JOINT_STALL = 0x02
-    BRAKE_TIMEOUT = 0x03
-    GLOBAL_TIMEOUT = 0x04
-    COMMUNICATION_FAULT = 0x05
+    STALL = 0x01
+    TIMEOUT = 0x02
 
 
 class MotorCheckError(enum.IntEnum):
-    """A8 motor-detection error per motor channel."""
+    """A8 motor error code per motor channel (single-value enum)."""
 
     NONE = 0x00
     HARDWARE_OVER_CURRENT = 0x01
@@ -403,7 +387,7 @@ class DeviceData:
 
 @dataclass
 class MotorDiagnosticError:
-    """Self-test error for a single 13-channel motor slot."""
+    """Self-test error for a single 13-channel slot (motor / sensor / joint)."""
 
     motor_index: int
     joint_id: JointId | None
@@ -415,12 +399,8 @@ class SelfTestErrorInfo:
     """Structured result of the self-test error query (Command 0xA0)."""
 
     summary: SelfTestError = SelfTestError.NONE
-    version: VersionCheckError = VersionCheckError.NONE
-    position_sensor: list[MotorDiagnosticError] = field(default_factory=list)
-    tactile_sensor: list[MotorDiagnosticError] = field(default_factory=list)
-    temperature: int = 0
-    fan: int = 0
-    zeroing: list[MotorDiagnosticError] = field(default_factory=list)
+    sensor: list[MotorDiagnosticError] = field(default_factory=list)
+    joint: list[MotorDiagnosticError] = field(default_factory=list)
     motor: list[MotorDiagnosticError] = field(default_factory=list)
 
     @property
@@ -438,33 +418,14 @@ class SelfTestErrorInfo:
             ]
             lines[0] += f" ({', '.join(names)})"
 
-        if self.summary & SelfTestError.POSITION_SENSOR_UNMAPPED:
-            lines.append("position_sensor_unmapped: position sensor unmapped")
-        if self.summary & SelfTestError.VERSION:
-            names = [
-                flag.name for flag in VersionCheckError
-                if flag.name is not None and flag != VersionCheckError.NONE and self.version & flag
-            ]
-            lines.append(f"version: 0x{int(self.version):02X} ({', '.join(names) or 'none'})")
-        if self.summary & SelfTestError.POSITION_SENSOR:
-            lines.append("position_sensor: " + _describe_motor_errors(
-                self.position_sensor,
-                lambda c: "position sensor abnormal" if c else "unknown",
-            ))
-        if self.summary & SelfTestError.TACTILE_SENSOR:
-            lines.append("tactile_sensor: " +
-                         _describe_motor_errors(self.tactile_sensor, _describe_tactile_code))
-        if self.summary & SelfTestError.TEMPERATURE_SENSOR:
-            desc = "temperature sensor abnormal" if self.temperature else "none"
-            lines.append(f"temperature: 0x{self.temperature:02X} ({desc})")
-        if self.summary & SelfTestError.FAN:
-            desc = "fan abnormal" if self.fan else "none"
-            lines.append(f"fan: 0x{self.fan:02X} ({desc})")
-        if self.summary & SelfTestError.ZEROING:
-            lines.append("zeroing: " + _describe_motor_errors(
-                self.zeroing, lambda c: _enum_name_or_unknown(ZeroingError, c)))
+        if self.summary & SelfTestError.SENSOR:
+            lines.append("sensor: " + _describe_channel_errors(
+                self.sensor, lambda c: _describe_flag_code(SensorError, c)))
+        if self.summary & SelfTestError.JOINT:
+            lines.append("joint: " + _describe_channel_errors(
+                self.joint, lambda c: _describe_flag_code(JointError, c)))
         if self.summary & SelfTestError.MOTOR:
-            lines.append("motor: " + _describe_motor_errors(
+            lines.append("motor: " + _describe_channel_errors(
                 self.motor, lambda c: _enum_name_or_unknown(MotorCheckError, c)))
         return "\n  ".join(lines)
 
@@ -476,15 +437,15 @@ def _enum_name_or_unknown(enum_type, code: int) -> str:
         return f"unknown (0x{code:02X})"
 
 
-def _describe_tactile_code(code: int) -> str:
+def _describe_flag_code(enum_type, code: int) -> str:
     names = [
-        flag.name for flag in TactileCheckError
-        if flag.name is not None and flag != TactileCheckError.NONE and code & flag
+        flag.name for flag in enum_type
+        if flag.name is not None and flag != enum_type.NONE and code & flag
     ]
     return ", ".join(names) if names else f"unknown (0x{code:02X})"
 
 
-def _describe_motor_errors(errors: list[MotorDiagnosticError], describe_code) -> str:
+def _describe_channel_errors(errors: list[MotorDiagnosticError], describe_code) -> str:
     if not errors:
         return "none"
     return "; ".join(f"motor={e.motor_index} "

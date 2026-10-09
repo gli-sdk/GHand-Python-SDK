@@ -19,11 +19,12 @@ import math
 import struct
 from dataclasses import dataclass, field
 
-from ..types import ErrorCode, JointId, ProductConfig, State
+from ..types import ErrorCode, JointId, ProductConfig, ProductType, State
 
 # TPDO component byte sizes
 _HAND_TPDO_SIZE = struct.calcsize('<BBh')  # 4
 _JOINT_TPDO_SIZE = struct.calcsize('<BBfbb')  # 8
+_LITE1_JOINT_TPDO_SIZE = struct.calcsize('<BBHbb')  # 6
 _TACTILE_STATE_SIZE = 2  # BB
 _TACTILE_RESULTANT_SIZE = 6  # resultant xyz (int16[3], low byte valid)
 _TACTILE_SAMPLE_PER_GROUP = 3  # xyz per sample group
@@ -36,11 +37,12 @@ def compute_tpdo_size(joint_count: int, tactile_region_counts: list[int] | None 
         joint_count: Total number of joints.
         tactile_region_counts: List of tactile region sample-group counts.
             If omitted, tactile data is excluded from the calculation.
+        joint_size: Size of one joint entry in bytes.
 
     Returns:
         Expected TPDO size in bytes.
     """
-    total = _HAND_TPDO_SIZE + joint_count * _JOINT_TPDO_SIZE
+    total = _HAND_TPDO_SIZE + joint_count * joint_size
     if tactile_region_counts:
         total += _TACTILE_STATE_SIZE
         for count in tactile_region_counts:
@@ -174,9 +176,12 @@ class Tpdo:
         Returns:
             Populated Tpdo instance.
         """
+        is_lite1 = config.product_type == ProductType.GHandLite1
+        joint_size = _LITE1_JOINT_TPDO_SIZE if is_lite1 else _JOINT_TPDO_SIZE
         expected_size = compute_tpdo_size(
             len(config.valid_joints),
             [r.count for r in config.tactile_regions] if config.has_tactile else None,
+            joint_size=joint_size,
         )
         instance = cls(config)
         if len(data) < expected_size:
@@ -187,10 +192,16 @@ class Tpdo:
         offset += _HAND_TPDO_SIZE
 
         for jid in config.valid_joints:
-            joint = JointTpdo.from_bytes(data[offset:offset + _JOINT_TPDO_SIZE])
+            if is_lite1:
+                state, error, angle_raw, speed, torque = struct.unpack_from(
+                    '<BBHbb', data, offset
+                )
+                joint = JointTpdo(state, error, angle_raw / 10.0, speed, torque)
+            else:
+                joint = JointTpdo.from_bytes(data[offset:offset + joint_size])
             instance.joints[jid] = joint
             setattr(instance, jid.name.lower(), joint)
-            offset += _JOINT_TPDO_SIZE
+            offset += joint_size
 
         if not config.has_tactile:
             return instance

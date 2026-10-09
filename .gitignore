@@ -28,3 +28,5 @@ package.sh
 package.bat
 CLAUDE.md
 nul
+reviews/
+tests/
