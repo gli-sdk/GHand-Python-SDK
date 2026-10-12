@@ -65,7 +65,7 @@ from .modbus_codec import (
     REG_IN_TACTILE_SENSOR_VER,
     REG_IN_THUMB_TACTILE_SENSOR_VER,
     build_tactile_info,
-    encode_joint_command,
+    encode_hand_command_frame,
     get_joint_input_span,
     get_modbus_profile,
     parse_device_name,
@@ -490,63 +490,27 @@ class CanfdComm(IComm):
     # ------------------------------------------------------------------
 
     def move_joints(self, joints: list, mode: CtrlMode) -> bool:
-        """Send joint control commands."""
+        """Send one whole-hand command with zero motion data for omitted joints."""
         if not self.is_connected():
             logger.error("Cannot move joints: CANFD device is not connected")
             return False
 
-        if self._profile.mode_register is not None:
-            mode_value = (mode.value << 8) & 0xFF00
-            logger.debug(
-                "CANFD write mode register addr=0x%04X value=0x%04X",
-                self._profile.mode_register,
-                mode_value,
+        address, registers = encode_hand_command_frame(joints, mode, self._profile)
+        logger.debug(
+            "CANFD write whole-hand command addr=0x%04X count=%d",
+            address,
+            len(registers),
+        )
+        try:
+            self._transport.write_registers(
+                self._src_id,
+                self._slave_id,
+                address,
+                struct.pack(f">{len(registers)}H", *registers),
             )
-            try:
-                self._transport.write_registers(
-                    self._src_id,
-                    self._slave_id,
-                    self._profile.mode_register,
-                    struct.pack(">H", mode_value),
-                )
-            except Exception:
-                logger.exception(
-                    "Failed to write CANFD mode register addr=0x%04X",
-                    self._profile.mode_register,
-                )
-                raise
-
-        for joint in joints:
-            joint_id = JointId(joint.id)
-            base_addr = self._profile.joint_control_addresses.get(joint_id)
-            if base_addr is None:
-                continue
-            position, speed_torque = encode_joint_command(joint)
-            if self._profile.control_layout == "per_joint_mode_3reg":
-                mode_stop = ((mode.value & 0xFF) << 8) | 0x00
-                registers = [mode_stop, position, speed_torque]
-            else:
-                registers = [position, speed_torque]
-            logger.debug(
-                "CANFD write joint=%s addr=0x%04X registers=%s",
-                joint_id.name,
-                base_addr,
-                [f"0x{reg:04X}" for reg in registers],
-            )
-            try:
-                self._transport.write_registers(
-                    self._src_id,
-                    self._slave_id,
-                    base_addr,
-                    struct.pack(f">{len(registers)}H", *registers),
-                )
-            except Exception:
-                logger.exception(
-                    "Failed to write CANFD joint=%s addr=0x%04X",
-                    joint_id.name,
-                    base_addr,
-                )
-                raise
+        except Exception:
+            logger.exception("Failed to write CANFD whole-hand command")
+            raise
         return True
 
     def stop(self) -> bool:

@@ -416,6 +416,31 @@ def encode_joint_command_registers(
     return [position, speed_torque]
 
 
+def encode_hand_command_frame(
+    joints,
+    mode: CtrlMode,
+    profile: ModbusRegisterProfile,
+) -> tuple[int, list[int]]:
+    """Encode a whole-hand command with zero motion data for omitted joints."""
+    width = 3 if profile.control_layout == "per_joint_mode_3reg" else 2
+    addresses = profile.joint_control_addresses
+    start = profile.mode_register if profile.mode_register is not None else min(addresses.values())
+    end = max(addresses.values()) + width
+    registers = [0] * (end - start)
+    if profile.mode_register is not None:
+        registers[0] = (mode.value << 8) & 0xFF00
+    if profile.control_layout == "per_joint_mode_3reg":
+        for address in addresses.values():
+            registers[address - start] = (mode.value << 8) & 0xFF00
+    for joint in joints:
+        address = addresses.get(JointId(joint.id))
+        if address is None:
+            continue
+        offset = address - start
+        registers[offset:offset + width] = encode_joint_command_registers(joint, mode, profile)
+    return start, registers
+
+
 def build_tactile_info(
     state_bit: bool,
     resultant_force: list[float],
