@@ -452,11 +452,21 @@ class EthercatComm(IComm):
         """Clear device faults.
 
         Returns:
-            True on success, False if the device rejected the command.
+            True on confirmed success, False on rejection or polling timeout.
         """
         self._client.sdo_write(0x2002, 0x01, b'\x01')
-        logger.info("Fault cleared")
-        return True
+        time.sleep(self._SDO_WRITE_SETTLE_SEC)
+        for _ in range(100):
+            state = self._client.sdo_read(0x2002, 0x02)
+            if state == b'\x00':
+                result = self._client.sdo_read(0x2002, 0x03)
+                if result == b'\x01':
+                    logger.info("Fault cleared")
+                    return True
+                logger.error("Device rejected clear_fault command")
+                return False
+        logger.error("Clear fault operation timed out")
+        return False
 
     def init_joint(self) -> bool:
         """Initialize joint positions.
