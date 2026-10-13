@@ -348,6 +348,17 @@ class EthercatClient:
             else:
                 slave.is_lost = False
 
+    def _recover_slaves(self) -> None:
+        """Recover slaves that left OP; call with ``_data_lock`` held."""
+        self._master.read_state()
+        for i, slave in enumerate(self._master.slaves):
+            if slave.state != pysoem.OP_STATE:
+                self._clear_pdo_ready(
+                    f"check-slave-state(slave={i},state={slave.state})"
+                )
+                self._master.do_check_state = True
+                self._check_slave(slave)
+
     def _processdata_thread(self):
         """Background thread that sends and receives cyclic process data."""
         while not self._pd_thread_stop_event.is_set():
@@ -379,6 +390,8 @@ class EthercatClient:
                         self._master.do_check_state = True
                         self._consecutive_wkc_errors += 1
                 if not valid:
+                    with self._data_lock:
+                        self._recover_slaves()
                     # Tiered logging: single misses are noise on a healthy bus,
                     # a small run is a warning, and sustained failure is an
                     # error that also trips connection_lost below.
@@ -439,18 +452,11 @@ class EthercatClient:
                         or self._master.do_check_state
                     ):
                         self._master.do_check_state = False
-                        self._master.read_state()
                         need_check = True
 
                 if need_check:
                     with self._data_lock:
-                        for i, slave in enumerate(self._master.slaves):
-                            if slave.state != pysoem.OP_STATE:
-                                self._clear_pdo_ready(
-                                    f"check-slave-state(slave={i},state={slave.state})"
-                                )
-                                self._master.do_check_state = True
-                                self._check_slave(slave)
+                        self._recover_slaves()
             except Exception as e:
                 logger.error("Error in check thread: %s", e)
             time.sleep(0.01)

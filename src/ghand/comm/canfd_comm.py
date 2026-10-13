@@ -531,12 +531,15 @@ class CanfdComm(IComm):
             time.sleep(interval_sec)
         return False
 
-    def _write_connection_control(self, slave_id: int, value: int) -> bool:
+    def _write_connection_control(
+        self, slave_id: int, value: int, timeout_ms: int = 5000
+    ) -> bool:
         if not self._transport.write_registers(
             self._src_id,
             slave_id,
             REG_CONNECTION_CONTROL,
             struct.pack(">H", value),
+            timeout_ms=timeout_ms,
         ):
             return False
         self._slave_id = slave_id
@@ -544,7 +547,7 @@ class CanfdComm(IComm):
 
     def _delete_connection(self) -> None:
         """Write 2 to the connection-control register."""
-        self._write_connection_control(self._slave_id, 2)
+        self._write_connection_control(self._slave_id, 2, timeout_ms=2000)
 
     def set_slave_id(self, slave_id: int) -> bool:
         """Write a new CANFD node/slave ID to holding register 0x0003.

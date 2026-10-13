@@ -396,9 +396,10 @@ def parse_tactile_distributed(data_bytes: bytes, count: int) -> list[float]:
 
     Returns:
         Flat list of [fx1, fy1, fz1, fx2, fy2, fz2, ...].
-        Each component is an int8 (signed) or uint8 (unsigned for Fz).
+        Each component is returned as a float parsed from an int8 (signed) or
+        uint8 (unsigned for Fz).
     """
-    distributed = []
+    distributed: list[float] = []
     for i in range(0, len(data_bytes) - 2, 3):
         fx_d = data_bytes[i]
         fy_d = data_bytes[i + 1]
@@ -407,7 +408,7 @@ def parse_tactile_distributed(data_bytes: bytes, count: int) -> list[float]:
             fx_d -= 0x100
         if fy_d >= 0x80:
             fy_d -= 0x100
-        distributed.extend([fx_d, fy_d, fz_d])
+        distributed.extend([float(fx_d), float(fy_d), float(fz_d)])
     return distributed
 
 

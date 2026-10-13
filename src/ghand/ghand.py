@@ -602,11 +602,6 @@ class GHand:
             logger.exception("Failed to query connection state before close")
 
         if connected:
-            try:
-                self._comm.stop()
-                time.sleep(1)
-            except Exception as exc:
-                logger.warning("Failed to stop device before disconnect: %s", exc)
             self._comm.disconnect()
             logger.info("Disconnected from device")
         self._opened = False
@@ -1128,6 +1123,8 @@ class GHand:
         )
 
         if result.has_collision:
+            if result.safe_angles is None:
+                raise RuntimeError("Collision checker reported a collision without safe angles")
             safe_angles = target_angles.copy()
             for index, joint_id in enumerate(_COLLISION_JOINT_ORDER):
                 safe_angles[int(joint_id)] = result.safe_angles[index]
