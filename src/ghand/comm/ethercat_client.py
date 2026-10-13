@@ -24,6 +24,8 @@ import threading
 import time
 from collections import deque
 
+from ..types import CommandReceipt
+
 import pysoem
 
 try:
@@ -32,6 +34,15 @@ except ImportError:
     psutil = None
 
 logger = logging.getLogger("ghand.ethercat_client")
+
+
+class _ReceivedBytes(bytes):
+    """Keep a TPDO snapshot and its receive time together through dispatch."""
+
+    def __new__(cls, data, received_at_ms):
+        obj = super().__new__(cls, data)
+        obj.received_at_ms = received_at_ms
+        return obj
 
 
 class EthercatClient:
@@ -113,6 +124,7 @@ class EthercatClient:
         # process-data timeout, so a single bad cycle does not surface as an
         # error to the application.
         self._last_valid_tpdo_snapshot = None
+        self._pending_receipt = None
         # Thread-safety lock
         self._data_lock = threading.RLock()
         # Exclusive adapter lock
@@ -279,6 +291,7 @@ class EthercatClient:
             self._consecutive_wkc_errors = 0
             self._wkc_validity_window.clear()
             self._last_valid_tpdo_snapshot = None
+            self._pending_receipt = None
 
         self._release_lock()
         self._master = self._create_master()
@@ -335,7 +348,10 @@ class EthercatClient:
         while not self._pd_thread_stop_event.is_set():
             try:
                 with self._data_lock:
-                    self._master.send_processdata()
+                    sent = self._master.send_processdata()
+                    if sent > 0 and self._pending_receipt is not None:
+                        self._pending_receipt.sent_at_ms = time.time_ns() // 1_000_000
+                        self._pending_receipt = None
                     self._actual_wkc = self._master.receive_processdata(15_000)
                     valid = self._actual_wkc >= self._expected_wkc and self._actual_wkc >= 1
                     self._wkc_validity_window.append(valid)
@@ -347,7 +363,8 @@ class EthercatClient:
                         # served a coherent frame even if the next cycle's WKC
                         # is bad. bytes(...) copies out of the shared buffer.
                         if self._slave is not None:
-                            self._last_valid_tpdo_snapshot = bytes(self._slave.input)
+                            self._last_valid_tpdo_snapshot = _ReceivedBytes(
+                                self._slave.input, time.time_ns() // 1_000_000)
                     else:
                         self._consecutive_wkc_errors += 1
                 if not valid:
@@ -450,7 +467,7 @@ class EthercatClient:
                     f"EtherCAT process data timeout: last valid frame {age * 1000:.1f} ms old")
             return self._last_valid_tpdo_snapshot
 
-    def send_data(self, data: bytes):
+    def send_data(self, data: bytes, receipt: CommandReceipt | None = None):
         """Send RPDO bytes to the slave.
 
         Args:
@@ -469,6 +486,9 @@ class EthercatClient:
                 hex_str = ' '.join(f'{b:02x}' for b in data)
                 logger.debug("Sending %d bytes:\n%s", len(data), hex_str)
                 self._slave.output = data
+                self._pending_receipt = receipt
+                if receipt is not None:
+                    receipt.submitted_at_ms = time.time_ns() // 1_000_000
             else:
                 raise RuntimeError("Device disconnected")
 

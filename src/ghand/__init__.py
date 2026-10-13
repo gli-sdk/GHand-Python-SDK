@@ -38,6 +38,7 @@ from .errors import (
 )
 from .diagnostics import Diagnostics
 from .types import (
+    CommandReceipt,
     CommType,
     CtrlMode,
     CANFDBitTiming,
@@ -61,6 +62,7 @@ __all__ = [
     # Core classes
     "GHand",
     "DeviceData",
+    "CommandReceipt",
     "JointCommand",
     "JointData",
     "JointId",

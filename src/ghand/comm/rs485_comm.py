@@ -37,6 +37,7 @@ except ImportError:
     ModbusSerialClient = None  # type: ignore[misc,assignment]
     ModbusException = Exception  # type: ignore[misc,assignment]
 from ..types import (
+    CommandReceipt,
     ErrorCode,
     HandState,
     JointData,
@@ -96,6 +97,21 @@ RS485_BAUDRATE_GEAR_MAP: dict[int, int] = {
 RS485_DEFAULT_BAUDRATE_GEAR = 0x05
 
 logger = logging.getLogger("ghand.rs485_comm")
+
+
+if ModbusSerialClient is not None:
+
+    class _TimestampedSerialClient(ModbusSerialClient):
+        """Record completed serial writes before waiting for the response."""
+
+        command_receipt = None
+
+        def send(self, request, *args, **kwargs):
+            size = super().send(request, *args, **kwargs)
+            receipt = self.command_receipt
+            if request and size == len(request) and receipt is not None:
+                receipt.sent_at_ms = time.time_ns() // 1_000_000
+            return size
 
 
 class Rs485Comm(IComm):
@@ -159,11 +175,19 @@ class Rs485Comm(IComm):
         with self._io_lock:
             return client.write_register(address, value, device_id=self._slave_id)
 
-    def _write_registers(self, address: int, values: list[int]):
+    def _write_registers(self, address: int, values: list[int],
+                         receipt: CommandReceipt | None = None):
         """Write multiple holding registers as one serialized Modbus transaction."""
         client = self._ensure_client()
         with self._io_lock:
-            return client.write_registers(address, values, device_id=self._slave_id)
+            if receipt is None:
+                return client.write_registers(address, values, device_id=self._slave_id)
+            receipt.submitted_at_ms = time.time_ns() // 1_000_000
+            client.command_receipt = receipt
+            try:
+                return client.write_registers(address, values, device_id=self._slave_id)
+            finally:
+                client.command_receipt = None
 
     @classmethod
     def _linux_serial_candidates(cls) -> list[str]:
@@ -284,7 +308,7 @@ class Rs485Comm(IComm):
                                quiet: bool) -> bool:
         """Attempt a single RS485 connection with the given baud rate."""
         try:
-            self._client = ModbusSerialClient(
+            self._client = _TimestampedSerialClient(
                 port=device_name,
                 baudrate=baudrate,
                 bytesize=8,
@@ -391,7 +415,7 @@ class Rs485Comm(IComm):
 
     # ===== Joint control =====
 
-    def move_joints(self, joints: list, mode) -> bool:
+    def move_joints(self, joints: list, mode, receipt: CommandReceipt | None = None) -> bool:
         """Send one whole-hand command with zero motion data for omitted joints.
 
         Args:
@@ -402,7 +426,8 @@ class Rs485Comm(IComm):
             True if all commands are sent successfully.
         """
         address, registers = encode_hand_command_frame(joints, mode, self._profile)
-        result = self._write_registers(address, registers)
+        write_kwargs = {"receipt": receipt} if receipt is not None else {}
+        result = self._write_registers(address, registers, **write_kwargs)
         if result is None or result.isError():
             raise RuntimeError("Failed to write whole-hand joint command")
 
@@ -443,12 +468,16 @@ class Rs485Comm(IComm):
         if result is None or result.isError():
             raise RuntimeError("Failed to read joint registers")
 
-        return parse_joints(
+        received_at_ms = time.time_ns() // 1_000_000
+        joints = parse_joints(
             list(result.registers),
             self._config.valid_joints,
             self._profile,
             start,
         )
+        for joint in joints:
+            joint.received_at_ms = received_at_ms
+        return joints
 
     def get_hand_info(self) -> HandState:
         """Retrieve high-level hand status.
@@ -460,8 +489,11 @@ class Rs485Comm(IComm):
         if result is None or result.isError():
             raise RuntimeError("Failed to read hand info registers")
 
+        received_at_ms = time.time_ns() // 1_000_000
         raw = result.registers
-        return parse_hand_info(raw)
+        hand = parse_hand_info(raw)
+        hand.received_at_ms = received_at_ms
+        return hand
 
     def get_tactile_data(self) -> dict:
         """Retrieve tactile sensor data.
@@ -479,6 +511,7 @@ class Rs485Comm(IComm):
         )
         if result is None or result.isError():
             raise RuntimeError("Failed to read tactile input registers")
+        received_at_ms = time.time_ns() // 1_000_000
         data = result.registers
         if len(data) < self._profile.tactile_resultant_register_count:
             raise RuntimeError("Tactile data insufficient")
@@ -497,14 +530,17 @@ class Rs485Comm(IComm):
             # Read distributed force
             dist_regs = (region.count * 3 + 1) // 2
             dist_result = self._read_input_registers(current_addr, count=dist_regs)
+            region_received_at_ms = received_at_ms
             distributed = None
             if dist_result is not None and not dist_result.isError():
+                region_received_at_ms = time.time_ns() // 1_000_000
                 dist_bytes = registers_to_bytes(dist_result.registers)
                 distributed = parse_tactile_distributed(dist_bytes, region.count)
 
             current_addr += dist_regs
 
             result[region.id] = build_tactile_info(state_bit, resultant, distributed)
+            result[region.id].received_at_ms = region_received_at_ms
         return result
 
     # ===== Device info reading =====
@@ -765,6 +801,7 @@ class Rs485Comm(IComm):
                 if result is None or result.isError():
                     raise ConnectionError("RS485 device did not respond")
 
+                received_at_ms = time.time_ns() // 1_000_000
                 raw = list(result.registers)
                 hand_offset = self._profile.hand_info_address - start
                 hand_state = parse_hand_info(raw[hand_offset:hand_offset + 2])
@@ -774,6 +811,10 @@ class Rs485Comm(IComm):
                     self._profile,
                     start,
                 )
+
+                hand_state.received_at_ms = received_at_ms
+                for joint in joints:
+                    joint.received_at_ms = received_at_ms
 
                 with self._lock:
                     callbacks = list(self._callbacks.values())

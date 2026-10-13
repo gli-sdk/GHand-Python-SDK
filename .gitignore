@@ -29,4 +29,4 @@ package.bat
 CLAUDE.md
 nul
 reviews/
-tests/
+tests/*

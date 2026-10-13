@@ -42,6 +42,7 @@ from .diagnostics import (
 from .errors import OperationResult, SdkError
 from .types import (
     CANFDBitTiming,
+    CommandReceipt,
     CommType,
     CtrlMode,
     DeviceData,
@@ -643,7 +644,8 @@ class GHand:
 
             def adapter(data_bytes, *args, **kwargs):
                 tpdo = Tpdo.from_bytes(data_bytes, self._product_config)
-                device_data = self._tpdo_to_device_data(tpdo)
+                device_data = self._tpdo_to_device_data(
+                    tpdo, getattr(data_bytes, "received_at_ms", None))
                 callback(device_data, *args, **kwargs)
         elif isinstance(self._comm, (CanfdComm, Rs485Comm)):
 
@@ -653,21 +655,24 @@ class GHand:
                     tactile = self._comm.get_tactile_data()
                     if not tactile:
                         tactile = None
-                device_data = DeviceData(hand=hand_state, joints=joints, tactile=tactile)
+                device_data = DeviceData(hand=hand_state, joints=joints, tactile=tactile,
+                                         received_at_ms=hand_state.received_at_ms)
                 callback(device_data, *args, **kwargs)
         else:
             raise TypeError(f"Unsupported comm type: {type(self._comm)}")
         return self._comm.subscribe(adapter, interval_ms=interval_ms)
 
-    def _tpdo_to_device_data(self, tpdo) -> DeviceData:
+    def _tpdo_to_device_data(self, tpdo, received_at_ms: int | None = None) -> DeviceData:
         """Convert an EtherCAT Tpdo to a protocol-agnostic DeviceData."""
         hand = HandState(
             state=EthercatComm._parse_state(tpdo.hand.state),
             error=EthercatComm._parse_error_code(tpdo.hand.error),
             temperature=tpdo.hand.temperature,
+            received_at_ms=received_at_ms,
         )
         joints = [
             JointData(
+                received_at_ms=received_at_ms,
                 id=jid.value,
                 state=EthercatComm._parse_state(jtpdo.state),
                 error=EthercatComm._parse_error_code(jtpdo.error),
@@ -687,8 +692,9 @@ class GHand:
                         state=bool(tpdo.tactile_state.state & (1 << region.id.value)),
                         resultant_force=tdata.resultant_force,
                         distributed_force=tdata.sample_force,
+                        received_at_ms=received_at_ms,
                     )
-        return DeviceData(hand=hand, joints=joints, tactile=tactile)
+        return DeviceData(hand=hand, joints=joints, tactile=tactile, received_at_ms=received_at_ms)
 
     def unsubscribe(self, sub_id):
         """Unsubscribe from data updates.
@@ -914,16 +920,26 @@ class GHand:
                 self._hand_type = HandType.RIGHT_HAND
         return self._hand_type
 
-    def move_joints(self, joints: list[JointCommand], mode: CtrlMode = CtrlMode.POSITION) -> bool:
+    def move_joints(
+        self, joints: list[JointCommand], mode: CtrlMode = CtrlMode.POSITION,
+        *, receipt: CommandReceipt | None = None,
+    ) -> bool:
         """Send joint control commands.
 
         Args:
             joints: List of JointCommand objects.
             mode: Control mode. Defaults to POSITION.
+            receipt: Optional fresh receipt for this command's host Unix
+                millisecond timestamps. EtherCAT fills sent_at_ms asynchronously;
+                read the same receipt again after a cycle. None means the send
+                has not completed. Use a new receipt for each call.
 
         Returns:
-            True if the command is sent successfully.
+            True if accepted (EtherCAT) or acknowledged (CAN FD / RS485).
+            This does not indicate completed device execution.
         """
+        if receipt is not None:
+            receipt.success = False
         if not self.is_connected():
             self._set_last_result(SdkError.NOT_CONNECTED, "device is not connected")
             return False
@@ -952,7 +968,11 @@ class GHand:
             return False
 
         try:
-            result = self._comm.move_joints(active_joints, mode)
+            if receipt is None:
+                result = self._comm.move_joints(active_joints, mode)
+            else:
+                result = self._comm.move_joints(active_joints, mode, receipt=receipt)
+                receipt.success = result
             self._set_last_result(
                 SdkError.OK if result else SdkError.TRANSPORT_ERROR,
                 "" if result else "move_joints failed",

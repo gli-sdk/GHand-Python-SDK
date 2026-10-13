@@ -37,6 +37,7 @@ except ImportError:
     list_ports = None  # type: ignore[assignment]
 
 from ..types import (
+    CommandReceipt,
     CtrlMode,
     ErrorCode,
     HandState,
@@ -489,7 +490,8 @@ class CanfdComm(IComm):
     # Joint control
     # ------------------------------------------------------------------
 
-    def move_joints(self, joints: list, mode: CtrlMode) -> bool:
+    def move_joints(self, joints: list, mode: CtrlMode,
+                    receipt: CommandReceipt | None = None) -> bool:
         """Send one whole-hand command with zero motion data for omitted joints."""
         if not self.is_connected():
             logger.error("Cannot move joints: CANFD device is not connected")
@@ -501,12 +503,14 @@ class CanfdComm(IComm):
             address,
             len(registers),
         )
+        write_kwargs = {"receipt": receipt} if receipt is not None else {}
         try:
             self._transport.write_registers(
                 self._src_id,
                 self._slave_id,
                 address,
                 struct.pack(f">{len(registers)}H", *registers),
+                **write_kwargs,
             )
         except Exception:
             logger.exception("Failed to write CANFD whole-hand command")
@@ -548,9 +552,13 @@ class CanfdComm(IComm):
                                                    start,
                                                    count,
                                                    func_code=0x04)
+        received_at_ms = time.time_ns() // 1_000_000
         # Convert bytes back to uint16 register list for the shared codec.
         raw = list(struct.unpack(f">{count}H", raw_bytes[:count * 2]))
-        return parse_joints(raw, self._config.valid_joints, self._profile, start)
+        joints = parse_joints(raw, self._config.valid_joints, self._profile, start)
+        for joint in joints:
+            joint.received_at_ms = received_at_ms
+        return joints
 
     def get_hand_info(self) -> HandState:
         """Retrieve high-level hand status."""
@@ -561,8 +569,11 @@ class CanfdComm(IComm):
             2,
             func_code=0x04,
         )
+        received_at_ms = time.time_ns() // 1_000_000
         raw = list(struct.unpack(">2H", raw_bytes[:4]))
-        return parse_hand_info(raw)
+        hand = parse_hand_info(raw)
+        hand.received_at_ms = received_at_ms
+        return hand
 
     def get_tactile_data(self) -> dict:
         """Retrieve tactile sensor data."""
@@ -596,10 +607,12 @@ class CanfdComm(IComm):
                                                         current_addr,
                                                         dist_regs,
                                                         func_code=0x04)
+            received_at_ms = time.time_ns() // 1_000_000
             distributed = parse_tactile_distributed(dist_bytes, region.count)
             current_addr += dist_regs
 
             result[region.id] = build_tactile_info(state_bit, resultant, distributed)
+            result[region.id].received_at_ms = received_at_ms
         return result
 
     # ------------------------------------------------------------------
@@ -841,6 +854,7 @@ class CanfdComm(IComm):
                                                            start,
                                                            count,
                                                            func_code=0x04)
+                received_at_ms = time.time_ns() // 1_000_000
                 raw = list(struct.unpack(f">{count}H", raw_bytes[:count * 2]))
                 hand_offset = self._profile.hand_info_address - start
                 hand_state = parse_hand_info(raw[hand_offset:hand_offset + 2])
@@ -850,6 +864,10 @@ class CanfdComm(IComm):
                     self._profile,
                     start,
                 )
+
+                hand_state.received_at_ms = received_at_ms
+                for joint in joints:
+                    joint.received_at_ms = received_at_ms
 
                 with self._lock:
                     callbacks = list(self._callbacks.values())

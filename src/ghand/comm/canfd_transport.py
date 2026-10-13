@@ -22,6 +22,8 @@ read/write over CANFD frames. ZQWL CDC adapters use a serial backend.
 
 from __future__ import annotations
 
+from ..types import CommandReceipt
+
 import logging
 import os
 import struct
@@ -585,6 +587,7 @@ class CanfdTransport:
         addr: int,
         data: bytes,
         timeout_ms: int = 5000,
+        receipt: CommandReceipt | None = None,
     ) -> bool:
         """Write register data starting at *addr*.
 
@@ -603,6 +606,8 @@ class CanfdTransport:
             payload = struct.pack(">HHB", addr, count, len(data)) + data
 
         with self._lock:
+            if receipt is not None:
+                receipt.submitted_at_ms = time.time_ns() // 1_000_000
             # Segmented transmit (single-frame payload is just one segment)
             seg_size = 64
             num_segs = (len(payload) + seg_size - 1) // seg_size
@@ -624,6 +629,9 @@ class CanfdTransport:
                 )
                 if not self.send_frame(can_id, seg_data):
                     raise ConnectionError(f"Failed to send write segment {seg_idx}")
+
+            if receipt is not None:
+                receipt.sent_at_ms = time.time_ns() // 1_000_000
 
             # Wait for single-frame response
             start_time = time.time()

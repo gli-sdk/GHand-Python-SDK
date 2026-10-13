@@ -267,6 +267,42 @@ CAN-FD baud-rate gears:
 | `0x04` | 1,000,000 bps, 75% sample point | 4,000,000 bps, 80% sample point |
 | `0x05` | 1,000,000 bps, 75% sample point | 5,000,000 bps, 75% sample point (default) |
 
+### Data and Command Timestamps
+
+`DeviceData`, `HandState`, `JointData`, and `TactileInfo` expose `received_at_ms`,
+a host Unix timestamp in integer milliseconds (for example, `1767225600123`).
+Subscription data also fills the existing `DeviceData.timestamp` in seconds.
+EtherCAT cached data retains its original receive time. Hand and joint data
+from one CAN-FD / RS-485 response share a timestamp. For tactile data assembled
+from multiple reads, each finger's timestamp is the completion time of its last
+successful read, not a simultaneous sensor sampling time. Manually constructed
+objects default to `None`.
+
+```python
+from ghand import CommandReceipt
+
+def on_data(data):
+    print(data.received_at_ms)
+
+subscription_id = hand.subscribe(on_data)
+receipt = CommandReceipt()  # Use a new receipt for each command.
+success = hand.move_joints(commands, receipt=receipt)
+print(receipt.success, receipt.submitted_at_ms, receipt.sent_at_ms)
+```
+
+`move_joints()` still returns `bool`. Its optional keyword-only `receipt`
+parameter fills a `CommandReceipt` with submission and completed transport-send
+times. Omit it when timestamps are not needed; use a fresh receipt for each call.
+For EtherCAT, `success` means accepted; the cyclic thread updates `sent_at_ms`
+asynchronously, so read the same receipt again after a cycle. A command replaced
+before transmission retains `None`. For CAN-FD / RS-485, `success` means
+acknowledged; a transmitted command retains its send time even if its
+acknowledgement fails. RS-485 retries record the last complete send time.
+These are host system-clock times, not device sampling or execution times.
+Millisecond units do not guarantee hardware accuracy. Multiple events may share
+a timestamp, and clock corrections can move time backwards; use a monotonic
+clock for measuring elapsed durations.
+
 ## Examples
 
 - `examples/tutorial/01.get_basic_info.py`: connect and read device information

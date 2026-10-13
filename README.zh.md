@@ -267,6 +267,44 @@ CAN-FD 波特率档位：
 | `0x04` | 1,000,000 bps, 75% 采样点 | 4,000,000 bps, 80% 采样点 |
 | `0x05` | 1,000,000 bps, 75% 采样点 | 5,000,000 bps, 75% 采样点（默认） |
 
+### 数据收发时间戳
+
+`DeviceData`、`HandState`、`JointData` 和 `TactileInfo` 提供
+`received_at_ms`：主机收到数据的 Unix 毫秒时间戳，例如 `1767225600123`。
+订阅数据的现有 `DeviceData.timestamp` 同时填写为对应的秒值。
+EtherCAT 缓存数据保留原接收时间；CAN-FD / RS-485 同一响应中的手部和关节数据
+共享时间戳。触觉由多次读取组成时，时间戳表示该指数据最后一次成功读取的时间，
+不表示所有传感器同时采样。没有接收时间的手动构造对象默认为 `None`。
+
+```python
+from datetime import datetime, timedelta, timezone
+from ghand import CommandReceipt
+
+def on_data(data):
+    print(data.received_at_ms)
+
+subscription_id = hand.subscribe(on_data)
+receipt = CommandReceipt()  # 每条命令使用一个新的回执。
+success = hand.move_joints(commands, receipt=receipt)
+print(receipt.success, receipt.submitted_at_ms, receipt.sent_at_ms)
+
+# 北京时间显示；SDK 字段仍保存完整的整数时间戳。
+if receipt.sent_at_ms is not None:
+    seconds, milliseconds = divmod(receipt.sent_at_ms, 1000)
+    dt = datetime.fromtimestamp(seconds, timezone(timedelta(hours=8)))
+    print(f"{dt:%Y-%m-%d %H:%M:%S}.{milliseconds:03d}")
+```
+
+`move_joints()` 继续返回 `bool`，通过可选的关键字参数 `receipt` 填写
+`CommandReceipt`：`submitted_at_ms` 为提交时间，`sent_at_ms` 为底层完成发送的时间。
+不需要时间戳时省略该参数；每次调用使用一个新的回执对象。
+EtherCAT 的 `success` 表示命令已提交，`sent_at_ms` 由周期线程异步填写，之后需再次
+读取该回执字段；发送前被其他命令覆盖的回执保持 `None`。
+CAN-FD / RS-485 的 `success` 表示收到成功应答；已经发送但应答失败时仍保留发送时间。
+RS-485 重试时记录最后一次完整发送的时间。
+时间均来自主机系统时钟，毫秒单位不代表硬件精度；不表示设备采样或执行时间。
+同一毫秒内可能有多个事件，系统校时也可能使时间回退，耗时测量应使用单调时钟。
+
 ## 示例
 
 - `examples/tutorial/01.get_basic_info.py`：连接设备并读取基础信息

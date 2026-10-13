@@ -29,6 +29,7 @@ from ..types import (
     CtrlMode,
     ErrorCode,
     HandState,
+    CommandReceipt,
     JointCommand,
     JointData,
     JointError,
@@ -219,7 +220,8 @@ class EthercatComm(IComm):
 
     # ===== Joint control =====
 
-    def move_joints(self, joints: list[JointCommand], mode: CtrlMode) -> bool:
+    def move_joints(self, joints: list[JointCommand], mode: CtrlMode,
+                    receipt: CommandReceipt | None = None) -> bool:
         """Send joint control commands via RPDO.
 
         Args:
@@ -229,8 +231,10 @@ class EthercatComm(IComm):
         Returns:
             True if the command is sent successfully.
         """
+        send_kwargs = {"receipt": receipt} if receipt is not None else {}
         if self._uses_per_joint_control_pdo_layout:
-            self._client.send_data(self._build_per_joint_control_rpdo(joints, mode, stop=0))
+            self._client.send_data(self._build_per_joint_control_rpdo(joints, mode, stop=0),
+                                   **send_kwargs)
         else:
             rpdo = Rpdo(self._controlled_joints)
             rpdo.mode = mode.value
@@ -239,7 +243,7 @@ class EthercatComm(IComm):
             for joint in joints:
                 rpdo.joints[joint.id] = (math.radians(joint.angle), joint.speed, joint.torque)
 
-            self._client.send_data(rpdo.to_bytes())
+            self._client.send_data(rpdo.to_bytes(), **send_kwargs)
         return True
 
     def stop(self) -> bool:
@@ -319,6 +323,7 @@ class EthercatComm(IComm):
                 angle = 0.0
             joints.append(
                 JointData(
+                    received_at_ms=getattr(data, "received_at_ms", None),
                     id=joint_id,
                     angle=angle,
                     speed=joint_tpdo.speed,
@@ -338,6 +343,7 @@ class EthercatComm(IComm):
             state, error, angle_raw, speed, torque = struct.unpack_from("<BBHbb", data, offset)
             joints.append(
                 JointData(
+                    received_at_ms=getattr(data, "received_at_ms", None),
                     id=joint_id,
                     angle=angle_raw / 10.0,
                     speed=speed,
@@ -375,6 +381,7 @@ class EthercatComm(IComm):
             state=self._parse_state(hand_tpdo.state),
             error=self._parse_error_code(hand_tpdo.error),
             temperature=hand_tpdo.temperature,
+            received_at_ms=getattr(data, "received_at_ms", None),
         )
 
     def get_tactile_data(self) -> dict:
@@ -399,6 +406,7 @@ class EthercatComm(IComm):
                 state=bool(tpdo.tactile_state.state & (1 << region.id.value)),
                 resultant_force=tactile.resultant_force,
                 distributed_force=tactile.sample_force,
+                received_at_ms=getattr(data, "received_at_ms", None),
             )
         return result
 

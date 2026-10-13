@@ -337,6 +337,22 @@ class HandState:
     state: State = State.STOPPED
     error: ErrorCode = ErrorCode.NORMAL
     temperature: int = 0
+    received_at_ms: int | None = None  # Host receive time, Unix milliseconds.
+
+
+@dataclass
+class CommandReceipt:
+    """Host command times in Unix milliseconds; not device execution times.
+
+    EtherCAT fills sent_at_ms asynchronously on the first successful cyclic
+    send. A command overwritten before sending retains None. success means
+    accepted (EtherCAT) or acknowledged (CAN FD / RS485). A sent command may
+    still fail to receive an acknowledgement.
+    """
+
+    submitted_at_ms: int | None = None
+    sent_at_ms: int | None = None
+    success: bool = False
 
 
 @dataclass
@@ -359,6 +375,7 @@ class JointData:
     angle: float = 0.0  # degrees
     speed: int = 0
     torque: int = 0
+    received_at_ms: int | None = None  # Host receive time, Unix milliseconds.
 
 
 @dataclass
@@ -368,6 +385,7 @@ class TactileInfo:
     state: bool = False
     resultant_force: list[float] | None = None
     distributed_force: list[float] | None = None
+    received_at_ms: int | None = None  # Host receive time, Unix milliseconds.
 
 
 @dataclass
@@ -377,9 +395,12 @@ class DeviceData:
     hand: HandState
     joints: list[JointData]
     tactile: dict[TactileSensorId, TactileInfo] | None = None
-    timestamp: float | None = None
+    timestamp: float | None = None  # Host receive time, Unix seconds.
+    received_at_ms: int | None = None
 
     def __post_init__(self):
+        if self.received_at_ms is not None:
+            self.timestamp = self.received_at_ms / 1000
         for joint in self.joints:
             jid = JointId(joint.id)
             setattr(self, jid.name.lower(), joint)
