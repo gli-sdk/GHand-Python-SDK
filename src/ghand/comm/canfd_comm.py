@@ -53,6 +53,7 @@ from .modbus_codec import (
     BAUDRATE_CONFIG_REGISTER,
     CONN_STATE_CONNECTED,
     CONN_STATE_ERROR,
+    MAILBOX_BUSY,
     MAILBOX_FAILED,
     MAILBOX_INVALID,
     MAILBOX_OK,
@@ -60,6 +61,7 @@ from .modbus_codec import (
     REG_CONNECTION_CONTROL,
     REG_CONNECTION_STATUS,
     REG_DEVICE_NAME,
+    REG_FAULT_CLEAR_STATUS,
     REG_FIRMWARE_VERSION,
     REG_HAND_TYPE,
     REG_IN_FIRMWARE_PACKAGE_VER,
@@ -72,6 +74,7 @@ from .modbus_codec import (
     REG_MODIFY_ID_STATUS,
     REG_SERIAL_NUMBER,
     REG_SLAVE_ID,
+    REG_TACTILE_CTRL_STATUS,
     build_tactile_info,
     encode_hand_command_frame,
     encode_hand_control,
@@ -409,15 +412,12 @@ class CanfdComm(IComm):
 
         The device drops the connection when no frame arrives within its watchdog
         window (0x0001~0x0002, 500 ms by default), so an app that idles between
-        API calls would otherwise lose the link. Subscription polling already
-        generates traffic, so skip the tick while it runs.
+        API calls would otherwise lose the link. Keep sending during subscriptions
+        because polling intervals and callbacks can exceed the watchdog window.
         """
         while not stop_event.wait(self._KEEPALIVE_INTERVAL_SEC):
             if not self._connected or self._transport is None:
                 break
-            poll_thread = self._poll_thread
-            if poll_thread is not None and poll_thread.is_alive():
-                continue
             try:
                 self._transport.read_registers(
                     self._src_id, self._slave_id, REG_HOST_CONN_STATE, 1, func_code=0x04
@@ -848,43 +848,73 @@ class CanfdComm(IComm):
         return self._write_tactile_control(0x0004)
 
     def _write_tactile_control(self, command: int) -> bool:
-        self._transport.write_registers(
+        """Write a tactile control command and await the terminal state.
+
+        Args:
+            command: V2.1 low-byte command value (1=enable, 2=disable, 4=zero).
+        """
+        baseline = self._read_input_word(REG_TACTILE_CTRL_STATUS)
+        if not self._transport.write_registers(
             self._src_id,
             self._slave_id,
             self._profile.tactile_control_address,
             struct.pack(">H", command),
-        )
-        return True
+        ):
+            return False
+        state = self._wait_mailbox_terminal(REG_TACTILE_CTRL_STATUS, baseline)
+        return state == MAILBOX_OK
 
     # ------------------------------------------------------------------
     # Device operations
     # ------------------------------------------------------------------
 
-    def _wait_holding_result(
+    def _wait_mailbox_terminal(
         self,
         address: int,
+        baseline: int | None = None,
         timeout_sec: float = 2.0,
-        interval_sec: float = 0.05,
-    ) -> bool:
-        deadline = time.time() + timeout_sec
+        interval_sec: float = 0.02,
+        settle_sec: float = 0.3,
+    ) -> int | None:
+        """Wait for the terminal mailbox state of a V2.1 command register.
+
+        V2.1 command mailboxes encode the low byte as status (0 idle / 1 busy)
+        and the high byte as result (1 ok / 2 failed / 3 invalid). The register
+        keeps the last terminal value, so a fresh terminal can equal
+        ``baseline`` (for example open-tactile right after close-tactile). A
+        terminal reading is accepted when it differs from ``baseline``, when
+        the busy state was observed first, or when it has stayed unchanged for
+        ``settle_sec`` (the firmware consumes commands within one 10 ms task
+        tick, so a value unchanged past the settle window is a fresh terminal).
+        Returns the terminal value, or None on timeout.
+        """
+        start = time.time()
+        deadline = start + timeout_sec
+        busy_seen = False
         while time.time() < deadline:
-            raw = self._transport.read_registers(
-                self._src_id, self._slave_id, address, 1, func_code=0x03
-            )
-            register = struct.unpack(">H", raw[:2])[0]
-            status = register & 0x00FF
-            if status == 1:
-                return True
-            if status == 2:
-                return False
+            value = self._read_input_word(address)
+            if value is None:
+                time.sleep(interval_sec)
+                continue
+            if value == MAILBOX_BUSY:
+                busy_seen = True
+            terminal = value in (MAILBOX_OK, MAILBOX_FAILED, MAILBOX_INVALID)
+            settled = (time.time() - start) >= settle_sec
+            if terminal and (busy_seen or value != baseline or settled):
+                return value
             time.sleep(interval_sec)
-        return False
+        return None
 
     def clear_fault(self) -> bool:
-        self._transport.write_registers(
-            self._src_id, self._slave_id, REG_CLEAR_FAULT, struct.pack(">H", 0x0100)
-        )
-        if not self._wait_holding_result(REG_CLEAR_FAULT):
+        """Clear device faults via the V2.1 mailbox (writing full value 1)."""
+        baseline = self._read_input_word(REG_FAULT_CLEAR_STATUS)
+        if not self._transport.write_registers(
+            self._src_id, self._slave_id, REG_CLEAR_FAULT, struct.pack(
+                ">H", 0x0001)
+        ):
+            return False
+        state = self._wait_mailbox_terminal(REG_FAULT_CLEAR_STATUS, baseline)
+        if state != MAILBOX_OK:
             logger.error("Fault clearance failed or timed out")
             return False
         logger.info("Fault cleared")

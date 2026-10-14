@@ -564,6 +564,8 @@ class CanfdTransport:
                 # Single-frame response (strip Modbus byte-count prefix)
                 if arb["start"] == 1 and arb["end"] == 1:
                     payload = resp_data[1:] if resp_data else resp_data
+                    if len(payload) < count * 2:
+                        continue
                     return payload[: count * 2]
 
                 # Multi-frame response: first segment carries byte-count prefix
@@ -582,6 +584,9 @@ class CanfdTransport:
                 if arb["end"] == 1:
                     expected = list(range(seg_num + 1))
                     if sorted(segments) != expected:
+                        continue
+                    if sum(len(segment) for segment in segments.values()) < count * 2:
+                        segments.clear()
                         continue
                     break
 

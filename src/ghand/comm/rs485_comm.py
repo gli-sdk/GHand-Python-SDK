@@ -52,6 +52,7 @@ from .modbus_codec import (
     BAUDRATE_CONFIG_REGISTER,
     CONN_STATE_CONNECTED,
     CONN_STATE_ERROR,
+    MAILBOX_BUSY,
     MAILBOX_FAILED,
     MAILBOX_INVALID,
     MAILBOX_OK,
@@ -59,6 +60,7 @@ from .modbus_codec import (
     REG_CONNECTION_CONTROL,
     REG_CONNECTION_STATUS,
     REG_DEVICE_NAME,
+    REG_FAULT_CLEAR_STATUS,
     REG_FIRMWARE_VERSION,
     REG_HAND_TYPE,
     REG_IN_FIRMWARE_PACKAGE_VER,
@@ -71,6 +73,7 @@ from .modbus_codec import (
     REG_MODIFY_ID_STATUS,
     REG_SERIAL_NUMBER,
     REG_SLAVE_ID,
+    REG_TACTILE_CTRL_STATUS,
     build_tactile_info,
     encode_hand_command_frame,
     encode_hand_control,
@@ -754,41 +757,66 @@ class Rs485Comm(IComm):
         return self._write_tactile_control(0x0004)
 
     def _write_tactile_control(self, command: int) -> bool:
-        """Write tactile control command to the product-specific register.
+        """Write a tactile control command and await the terminal state.
 
         Args:
-            command: Command value in the low byte (1 open, 2 close, 4 zero).
+            command: V2.1 low-byte command value (1=enable, 2=disable, 4=zero).
         """
-        result = self._write_register(self._profile.tactile_control_address, command)
-        return result is not None and not result.isError()
+        baseline = self._read_input_word(REG_TACTILE_CTRL_STATUS)
+        result = self._write_register(
+            self._profile.tactile_control_address, command)
+        if result is None or result.isError():
+            return False
+        state = self._wait_mailbox_terminal(REG_TACTILE_CTRL_STATUS, baseline)
+        return state == MAILBOX_OK
 
     # ===== Device operations =====
 
-    def _wait_holding_result(
+    def _wait_mailbox_terminal(
         self,
         address: int,
+        baseline: int | None = None,
         timeout_sec: float = 2.0,
-        interval_sec: float = 0.05,
-    ) -> bool:
-        deadline = time.time() + timeout_sec
+        interval_sec: float = 0.02,
+        settle_sec: float = 0.3,
+    ) -> int | None:
+        """Wait for the terminal mailbox state of a V2.1 command register.
+
+        V2.1 command mailboxes encode the low byte as status (0 idle / 1 busy)
+        and the high byte as result (1 ok / 2 failed / 3 invalid). The register
+        keeps the last terminal value, so a fresh terminal can equal
+        ``baseline`` (for example open-tactile right after close-tactile). A
+        terminal reading is accepted when it differs from ``baseline``, when
+        the busy state was observed first, or when it has stayed unchanged for
+        ``settle_sec`` (the firmware consumes commands within one 10 ms task
+        tick, so a value unchanged past the settle window is a fresh terminal).
+        Returns the terminal value, or None on timeout.
+        """
+        start = time.time()
+        deadline = start + timeout_sec
+        busy_seen = False
         while time.time() < deadline:
-            result = self._read_holding_registers(address, count=1)
-            if result is None or result.isError():
-                return False
-            status = result.registers[0] & 0x00FF
-            if status == 1:
-                return True
-            if status == 2:
-                return False
+            value = self._read_input_word(address)
+            if value is None:
+                time.sleep(interval_sec)
+                continue
+            if value == MAILBOX_BUSY:
+                busy_seen = True
+            terminal = value in (MAILBOX_OK, MAILBOX_FAILED, MAILBOX_INVALID)
+            settled = (time.time() - start) >= settle_sec
+            if terminal and (busy_seen or value != baseline or settled):
+                return value
             time.sleep(interval_sec)
-        return False
+        return None
 
     def clear_fault(self) -> bool:
-        """Clear device faults."""
-        result = self._write_register(REG_CLEAR_FAULT, 0x0100)
+        """Clear device faults via the V2.1 mailbox (writing full value 1)."""
+        baseline = self._read_input_word(REG_FAULT_CLEAR_STATUS)
+        result = self._write_register(REG_CLEAR_FAULT, 0x0001)
         if result is None or result.isError():
             return False
-        if not self._wait_holding_result(REG_CLEAR_FAULT):
+        state = self._wait_mailbox_terminal(REG_FAULT_CLEAR_STATUS, baseline)
+        if state != MAILBOX_OK:
             logger.error("Fault clearance failed or timed out")
             return False
         logger.info("Fault cleared")

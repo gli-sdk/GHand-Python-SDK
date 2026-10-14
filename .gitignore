@@ -30,4 +30,4 @@ CLAUDE.md
 nul
 reviews/
 .codegraph/
-tests/
+tests/*
