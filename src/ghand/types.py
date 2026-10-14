@@ -59,6 +59,8 @@ class RS485BaudRate(enum.IntEnum):
     BAUD_460800 = 0x03
     BAUD_921600 = 0x04
     BAUD_1000000 = 0x05
+    BAUD_1000000 = 0x06
+    BAUD_1000000 = 0x07
 
 
 class CANFDBitTiming(enum.IntEnum):
@@ -76,10 +78,14 @@ class CANFDBitTiming(enum.IntEnum):
     TIMING_500K_4M = 0x02
     # Arbitration: 500 Kbps @ 80%; data: 5 Mbps @ 75%.
     TIMING_500K_5M = 0x03
+    # Arbitration: 1 Mbps @ 75%; data: 1 Mbps @ 75%.
+    TIMING_1M_1M = 0x04
+    # Arbitration: 1 Mbps @ 75%; data: 2 Mbps @ 80%.
+    TIMING_1M_2M = 0x05
     # Arbitration: 1 Mbps @ 75%; data: 4 Mbps @ 80%.
-    TIMING_1M_4M = 0x04
+    TIMING_1M_4M = 0x06
     # Arbitration: 1 Mbps @ 75%; data: 5 Mbps @ 75%.
-    TIMING_1M_5M = 0x05
+    TIMING_1M_5M = 0x07
 
 
 def _unknown_member(cls, fallback, value):

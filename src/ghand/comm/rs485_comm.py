@@ -92,8 +92,10 @@ RS485_BAUDRATE_GEAR_MAP: dict[int, int] = {
     0x03: 460_800,
     0x04: 921_600,
     0x05: 1_000_000,
+    0x06: 1_000_000,
+    0x07: 1_000_000,
 }
-RS485_DEFAULT_BAUDRATE_GEAR = 0x05
+RS485_DEFAULT_BAUDRATE_GEAR = 0x07
 
 logger = logging.getLogger("ghand.rs485_comm")
 
