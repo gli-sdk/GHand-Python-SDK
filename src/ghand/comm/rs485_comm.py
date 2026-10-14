@@ -244,7 +244,7 @@ class Rs485Comm(IComm):
                 used; otherwise the connection polls 0x31 and 0x32.
             baudrate_gear: Connection baud rate gear. If None, the value is
                 taken from the ``GHAND_RS485_BAUDRATE_GEAR`` environment
-                variable, falling back to the default gear (0x05).
+                variable, falling back to the default gear (0x07).
             quiet: When True, suppress non-fatal failure logs. Useful when the
                 caller is scanning several ports or baud rates.
 
@@ -378,7 +378,7 @@ class Rs485Comm(IComm):
 
         Args:
             baudrate_gear: Gear value written directly to the register. When
-                omitted the default gear (0x05) is used.
+                omitted the default gear (0x07) is used.
 
         Returns:
             True if the device accepted the configuration.

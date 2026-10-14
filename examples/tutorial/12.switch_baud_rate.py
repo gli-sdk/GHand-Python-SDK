@@ -6,7 +6,7 @@ the next power-up. After power cycling the device, pass the new baud_rate value
 to open().
 """
 
-import logging,time
+import logging
 
 from ghand import (
     CANFDBitTiming,
@@ -14,7 +14,6 @@ from ghand import (
     GHand,
     ProductType,
     RS485BaudRate,
-    CANFDBitTiming,
     configure_logging,
 )
 
@@ -53,10 +52,11 @@ def main():
     hand.close()
     print("Baud-rate configuration written successfully.")
 
-    print(f"Preparing CANFD adapter listener at {target_baud_rate.name}...")
-    if not hand.prepare_canfd_baudrate_listener(device_id, target_baud_rate):
-        print("Failed to prepare CANFD adapter listener")
-        return
+    if comm_type == CommType.CANFD:
+        print(f"Preparing CANFD adapter listener at {target_baud_rate.name}...")
+        if not hand.prepare_canfd_baudrate_listener(device_id, target_baud_rate):
+            print("Failed to prepare CANFD adapter listener")
+            return
 
     input("Power-cycle the device now, then press Enter to reconnect...")
     if hand.open(device_id, slave_id=slave_id, baud_rate=target_baud_rate):

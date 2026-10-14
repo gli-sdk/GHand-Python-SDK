@@ -264,8 +264,10 @@ CAN-FD baud-rate gears:
 | `0x01` | 500,000 bps, 80% sample point | 2,000,000 bps, 80% sample point |
 | `0x02` | 500,000 bps, 80% sample point | 4,000,000 bps, 80% sample point |
 | `0x03` | 500,000 bps, 80% sample point | 5,000,000 bps, 75% sample point |
-| `0x04` | 1,000,000 bps, 75% sample point | 4,000,000 bps, 80% sample point |
-| `0x05` | 1,000,000 bps, 75% sample point | 5,000,000 bps, 75% sample point (default) |
+| `0x04` | 1,000,000 bps, 75% sample point | 1,000,000 bps, 75% sample point |
+| `0x05` | 1,000,000 bps, 75% sample point | 2,000,000 bps, 80% sample point |
+| `0x06` | 1,000,000 bps, 75% sample point | 4,000,000 bps, 80% sample point |
+| `0x07` | 1,000,000 bps, 75% sample point | 5,000,000 bps, 75% sample point (default) |
 
 ## Examples
 

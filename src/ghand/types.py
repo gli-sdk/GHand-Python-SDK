@@ -59,9 +59,6 @@ class RS485BaudRate(enum.IntEnum):
     BAUD_460800 = 0x03
     BAUD_921600 = 0x04
     BAUD_1000000 = 0x05
-    BAUD_1000000 = 0x06
-    BAUD_1000000 = 0x07
-
 
 class CANFDBitTiming(enum.IntEnum):
     """Predefined CAN FD bit timing profiles.

@@ -31,7 +31,7 @@ You can also install directly from Git:
 - Latest version: v2.2.1
 - Python requirement: 3.10 or higher
 - Supported platforms: Windows 10/11, Linux Ubuntu 22.04/24.04 LTS (x86_64/aarch64), macOS 12+ (Intel/Apple Silicon)
-- RS485/CANFD default baud-rate gear: ``0x05``
+- RS485/CANFD default baud-rate gear: ``0x07``
 
 Example Code
 ------------
@@ -166,9 +166,13 @@ CANFD gear mapping:
 +--------+-------------------------------+-------------------------------+
 | 0x03   | 500,000 bps, 80% sample point | 5,000,000 bps, 75% sample point |
 +--------+-------------------------------+-------------------------------+
-| 0x04   | 1,000,000 bps, 75% sample point | 4,000,000 bps, 80% sample point |
+| 0x04   | 1,000,000 bps, 75% sample point | 1,000,000 bps, 75% sample point |
 +--------+-------------------------------+-------------------------------+
-| 0x05   | 1,000,000 bps, 75% sample point | 5,000,000 bps, 75% sample point |
+| 0x05   | 1,000,000 bps, 75% sample point | 2,000,000 bps, 80% sample point |
++--------+-------------------------------+-------------------------------+
+| 0x06   | 1,000,000 bps, 75% sample point | 4,000,000 bps, 80% sample point |
++--------+-------------------------------+-------------------------------+
+| 0x07   | 1,000,000 bps, 75% sample point | 5,000,000 bps, 75% sample point |
 +--------+-------------------------------+-------------------------------+
 
 **Running Examples**
