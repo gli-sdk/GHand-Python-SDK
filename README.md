@@ -278,8 +278,25 @@ CAN-FD baud-rate gears:
 - `examples/tutorial/05.tactile_callback.py`: tactile data callback
 - `examples/tutorial/06.subscription_demo.py`: data subscription
 - `examples/tutorial/07.multi_hand.py`: multi-hand discovery and connection
+- `examples/tutorial/13.tactile_display.py`: tactile display with device setup, subscription, and cleanup
 - `examples/demo/`: action and gesture demonstrations
 - `examples/extension/`: collision detection and adaptive grasp examples
+
+Install optional display dependencies and launch the example:
+
+```bash
+python -m pip install ".[tactile-display]"
+python examples/tutorial/13.tactile_display.py
+```
+
+The hardware example currently supports GHand5 + EtherCAT. `ghand.tactile_display.window.TactileWindow` only handles display. Existing
+Qt applications can capture `window.data_generation` and call
+`window.update_tactile(frame.tactile, generation)` from a subscription callback.
+The caller owns the device and subscription, updates controls through
+`set_connected()` and `set_command_result()`, and handles the `open_requested`,
+`close_requested`, and `zero_requested` signals. After `clear()` or `invalidate()`,
+old generation callbacks are rejected; capture the new value when subscribing again.
+Closing the window leaves the caller's subscription and device open.
 
 ## Project Structure
 

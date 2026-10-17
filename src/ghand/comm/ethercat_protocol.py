@@ -30,7 +30,8 @@ _TACTILE_RESULTANT_SIZE = 6  # resultant xyz (int16[3], low byte valid)
 _TACTILE_SAMPLE_PER_GROUP = 3  # xyz per sample group
 
 
-def compute_tpdo_size(joint_count: int, tactile_region_counts: list[int] | None = None) -> int:
+def compute_tpdo_size(joint_count: int, tactile_region_counts: list[int] | None = None,
+                      joint_size: int = _JOINT_TPDO_SIZE) -> int:
     """Calculate the total TPDO byte size based on joint count and tactile sample groups.
 
     Args:

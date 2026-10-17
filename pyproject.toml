@@ -24,6 +24,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+tactile-display = [
+    "PySide6>=6.8,<7",
+    "pyqtgraph>=0.13.7,<0.15",
+]
+
 dev = [
     "yapf>=0.40.0",
     "mypy>=1.0.0",
@@ -44,6 +49,7 @@ where = ["src"]
 [tool.setuptools.package-data]
 ghand = [
     "config/*.json",
+    "tactile_display/assets/*",
     "py.typed",
 ]
 
