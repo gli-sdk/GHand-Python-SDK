@@ -60,11 +60,14 @@ from .modbus_codec import (
     REG_CLEAR_FAULT,
     REG_CONNECTION_CONTROL,
     REG_CONNECTION_STATUS,
+    REG_CONNECTION_TIMER,
     REG_DEVICE_NAME,
     REG_FAULT_CLEAR_STATUS,
     REG_FIRMWARE_VERSION,
     REG_HAND_TYPE,
     REG_IN_FIRMWARE_PACKAGE_VER,
+    REG_IN_THUMB_TACTILE_VER,
+    REG_IN_FINGER_TACTILE_VER,
     REG_IN_MOTOR_DRV_VER,
     REG_IN_POSITION_SENSOR_VER,
     REG_IN_TACTILE_SENSOR_VER,
@@ -99,14 +102,16 @@ from .modbus_codec import (
 # configuration takes effect after the next power-up.
 CANFD_BAUDRATE_GEAR_MAP: dict[int, tuple[tuple[int, int], tuple[int, int]]] = {
     # gear: ((arbitration_baud, arbitration_sample_point), (data_baud, data_sample_point))
-    0x00: ((500_000, 80), (1_000_000, 75)),
-    0x01: ((500_000, 80), (2_000_000, 80)),
-    0x02: ((500_000, 80), (4_000_000, 80)),
-    0x03: ((500_000, 80), (5_000_000, 75)),
-    0x04: ((1_000_000, 75), (4_000_000, 80)),
-    0x05: ((1_000_000, 75), (5_000_000, 75)),
+    0x00: ((500_000, 80), (800_000, 80)),
+    0x01: ((500_000, 80), (1_000_000, 75)),
+    0x02: ((500_000, 80), (2_000_000, 80)),
+    0x03: ((500_000, 80), (4_000_000, 80)),
+    0x04: ((1_000_000, 75), (1_000_000, 75)),
+    0x05: ((1_000_000, 75), (2_000_000, 80)),
+    0x06: ((1_000_000, 75), (4_000_000, 80)),
+    0x07: ((1_000_000, 75), (5_000_000, 75)),
 }
-CANFD_DEFAULT_BAUDRATE_GEAR = 0x05
+CANFD_DEFAULT_BAUDRATE_GEAR = 0x07
 
 logger = logging.getLogger("ghand.canfd_comm")
 
@@ -118,6 +123,11 @@ class CanfdComm(IComm):
     _MIN_REOPEN_INTERVAL_SEC = 0.5
     _DEFAULT_POLL_INTERVAL_SEC = 0.03
     _KEEPALIVE_INTERVAL_SEC = 0.2
+    _KEEPALIVE_TIMEOUT_MS = 300
+    # Connection watchdog written at connect time. It must stay well above the
+    # transport request timeout so a single lost response cannot starve the
+    # keep-alive long enough for the device to drop the session.
+    _CONNECTION_WATCHDOG_MS = 3000
     _DEFAULT_BAUDRATE_GEAR = CANFD_DEFAULT_BAUDRATE_GEAR
     COMMON_BAUDRATE_GEARS = tuple(sorted(CANFD_BAUDRATE_GEAR_MAP.keys(), reverse=True))
 
@@ -132,6 +142,7 @@ class CanfdComm(IComm):
         self._transport: CanfdTransport | None = None
         self._src_id = 0x0A  # master node id
         self._slave_id = 0x00
+        self._connection_watchdog_ms = self._CONNECTION_WATCHDOG_MS
         self._connected = False
         self._poll_thread: threading.Thread | None = None
         self._poll_stop = threading.Event()
@@ -277,7 +288,7 @@ class CanfdComm(IComm):
             slave_id: Optional target slave ID. If provided, only this ID is
                 used; otherwise the connection polls 0x31 and 0x32.
             baudrate_gear: Baud rate gear value. The gear selects both the
-                arbitration and data phase bitrates. Defaults to gear 0x05
+                arbitration and data phase bitrates. Defaults to gear 0x07
                 (1 Mbps arbitration, 5 Mbps data).
             quiet: When True, suppress non-fatal failure logs. Useful when the
                 caller is scanning several gears.
@@ -420,7 +431,12 @@ class CanfdComm(IComm):
                 break
             try:
                 self._transport.read_registers(
-                    self._src_id, self._slave_id, REG_HOST_CONN_STATE, 1, func_code=0x04
+                    self._src_id,
+                    self._slave_id,
+                    REG_HOST_CONN_STATE,
+                    1,
+                    func_code=0x04,
+                    timeout_ms=self._KEEPALIVE_TIMEOUT_MS,
                 )
             except Exception as exc:
                 logger.debug("CANFD keep-alive read failed: %s", exc)
@@ -445,7 +461,10 @@ class CanfdComm(IComm):
                 and arb["src_id"] == arb["dst_id"]
                 and arb["src_id"] in candidates
             ):
-                if self._write_connection_control(arb["src_id"], 1):
+                if self._write_connection_control(
+                    arb["src_id"], 1,
+                    connection_timer_ms=self._connection_watchdog_ms,
+                ):
                     return self._verify_connection()
                 return False
 
@@ -473,7 +492,10 @@ class CanfdComm(IComm):
                     if arb["func_code"] == 0xC4:
                         break  # Exception: try next dst_id
                     if arb["func_code"] == 0x44:
-                        if self._write_connection_control(slave_id, 1):
+                        if self._write_connection_control(
+                            slave_id, 1,
+                            connection_timer_ms=self._connection_watchdog_ms,
+                        ):
                             return self._verify_connection()
                         break
         return False
@@ -532,13 +554,28 @@ class CanfdComm(IComm):
         return False
 
     def _write_connection_control(
-        self, slave_id: int, value: int, timeout_ms: int = 5000
+        self,
+        slave_id: int,
+        value: int,
+        timeout_ms: int = 5000,
+        connection_timer_ms: int | None = None,
     ) -> bool:
+        if connection_timer_ms is None:
+            payload = struct.pack(">H", value)
+        else:
+            # 0x0001 holds the high 16 bits and 0x0002 the low 16 bits; both are
+            # written with the connection control in one FC10 frame.
+            payload = struct.pack(
+                ">HHH",
+                value,
+                (connection_timer_ms >> 16) & 0xFFFF,
+                connection_timer_ms & 0xFFFF,
+            )
         if not self._transport.write_registers(
             self._src_id,
             slave_id,
             REG_CONNECTION_CONTROL,
-            struct.pack(">H", value),
+            payload,
             timeout_ms=timeout_ms,
         ):
             return False
@@ -573,6 +610,43 @@ class CanfdComm(IComm):
         self._slave_id = slave_id
         return True
 
+    def set_connection_watchdog(self, timeout_ms: int) -> bool:
+        """Write the connection watchdog to holding registers 0x0001~0x0002.
+
+        The 32-bit timeout is stored high word first and takes effect
+        immediately; 0 disables the connection check. The value is not saved
+        to Flash and is re-applied on the next connect.
+        """
+        if not 0 <= timeout_ms <= 0xFFFFFFFF:
+            raise ValueError("timeout_ms must be in range 0..4294967295")
+        try:
+            if not self._transport.write_registers(
+                self._src_id,
+                self._slave_id,
+                REG_CONNECTION_TIMER,
+                struct.pack(
+                    ">HH",
+                    (timeout_ms >> 16) & 0xFFFF,
+                    timeout_ms & 0xFFFF,
+                ),
+            ):
+                return False
+        except Exception as exc:
+            logger.error(
+                "Failed to set CANFD connection watchdog to %d ms: %s",
+                timeout_ms,
+                exc,
+            )
+            return False
+        self._connection_watchdog_ms = timeout_ms
+        if 0 < timeout_ms < self._KEEPALIVE_INTERVAL_SEC * 1000:
+            logger.warning(
+                "CANFD connection watchdog %d ms is below the %d ms keep-alive interval",
+                timeout_ms,
+                int(self._KEEPALIVE_INTERVAL_SEC * 1000),
+            )
+        return True
+
     def set_baudrate_config(
         self,
         baudrate_gear: int | None = None,
@@ -584,11 +658,19 @@ class CanfdComm(IComm):
         bitrate and their sample points.
 
         Args:
-            baudrate_gear: Gear value written directly to the register. When
-                omitted the default gear (0x05) is used. Supported gears map to:
-                0x00=(500K@80%,1M@75%), 0x01=(500K@80%,2M@80%),
-                0x02=(500K@80%,4M@80%), 0x03=(500K@80%,5M@75%),
-                0x04=(1M@75%,4M@80%), 0x05=(1M@75%,5M@75%) default.
+            baudrate_gear: Gear stored in the register's high byte; the low
+                byte is 0x01 to execute the configuration. Defaults to 0x07.
+                Each entry below lists arbitration bitrate/sample point,
+                followed by data bitrate/sample point:
+                0x00: 500 Kbit/s at 80%, 800 Kbit/s at 80%.
+                0x01: 500 Kbit/s at 80%, 1 Mbit/s at 75%.
+                0x02: 500 Kbit/s at 80%, 2 Mbit/s at 80%.
+                0x03: 500 Kbit/s at 80%, 4 Mbit/s at 80%.
+                0x04: 1 Mbit/s at 75%, 1 Mbit/s at 75%.
+                0x05: 1 Mbit/s at 75%, 2 Mbit/s at 80%.
+                0x06: 1 Mbit/s at 75%, 4 Mbit/s at 80%.
+                0x07: 1 Mbit/s at 75%, 5 Mbit/s at 75%.
+                Values outside 0x00 through 0x07 are rejected by the SDK.
 
         Returns:
             True if the device accepted the configuration.
@@ -829,10 +911,10 @@ class CanfdComm(IComm):
         return self._get_packed_version(REG_IN_MOTOR_DRV_VER)
 
     def get_thumb_tactile_sensor_version(self) -> str:
-        return "N/A"
+        return self._get_packed_version(REG_IN_THUMB_TACTILE_VER)
 
     def get_finger_tactile_sensor_version(self) -> str:
-        return "N/A"
+        return self._get_packed_version(REG_IN_FINGER_TACTILE_VER)
 
     # ------------------------------------------------------------------
     # Tactile sensor

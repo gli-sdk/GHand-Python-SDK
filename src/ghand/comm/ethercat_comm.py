@@ -73,6 +73,7 @@ SDO_SUB_COMMAND = 0x01
 SDO_SUB_STATE = 0x02
 SDO_SUB_RESULT = 0x03
 
+
 _STALL_TOLERANCE_JOINT_ORDER = (
     JointId.THUMB_MCP,
     JointId.THUMB_TMC_FE,
@@ -506,7 +507,7 @@ class EthercatComm(IComm):
         """Retrieve the 19-byte ASCII product serial number via SDO."""
         def read_serial_number() -> str:
             try:
-                raw = self._client.sdo_read(SDO_SERIAL_NUMBER, 0x01)
+                raw = self._client.sdo_read(SDO_SERIAL_NUMBER, 0x00)
                 return raw[:19].decode("ascii", errors="ignore").strip("\x00")
             except Exception:
                 return "N/A"
@@ -548,6 +549,11 @@ class EthercatComm(IComm):
 
     def get_stall_tolerances(self) -> dict[JointId, int]:
         """Read the 13 per-joint stall tolerances from SDO 0x2003:01."""
+        if not self._execute_sdo_command(
+            SDO_STALL_TOLERANCE, 0xA2,
+            command_subindex=0x02, state_subindex=0x03, result_subindex=0x04,
+        ):
+            raise RuntimeError("Failed to refresh stall tolerances")
         values = self._unpack_uint_array(
             self._client.sdo_read(SDO_STALL_TOLERANCE, 0x01), 13, "B"
         )
@@ -565,6 +571,11 @@ class EthercatComm(IComm):
 
     def get_pid_parameters(self) -> list[int]:
         """Read the raw 39-value uint16 PID array from SDO 0x2008:01."""
+        if not self._execute_sdo_command(
+            SDO_PID_PARAMETERS, 0xA2,
+            command_subindex=0x02, state_subindex=0x03, result_subindex=0x04,
+        ):
+            raise RuntimeError("Failed to refresh PID parameters")
         return self._unpack_uint_array(
             self._client.sdo_read(SDO_PID_PARAMETERS, 0x01), 39, "H"
         )
@@ -577,8 +588,8 @@ class EthercatComm(IComm):
         )
 
     def get_hand_state_machine(self) -> HandStateMachine:
-        """Read the whole-hand runtime state from SDO 0x200A:01."""
-        raw = self._client.sdo_read(SDO_HAND_STATE_MACHINE, 0x01)
+        """Read the whole-hand runtime state from SDO 0x200A:00."""
+        raw = self._client.sdo_read(SDO_HAND_STATE_MACHINE, 0x00)
         if len(raw) != 1:
             raise RuntimeError(
                 f"invalid hand state machine size: expected 1, got {len(raw)}"
@@ -604,8 +615,10 @@ class EthercatComm(IComm):
         return f"V{major}.{minor}.{patch}"
 
     def get_firmware_package_version(self) -> str:
-        """Firmware package version is not exposed by EtherCAT V2.1."""
-        return "N/A"
+        """Retrieve the firmware package version via SDO."""
+        return self._read_static_sdo_once(
+            "firmware_package_version", lambda: self._read_packed_firmware_version(0x05)
+        )
 
     def get_position_sensor_version(self) -> str:
         """Retrieve the position sensor version via SDO."""
@@ -629,12 +642,16 @@ class EthercatComm(IComm):
         )
 
     def get_thumb_tactile_sensor_version(self) -> str:
-        """Per-finger tactile versions are not exposed by EtherCAT V2.1."""
-        return "N/A"
+        """Retrieve the thumb tactile sensor version via SDO."""
+        return self._read_static_sdo_once(
+            "thumb_tactile_sensor_version", lambda: self._read_packed_firmware_version(0x06)
+        )
 
     def get_finger_tactile_sensor_version(self) -> str:
-        """Per-finger tactile versions are not exposed by EtherCAT V2.1."""
-        return "N/A"
+        """Retrieve the four-finger tactile sensor version via SDO."""
+        return self._read_static_sdo_once(
+            "finger_tactile_sensor_version", lambda: self._read_packed_firmware_version(0x07)
+        )
 
     def get_hand_type(self) -> int:
         """Retrieve the hand type via SDO.

@@ -33,7 +33,7 @@ You can also install directly from Git:
 - Latest version: v3.0.0
 - Python requirement: 3.10 or higher
 - Supported platforms: Windows 10/11, Linux Ubuntu 22.04/24.04 LTS (x86_64/aarch64), macOS 12+ (Intel/Apple Silicon)
-- RS485/CANFD default baud-rate gear: ``0x05``
+- Default baud-rate gear: RS485 ``0x05``; CANFD ``0x07``
 
 Example Code
 ------------
@@ -159,17 +159,21 @@ CANFD gear mapping:
 +--------+-------------------------------+-------------------------------+
 | Gear   | Arbitration phase             | Data phase                    |
 +========+===============================+===============================+
-| 0x00   | 500,000 bps, 80% sample point | 1,000,000 bps, 75% sample point |
+| 0x00   | 500,000 bps, 80% sample point | 800,000 bps, 80% sample point   |
 +--------+-------------------------------+-------------------------------+
-| 0x01   | 500,000 bps, 80% sample point | 2,000,000 bps, 80% sample point |
+| 0x01   | 500,000 bps, 80% sample point | 1,000,000 bps, 75% sample point |
 +--------+-------------------------------+-------------------------------+
-| 0x02   | 500,000 bps, 80% sample point | 4,000,000 bps, 80% sample point |
+| 0x02   | 500,000 bps, 80% sample point | 2,000,000 bps, 80% sample point |
 +--------+-------------------------------+-------------------------------+
-| 0x03   | 500,000 bps, 80% sample point | 5,000,000 bps, 75% sample point |
+| 0x03   | 500,000 bps, 80% sample point | 4,000,000 bps, 80% sample point |
 +--------+-------------------------------+-------------------------------+
-| 0x04   | 1,000,000 bps, 75% sample point | 4,000,000 bps, 80% sample point |
+| 0x04   | 1,000,000 bps, 75% sample point | 1,000,000 bps, 75% sample point |
 +--------+-------------------------------+-------------------------------+
-| 0x05   | 1,000,000 bps, 75% sample point | 5,000,000 bps, 75% sample point |
+| 0x05   | 1,000,000 bps, 75% sample point | 2,000,000 bps, 80% sample point |
++--------+-------------------------------+-------------------------------+
+| 0x06   | 1,000,000 bps, 75% sample point | 4,000,000 bps, 80% sample point |
++--------+-------------------------------+-------------------------------+
+| 0x07   | 1,000,000 bps, 75% sample point | 5,000,000 bps, 75% sample point |
 +--------+-------------------------------+-------------------------------+
 
 **Running Examples**

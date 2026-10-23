@@ -103,7 +103,7 @@ class JointData:
 
 @dataclass
 class TactileData:
-    """Tactile sensor reading for a single finger."""
+    """Tactile sensor reading for a single finger, with forces in Newtons."""
 
     state: bool = False
     resultant_force: list[float] | None = None

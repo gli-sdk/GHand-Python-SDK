@@ -93,6 +93,21 @@ class IComm(ABC):
         """
         return False
 
+    def set_connection_watchdog(self, timeout_ms: int) -> bool:
+        """Set the connection watchdog timeout in milliseconds.
+
+        The device drops the connection when no frame from the master arrives
+        within ``timeout_ms``; 0 disables the check. The value is not saved to
+        Flash.
+
+        Args:
+            timeout_ms: Timeout in milliseconds (0..4294967295).
+
+        Returns:
+            True if the command succeeds, False otherwise.
+        """
+        return False
+
     def set_baudrate_config(
         self,
         baudrate_gear: int | None = None,

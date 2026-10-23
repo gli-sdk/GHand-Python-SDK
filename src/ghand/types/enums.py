@@ -84,18 +84,22 @@ class CANFDBitTiming(enum.IntEnum):
     directly to the protocol gear stored by the GHand device.
     """
 
+    # Arbitration: 500 Kbps @ 80%; data: 800 Kbps @ 80%.
+    TIMING_500K_800K = 0x00
     # Arbitration: 500 Kbps @ 80%; data: 1 Mbps @ 75%.
-    TIMING_500K_1M = 0x00
+    TIMING_500K_1M = 0x01
     # Arbitration: 500 Kbps @ 80%; data: 2 Mbps @ 80%.
-    TIMING_500K_2M = 0x01
+    TIMING_500K_2M = 0x02
     # Arbitration: 500 Kbps @ 80%; data: 4 Mbps @ 80%.
-    TIMING_500K_4M = 0x02
-    # Arbitration: 500 Kbps @ 80%; data: 5 Mbps @ 75%.
-    TIMING_500K_5M = 0x03
+    TIMING_500K_4M = 0x03
+    # Arbitration: 1 Mbps @ 75%; data: 1 Mbps @ 75%.
+    TIMING_1M_1M = 0x04
+    # Arbitration: 1 Mbps @ 75%; data: 2 Mbps @ 80%.
+    TIMING_1M_2M = 0x05
     # Arbitration: 1 Mbps @ 75%; data: 4 Mbps @ 80%.
-    TIMING_1M_4M = 0x04
+    TIMING_1M_4M = 0x06
     # Arbitration: 1 Mbps @ 75%; data: 5 Mbps @ 75%.
-    TIMING_1M_5M = 0x05
+    TIMING_1M_5M = 0x07
 
 
 class CommType(enum.Enum):

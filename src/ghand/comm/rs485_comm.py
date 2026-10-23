@@ -59,11 +59,14 @@ from .modbus_codec import (
     REG_CLEAR_FAULT,
     REG_CONNECTION_CONTROL,
     REG_CONNECTION_STATUS,
+    REG_CONNECTION_TIMER,
     REG_DEVICE_NAME,
     REG_FAULT_CLEAR_STATUS,
     REG_FIRMWARE_VERSION,
     REG_HAND_TYPE,
     REG_IN_FIRMWARE_PACKAGE_VER,
+    REG_IN_THUMB_TACTILE_VER,
+    REG_IN_FINGER_TACTILE_VER,
     REG_IN_MOTOR_DRV_VER,
     REG_IN_POSITION_SENSOR_VER,
     REG_IN_TACTILE_SENSOR_VER,
@@ -474,6 +477,29 @@ class Rs485Comm(IComm):
         self._slave_id = slave_id
         return True
 
+    def set_connection_watchdog(self, timeout_ms: int) -> bool:
+        """Write the connection watchdog to holding registers 0x0001~0x0002.
+
+        The 32-bit timeout is stored high word first and takes effect
+        immediately; 0 disables the connection check. The value is not saved
+        to Flash.
+        """
+        if not 0 <= timeout_ms <= 0xFFFFFFFF:
+            raise ValueError("timeout_ms must be in range 0..4294967295")
+        try:
+            result = self._write_registers(
+                REG_CONNECTION_TIMER,
+                [(timeout_ms >> 16) & 0xFFFF, timeout_ms & 0xFFFF],
+            )
+        except Exception as exc:
+            logger.error(
+                "Failed to set RS485 connection watchdog to %d ms: %s",
+                timeout_ms,
+                exc,
+            )
+            return False
+        return result is not None and not result.isError()
+
     def set_baudrate_config(
         self,
         baudrate_gear: int | None = None,
@@ -735,12 +761,12 @@ class Rs485Comm(IComm):
         return self._get_packed_version(REG_IN_MOTOR_DRV_VER)
 
     def get_thumb_tactile_sensor_version(self) -> str:
-        """Per-finger tactile versions are not exposed by Modbus V2.0."""
-        return "N/A"
+        """Retrieve the thumb tactile sensor version."""
+        return self._get_packed_version(REG_IN_THUMB_TACTILE_VER)
 
     def get_finger_tactile_sensor_version(self) -> str:
-        """Per-finger tactile versions are not exposed by Modbus V2.0."""
-        return "N/A"
+        """Retrieve the four-finger tactile sensor version."""
+        return self._get_packed_version(REG_IN_FINGER_TACTILE_VER)
 
     # ===== Tactile sensor =====
 

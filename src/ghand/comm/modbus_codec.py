@@ -62,9 +62,10 @@ BAUDRATE_CONFIG_REGISTER = 0x0004
 
 # Common holding register addresses (device configuration / control).
 REG_CONNECTION_CONTROL = 0x0000
+# Connection watchdog: 32-bit timeout in ms, high word at 0x0001, 0 disables.
+REG_CONNECTION_TIMER = 0x0001
 REG_SLAVE_ID = 0x0003
 REG_CLEAR_FAULT = 0x001F
-
 # Command mailbox encoding: low byte status, high byte result.
 MAILBOX_BUSY = 0x0001
 MAILBOX_OK = 0x0100
@@ -84,6 +85,8 @@ REG_IN_POSITION_SENSOR_VER = 0x101A
 REG_IN_TACTILE_SENSOR_VER = 0x101B
 REG_IN_MOTOR_DRV_VER = 0x101C
 REG_IN_FIRMWARE_PACKAGE_VER = 0x101D
+REG_IN_THUMB_TACTILE_VER = 0x101E
+REG_IN_FINGER_TACTILE_VER = 0x101F
 REG_CONNECTION_STATUS = 0x1026
 REG_FAULT_CLEAR_STATUS = 0x1027
 REG_TACTILE_CTRL_STATUS = 0x1028
@@ -397,12 +400,12 @@ def parse_tactile_distributed(data_bytes: bytes, count: int) -> list[float]:
         count: Number of tactile points for this region.
 
     Returns:
-        Flat list of [fx1, fy1, fz1, fx2, fy2, fz2, ...].
+        Flat list of [fx1, fy1, fz1, fx2, fy2, fz2, ...] in Newtons.
         Each component is returned as a float parsed from an int8 (signed) or
         uint8 (unsigned for Fz).
     """
     distributed: list[float] = []
-    for i in range(0, len(data_bytes) - 2, 3):
+    for i in range(0, min(len(data_bytes), count * 3) - 2, 3):
         fx_d = data_bytes[i]
         fy_d = data_bytes[i + 1]
         fz_d = data_bytes[i + 2]
@@ -410,7 +413,7 @@ def parse_tactile_distributed(data_bytes: bytes, count: int) -> list[float]:
             fx_d -= 0x100
         if fy_d >= 0x80:
             fy_d -= 0x100
-        distributed.extend([float(fx_d), float(fy_d), float(fz_d)])
+        distributed.extend([fx_d / 10.0, fy_d / 10.0, fz_d / 10.0])
     return distributed
 
 

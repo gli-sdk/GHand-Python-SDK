@@ -507,6 +507,41 @@ class GHand:
             self._set_last_result(SdkError.DEVICE_REJECTED, "device rejected slave ID change")
         return result
 
+    def set_connection_watchdog(self, timeout_ms: int) -> bool:
+        """Set the RS485/CANFD connection watchdog timeout.
+
+        The device drops the connection when no frame from the master arrives
+        within ``timeout_ms``; 0 disables the check. The value is written to
+        holding registers ``0x0001~0x0002`` (unit ms, high word first) and is
+        not saved to Flash.
+
+        Args:
+            timeout_ms: Watchdog timeout in milliseconds (0..4294967295).
+
+        Returns:
+            True if the device accepted the configuration.
+        """
+        if self._comm_type not in (CommType.CANFD, CommType.RS485):
+            logger.error("set_connection_watchdog is only supported for CANFD and RS485")
+            self._set_last_result(SdkError.NOT_SUPPORTED, "set_connection_watchdog is only supported for CANFD and RS485")
+            return False
+        if not self.is_connected():
+            self._set_last_result(SdkError.NOT_CONNECTED, "device is not connected")
+            raise RuntimeError("Device is not connected")
+
+        try:
+            result = self._comm.set_connection_watchdog(timeout_ms)
+        except Exception as e:
+            logger.error("set_connection_watchdog failed: %s", e)
+            self._set_last_result(SdkError.TRANSPORT_ERROR, str(e))
+            return False
+        if result:
+            logger.info("Connection watchdog set to %d ms", timeout_ms)
+            self._set_last_result(SdkError.OK)
+        else:
+            self._set_last_result(SdkError.DEVICE_REJECTED, "device rejected watchdog configuration")
+        return result
+
     def set_baudrate_config(
         self,
         baud_rate: BaudRateSelection,

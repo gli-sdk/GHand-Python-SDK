@@ -235,7 +235,7 @@ class CanfdTransport:
                 parity="N",
                 stopbits=1,
                 timeout=0.02,
-                write_timeout=1.0,
+                write_timeout=0.3,
             )
             self._serial = ser
             # Give the adapter a moment to settle after the CDC serial port opens.
@@ -515,7 +515,7 @@ class CanfdTransport:
         addr: int,
         count: int,
         func_code: int = 0x03,
-        timeout_ms: int = 5000,
+        timeout_ms: int = 1000,
     ) -> bytes:
         """Read *count* registers starting at *addr*.
 
@@ -600,7 +600,7 @@ class CanfdTransport:
         dst_id: int,
         addr: int,
         data: bytes,
-        timeout_ms: int = 5000,
+        timeout_ms: int = 1000,
     ) -> bool:
         """Write register data starting at *addr*.
 
