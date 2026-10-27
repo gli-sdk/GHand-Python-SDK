@@ -54,31 +54,31 @@ def main():
             JointCommand(
                 id=JointId.THUMB_MCP,
                 angle=66,
-                speed=DEFAULT_SPEED,
+                velocity=DEFAULT_SPEED,
                 current=DEFAULT_CURRENT,
             ),
             JointCommand(
                 id=JointId.THUMB_TMC_AA,
                 angle=52,
-                speed=DEFAULT_SPEED,
+                velocity=DEFAULT_SPEED,
                 current=DEFAULT_CURRENT,
             ),
             JointCommand(
                 id=JointId.THUMB_TMC_PS,
                 angle=-10,
-                speed=DEFAULT_SPEED,
+                velocity=DEFAULT_SPEED,
                 current=DEFAULT_CURRENT,
             ),
             JointCommand(
                 id=JointId.FF_PIP,
                 angle=70,
-                speed=DEFAULT_SPEED,
+                velocity=DEFAULT_SPEED,
                 current=DEFAULT_CURRENT,
             ),
             JointCommand(
                 id=JointId.FF_MCP,
                 angle=70,
-                speed=DEFAULT_SPEED,
+                velocity=DEFAULT_SPEED,
                 current=DEFAULT_CURRENT,
             ),
         ]

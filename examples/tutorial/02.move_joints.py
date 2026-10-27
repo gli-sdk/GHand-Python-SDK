@@ -32,19 +32,19 @@ def main():
 
             # Configure joint angles for gesture 1
             joints = []
-            joints.append(JointCommand(id=JointId.THUMB_MCP, angle=30, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.THUMB_TMC_FE, angle=30, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=30, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.THUMB_TMC_PS, angle=0, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.FF_PIP, angle=30, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.FF_MCP, angle=30, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.FF_MCP_AA, angle=0, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.MF_PIP, angle=30, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.MF_MCP, angle=30, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.RF_PIP, angle=30, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.RF_MCP, angle=30, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.LF_PIP, angle=30, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.LF_MCP, angle=30, speed=100, current=100))
+            joints.append(JointCommand(id=JointId.THUMB_MCP, angle=30, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.THUMB_TMC_FE, angle=30, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=30, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.THUMB_TMC_PS, angle=0, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.FF_PIP, angle=30, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.FF_MCP, angle=30, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.FF_MCP_AA, angle=0, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.MF_PIP, angle=30, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.MF_MCP, angle=30, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.RF_PIP, angle=30, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.RF_MCP, angle=30, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.LF_PIP, angle=30, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.LF_MCP, angle=30, velocity=100, current=100))
 
             result = hand.move_joints(joints)
             if result:
@@ -53,26 +53,26 @@ def main():
                 current_joints = hand.get_joints()
                 for joint in current_joints:
                     print(
-                        f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\terror:{joint.error:<30},\tangle: {joint.angle:.2f}deg,\tspeed: {joint.speed},\tcurrent: {joint.current}"
+                        f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\terror:{joint.error:<30},\tangle: {joint.angle:.2f}deg,\tspeed: {joint.velocity},\tcurrent: {joint.current}"
                     )
             else:
                 break
 
             # Configure joint angles for gesture 2 (reset position)
             joints = []
-            joints.append(JointCommand(id=JointId.THUMB_MCP, angle=0, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.THUMB_TMC_FE, angle=0, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=20, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.THUMB_TMC_PS, angle=0, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.FF_PIP, angle=0, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.FF_MCP, angle=0, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.FF_MCP_AA, angle=0, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.MF_PIP, angle=0, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.MF_MCP, angle=0, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.RF_PIP, angle=0, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.RF_MCP, angle=0, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.LF_PIP, angle=0, speed=100, current=100))
-            joints.append(JointCommand(id=JointId.LF_MCP, angle=0, speed=100, current=100))
+            joints.append(JointCommand(id=JointId.THUMB_MCP, angle=0, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.THUMB_TMC_FE, angle=0, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=20, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.THUMB_TMC_PS, angle=0, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.FF_PIP, angle=0, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.FF_MCP, angle=0, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.FF_MCP_AA, angle=0, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.MF_PIP, angle=0, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.MF_MCP, angle=0, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.RF_PIP, angle=0, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.RF_MCP, angle=0, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.LF_PIP, angle=0, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.LF_MCP, angle=0, velocity=100, current=100))
 
             result = hand.move_joints(joints)
             if result:
@@ -83,7 +83,7 @@ def main():
                 current_joints = hand.get_joints()
                 for joint in current_joints:
                     print(
-                        f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\terror:{joint.error:<30},\tangle: {joint.angle:.2f}deg,\tspeed: {joint.speed},\tcurrent: {joint.current}"
+                        f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\terror:{joint.error:<30},\tangle: {joint.angle:.2f}deg,\tspeed: {joint.velocity},\tcurrent: {joint.current}"
                     )
             else:
                 break

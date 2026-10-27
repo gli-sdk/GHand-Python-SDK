@@ -446,7 +446,7 @@ class CanfdComm(IComm):
         slave_ids = [slave_id] if slave_id is not None else [0x31, 0x32]
         candidates = [node_id for node_id in dict.fromkeys(slave_ids) if node_id is not None]
 
-        # V2.0 devices announce their node ID after power-up with a spontaneous
+        # devices announce their node ID after power-up with a spontaneous
         # FC44 frame: Src=Target=Node ID, ACK=0.
         deadline = time.time() + 0.5
         while time.time() < deadline:
@@ -475,7 +475,7 @@ class CanfdComm(IComm):
                 self._src_id, slave_id, ack=0, func_code=0x44,
                 start=1, end=1, toggle=0, seg_num=0,
             )
-            # V2.1 firmware answers FC44 only when PDU[4] equals its own node ID.
+            # firmware answers FC44 only when PDU[4] equals its own node ID.
             probe = struct.pack(">HH", 0x0000, 1) + bytes([slave_id, 0, 0, 0])
             if not self._transport.send_frame(can_id, probe):
                 continue
@@ -804,7 +804,7 @@ class CanfdComm(IComm):
         return parse_hand_info(raw)
 
     def get_hand_state_machine(self) -> HandRuntimeState | int:
-        """Retrieve the Modbus V2.0 whole-hand runtime state."""
+        """Retrieve the Modbus whole-hand runtime state."""
         raw_bytes = self._transport.read_registers(
             self._src_id,
             self._slave_id,
@@ -933,7 +933,7 @@ class CanfdComm(IComm):
         """Write a tactile control command and await the terminal state.
 
         Args:
-            command: V2.1 low-byte command value (1=enable, 2=disable, 4=zero).
+            command: low-byte command value (1=enable, 2=disable, 4=zero).
         """
         baseline = self._read_input_word(REG_TACTILE_CTRL_STATUS)
         if not self._transport.write_registers(
@@ -958,9 +958,9 @@ class CanfdComm(IComm):
         interval_sec: float = 0.02,
         settle_sec: float = 0.3,
     ) -> int | None:
-        """Wait for the terminal mailbox state of a V2.1 command register.
+        """Wait for the terminal mailbox state of a command register.
 
-        V2.1 command mailboxes encode the low byte as status (0 idle / 1 busy)
+        command mailboxes encode the low byte as status (0 idle / 1 busy)
         and the high byte as result (1 ok / 2 failed / 3 invalid). The register
         keeps the last terminal value, so a fresh terminal can equal
         ``baseline`` (for example open-tactile right after close-tactile). A
@@ -988,7 +988,7 @@ class CanfdComm(IComm):
         return None
 
     def clear_fault(self) -> bool:
-        """Clear device faults via the V2.1 mailbox (writing full value 1)."""
+        """Clear device faults via the mailbox (writing full value 1)."""
         baseline = self._read_input_word(REG_FAULT_CLEAR_STATUS)
         if not self._transport.write_registers(
             self._src_id, self._slave_id, REG_CLEAR_FAULT, struct.pack(

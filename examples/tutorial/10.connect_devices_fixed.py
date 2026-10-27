@@ -75,17 +75,17 @@ def main():
     # hand2.move_joints([...])
     joints1 = []
 
-    joints1.append(JointCommand(id=JointId.THUMB_MCP, angle=0, speed=100,
+    joints1.append(JointCommand(id=JointId.THUMB_MCP, angle=0, velocity=100,
                                 current=100))  # Angle range: 0~75 (degrees)
-    joints1.append(JointCommand(id=JointId.THUMB_TMC_FE, angle=50, speed=100,
+    joints1.append(JointCommand(id=JointId.THUMB_TMC_FE, angle=50, velocity=100,
                                 current=100))  # Angle range: 0~55 (degrees)
-    joints1.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=20, speed=100,
+    joints1.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=20, velocity=100,
                                 current=100))  # Angle range: 0~90 (degrees)
-    joints1.append(JointCommand(id=JointId.THUMB_TMC_PS, angle=0, speed=100,
+    joints1.append(JointCommand(id=JointId.THUMB_TMC_PS, angle=0, velocity=100,
                                 current=100))  # Angle range: 0~90 (degrees)
-    joints1.append(JointCommand(id=JointId.FF_PIP, angle=0, speed=100,
+    joints1.append(JointCommand(id=JointId.FF_PIP, angle=0, velocity=100,
                                 current=100))  # Angle range: 0~75 (degrees)
-    joints1.append(JointCommand(id=JointId.FF_MCP, angle=0, speed=100,
+    joints1.append(JointCommand(id=JointId.FF_MCP, angle=0, velocity=100,
                                 current=100))  # Angle range: 0~70 (degrees)
 
     result = hand1.move_joints(joints1)
@@ -96,20 +96,20 @@ def main():
         if current_joints:
             joint = current_joints[2]
             print(
-                f"  {JointId(joint.id).name:<15}- Angle: {joint.angle:.2f} deg,\tSpeed: {joint.speed},\tCurrent: {joint.current}"
+                f"  {JointId(joint.id).name:<15}- Angle: {joint.angle:.2f} deg,\tSpeed: {joint.velocity},\tCurrent: {joint.current}"
             )
 
-    joints1.append(JointCommand(id=JointId.THUMB_MCP, angle=0, speed=100,
+    joints1.append(JointCommand(id=JointId.THUMB_MCP, angle=0, velocity=100,
                                 current=100))  # Angle range: 0~75 (degrees)
-    joints1.append(JointCommand(id=JointId.THUMB_TMC_FE, angle=0, speed=100,
+    joints1.append(JointCommand(id=JointId.THUMB_TMC_FE, angle=0, velocity=100,
                                 current=100))  # Angle range: 0~55 (degrees)
-    joints1.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=20, speed=100,
+    joints1.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=20, velocity=100,
                                 current=100))  # Angle range: 0~90 (degrees)
-    joints1.append(JointCommand(id=JointId.THUMB_TMC_PS, angle=0, speed=100,
+    joints1.append(JointCommand(id=JointId.THUMB_TMC_PS, angle=0, velocity=100,
                                 current=100))  # Angle range: 0~90 (degrees)
-    joints1.append(JointCommand(id=JointId.FF_PIP, angle=50, speed=100,
+    joints1.append(JointCommand(id=JointId.FF_PIP, angle=50, velocity=100,
                                 current=100))  # Angle range: 0~75 (degrees)
-    joints1.append(JointCommand(id=JointId.FF_MCP, angle=50, speed=100,
+    joints1.append(JointCommand(id=JointId.FF_MCP, angle=50, velocity=100,
                                 current=100))  # Angle range: 0~70 (degrees)
 
     result = hand2.move_joints(joints1)
@@ -120,7 +120,7 @@ def main():
         if current_joints2:
             joint = current_joints2[7]
             print(
-                f"  {JointId(joint.id).name:<15}- Angle: {joint.angle:.2f} deg,\tSpeed: {joint.speed},\tCurrent: {joint.current}"
+                f"  {JointId(joint.id).name:<15}- Angle: {joint.angle:.2f} deg,\tSpeed: {joint.velocity},\tCurrent: {joint.current}"
             )
 
     # Close connections when program ends

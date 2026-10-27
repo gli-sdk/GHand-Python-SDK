@@ -133,7 +133,7 @@ def execute_gesture(
 
     angles = GESTURE_DEFINITIONS[gesture]
     joints = [
-        JointCommand(id=joint_id, angle=angle, speed=speed, current=current)
+        JointCommand(id=joint_id, angle=angle, velocity=speed, current=current)
         for joint_id, angle in angles.items()
     ]
 

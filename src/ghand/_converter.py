@@ -74,7 +74,7 @@ class JointConverter:
             JointCommand(
                 id=int(JointId(i)),
                 angle=float(angles[i]),
-                speed=speed,
+                velocity=speed,
                 current=current,
             )
             for i in range(18)

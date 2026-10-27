@@ -52,7 +52,7 @@ class JointCommandBuilder:
 
     def position_command(self, angles: dict[JointId, float], speed: int, current: int) -> list[JointCommand]:
         return [
-            JointCommand(id=joint_id, angle=angle, speed=speed, current=current)
+            JointCommand(id=joint_id, angle=angle, velocity=speed, current=current)
             for joint_id, angle in angles.items()
         ]
 
@@ -62,12 +62,12 @@ class JointCommandBuilder:
         joints = [
             JointCommand(id=joint_id, current=current)
             if joint_id in active
-            else JointCommand(id=joint_id, angle=0.0, speed=0, current=0)
+            else JointCommand(id=joint_id, angle=0.0, velocity=0, current=0)
             for joint_id in CURRENT_CONTROL_JOINTS
         ]
         joints += [
-            JointCommand(id=JointId.THUMB_TMC_PS, angle=0.0, speed=0, current=thumb_aux_current),
-            JointCommand(id=JointId.THUMB_TMC_AA, angle=20.0, speed=0, current=thumb_aux_current),
+            JointCommand(id=JointId.THUMB_TMC_PS, angle=0.0, velocity=0, current=thumb_aux_current),
+            JointCommand(id=JointId.THUMB_TMC_AA, angle=20.0, velocity=0, current=thumb_aux_current),
         ]
         return joints
 
@@ -84,7 +84,7 @@ class JointCommandBuilder:
             JointCommand(
                 id=joint_id,
                 angle=hold_angles.get(joint_id, 0.0),
-                speed=limited_speed,
+                velocity=limited_speed,
                 current=limited_current,
             )
             for joint_id in self._current_joints

@@ -161,7 +161,7 @@ def main():
                     JointCommand(
                         id=joint_id,
                         angle=params["angle"],
-                        speed=params["speed"],
+                        velocity=params["speed"],
                         current=params["current"],
                     ))
 

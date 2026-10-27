@@ -39,7 +39,7 @@ from ..types import (
     JointCommand,
     DeviceData,
     HandData,
-    HandFaultData,
+    HandFault,
     HandWarning,
     HandCriticalError,
     HandRuntimeState,
@@ -277,7 +277,7 @@ class EthercatComm(IComm):
             target.stop = JointControlState(joint.stop).value
             target.mode = (target.mode & 0x0F) | (JointLoopType(joint.closed_loop_type).value << 4)
             target.angle = joint.angle
-            target.speed = joint.speed
+            target.speed = joint.velocity
             target.current = joint.current
             target.kp = joint.kp
             target.kd = joint.kd
@@ -342,7 +342,7 @@ class EthercatComm(IComm):
                     mode=joint_tpdo.mode,
                     stop=joint_tpdo.stop,
                     angle=angle,
-                    speed=joint_tpdo.speed,
+                    velocity=joint_tpdo.speed,
                     current=joint_tpdo.current,
                 )
             )
@@ -372,7 +372,7 @@ class EthercatComm(IComm):
         return HandData(
             joints_state=self._parse_state(hand_tpdo.state),
             error_warn=HandWarning(int.from_bytes(hand_tpdo.error_warn, "little")),
-            error_fault=HandFaultData(int.from_bytes(hand_tpdo.error_fault, "little")),
+            error_fault=HandFault(int.from_bytes(hand_tpdo.error_fault, "little")),
             error_critical=HandCriticalError(int.from_bytes(hand_tpdo.error_critical, "little")),
             temperature=hand_tpdo.temperature,
         )
@@ -690,7 +690,7 @@ class EthercatComm(IComm):
             hand = HandData(
                 joints_state=self._parse_state(tpdo.hand.state),
                 error_warn=HandWarning(int.from_bytes(tpdo.hand.error_warn, "little")),
-                error_fault=HandFaultData(int.from_bytes(tpdo.hand.error_fault, "little")),
+                error_fault=HandFault(int.from_bytes(tpdo.hand.error_fault, "little")),
                 error_critical=HandCriticalError(int.from_bytes(tpdo.hand.error_critical, "little")),
                 temperature=tpdo.hand.temperature,
             )
@@ -702,7 +702,7 @@ class EthercatComm(IComm):
                     mode=jtpdo.mode,
                     stop=jtpdo.stop,
                     angle=jtpdo.angle,
-                    speed=jtpdo.speed,
+                    velocity=jtpdo.speed,
                     current=jtpdo.current,
                 )
                 for jid, jtpdo in tpdo.joints.items()

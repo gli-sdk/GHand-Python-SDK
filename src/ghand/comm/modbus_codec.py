@@ -36,7 +36,7 @@ from ..types import (
     HandControlState,
     JointErrorCode,
     HandData,
-    HandFaultData,
+    HandFault,
     HandWarning,
     HandCriticalError,
     HandRuntimeState,
@@ -272,7 +272,7 @@ def parse_hand_info(raw: list[int]) -> HandData:
     return HandData(
         joints_state=_parse_state(state),
         error_warn=HandWarning(int.from_bytes(error_warn, "little")),
-        error_fault=HandFaultData(int.from_bytes(error_fault, "little")),
+        error_fault=HandFault(int.from_bytes(error_fault, "little")),
         error_critical=HandCriticalError(int.from_bytes(error_critical, "little")),
         temperature=temperature,
     )
@@ -333,7 +333,7 @@ def parse_joint_data(raw: list[int], offset: int, joint_id: int) -> JointData:
         mode=mode,
         stop=stop,
         angle=angle,
-        speed=speed,
+        velocity=speed,
         current=current,
     )
 

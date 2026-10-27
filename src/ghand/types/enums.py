@@ -133,10 +133,10 @@ class HandControlState(enum.IntEnum):
 class JointControlMode(enum.IntEnum):
     """Per-joint control modes; CUSTOM is only available at hand level."""
 
-    POSITION = 0
-    VELOCITY = 1
-    CURRENT = 2
-    MIT = 3
+    POSITION = 0  # Position control using the target joint angle.
+    VELOCITY = 1  # Velocity control using the target joint velocity (%).
+    CURRENT = 2  # Current (torque) control using the target motor current (%).
+    MIT = 3  # MIT control combining target angle, velocity, current, and kp/kd gains.
 class JointLoopType(enum.IntEnum):
     """Feedback loop type encoded in the high nibble of TPDO joint mode."""
     # Only effective when CtrlMode is CUSTOM; other modes default to CLOSED_LOOP.

@@ -21,10 +21,8 @@ from .data import (
     JointCommand,
     DeviceData,
     HandData,
-    HandFaultData,
     JointData,
     TactileData,
-    describe_hand_state_errors,
 )
 from .enums import (
     HandControlMode,
@@ -63,7 +61,6 @@ __all__ = [
     "HandCriticalError",
     "HandFault",
     "HandData",
-    "HandFaultData",
     "HandRuntimeState",
     "HandType",
     "HandWarning",
@@ -80,5 +77,4 @@ __all__ = [
     "HandControlState",
     "TactileData",
     "TactileSensorId",
-    "describe_hand_state_errors",
 ]

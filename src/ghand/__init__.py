@@ -54,7 +54,6 @@ from .types import (
     JointCommand,
     DeviceData,
     HandData,
-    HandFaultData,
     JointData,
     TactileData,
 )
@@ -71,7 +70,6 @@ __all__ = [
     "RS485BaudRate",
     "CANFDBitTiming",
     "HandData",
-    "HandFaultData",
     "HandRuntimeState",
     "HandType",
     "TactileSensorId",

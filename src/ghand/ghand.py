@@ -269,18 +269,18 @@ class GHand:
                 "[Joint] ID: %s speed input is invalid in current mode and will be ignored",
                 JointId(joint.id).name,
             )
-        original_speed = joint.speed
+        original_speed = joint.velocity
         if mode == HandControlMode.VELOCITY:
-            joint.speed = max(-100, min(100, joint.speed))
+            joint.velocity = max(-100, min(100, joint.velocity))
         else:
-            joint.speed = min(100, abs(joint.speed))
+            joint.velocity = min(100, abs(joint.velocity))
 
-        if joint.speed != original_speed and mode != HandControlMode.CURRENT:
+        if joint.velocity != original_speed and mode != HandControlMode.CURRENT:
             logger.warning(
                 "[Joint] ID: %s speed %s adjusted to %s in %s mode",
                 JointId(joint.id).name,
                 original_speed,
-                joint.speed,
+                joint.velocity,
                 mode.name,
             )
 
@@ -701,7 +701,7 @@ class GHand:
         """Retrieve the firmware version.
 
         Returns:
-            Firmware version string (e.g., "v1.0.0").
+            Firmware version string.
         """
         if self._firmware_version == "":
             version = self._comm_read(
@@ -981,7 +981,7 @@ class GHand:
                 mode=getattr(joint, "mode", mode),
                 stop=joint.stop,
                 angle=joint.angle,
-                speed=joint.speed,
+                velocity=joint.velocity,
                 current=joint.current,
                 kp=joint.kp,
                 kd=joint.kd,

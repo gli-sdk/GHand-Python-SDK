@@ -636,7 +636,7 @@ class Rs485Comm(IComm):
         return parse_hand_info(raw)
 
     def get_hand_state_machine(self) -> HandRuntimeState | int:
-        """Retrieve the Modbus V2.0 whole-hand runtime state."""
+        """Retrieve the Modbus whole-hand runtime state."""
         result = self._read_input_registers(REG_HAND_STATE_MACHINE, count=1)
         if result is None or result.isError():
             raise RuntimeError("Failed to read hand state machine register")
@@ -786,7 +786,7 @@ class Rs485Comm(IComm):
         """Write a tactile control command and await the terminal state.
 
         Args:
-            command: V2.1 low-byte command value (1=enable, 2=disable, 4=zero).
+            command: low-byte command value (1=enable, 2=disable, 4=zero).
         """
         baseline = self._read_input_word(REG_TACTILE_CTRL_STATUS)
         result = self._write_register(
@@ -806,9 +806,9 @@ class Rs485Comm(IComm):
         interval_sec: float = 0.02,
         settle_sec: float = 0.3,
     ) -> int | None:
-        """Wait for the terminal mailbox state of a V2.1 command register.
+        """Wait for the terminal mailbox state of a command register.
 
-        V2.1 command mailboxes encode the low byte as status (0 idle / 1 busy)
+        command mailboxes encode the low byte as status (0 idle / 1 busy)
         and the high byte as result (1 ok / 2 failed / 3 invalid). The register
         keeps the last terminal value, so a fresh terminal can equal
         ``baseline`` (for example open-tactile right after close-tactile). A
@@ -836,7 +836,7 @@ class Rs485Comm(IComm):
         return None
 
     def clear_fault(self) -> bool:
-        """Clear device faults via the V2.1 mailbox (writing full value 1)."""
+        """Clear device faults via the mailbox (writing full value 1)."""
         baseline = self._read_input_word(REG_FAULT_CLEAR_STATUS)
         result = self._write_register(REG_CLEAR_FAULT, 0x0001)
         if result is None or result.isError():

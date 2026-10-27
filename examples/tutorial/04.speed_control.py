@@ -47,7 +47,7 @@ def main():
                     JointId.LF_PIP,
                     JointId.LF_MCP,
             ]:
-                joints.append(JointCommand(id=joint_id, speed=100, current=100))
+                joints.append(JointCommand(id=joint_id, velocity=100, current=100))
 
             result = hand.move_joints(joints, mode=HandControlMode.VELOCITY)
             if result:
@@ -59,7 +59,7 @@ def main():
                         print(f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\t"
                               f"error:{joint.error:<30},\t"
                               f"angle: {joint.angle:.2f}deg,\t"
-                              f"speed: {joint.speed},\tcurrent: {joint.current}")
+                              f"speed: {joint.velocity},\tcurrent: {joint.current}")
             else:
                 print("Failed to send speed command")
                 break
@@ -79,7 +79,7 @@ def main():
                     JointId.LF_PIP,
                     JointId.LF_MCP,
             ]:
-                joints.append(JointCommand(id=joint_id,speed=-100, current=100))
+                joints.append(JointCommand(id=joint_id,velocity=-100, current=100))
 
             result = hand.move_joints(joints, mode=HandControlMode.VELOCITY)
             if result:
@@ -91,7 +91,7 @@ def main():
                         print(f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\t"
                               f"error:{joint.error:<30},\t"
                               f"angle: {joint.angle:.2f}deg,\t"
-                              f"speed: {joint.speed},\tcurrent: {joint.current}")
+                              f"speed: {joint.velocity},\tcurrent: {joint.current}")
             else:
                 print("Failed to send speed command")
                 break

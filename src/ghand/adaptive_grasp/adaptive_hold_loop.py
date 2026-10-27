@@ -401,13 +401,13 @@ class HoldController:
                     JointCommand(
                         id=joint_id,
                         angle=self._contact_joint_angles[joint_id],
-                        speed=100,
+                        velocity=100,
                         current=100,
                     ))
                 continue
 
             command.angle = self._contact_joint_angles[joint_id]
-            command.speed = 100
+            command.velocity = 100
             command.current = 100
 
     def _clamp_to_contact_window(self, angles: JointAngles) -> JointAngles:

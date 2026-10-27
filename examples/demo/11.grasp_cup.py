@@ -38,12 +38,12 @@ def main():
                 break
 
             joints = []
-            joints.append(JointCommand(id=JointId.THUMB_TMC_FE, angle=36, speed=50, current=100))
-            joints.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=70, speed=50, current=100))
-            joints.append(JointCommand(id=JointId.THUMB_TMC_PS, angle=10, speed=50, current=100))
-            joints.append(JointCommand(id=JointId.FF_MCP, angle=51, speed=50, current=100))
-            joints.append(JointCommand(id=JointId.MF_MCP, angle=46, speed=50, current=100))
-            joints.append(JointCommand(id=JointId.RF_MCP, angle=40, speed=50, current=100))
+            joints.append(JointCommand(id=JointId.THUMB_TMC_FE, angle=36, velocity=50, current=100))
+            joints.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=70, velocity=50, current=100))
+            joints.append(JointCommand(id=JointId.THUMB_TMC_PS, angle=10, velocity=50, current=100))
+            joints.append(JointCommand(id=JointId.FF_MCP, angle=51, velocity=50, current=100))
+            joints.append(JointCommand(id=JointId.MF_MCP, angle=46, velocity=50, current=100))
+            joints.append(JointCommand(id=JointId.RF_MCP, angle=40, velocity=50, current=100))
 
             result = hand.move_joints(joints)
             if result:
@@ -77,7 +77,7 @@ def main():
                                 f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\t"
                                 f"error:{joint.error:<30},\t"
                                 f"angle: {joint.angle:.2f}deg,\t"
-                                f"speed: {joint.speed},\tcurrent: {joint.current}")
+                                f"speed: {joint.velocity},\tcurrent: {joint.current}")
             else:
                 print("Failed to send current command")
                 break
