@@ -2,7 +2,7 @@
 import time
 
 from ghand import ProductType, configure_logging
-from ghand.ghand import CommType, CtrlMode, GHand, JointCommand, JointId
+from ghand.ghand import CommType, HandControlMode, GHand, JointCommand, JointId
 
 # Configure SDK logging (shows connection state, warnings, errors)
 configure_logging(level=logging.INFO)
@@ -49,7 +49,7 @@ def main():
             ]:
                 joints.append(JointCommand(id=joint_id, speed=100, current=100))
 
-            result = hand.move_joints(joints, mode=CtrlMode.SPEED)
+            result = hand.move_joints(joints, mode=HandControlMode.VELOCITY)
             if result:
                 time.sleep(2)
                 current_joints = hand.get_joints()
@@ -81,7 +81,7 @@ def main():
             ]:
                 joints.append(JointCommand(id=joint_id,speed=-100, current=100))
 
-            result = hand.move_joints(joints, mode=CtrlMode.SPEED)
+            result = hand.move_joints(joints, mode=HandControlMode.VELOCITY)
             if result:
                 time.sleep(2)
                 current_joints = hand.get_joints()

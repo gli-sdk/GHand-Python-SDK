@@ -18,7 +18,9 @@
 import struct
 from dataclasses import dataclass, field
 
-from ..types import JointErrorCode, JointId, JointState, State, ProductConfig
+from .._product_config import ProductConfig
+from .._device_value import format_device_value, parse_device_value
+from ..types import JointErrorCode, JointId, JointState, HandControlState
 
 # TPDO component byte sizes
 _HAND_TPDO_SIZE = struct.calcsize('<H6s12s6sh')  # 28
@@ -68,7 +70,7 @@ class HandTpdo:
 
     def __str__(self):
         return (
-            f"HandTpdo(state={State(self.state)}, error_warn={self.error_warn!r}, "
+            f"HandTpdo(state={format_device_value(parse_device_value(HandControlState, self.state))}, error_warn={self.error_warn!r}, "
             f"error_fault={self.error_fault!r}, error_critical={self.error_critical!r}, "
             f"temperature={self.temperature})"
         )
@@ -99,8 +101,8 @@ class JointTpdo:
 
     def __str__(self):
         return (
-            f"JointTpdo(state={JointState(self.state)}, "
-            f"error={JointErrorCode(self.error)}, "
+            f"JointTpdo(state={format_device_value(parse_device_value(JointState, self.state))}, "
+            f"error={format_device_value(parse_device_value(JointErrorCode, self.error))}, "
             f"mode={self.mode}, stop={self.stop}, angle={self.angle:.3f}, "
             f"speed={self.speed}, current={self.current})"
         )

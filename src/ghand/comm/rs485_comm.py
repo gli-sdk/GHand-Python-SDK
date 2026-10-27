@@ -37,14 +37,14 @@ try:
 except ImportError:
     ModbusSerialClient = None  # type: ignore[misc,assignment]
     ModbusException = Exception  # type: ignore[misc,assignment]
+from .._product_config import ProductConfig
 from ..types import (
-    CtrlMode,
-    HandState,
-    HandStateMachine,
+    HandControlMode,
+    HandData,
+    HandRuntimeState,
     JointControlState,
     JointData,
     JointId,
-    ProductConfig,
     TactileData,
 )
 from .icomm import IComm
@@ -129,9 +129,9 @@ class Rs485Comm(IComm):
     def __init__(self, config: ProductConfig):
         self._config = config
         self._profile = get_modbus_profile(config)
-        self._hand_mode = CtrlMode.POSITION
+        self._hand_mode = HandControlMode.POSITION
         self._joint_modes = {
-            joint_id: CtrlMode.POSITION.value
+            joint_id: HandControlMode.POSITION.value
             for joint_id in self._profile.joint_control_addresses
         }
         self._slave_id = getattr(config, "slave_id", 0x31) or 0x31
@@ -149,9 +149,9 @@ class Rs485Comm(IComm):
         """Update the cached product configuration."""
         self._config = config
         self._profile = get_modbus_profile(config)
-        self._hand_mode = CtrlMode.POSITION
+        self._hand_mode = HandControlMode.POSITION
         self._joint_modes = {
-            joint_id: CtrlMode.POSITION.value
+            joint_id: HandControlMode.POSITION.value
             for joint_id in self._profile.joint_control_addresses
         }
         if not self._connected:
@@ -589,7 +589,7 @@ class Rs485Comm(IComm):
             result = self._write_register(
                 base_addr,
                 encode_joint_mode_stop(
-                    self._joint_modes.get(joint_id, CtrlMode.POSITION.value),
+                    self._joint_modes.get(joint_id, HandControlMode.POSITION.value),
                     JointControlState.STOPPED,
                 ),
             )
@@ -622,11 +622,11 @@ class Rs485Comm(IComm):
             start,
         )
 
-    def get_hand_info(self) -> HandState:
+    def get_hand_info(self) -> HandData:
         """Retrieve high-level hand status.
 
         Returns:
-            HandState instance.
+            HandData instance.
         """
         result = self._read_input_registers(self._profile.hand_info_address, count=14)
         if result is None or result.isError():
@@ -635,7 +635,7 @@ class Rs485Comm(IComm):
         raw = result.registers
         return parse_hand_info(raw)
 
-    def get_hand_state_machine(self) -> HandStateMachine:
+    def get_hand_state_machine(self) -> HandRuntimeState | int:
         """Retrieve the Modbus V2.0 whole-hand runtime state."""
         result = self._read_input_registers(REG_HAND_STATE_MACHINE, count=1)
         if result is None or result.isError():

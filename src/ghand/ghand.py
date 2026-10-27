@@ -37,6 +37,7 @@ from .diagnostics import (
     IdentityDiagnostics,
     SubscriptionDiagnostics,
 )
+from ._product_config import ProductConfig
 from .types import (
     OperationResult,
     SdkError,
@@ -45,12 +46,11 @@ from .types import (
     JointId,
     ProductType,
     RS485BaudRate,
-    CtrlMode,
+    HandControlMode,
     HandType,
-    ProductConfig,
     JointCommand,
-    HandState,
-    HandStateMachine,
+    HandData,
+    HandRuntimeState,
     JointData,
 )
 
@@ -228,7 +228,7 @@ class GHand:
         self._tactile_opened = False
 
     @staticmethod
-    def _check_joint_limit(joint: JointCommand, limit, mode: CtrlMode):
+    def _check_joint_limit(joint: JointCommand, limit, mode: HandControlMode):
         """Clamp the joint angle to its configured limits.
 
         Args:
@@ -236,46 +236,46 @@ class GHand:
             limit: Tuple of (min, max) in degrees.
             mode: Current control mode.
         """
-        if mode == CtrlMode.SPEED or mode == CtrlMode.CURRENT:
+        if mode == HandControlMode.VELOCITY or mode == HandControlMode.CURRENT:
             logger.warning(
                 "[Joint] ID: %s angle input is invalid in %s mode and will be ignored",
                 JointId(joint.id).name, mode.name,
             )
         if joint.angle < limit[0]:
             joint.angle = limit[0]
-            if mode == CtrlMode.POSITION:
+            if mode == HandControlMode.POSITION:
                 logger.warning(
                     "[Joint] ID: %s angle below limit, clamped to min value %.1f degrees",
                     JointId(joint.id).name, limit[0]
                 )
         elif joint.angle > limit[1]:
             joint.angle = limit[1]
-            if mode == CtrlMode.POSITION:
+            if mode == HandControlMode.POSITION:
                 logger.warning(
                     "[Joint] ID: %s angle above limit, clamped to max value %.1f degrees",
                     JointId(joint.id).name, limit[1]
                 )
 
     @staticmethod
-    def _check_speed_limit(joint: JointCommand, mode: CtrlMode):
+    def _check_speed_limit(joint: JointCommand, mode: HandControlMode):
         """Validate and clamp joint speed based on the control mode.
 
         Args:
             joint: Joint to check and modify in place.
             mode: current control mode.
         """
-        if mode == CtrlMode.CURRENT:
+        if mode == HandControlMode.CURRENT:
             logger.warning(
                 "[Joint] ID: %s speed input is invalid in current mode and will be ignored",
                 JointId(joint.id).name,
             )
         original_speed = joint.speed
-        if mode == CtrlMode.SPEED:
+        if mode == HandControlMode.VELOCITY:
             joint.speed = max(-100, min(100, joint.speed))
         else:
             joint.speed = min(100, abs(joint.speed))
 
-        if joint.speed != original_speed and mode != CtrlMode.CURRENT:
+        if joint.speed != original_speed and mode != HandControlMode.CURRENT:
             logger.warning(
                 "[Joint] ID: %s speed %s adjusted to %s in %s mode",
                 JointId(joint.id).name,
@@ -285,7 +285,7 @@ class GHand:
             )
 
     @staticmethod
-    def _check_current_limit(joint: JointCommand, mode: CtrlMode):
+    def _check_current_limit(joint: JointCommand, mode: HandControlMode):
         """Validate and clamp joint current based on the control mode.
 
         Args:
@@ -293,7 +293,7 @@ class GHand:
             mode: current control mode.
         """
         original_current = joint.current
-        if mode == CtrlMode.CURRENT:
+        if mode == HandControlMode.CURRENT:
             joint.current = max(-100, min(100, joint.current))
         else:
             joint.current = min(100, abs(joint.current))
@@ -805,7 +805,7 @@ class GHand:
             "device rejected PID parameter configuration",
         )
 
-    def get_hand_state_machine(self) -> HandStateMachine:
+    def get_hand_state_machine(self) -> HandRuntimeState | int:
         """Retrieve the whole-hand runtime state."""
         return self._comm_read(
             "get_hand_state_machine", self._comm.get_hand_state_machine
@@ -956,7 +956,7 @@ class GHand:
                 self._hand_type = HandType.RIGHT_HAND
         return self._hand_type
 
-    def move_joints(self, joints: list[JointCommand], mode: CtrlMode = CtrlMode.POSITION) -> bool:
+    def move_joints(self, joints: list[JointCommand], mode: HandControlMode = HandControlMode.POSITION) -> bool:
         """Send joint control commands.
 
         Args:
@@ -987,13 +987,13 @@ class GHand:
                 kd=joint.kd,
             )
             effective_mode = mode
-            if mode == CtrlMode.CUSTOM and joint_cmd.mode is not None:
+            if mode == HandControlMode.CUSTOM and joint_cmd.mode is not None:
                 joint_mode_value = (
                     joint_cmd.mode.value
-                    if isinstance(joint_cmd.mode, CtrlMode)
+                    if isinstance(joint_cmd.mode, HandControlMode)
                     else int(joint_cmd.mode)
                 )
-                effective_mode = CtrlMode(joint_mode_value & 0x0F)
+                effective_mode = HandControlMode(joint_mode_value & 0x0F)
             self._check_speed_limit(joint_cmd, effective_mode)
             self._check_current_limit(joint_cmd, effective_mode)
             if joint.id in self._joint_limits:
@@ -1058,11 +1058,11 @@ class GHand:
         """
         return self._comm_read("get_joints", self._comm.get_joints)
 
-    def get_hand_info(self) -> HandState:
+    def get_hand_info(self) -> HandData:
         """Retrieve high-level hand status information.
 
         Returns:
-            HandState instance.
+            HandData instance.
         """
         return self._comm_read("get_hand_info", self._comm.get_hand_info)
 

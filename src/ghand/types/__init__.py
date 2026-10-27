@@ -17,66 +17,54 @@
 
 """Public SDK types, available directly from ``ghand.types``."""
 
-from .commands import JointCommand
-from .config import (
-    ProductConfig,
-    TactileRegionConfig,
-)
 from .data import (
+    JointCommand,
     DeviceData,
-    HandState,
+    HandData,
+    HandFaultData,
     JointData,
     TactileData,
     describe_hand_state_errors,
 )
 from .enums import (
+    HandControlMode,
+    JointControlMode,
+    JointLoopType,
+    JointControlState,
+    HandRuntimeState,
+    JointState,
+    HandControlState,
     CANFDBitTiming,
     CommType,
-    DeviceCode,
     GestureType,
+    HandType,
     JointId,
     ProductType,
     RS485BaudRate,
     TactileSensorId,
 )
 from .errors import (
-    CommunicationError,
-    ErrorCode,
-    GHandError,
     HandCriticalError,
     HandFault,
-    HandStateError,
     HandWarning,
     JointErrorCode,
     OperationResult,
     SdkError,
 )
-from .states import (
-    ClosedLoopType,
-    CtrlMode,
-    HandStateMachine,
-    HandType,
-    JointControlState,
-    JointState,
-    State,
-)
 
 __all__ = [
     "CANFDBitTiming",
     "CommType",
-    "CommunicationError",
-    "ClosedLoopType",
-    "CtrlMode",
-    "DeviceCode",
+    "JointLoopType",
+    "HandControlMode",
+    "JointControlMode",
     "DeviceData",
-    "ErrorCode",
-    "GHandError",
     "GestureType",
     "HandCriticalError",
     "HandFault",
-    "HandState",
-    "HandStateError",
-    "HandStateMachine",
+    "HandData",
+    "HandFaultData",
+    "HandRuntimeState",
     "HandType",
     "HandWarning",
     "JointCommand",
@@ -86,13 +74,11 @@ __all__ = [
     "JointId",
     "JointState",
     "OperationResult",
-    "ProductConfig",
     "ProductType",
     "RS485BaudRate",
     "SdkError",
-    "State",
+    "HandControlState",
     "TactileData",
-    "TactileRegionConfig",
     "TactileSensorId",
     "describe_hand_state_errors",
 ]

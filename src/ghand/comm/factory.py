@@ -17,7 +17,8 @@
 
 """Communication protocol factory for creating IComm instances."""
 
-from ..types import CommType, ProductConfig
+from .._product_config import ProductConfig
+from ..types import CommType
 from .icomm import IComm
 
 

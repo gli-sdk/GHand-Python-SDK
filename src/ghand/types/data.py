@@ -15,41 +15,52 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Device feedback dataclasses and error-bit descriptions."""
+"""Command and feedback dataclasses and error-bit descriptions."""
 
 from dataclasses import dataclass
 
-from .enums import JointId, TactileSensorId
+from .enums import (
+    JointControlMode, JointLoopType, JointControlState, JointId, JointState,
+    HandControlState, TactileSensorId,
+)
 from .errors import HandCriticalError, HandFault, HandWarning, JointErrorCode
-from .states import ClosedLoopType, CtrlMode, JointState, State
 
 
 @dataclass
-class HandState:
-    """High-level status of the dexterous hand."""
+class JointCommand:
+    """Single joint command sent to the device."""
 
-    state: State = State.DISABLED
-    error_warn: bytes = b"\x00" * 6
-    error_fault: bytes = b"\x00" * 12
-    error_critical: bytes = b"\x00" * 6
-    temperature: int = 0
+    id: int = JointId.THUMB_IP
+    control_mode: JointControlMode = JointControlMode.POSITION
+    loop_type: JointLoopType = JointLoopType.CLOSED_LOOP  # Effective in hand CUSTOM mode.
+    control_state: JointControlState = JointControlState.DISABLED
+    angle: float = 0.0  # degrees
+    speed: int = 0
+    current: int = 0
+    kp: int = 0
+    kd: int = 0
+
+
+@dataclass(frozen=True)
+class HandFaultData:
+    """Complete hand fault bitfield, including per-channel and reserved bits."""
+
+    value: int = 0
+
+    def __bool__(self) -> bool:
+        return bool(self.value)
 
     @property
-    def warnings(self) -> HandWarning:
-        """Return the warning bitfield as a typed flag set."""
-        return HandWarning(int.from_bytes(self.error_warn, "little"))
-
-    @property
-    def faults(self) -> HandFault:
+    def categories(self) -> HandFault:
         """Return categories that contain at least one active fault."""
-        raw = int.from_bytes(self.error_fault, "little")
+        raw = self.value
         categories = HandFault.NONE
-        for category, offset, _, _ in _HAND_FAULT_LAYOUT:
-            if raw & (_HAND_FAULT_CHANNEL_MASK << offset):
+        for category, _, _, _ in _HAND_FAULT_LAYOUT:
+            if raw & category:
                 categories |= category
         return categories
 
-    def fault_indices(self, category: HandFault) -> list[int]:
+    def indices(self, category: HandFault) -> list[int]:
         """Return active 0-based channel indices for one fault category."""
         try:
             offset = next(
@@ -60,14 +71,39 @@ class HandState:
         except StopIteration as exc:
             raise ValueError("category must be one HandFault member") from exc
 
-        bits = (int.from_bytes(self.error_fault, "little") >> offset)
+        bits = (self.value >> offset)
         bits &= _HAND_FAULT_CHANNEL_MASK
         return [index for index in range(13) if bits & (1 << index)]
+
+
+@dataclass
+class HandData:
+    """High-level status of the dexterous hand."""
+
+    joints_state: HandControlState = HandControlState.DISABLED
+    error_warn: HandWarning = HandWarning.NONE
+    error_fault: HandFaultData = HandFaultData()
+    error_critical: HandCriticalError = HandCriticalError.NONE
+    temperature: int = 0
+
+    @property
+    def warnings(self) -> HandWarning:
+        """Return the warning bitfield as a typed flag set."""
+        return self.error_warn
+
+    @property
+    def faults(self) -> HandFault:
+        """Return categories that contain at least one active fault."""
+        return self.error_fault.categories
+
+    def fault_indices(self, category: HandFault) -> list[int]:
+        """Return active 0-based channel indices for one fault category."""
+        return self.error_fault.indices(category)
 
     @property
     def critical_errors(self) -> HandCriticalError:
         """Return the critical-error bitfield as a typed flag set."""
-        return HandCriticalError(int.from_bytes(self.error_critical, "little"))
+        return self.error_critical
 
     def active_errors(self) -> list[tuple[str, int, int, str]]:
         """Return active hand-level warn/fault/critical bit descriptions."""
@@ -81,25 +117,11 @@ class JointData:
     id: int = JointId.THUMB_IP
     state: JointState = JointState.DISABLED
     error: JointErrorCode = JointErrorCode.NORMAL
-    mode: int = 0
-    stop: int = 0
+    control_mode: JointControlMode = JointControlMode.POSITION
+    loop_type: JointLoopType = JointLoopType.CLOSED_LOOP  
     angle: float = 0.0  # degrees
     speed: int = 0
     current: int = 0
-
-    @property
-    def control_mode(self) -> CtrlMode | None:
-        """Return the control mode encoded in bits 0..3 of ``mode``."""
-        try:
-            return CtrlMode(self.mode & 0x0F)
-        except ValueError:
-            return None
-
-    @property
-    def closed_loop_type(self) -> ClosedLoopType:
-        """Return the feedback loop type encoded in bits 4..7 of ``mode``."""
-        return ClosedLoopType((self.mode >> 4) & 0x0F)
-
 
 @dataclass
 class TactileData:
@@ -114,7 +136,7 @@ class TactileData:
 class DeviceData:
     """Unified data carrier for subscription callbacks across all protocols."""
 
-    hand: HandState
+    hand: HandData
     joints: list[JointData]
     tactile: dict[TactileSensorId, TactileData] | None = None
     timestamp: float | None = None
@@ -123,20 +145,6 @@ class DeviceData:
         for joint in self.joints:
             jid = JointId(joint.id)
             setattr(self, jid.name.lower(), joint)
-
-
-_HAND_WARN_MESSAGES = {
-    (0, 0): "Temperature sensor 1 abnormal",
-    (0, 1): "Temperature sensor 2 abnormal",
-    (0, 2): "Fan abnormal",
-    (0, 3): "Tactile board communication abnormal",
-    (0, 4): "Thumb tactile sensor disconnected",
-    (0, 5): "Forefinger tactile sensor disconnected",
-    (0, 6): "Middle finger tactile sensor disconnected",
-    (0, 7): "Ring finger tactile sensor disconnected",
-    (1, 0): "Little finger tactile sensor disconnected",
-    (1, 1): "Self-test error",
-}
 
 
 _ACTIVE_JOINT_NAMES = (
@@ -189,25 +197,19 @@ _HAND_FAULT_MESSAGES = {
 }
 
 
-_HAND_CRITICAL_MESSAGES = {
-    (0, 0): "Unknown error",
-    (0, 2): "Position sensor version mismatch",
-    (0, 3): "Tactile sensor version mismatch",
-    (0, 4): "Motor driver version mismatch",
-    (0, 5): "Position board detection abnormal",
-    (0, 6): "Temperature too high",
-    (0, 7): "Temperature too low",
-    (1, 0): "Zeroing global timeout",
-}
-
-
-def describe_hand_state_errors(hand_state: HandState) -> list[tuple[str, int, int, str]]:
+def describe_hand_state_errors(hand_state: HandData) -> list[tuple[str, int, int, str]]:
     """Decode active hand-level error bitfields."""
     decoded: list[tuple[str, int, int, str]] = []
     groups = (
-        ("warn", hand_state.error_warn, _HAND_WARN_MESSAGES),
-        ("fault", hand_state.error_fault, _HAND_FAULT_MESSAGES),
-        ("critical", hand_state.error_critical, _HAND_CRITICAL_MESSAGES),
+        ("warn", hand_state.error_warn.to_bytes(6, "little"), {
+            divmod(warning.value.bit_length() - 1, 8): warning.name
+            for warning in HandWarning
+        }),
+        ("fault", hand_state.error_fault.value.to_bytes(12, "little"), _HAND_FAULT_MESSAGES),
+        ("critical", hand_state.error_critical.to_bytes(6, "little"), {
+            divmod(error.value.bit_length() - 1, 8): error.name
+            for error in HandCriticalError
+        }),
     )
     for level, data, messages in groups:
         for byte_index, value in enumerate(data):

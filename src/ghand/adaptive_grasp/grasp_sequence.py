@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Optional
 
-from ..types import JointId, TactileSensorId, CtrlMode, JointCommand
+from ..types import JointId, TactileSensorId, HandControlMode, JointCommand
 from .config import AdaptiveGraspConfig
 from .ports import HandCommandPort, SensorFrameSource, read_sensor_frame
 from .runtime import GraspState
@@ -156,7 +156,7 @@ class PhaseController:
     ) -> bool:
         self._set_state(state)
         joints = self._joint_builder.position_command(pose, speed=speed, current=current)
-        ok = self.hand_port.move_joints(joints, mode=CtrlMode.POSITION)
+        ok = self.hand_port.move_joints(joints, mode=HandControlMode.POSITION)
         if not ok:
             return False
         
@@ -261,7 +261,7 @@ class PhaseController:
                 _logger.error("CLOSING phase timeout")
                 return False
 
-            self.hand_port.move_joints(self._joint_builder.current_command(self.current_current), mode=CtrlMode.CURRENT)
+            self.hand_port.move_joints(self._joint_builder.current_command(self.current_current), mode=HandControlMode.CURRENT)
             time.sleep(self.config.closing_period_s)
 
             frame = self._read_closing_sensor_frame()

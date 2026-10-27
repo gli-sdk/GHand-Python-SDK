@@ -24,17 +24,22 @@ data types.  This module has no bus-layer dependencies.
 import struct
 from dataclasses import dataclass
 
+from .._device_value import parse_device_value
 from ..types import (
     JointId,
     ProductType,
     TactileSensorId,
-    CtrlMode,
+    HandControlMode,
+    JointLoopType,
     JointControlState,
     JointState,
-    State,
+    HandControlState,
     JointErrorCode,
-    HandState,
-    HandStateMachine,
+    HandData,
+    HandFaultData,
+    HandWarning,
+    HandCriticalError,
+    HandRuntimeState,
     JointData,
     TactileData,
 )
@@ -241,8 +246,8 @@ def parse_hand_type(raw_bytes: bytes) -> int:
     return int.from_bytes(raw_bytes, byteorder="big") & 0xFF
 
 
-def parse_hand_info(raw: list[int]) -> HandState:
-    """Parse 14 input registers (0x1051~0x105E) into HandState.
+def parse_hand_info(raw: list[int]) -> HandData:
+    """Parse 14 input registers (0x1051~0x105E) into HandData.
 
     Args:
         raw: raw[0] = uint16 hand state, raw[1:4] = warn bitfield,
@@ -264,11 +269,11 @@ def parse_hand_info(raw: list[int]) -> HandState:
     temperature = raw[13] if len(raw) >= 14 else 0
     if temperature >= 32768:
         temperature -= 65536
-    return HandState(
-        state=_parse_state(state),
-        error_warn=error_warn,
-        error_fault=error_fault,
-        error_critical=error_critical,
+    return HandData(
+        joints_state=_parse_state(state),
+        error_warn=HandWarning(int.from_bytes(error_warn, "little")),
+        error_fault=HandFaultData(int.from_bytes(error_fault, "little")),
+        error_critical=HandCriticalError(int.from_bytes(error_critical, "little")),
         temperature=temperature,
     )
 
@@ -277,25 +282,16 @@ def _registers_to_bytes_low_high(raw: list[int]) -> bytes:
     return bytes(byte for reg in raw for byte in (reg & 0xFF, (reg >> 8) & 0xFF))
 
 
-def _parse_state(value: int) -> State:
-    try:
-        return State(value)
-    except ValueError:
-        return State.UNKNOWN_STATE
+def _parse_state(value: int) -> HandControlState | int:
+    return parse_device_value(HandControlState, value)
 
 
-def _parse_joint_state(value: int) -> JointState:
-    try:
-        return JointState(value)
-    except ValueError:
-        return JointState.UNKNOWN_STATE
+def _parse_joint_state(value: int) -> JointState | int:
+    return parse_device_value(JointState, value)
 
 
-def _parse_joint_error_code(value: int) -> JointErrorCode:
-    try:
-        return JointErrorCode(value)
-    except ValueError:
-        return JointErrorCode.UNKNOWN_ERROR
+def _parse_joint_error_code(value: int) -> JointErrorCode | int:
+    return parse_device_value(JointErrorCode, value)
 
 
 def parse_joint_data(raw: list[int], offset: int, joint_id: int) -> JointData:
@@ -417,26 +413,27 @@ def parse_tactile_distributed(data_bytes: bytes, count: int) -> list[float]:
     return distributed
 
 
-def encode_hand_control(mode: CtrlMode, enabled: bool) -> int:
+def encode_hand_control(mode: HandControlMode, enabled: bool) -> int:
     """Encode the shared hand mode/enable register."""
-    mode_value = mode.value if isinstance(mode, CtrlMode) else int(mode)
+    mode_value = mode.value if isinstance(mode, HandControlMode) else int(mode)
     return (int(enabled) << 8) | (mode_value & 0x0F)
 
 
-def resolve_joint_mode(joint, mode: CtrlMode, default_mode: int = 0) -> int:
+def resolve_joint_mode(joint, mode: HandControlMode, default_mode: int = 0) -> int:
     """Resolve the mode encoded in a per-joint control register."""
     joint_mode = getattr(joint, "mode", None)
     if joint_mode is None:
-        joint_mode = default_mode if mode == CtrlMode.CUSTOM else mode
-    mode_value = joint_mode.value if isinstance(joint_mode, CtrlMode) else int(joint_mode)
+        joint_mode = default_mode if mode == HandControlMode.CUSTOM else mode
+    mode_value = joint_mode.value if isinstance(joint_mode, HandControlMode) else int(joint_mode)
     if (mode_value & 0x0F) not in (
-        CtrlMode.POSITION.value,
-        CtrlMode.SPEED.value,
-        CtrlMode.CURRENT.value,
-        CtrlMode.MIT.value,
+        HandControlMode.POSITION.value,
+        HandControlMode.VELOCITY.value,
+        HandControlMode.CURRENT.value,
+        HandControlMode.MIT.value,
     ):
         raise ValueError(f"Invalid per-joint control mode: {mode_value}")
-    return mode_value
+    loop_type = JointLoopType(joint.closed_loop_type)
+    return (mode_value & 0x0F) | (loop_type.value << 4)
 
 
 def encode_joint_mode_stop(mode: int, stop: JointControlState | int) -> int:
@@ -444,13 +441,13 @@ def encode_joint_mode_stop(mode: int, stop: JointControlState | int) -> int:
     return (JointControlState(stop).value << 8) | (mode & 0xFF)
 
 
-def parse_hand_state_machine(raw: list[int]) -> HandStateMachine:
+def parse_hand_state_machine(raw: list[int]) -> HandRuntimeState | int:
     """Parse one input register containing the whole-hand state machine."""
-    return HandStateMachine(raw[0] & 0xFF)
+    return parse_device_value(HandRuntimeState, raw[0] & 0xFF)
 
 
 def encode_joint_command(
-    joint, mode: CtrlMode, default_mode: int = CtrlMode.POSITION.value
+    joint, mode: HandControlMode, default_mode: int = HandControlMode.POSITION.value
 ) -> list[int]:
     """Encode a JointCommand into six holding-register values.
 
@@ -480,7 +477,7 @@ def encode_joint_command(
 
 def encode_hand_command_frame(
     joints,
-    mode: CtrlMode,
+    mode: HandControlMode,
     profile: ModbusRegisterProfile,
     joint_modes: dict[JointId, int],
 ) -> tuple[int, list[int], dict[JointId, int]]:
@@ -492,10 +489,10 @@ def encode_hand_command_frame(
         if joint_id not in profile.joint_control_addresses:
             continue
         registers = encode_joint_command(
-            joint, mode, joint_modes.get(joint_id, CtrlMode.POSITION.value)
+            joint, mode, joint_modes.get(joint_id, HandControlMode.POSITION.value)
         )
         commands[joint_id] = registers
-        updated_modes[joint_id] = registers[0] & 0x0F
+        updated_modes[joint_id] = registers[0] & 0xFF
 
     ordered_joints = sorted(
         profile.joint_control_addresses.items(), key=lambda item: item[1]
@@ -519,7 +516,7 @@ def encode_hand_command_frame(
                 joint_id,
                 [
                     encode_joint_mode_stop(
-                        joint_modes.get(joint_id, CtrlMode.POSITION.value),
+                        joint_modes.get(joint_id, HandControlMode.POSITION.value),
                         JointControlState.STOPPED,
                     ),
                     0,
@@ -536,7 +533,7 @@ def encode_hand_command_frame(
 
 def encode_joint_command_registers(
     joint,
-    mode: CtrlMode,
+    mode: HandControlMode,
     profile: ModbusRegisterProfile,
 ) -> list[int]:
     """Encode a joint command according to the product's control layout."""

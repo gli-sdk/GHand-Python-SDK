@@ -15,23 +15,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Command dataclasses sent to the device."""
+"""Internal helpers for parsing and displaying device enum values."""
 
-from dataclasses import dataclass
-
-from .enums import JointId
-from .states import CtrlMode, JointControlState
+import enum
+from typing import TypeVar
 
 
-@dataclass
-class JointCommand:
-    """Single joint command sent to the device."""
+_DeviceValue = TypeVar("_DeviceValue", bound=enum.IntEnum)
 
-    id: int = JointId.THUMB_IP
-    mode: CtrlMode | None = None
-    stop: JointControlState | int = JointControlState.RUNNING
-    angle: float = 0.0  # degrees
-    speed: int = 0
-    current: int = 0
-    kp: int = 0
-    kd: int = 0
+
+def parse_device_value(enum_type: type[_DeviceValue], value: int) -> _DeviceValue | int:
+    """Return a known enum member or the original undefined integer."""
+    try:
+        return enum_type(value)
+    except ValueError:
+        return value
+
+
+def format_device_value(value: enum.IntEnum | int) -> str:
+    """Display a device value with its enum name or undefined."""
+    name = value.name if isinstance(value, enum.IntEnum) else "undefined"
+    return f"{int(value)}({name})"
+
+

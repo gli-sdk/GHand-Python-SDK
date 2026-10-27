@@ -4,7 +4,7 @@ import time
 from ghand import (
     ProductType,
     CommType,
-    CtrlMode,
+    HandControlMode,
     GestureType,
     GHand,
     JointCommand,
@@ -60,7 +60,7 @@ def main():
                 JointCommand(id=JointId.MF_PIP, current=8),
             ]
 
-            result = hand.move_joints(current_joints, mode=CtrlMode.CURRENT)
+            result = hand.move_joints(current_joints, mode=HandControlMode.CURRENT)
             if result:
                 while True:
                     time.sleep(2)

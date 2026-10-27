@@ -37,13 +37,13 @@ try:
 except ImportError:
     list_ports = None  # type: ignore[assignment]
 
+from .._product_config import ProductConfig
 from ..types import (
     JointId,
-    CtrlMode,
+    HandControlMode,
     JointControlState,
-    ProductConfig,
-    HandState,
-    HandStateMachine,
+    HandData,
+    HandRuntimeState,
     JointData,
     TactileData,
 )
@@ -134,9 +134,9 @@ class CanfdComm(IComm):
     def __init__(self, config: ProductConfig):
         self._config = config
         self._profile = get_modbus_profile(config)
-        self._hand_mode = CtrlMode.POSITION
+        self._hand_mode = HandControlMode.POSITION
         self._joint_modes = {
-            joint_id: CtrlMode.POSITION.value
+            joint_id: HandControlMode.POSITION.value
             for joint_id in self._profile.joint_control_addresses
         }
         self._transport: CanfdTransport | None = None
@@ -158,9 +158,9 @@ class CanfdComm(IComm):
         """Update the cached product configuration."""
         self._config = config
         self._profile = get_modbus_profile(config)
-        self._hand_mode = CtrlMode.POSITION
+        self._hand_mode = HandControlMode.POSITION
         self._joint_modes = {
-            joint_id: CtrlMode.POSITION.value
+            joint_id: HandControlMode.POSITION.value
             for joint_id in self._profile.joint_control_addresses
         }
 
@@ -711,7 +711,7 @@ class CanfdComm(IComm):
     # Joint control
     # ------------------------------------------------------------------
 
-    def move_joints(self, joints: list, mode: CtrlMode) -> bool:
+    def move_joints(self, joints: list, mode: HandControlMode) -> bool:
         """Send joint control commands."""
         if not self.is_connected():
             logger.error("Cannot move joints: CANFD device is not connected")
@@ -766,7 +766,7 @@ class CanfdComm(IComm):
                 struct.pack(
                     ">H",
                     encode_joint_mode_stop(
-                        self._joint_modes.get(joint_id, CtrlMode.POSITION.value),
+                        self._joint_modes.get(joint_id, HandControlMode.POSITION.value),
                         JointControlState.STOPPED,
                     ),
                 ),
@@ -791,7 +791,7 @@ class CanfdComm(IComm):
         raw = list(struct.unpack(f">{count}H", raw_bytes[: count * 2]))
         return parse_joints(raw, self._config.valid_joints, self._profile, start)
 
-    def get_hand_info(self) -> HandState:
+    def get_hand_info(self) -> HandData:
         """Retrieve high-level hand status."""
         raw_bytes = self._transport.read_registers(
             self._src_id,
@@ -803,7 +803,7 @@ class CanfdComm(IComm):
         raw = list(struct.unpack(">14H", raw_bytes[:28]))
         return parse_hand_info(raw)
 
-    def get_hand_state_machine(self) -> HandStateMachine:
+    def get_hand_state_machine(self) -> HandRuntimeState | int:
         """Retrieve the Modbus V2.0 whole-hand runtime state."""
         raw_bytes = self._transport.read_registers(
             self._src_id,

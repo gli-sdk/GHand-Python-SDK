@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from typing import Any, Optional, Protocol, runtime_checkable
 
-from ..types import TactileSensorId, CtrlMode, JointCommand
+from ..types import TactileSensorId, HandControlMode, JointCommand
 
 
 @dataclass(frozen=True)
@@ -31,7 +31,7 @@ def read_sensor_frame(sensor: "SensorFrameSource") -> SensorFrame:
 
 @runtime_checkable
 class HandCommandPort(Protocol):
-    def move_joints(self, joints: list[JointCommand], mode: CtrlMode) -> bool:
+    def move_joints(self, joints: list[JointCommand], mode: HandControlMode) -> bool:
         ...
 
     def stop(self) -> None:

@@ -26,7 +26,7 @@ import time
 from typing import Dict
 
 from .ghand import GHand
-from .types import GestureType, JointId, JointState, JointCommand
+from .types import GestureType, JointId, JointState, JointCommand, HandControlState
 
 logger = logging.getLogger("ghand.gestures")
 
@@ -212,7 +212,7 @@ def _wait_for_completion(
             has_been_running = True
         elif has_been_running:
             break
-        elif any(joint.state.is_abnormal for joint in joints):
+        elif any(joint.state not in (JointState.DISABLED, JointState.RUNNING, JointState.STOPPED) for joint in joints):
             break
         elif not has_been_running and time.monotonic() - start_time >= warmup_s:
             break
@@ -229,9 +229,9 @@ def _wait_for_completion(
             last_error,
         )
         return False
-    if hand_info.state.is_abnormal or any(
-        hand_info.error_warn + hand_info.error_fault + hand_info.error_critical
-    ) or any(joint.state.is_abnormal for joint in joints):
+    if hand_info.joints_state not in (HandControlState.DISABLED, HandControlState.ENABLED) or (
+        hand_info.error_warn or hand_info.error_fault or hand_info.error_critical
+    ) or any(joint.state not in (JointState.DISABLED, JointState.RUNNING, JointState.STOPPED) for joint in joints):
         logger.warning("Action completed with error state. Please clear fault and retry.")
         return False
     return True

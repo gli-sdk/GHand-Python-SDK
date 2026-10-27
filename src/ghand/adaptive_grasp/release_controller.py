@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
-from ..types import CtrlMode
+from ..types import HandControlMode
 
 from .config import AdaptiveGraspConfig
 from .joint_builder import JointCommandBuilder
@@ -46,7 +46,7 @@ class ReleaseController:
         self._release_operation: Optional[_ReleaseOperation] = None
         self._command_lock = threading.Lock()
 
-    def move_hold_joints(self, joints, mode: CtrlMode) -> bool:
+    def move_hold_joints(self, joints, mode: HandControlMode) -> bool:
         with self._command_lock:
             if not self.runtime.running:
                 return True
@@ -92,7 +92,7 @@ class ReleaseController:
                 current=self.config.release_open_current,
             )
             with self._command_lock:
-                ok = self.hand.move_joints(joints, mode=CtrlMode.POSITION)
+                ok = self.hand.move_joints(joints, mode=HandControlMode.POSITION)
             self.sleep(self.config.release_timeout_s if release_wait_s is None else release_wait_s)
             if not ok:
                 _logger.error("RELEASE phase: move_joints failed")

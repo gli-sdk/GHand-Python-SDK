@@ -28,7 +28,8 @@ import logging
 import os
 from importlib.resources import files
 
-from .types import JointId, ProductType, TactileSensorId, ProductConfig, TactileRegionConfig
+from ._product_config import ProductConfig, TactileRegionConfig
+from .types import JointId, ProductType, TactileSensorId
 
 logger = logging.getLogger("ghand.config")
 

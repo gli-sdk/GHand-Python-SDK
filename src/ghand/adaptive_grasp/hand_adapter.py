@@ -4,7 +4,7 @@
 from typing import Any
 
 from ..gestures import _wait_for_completion
-from ..types import JointId, CtrlMode, JointCommand
+from ..types import JointId, HandControlMode, JointCommand
 
 from .ports import HandCommandPort
 
@@ -13,7 +13,7 @@ class GHandCommandPort:
     def __init__(self, hand: Any):
         self.hand = hand
 
-    def move_joints(self, joints: list[JointCommand], mode: CtrlMode) -> bool:
+    def move_joints(self, joints: list[JointCommand], mode: HandControlMode) -> bool:
         joint_command_cls = _ghand_attr("JointCommand", self.hand)
         ctrl_mode = _map_ghand_ctrl_mode(mode, self.hand)
         commands = [
@@ -79,12 +79,12 @@ def _ghand_attr(name: str, hand: Any | None = None) -> Any:
     if hand is not None and hasattr(hand, name):
         return getattr(hand, name)
     sdk_types = {
-        "CtrlMode": CtrlMode,
+        "CtrlMode": HandControlMode,
         "JointCommand": JointCommand,
     }
     return sdk_types[name]
 
 
-def _map_ghand_ctrl_mode(mode: CtrlMode, hand: Any | None = None) -> Any:
+def _map_ghand_ctrl_mode(mode: HandControlMode, hand: Any | None = None) -> Any:
     ghand_ctrl_mode = _ghand_attr("CtrlMode", hand)
     return ghand_ctrl_mode(mode.value)

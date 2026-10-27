@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING, Any, Callable, Optional, Protocol
 
-from ..types import JointId, TactileSensorId, CtrlMode, JointCommand
+from ..types import JointId, TactileSensorId, HandControlMode, JointCommand
 from .config import AdaptiveGraspConfig, HoldCommandMode
 from .force_reference_planner import ForceReferencePlanner
 from .incremental_position_hold_planner import IncrementalPositionHoldPlanner
@@ -130,7 +130,7 @@ class HoldController:
             IncrementalPositionHoldPlanner] = None,
         observer: Optional[HoldObserver] = None,
         hold_target_force_n: Optional[float] = None,
-        move_joints: Optional[Callable[[list[JointCommand], CtrlMode], bool]] = None,
+        move_joints: Optional[Callable[[list[JointCommand], HandControlMode], bool]] = None,
     ):
         self.hand = hand
         self._sensor = sensor
@@ -373,7 +373,7 @@ class HoldController:
 
     def _build_hold_payload(
             self,
-            command: HoldCommand) -> tuple[list[JointCommand], CtrlMode, int]:
+            command: HoldCommand) -> tuple[list[JointCommand], HandControlMode, int]:
         angles = self._clamp_to_contact_window(command.angles)
         joints = self._joint_builder.hold_position_command(
             command.current,
@@ -381,7 +381,7 @@ class HoldController:
             speed=command.speed,
         )
         self._append_position_hold_thumb_aux_commands(joints)
-        return joints, CtrlMode.POSITION, command.current
+        return joints, HandControlMode.POSITION, command.current
 
     def _append_position_hold_thumb_aux_commands(
         self,

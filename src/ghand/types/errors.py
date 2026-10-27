@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Device error codes, diagnostic results, SDK errors, and exceptions."""
+"""Device error codes, diagnostic results, and SDK errors."""
 
 from __future__ import annotations
 
@@ -23,40 +23,10 @@ import enum
 from dataclasses import dataclass
 from enum import Enum
 
-from .enums import CommType, DeviceCode, unknown_member
+from .enums import CommType
 
 
-class ErrorCode(DeviceCode):
-    NORMAL = 0
-    MOTOR_HARDWARE_OVERCURRENT = 1
-    MOTOR_SOFTWARE_OVERCURRENT = 2
-    MOTOR_BUS_OVERCURRENT = 3
-    MOTOR_PHASE_LOST = 4
-    MOTOR_STALLED = 5
-    MOTOR_DRIVER_OVERTEMP = 6
-    MOTOR_COMM_ERROR = 7
-    MOTOR_OVERTEMP = 8
-    JOINT_CONFLICT = 11
-    TIP_CONFLICT = 12
-    JOINT_POSITION_ABNORMAL = 13
-    LOW_TEMP = 21
-    HIGH_TEMP = 22
-    LOW_VOLTAGE = 23
-    HIGH_VOLTAGE = 24
-    TACTILE_DISCONNECTED = 31
-    TACTILE_ERROR = 31
-    TACTILE_DATA_ABNORMAL = 32
-    SELF_TEST_ERROR = 41
-    PARAM_ERROR = 101
-    UNKNOWN_ERROR = 201
-
-    @classmethod
-    def _missing_(cls, value):
-        """Map any undefined code to UNKNOWN_ERROR, keeping the raw value."""
-        return unknown_member(cls, cls.UNKNOWN_ERROR, value)
-
-
-class JointErrorCode(DeviceCode):
+class JointErrorCode(enum.IntEnum):
     NORMAL = 0
     MOTOR_HARDWARE_OVERCURRENT = 1
     MOTOR_CONTINUOUS_CURRENT_HIGH = 2
@@ -71,12 +41,6 @@ class JointErrorCode(DeviceCode):
     MOTOR_SOFTWARE_UNDERVOLTAGE = 11
     MOTOR_OVERTEMPERATURE = 12
     MOTOR_WINDING_OVERTEMPERATURE = 13
-    UNKNOWN_ERROR = 255
-
-    @classmethod
-    def _missing_(cls, value):
-        """Map undefined joint error codes to UNKNOWN_ERROR, keeping the raw value."""
-        return unknown_member(cls, cls.UNKNOWN_ERROR, value)
 
 
 class HandWarning(enum.IntFlag):
@@ -96,15 +60,15 @@ class HandWarning(enum.IntFlag):
 
 
 class HandFault(enum.IntFlag):
-    """Hand-level fault categories from the EtherCAT V2.1 TPDO."""
+    """Protocol masks for the six 13-channel hand fault groups."""
 
     NONE = 0
-    JOINT_MOTOR = 1 << 0
-    POSITION_SENSOR_ABNORMAL = 1 << 1
-    POSITION_SENSOR_UNCALIBRATED = 1 << 2
-    ZEROING_JOINT_STALL = 1 << 3
-    ZEROING_BRAKE_TIMEOUT = 1 << 4
-    ZEROING_MOTOR_COMMUNICATION = 1 << 5
+    JOINT_MOTOR = ((1 << 13) - 1) << 0  # byte0:bit0 .. byte1:bit4
+    POSITION_SENSOR_ABNORMAL = ((1 << 13) - 1) << 13  # byte1:bit5 .. byte3:bit1
+    POSITION_SENSOR_UNCALIBRATED = ((1 << 13) - 1) << 26  # byte3:bit2 .. byte4:bit6
+    ZEROING_JOINT_STALL = ((1 << 13) - 1) << 39  # byte4:bit7 .. byte6:bit3
+    ZEROING_BRAKE_TIMEOUT = ((1 << 13) - 1) << 52  # byte6:bit4 .. byte8:bit0
+    ZEROING_MOTOR_COMMUNICATION = ((1 << 13) - 1) << 65  # byte8:bit1 .. byte9:bit5
 
 
 class HandCriticalError(enum.IntFlag):
@@ -139,15 +103,3 @@ class OperationResult:
     code: SdkError = SdkError.OK
     message: str = ""
     comm: CommType | None = None
-
-
-class GHandError(Exception):
-    """Base class for GHand SDK exceptions."""
-
-
-class CommunicationError(GHandError):
-    """Raised when a communication operation fails unexpectedly."""
-
-
-class HandStateError(GHandError):
-    """Raised when device state prevents an operation."""

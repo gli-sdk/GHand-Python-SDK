@@ -15,12 +15,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Product configuration dataclasses."""
+"""Internal product configuration dataclasses."""
 
 from dataclasses import dataclass, field
 
-from .enums import JointId, ProductType, TactileSensorId
-
+from .types.enums import JointId, ProductType, TactileSensorId
 
 @dataclass
 class TactileRegionConfig:
