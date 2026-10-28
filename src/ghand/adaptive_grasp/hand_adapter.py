@@ -10,6 +10,7 @@ from .ports import HandCommandPort
 
 
 class GHandCommandPort:
+
     def __init__(self, hand: Any):
         self.hand = hand
 
@@ -22,8 +23,7 @@ class GHandCommandPort:
                 angle=joint.angle,
                 velocity=joint.velocity,
                 current=joint.current,
-            )
-            for joint in joints
+            ) for joint in joints
         ]
         return self.hand.move_joints(commands, mode=ctrl_mode)
 
@@ -70,9 +70,7 @@ def ensure_hand_command_port(hand: Any) -> HandCommandPort:
         return hand
     if is_ghand_like and has_command_methods:
         return GHandCommandPort(hand)
-    raise TypeError(
-        "hand port must provide move_joints()/stop() or be a GHand-like object"
-    )
+    raise TypeError("hand port must provide move_joints()/stop() or be a GHand-like object")
 
 
 def _ghand_attr(name: str, hand: Any | None = None) -> Any:

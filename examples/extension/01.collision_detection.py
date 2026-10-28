@@ -131,7 +131,9 @@ def main():
         # Get current joint states and print
         current_joints = hand.get_joints()
         print(f"Current angle: Thumb MCP={current_joints[JointId.THUMB_MCP.value].angle:.1f}deg")
-        print(f"Current angle: Thumb TMC A-A={current_joints[JointId.THUMB_TMC_AA.value].angle:.1f}deg")
+        print(
+            f"Current angle: Thumb TMC A-A={current_joints[JointId.THUMB_TMC_AA.value].angle:.1f}deg"
+        )
         print(
             f"Current angle: Thumb TMC P-S={current_joints[JointId.THUMB_TMC_PS.value].angle:.1f}deg"
         )
@@ -139,7 +141,6 @@ def main():
         print(f"Current angle: Index MCP={current_joints[JointId.FF_MCP.value].angle:.1f}deg")
 
         print("\n===== Demo complete =====")
-
 
     finally:
         hand.close()

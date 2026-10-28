@@ -7,14 +7,19 @@ from ..types import JointId, JointCommand
 from .config import AdaptiveGraspConfig
 from .utils import clip
 
-
 CURRENT_CONTROL_JOINTS = (
-    JointId.THUMB_MCP, JointId.THUMB_TMC_FE,
-    JointId.FF_PIP, JointId.FF_MCP,
-    JointId.MF_PIP, JointId.MF_MCP,
-    JointId.RF_PIP, JointId.RF_MCP,
-    JointId.LF_PIP, JointId.LF_MCP,
+    JointId.THUMB_MCP,
+    JointId.THUMB_TMC_FE,
+    JointId.FF_PIP,
+    JointId.FF_MCP,
+    JointId.MF_PIP,
+    JointId.MF_MCP,
+    JointId.RF_PIP,
+    JointId.RF_MCP,
+    JointId.LF_PIP,
+    JointId.LF_MCP,
 )
+
 
 class JointCommandBuilder:
     _current_joints = CURRENT_CONTROL_JOINTS
@@ -50,24 +55,27 @@ class JointCommandBuilder:
             for joint_id in self._current_joints
         }
 
-    def position_command(self, angles: dict[JointId, float], velocity: int, current: int) -> list[JointCommand]:
+    def position_command(self, angles: dict[JointId, float], velocity: int,
+                         current: int) -> list[JointCommand]:
         return [
             JointCommand(id=joint_id, angle=angle, velocity=velocity, current=current)
             for joint_id, angle in angles.items()
         ]
 
-    def current_command(self, current: int, thumb_current: Optional[int] = None) -> list[JointCommand]:
+    def current_command(self,
+                        current: int,
+                        thumb_current: Optional[int] = None) -> list[JointCommand]:
         thumb_aux_current = self._config.thumb_aux_current if thumb_current is None else thumb_current
         active = set(self._current_joints)
         joints = [
             JointCommand(id=joint_id, current=current)
-            if joint_id in active
-            else JointCommand(id=joint_id, angle=0.0, velocity=0, current=0)
+            if joint_id in active else JointCommand(id=joint_id, angle=0.0, velocity=0, current=0)
             for joint_id in CURRENT_CONTROL_JOINTS
         ]
         joints += [
             JointCommand(id=JointId.THUMB_TMC_PS, angle=0.0, velocity=0, current=thumb_aux_current),
-            JointCommand(id=JointId.THUMB_TMC_AA, angle=20.0, velocity=0, current=thumb_aux_current),
+            JointCommand(id=JointId.THUMB_TMC_AA, angle=20.0, velocity=0,
+                         current=thumb_aux_current),
         ]
         return joints
 
@@ -86,6 +94,5 @@ class JointCommandBuilder:
                 angle=hold_angles.get(joint_id, 0.0),
                 velocity=limited_velocity,
                 current=limited_current,
-            )
-            for joint_id in self._current_joints
+            ) for joint_id in self._current_joints
         ]

@@ -95,15 +95,10 @@ class SensorClient:
         joint_feedback: Optional[list[JointData]],
         sample_time_s: Optional[float],
     ) -> SensorFrame:
-        normal_forces = active_finger_normal_forces(
-            tactile_data or {}, self._active_fingers
-        )
+        normal_forces = active_finger_normal_forces(tactile_data or {}, self._active_fingers)
         touch_flags = {
-            finger: (
-                (info := (tactile_data or {}).get(finger)) is not None
-                and info.state
-                and normal_force_z(info) >= self._finger_touch_threshold_n
-            )
+            finger: ((info := (tactile_data or {}).get(finger)) is not None and info.state
+                     and normal_force_z(info) >= self._finger_touch_threshold_n)
             for finger in self._active_fingers
         }
         return SensorFrame(
@@ -119,10 +114,8 @@ class SensorClient:
     # ------------------------------------------------------------------
     def _on_data(self, data: Any) -> None:
         if not (hasattr(data, "tactile") and hasattr(data, "joints")):
-            raise TypeError(
-                "SensorClient subscription callback expects ghand.DeviceData; "
-                "legacy TPDO parsing is not supported."
-            )
+            raise TypeError("SensorClient subscription callback expects ghand.DeviceData; "
+                            "legacy TPDO parsing is not supported.")
 
         tactile = getattr(data, "tactile", None)
         if tactile is None:
@@ -142,7 +135,6 @@ class SensorClient:
                 angle=joint_data.angle,
                 velocity=joint_data.velocity,
                 current=joint_data.current,
-            )
-            for joint_data in getattr(data, "joints", ())
+            ) for joint_data in getattr(data, "joints", ())
         ]
         self._frame = self._make_frame(tactile_data, joint_feedback, sample_time_s)

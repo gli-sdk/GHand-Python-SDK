@@ -44,12 +44,8 @@ class ForceReferencePlanner:
         self.contact_ratios = self._compute_contact_ratios(contact_snapshot)
         self._force_refs = self._initial_finger_force_refs(contact_snapshot)
         self.force_reference_total_n = sum(self._force_refs.values())
-        self._last_slip_confirmed = {
-            finger: False for finger in config.active_fingers
-        }
-        self._stable_time_s = {
-            finger: 0.0 for finger in config.active_fingers
-        }
+        self._last_slip_confirmed = {finger: False for finger in config.active_fingers}
+        self._stable_time_s = {finger: 0.0 for finger in config.active_fingers}
         self._last_global_slip_confirmed = False
         self._global_stable_time_s = 0.0
 
@@ -73,19 +69,16 @@ class ForceReferencePlanner:
 
     def maximum_force_ref(self) -> float:
         if self.profile is None:
-            return float(
-                self.config.max_normal_force_per_finger_n
-                * len(self.config.active_fingers)
-            )
+            return float(self.config.max_normal_force_per_finger_n *
+                         len(self.config.active_fingers))
         return self.profile.safe_force_max
 
     def _update_finger_force_refs(self, analysis: TactileAnalysis, dt: float) -> None:
         for finger in self.config.active_fingers:
             finger_analysis = analysis.per_finger.get(finger)
             slip_risk = finger_analysis.slip_risk if finger_analysis is not None else 0.0
-            slip_confirmed = (
-                finger_analysis.slip_confirmed if finger_analysis is not None else False
-            )
+            slip_confirmed = (finger_analysis.slip_confirmed
+                              if finger_analysis is not None else False)
             self._force_refs[finger] = self._update_finger_force_ref(
                 finger,
                 self._force_refs.get(finger, 0.0),

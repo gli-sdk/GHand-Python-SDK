@@ -14,36 +14,47 @@ from .transforms import cal_capsule_param, update_joint_transforms
 EPS = 1e-8
 
 COLLISION_JOINT_LIST = [
-    'Thumb_TMC_FE_link', 'Thumb_MCP_link', 'Thumb_IP_link',
-    'FF_MCP_link', 'FF_PIP_link', 'FF_DIP_link',
-    'MF_MCP_link', 'MF_PIP_link', 'MF_DIP_link',
-    'RF_MCP_link', 'RF_PIP_link', 'RF_DIP_link',
-    'LF_MCP_link', 'LF_PIP_link', 'LF_DIP_link',
+    'Thumb_TMC_FE_link',
+    'Thumb_MCP_link',
+    'Thumb_IP_link',
+    'FF_MCP_link',
+    'FF_PIP_link',
+    'FF_DIP_link',
+    'MF_MCP_link',
+    'MF_PIP_link',
+    'MF_DIP_link',
+    'RF_MCP_link',
+    'RF_PIP_link',
+    'RF_DIP_link',
+    'LF_MCP_link',
+    'LF_PIP_link',
+    'LF_DIP_link',
 ]
 
-PLANE_COLLISION_JOINTS = ['Thumb_IP_link', 'FF_DIP_link', 'MF_DIP_link', 'RF_DIP_link', 'LF_DIP_link']
+PLANE_COLLISION_JOINTS = [
+    'Thumb_IP_link', 'FF_DIP_link', 'MF_DIP_link', 'RF_DIP_link', 'LF_DIP_link'
+]
 
 COLLISION_JOINT_INDEX = {name: idx for idx, name in enumerate(COLLISION_JOINT_LIST)}
 
-ADJACENT_JOINT_PAIRS = [
-    ('Thumb_TMC_FE_link', 'Thumb_MCP_link'),
-    ('Thumb_MCP_link', 'Thumb_IP_link'),
-    ('FF_MCP_link', 'FF_PIP_link'),
-    ('FF_PIP_link', 'FF_DIP_link'),
-    ('MF_MCP_link', 'MF_PIP_link'),
-    ('MF_PIP_link', 'MF_DIP_link'),
-    ('RF_MCP_link', 'RF_PIP_link'),
-    ('RF_PIP_link', 'RF_DIP_link'),
-    ('LF_MCP_link', 'LF_PIP_link'),
-    ('LF_PIP_link', 'LF_DIP_link'),
-    ('FF_MCP_link', 'Thumb_TMC_FE_link'),
-    ('Thumb_TMC_FE_link', 'Thumb_IP_link')
-]
+ADJACENT_JOINT_PAIRS = [('Thumb_TMC_FE_link', 'Thumb_MCP_link'),
+                        ('Thumb_MCP_link', 'Thumb_IP_link'), ('FF_MCP_link', 'FF_PIP_link'),
+                        ('FF_PIP_link', 'FF_DIP_link'), ('MF_MCP_link', 'MF_PIP_link'),
+                        ('MF_PIP_link', 'MF_DIP_link'), ('RF_MCP_link', 'RF_PIP_link'),
+                        ('RF_PIP_link', 'RF_DIP_link'), ('LF_MCP_link', 'LF_PIP_link'),
+                        ('LF_PIP_link', 'LF_DIP_link'), ('FF_MCP_link', 'Thumb_TMC_FE_link'),
+                        ('Thumb_TMC_FE_link', 'Thumb_IP_link')]
 
 NON_INTERFERENCE_GROUP = [
-    'MF_MCP_link', 'MF_PIP_link', 'MF_DIP_link',
-    'RF_MCP_link', 'RF_PIP_link', 'RF_DIP_link',
-    'LF_MCP_link', 'LF_PIP_link', 'LF_DIP_link',
+    'MF_MCP_link',
+    'MF_PIP_link',
+    'MF_DIP_link',
+    'RF_MCP_link',
+    'RF_PIP_link',
+    'RF_DIP_link',
+    'LF_MCP_link',
+    'LF_PIP_link',
+    'LF_DIP_link',
     'Thumb_TMC_FE_link',
 ]
 
@@ -115,7 +126,9 @@ def _extract_collision_args(
         stl_data, plane, adj_matrix, safety_margin = args
         return stl_data, plane, adj_matrix, float(safety_margin)
 
-    raise TypeError('expected (plane, adj_matrix, safety_margin) or (stl_data, plane, adj_matrix, safety_margin)')
+    raise TypeError(
+        'expected (plane, adj_matrix, safety_margin) or (stl_data, plane, adj_matrix, safety_margin)'
+    )
 
 
 def _normalize_collision_response(response: Tuple[Any, ...]) -> Tuple[bool, List[Any], List[str]]:
@@ -130,7 +143,7 @@ def _normalize_collision_response(response: Tuple[Any, ...]) -> Tuple[bool, List
 
 def _maybe_apply_passive_dip_mapping(angles: np.ndarray) -> np.ndarray:
     normalized_angles = np.asarray(angles, dtype=float)
-    if normalized_angles.shape == (len(JOINT_ORDER),):
+    if normalized_angles.shape == (len(JOINT_ORDER), ):
         return np.asarray(apply_passive_dip_mapping(normalized_angles), dtype=float)
     return normalized_angles
 
@@ -156,7 +169,9 @@ def gen_adj_matrix() -> np.ndarray:
     return adj_matrix
 
 
-def get_plane_from_normal(base_link_stl: STLData, n: np.ndarray = PLANE_NORMAL, p0: np.ndarray = PLANE_ORIGIN) -> Plane:
+def get_plane_from_normal(base_link_stl: STLData,
+                          n: np.ndarray = PLANE_NORMAL,
+                          p0: np.ndarray = PLANE_ORIGIN) -> Plane:
     n_unit = _validate_horizontal_plane_normal(n)
     p0 = np.asarray(p0, dtype=float).reshape(3)
     d = -float(np.dot(n_unit, p0))
@@ -188,7 +203,8 @@ def get_plane_from_normal(base_link_stl: STLData, n: np.ndarray = PLANE_NORMAL, 
     )
 
 
-def dist_segment_to_segment(P1: np.ndarray, P2: np.ndarray, Q1: np.ndarray, Q2: np.ndarray) -> float:
+def dist_segment_to_segment(P1: np.ndarray, P2: np.ndarray, Q1: np.ndarray,
+                            Q2: np.ndarray) -> float:
     P1 = _as_point3(P1)
     P2 = _as_point3(P2)
     Q1 = _as_point3(Q1)
@@ -386,23 +402,23 @@ def dist_segment_to_plane(plane: Plane, p1: np.ndarray, p2: np.ndarray) -> Tuple
     return min(dist1, dist2), False
 
 
+def segment_to_segment_aabb(P1: np.ndarray, P2: np.ndarray, r1: float, Q1: np.ndarray,
+                            Q2: np.ndarray, r2: float, safety_margin: float) -> bool:
+    P_pad = r1 + safety_margin
+    segP_min_x = min(P1[0], P2[0]) - P_pad
+    segP_max_x = max(P1[0], P2[0]) + P_pad
+    segP_min_y = min(P1[1], P2[1]) - P_pad
+    segP_max_y = max(P1[1], P2[1]) + P_pad
+    segP_min_z = min(P1[2], P2[2]) - P_pad
+    segP_max_z = max(P1[2], P2[2]) + P_pad
 
-def segment_to_segment_aabb(P1: np.ndarray, P2: np.ndarray, r1:float, Q1: np.ndarray, Q2: np.ndarray,r2:float,safety_margin:float)-> bool:
-    P_pad = r1+safety_margin
-    segP_min_x = min(P1[0], P2[0])-P_pad
-    segP_max_x = max(P1[0], P2[0])+P_pad
-    segP_min_y = min(P1[1], P2[1])-P_pad
-    segP_max_y = max(P1[1], P2[1])+P_pad
-    segP_min_z = min(P1[2], P2[2])-P_pad
-    segP_max_z = max(P1[2], P2[2])+P_pad
+    segQ_min_x = min(Q1[0], Q2[0]) - r2
+    segQ_max_x = max(Q1[0], Q2[0]) + r2
+    segQ_min_y = min(Q1[1], Q2[1]) - r2
+    segQ_max_y = max(Q1[1], Q2[1]) + r2
+    segQ_min_z = min(Q1[2], Q2[2]) - r2
+    segQ_max_z = max(Q1[2], Q2[2]) + r2
 
-    segQ_min_x = min(Q1[0], Q2[0])-r2
-    segQ_max_x = max(Q1[0], Q2[0])+r2
-    segQ_min_y = min(Q1[1], Q2[1])-r2
-    segQ_max_y = max(Q1[1], Q2[1])+r2
-    segQ_min_z = min(Q1[2], Q2[2])-r2
-    segQ_max_z = max(Q1[2], Q2[2])+r2
-    
     # 包围盒不重叠->一定不相交->is_x/y/z_overlap = false
     is_x_overlap = not (segQ_max_x < segP_min_x or segQ_min_x > segP_max_x)
     is_y_overlap = not (segQ_max_y < segP_min_y or segQ_min_y > segP_max_y)
@@ -410,29 +426,36 @@ def segment_to_segment_aabb(P1: np.ndarray, P2: np.ndarray, r1:float, Q1: np.nda
 
     return is_x_overlap and is_y_overlap and is_z_overlap
 
-def segment_to_plane_aabb(plane: Plane, P1: np.ndarray, P2: np.ndarray, r:float, safety_margin:float)-> bool:
-    pad = r+safety_margin
-    segP_min_x = min(P1[0], P2[0])-pad
-    segP_max_x = max(P1[0], P2[0])+pad
-    segP_min_y = min(P1[1], P2[1])-pad
-    segP_max_y = max(P1[1], P2[1])+pad
-    segP_min_z = min(P1[2], P2[2])-pad   
-    segP_max_z = max(P1[2], P2[2])+pad
+
+def segment_to_plane_aabb(plane: Plane, P1: np.ndarray, P2: np.ndarray, r: float,
+                          safety_margin: float) -> bool:
+    pad = r + safety_margin
+    segP_min_x = min(P1[0], P2[0]) - pad
+    segP_max_x = max(P1[0], P2[0]) + pad
+    segP_min_y = min(P1[1], P2[1]) - pad
+    segP_max_y = max(P1[1], P2[1]) + pad
+    segP_min_z = min(P1[2], P2[2]) - pad
+    segP_max_z = max(P1[2], P2[2]) + pad
 
     quad_vertices = _get_plane_quad_vertices(plane)
-    plane_min_x = min(quad_vertices[0][0], quad_vertices[1][0], quad_vertices[2][0], quad_vertices[3][0])
-    plane_max_x = max(quad_vertices[0][0], quad_vertices[1][0], quad_vertices[2][0], quad_vertices[3][0])
-    plane_min_y = min(quad_vertices[0][1], quad_vertices[1][1], quad_vertices[2][1], quad_vertices[3][1])
-    plane_max_y = max(quad_vertices[0][1], quad_vertices[1][1], quad_vertices[2][1], quad_vertices[3][1])
-    plane_min_z = min(quad_vertices[0][2], quad_vertices[1][2], quad_vertices[2][2], quad_vertices[3][2])
-    plane_max_z = max(quad_vertices[0][2], quad_vertices[1][2], quad_vertices[2][2], quad_vertices[3][2])
+    plane_min_x = min(quad_vertices[0][0], quad_vertices[1][0], quad_vertices[2][0],
+                      quad_vertices[3][0])
+    plane_max_x = max(quad_vertices[0][0], quad_vertices[1][0], quad_vertices[2][0],
+                      quad_vertices[3][0])
+    plane_min_y = min(quad_vertices[0][1], quad_vertices[1][1], quad_vertices[2][1],
+                      quad_vertices[3][1])
+    plane_max_y = max(quad_vertices[0][1], quad_vertices[1][1], quad_vertices[2][1],
+                      quad_vertices[3][1])
+    plane_min_z = min(quad_vertices[0][2], quad_vertices[1][2], quad_vertices[2][2],
+                      quad_vertices[3][2])
+    plane_max_z = max(quad_vertices[0][2], quad_vertices[1][2], quad_vertices[2][2],
+                      quad_vertices[3][2])
 
     is_x_overlap = not (plane_max_x < segP_min_x or plane_min_x > segP_max_x)
     is_y_overlap = not (plane_max_y < segP_min_y or plane_min_y > segP_max_y)
     is_z_overlap = not (plane_max_z < segP_min_z or plane_min_z > segP_max_z)
 
     return is_x_overlap and is_y_overlap and is_z_overlap
-    
 
 
 def is_pose_collision(
@@ -447,7 +470,8 @@ def is_pose_collision(
         link2_name = COLLISION_JOINT_LIST[j]
         link1 = joints_info[link1_name]
         link2 = joints_info[link2_name]
-        if not segment_to_segment_aabb(link1.p1, link1.p2,link1.r, link2.p1, link2.p2,link2.r,safety_margin):
+        if not segment_to_segment_aabb(link1.p1, link1.p2, link1.r, link2.p1, link2.p2, link2.r,
+                                       safety_margin):
             continue
         dist = dist_segment_to_segment(link1.p1, link1.p2, link2.p1, link2.p2)
         if dist - (link1.r + link2.r) < safety_margin:
@@ -455,7 +479,7 @@ def is_pose_collision(
 
     for link_name in PLANE_COLLISION_JOINTS:
         link = joints_info[link_name]
-        if not segment_to_plane_aabb(plane, link.p1, link.p2,link.r,safety_margin):
+        if not segment_to_plane_aabb(plane, link.p1, link.p2, link.r, safety_margin):
             continue
         dist_to_plane, is_intersect = dist_segment_to_plane(plane, link.p1, link.p2)
         if is_intersect or (dist_to_plane - link.r < safety_margin):
@@ -484,14 +508,12 @@ def is_pose_collision_detail(
         dist = dist_segment_to_segment(link1.p1, link1.p2, link2.p1, link2.p2)
         if dist - (link1.r + link2.r) < safety_margin:
             collision_flag = True
-            collision_results.append(
-                {
-                    'type': 'link_link',
-                    'link1': link1_name,
-                    'link2': link2_name,
-                    'distance': _rounded_distance(dist),
-                }
-            )
+            collision_results.append({
+                'type': 'link_link',
+                'link1': link1_name,
+                'link2': link2_name,
+                'distance': _rounded_distance(dist),
+            })
             collision_links.extend([link1_name, link2_name])
 
     for link_name in PLANE_COLLISION_JOINTS:
@@ -499,14 +521,12 @@ def is_pose_collision_detail(
         dist_to_plane, is_intersect = dist_segment_to_plane(plane, link.p1, link.p2)
         if is_intersect or (dist_to_plane - link.r < safety_margin):
             collision_flag = True
-            collision_results.append(
-                {
-                    'type': 'link_plane',
-                    'link': link_name,
-                    'distance': _rounded_distance(dist_to_plane),
-                    'is_intersect': bool(is_intersect),
-                }
-            )
+            collision_results.append({
+                'type': 'link_plane',
+                'link': link_name,
+                'distance': _rounded_distance(dist_to_plane),
+                'is_intersect': bool(is_intersect),
+            })
             collision_links.append(link_name)
 
     return collision_flag, collision_results, collision_links
@@ -599,7 +619,8 @@ def binary_search_collision_path(
     def evaluate_at(t_value: float) -> Tuple[bool, np.ndarray, List[str]]:
         sampled_angles = start_angles + (target_angles - start_angles) * t_value
         evaluated_angles = _maybe_apply_passive_dip_mapping(sampled_angles)
-        updated_joints = update_joint_transforms(joints_info, evaluated_angles, angle_map, finger_funs)
+        updated_joints = update_joint_transforms(joints_info, evaluated_angles, angle_map,
+                                                 finger_funs)
         updated_joints = cal_capsule_param(updated_joints)
         response = is_pose_collision(updated_joints, plane, adj_matrix, safety_margin)
         has_collision, _, collision_links = _normalize_collision_response(response)

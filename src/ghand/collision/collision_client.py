@@ -22,6 +22,7 @@ class CollisionCheckResult:
 
 
 class CollisionClient:
+
     def __init__(self, runtime: CollisionRuntime | None = None):
         self.runtime = runtime if runtime is not None else load_collision_runtime()
         self.joints_info = self.runtime.joints_template
@@ -30,8 +31,11 @@ class CollisionClient:
         self.plane = self.runtime.plane
         self.adj_matrix = self.runtime.adj_matrix
 
-    def collision_check(self, target_angles: np.ndarray, safety_margin: float = 0.0) -> CollisionCheckResult:
-        validated_safety_margin = self._validate_safety_margin(safety_margin) * 2/1000 #max safety distance is 2 mm
+    def collision_check(self,
+                        target_angles: np.ndarray,
+                        safety_margin: float = 0.0) -> CollisionCheckResult:
+        validated_safety_margin = self._validate_safety_margin(
+            safety_margin) * 2 / 1000  #max safety distance is 2 mm
         clamped_angles = np.asarray(
             ang_mp.sdk_degrees_to_internal_radians(target_angles),
             dtype=float,
@@ -97,8 +101,6 @@ class CollisionClient:
         if validated < 0.0 or validated > 1.0:
             raise ValueError('the value of safety margin must be within the range [0.0, 1.0]')
         return validated
-
-    
 
 
 def main() -> None:

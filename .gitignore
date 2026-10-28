@@ -32,3 +32,4 @@ reviews/
 .codegraph/
 tests/*
 docs/
+.tmp-format-tools/*

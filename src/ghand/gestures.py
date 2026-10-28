@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Predefined gesture module.
 
 Provides joint-angle definitions and a unified execution interface for
@@ -29,7 +28,6 @@ from .ghand import GHand
 from .types import GestureType, JointId, JointState, JointCommand, HandControlState
 
 logger = logging.getLogger("ghand.gestures")
-
 
 # Gesture definitions: joint angles in degrees.
 # Key is GestureType, value is a dict of {JointId: angle(degrees)}.
@@ -112,9 +110,11 @@ GESTURE_DEFINITIONS: Dict[GestureType, Dict[JointId, float]] = {
 }
 
 
-def execute_gesture(
-    hand: GHand, gesture: GestureType, velocity: int = 100, current: int = 100, wait: bool = True
-) -> bool:
+def execute_gesture(hand: GHand,
+                    gesture: GestureType,
+                    velocity: int = 100,
+                    current: int = 100,
+                    wait: bool = True) -> bool:
     """Execute a predefined gesture.
 
     Args:
@@ -201,9 +201,7 @@ def _wait_for_completion(
                 )
                 return False
             if now >= deadline:
-                logger.error(
-                    "Timed out waiting for motion; last error: %s", exc
-                )
+                logger.error("Timed out waiting for motion; last error: %s", exc)
                 return False
             time.sleep(poll_period_s)
             continue
@@ -212,7 +210,8 @@ def _wait_for_completion(
             has_been_running = True
         elif has_been_running:
             break
-        elif any(joint.state not in (JointState.DISABLED, JointState.RUNNING, JointState.STOPPED) for joint in joints):
+        elif any(joint.state not in (JointState.DISABLED, JointState.RUNNING, JointState.STOPPED)
+                 for joint in joints):
             break
         elif not has_been_running and time.monotonic() - start_time >= warmup_s:
             break
@@ -230,8 +229,9 @@ def _wait_for_completion(
         )
         return False
     if hand_info.joints_state not in (HandControlState.DISABLED, HandControlState.ENABLED) or (
-        hand_info.error_warn or hand_info.error_fault or hand_info.error_critical
-    ) or any(joint.state not in (JointState.DISABLED, JointState.RUNNING, JointState.STOPPED) for joint in joints):
+            hand_info.error_warn or hand_info.error_fault or hand_info.error_critical) or any(
+                joint.state not in (JointState.DISABLED, JointState.RUNNING, JointState.STOPPED)
+                for joint in joints):
         logger.warning("Action completed with error state. Please clear fault and retry.")
         return False
     return True

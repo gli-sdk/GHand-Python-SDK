@@ -29,6 +29,7 @@ _TACTILE_STATE_SIZE = 2  # BB
 _TACTILE_RESULTANT_SIZE = 6  # resultant xyz (int16[3], low byte valid)
 _TACTILE_SAMPLE_PER_GROUP = 3  # xyz per sample group
 
+
 def compute_tpdo_size(joint_count: int, tactile_region_counts: list[int] | None = None) -> int:
     """Calculate the total TPDO byte size based on joint count and tactile sample groups.
 
@@ -63,17 +64,15 @@ class HandTpdo:
         expected_size = struct.calcsize('<H6s12s6sh')
         if len(data) < expected_size:
             return cls(0, b"\x00" * 6, b"\x00" * 12, b"\x00" * 6, 0)
-        state, error_warn, error_fault, error_critical, temperature = (
-            struct.unpack_from('<H6s12s6sh', data, 0)
-        )
+        state, error_warn, error_fault, error_critical, temperature = (struct.unpack_from(
+            '<H6s12s6sh', data, 0))
         return cls(state, error_warn, error_fault, error_critical, temperature)
 
     def __str__(self):
         return (
             f"HandTpdo(state={format_device_value(parse_device_value(HandControlState, self.state))}, error_warn={self.error_warn!r}, "
             f"error_fault={self.error_fault!r}, error_critical={self.error_critical!r}, "
-            f"temperature={self.temperature})"
-        )
+            f"temperature={self.temperature})")
 
 
 @dataclass
@@ -94,8 +93,7 @@ class JointTpdo:
         if len(data) < expected_size:
             return cls(0, 0, 0, 0, 0.0, 0, 0)
         state, error, mode, stop, angle_raw, velocity, current = struct.unpack_from(
-            '<BBBBhhh', data, 0
-        )
+            '<BBBBhhh', data, 0)
         angle = angle_raw * 0.1
         return cls(state, error, mode, stop, angle, velocity, current)
 
@@ -104,8 +102,7 @@ class JointTpdo:
             f"JointTpdo(state={format_device_value(parse_device_value(JointState, self.state))}, "
             f"error={format_device_value(parse_device_value(JointErrorCode, self.error))}, "
             f"mode={self.mode}, stop={self.stop}, angle={self.angle:.3f}, "
-            f"velocity={self.velocity}, current={self.current})"
-        )
+            f"velocity={self.velocity}, current={self.current})")
 
 
 @dataclass
@@ -210,9 +207,8 @@ class Tpdo:
         if not config.has_tactile:
             return instance
 
-        instance.tactile_state = TactileSensorState.from_bytes(
-            data[offset:offset + _TACTILE_STATE_SIZE]
-        )
+        instance.tactile_state = TactileSensorState.from_bytes(data[offset:offset +
+                                                                    _TACTILE_STATE_SIZE])
         offset += _TACTILE_STATE_SIZE
 
         for region in config.tactile_regions:
@@ -251,9 +247,7 @@ class Rpdo:
     def __init__(self, controlled_joints: list[JointId]):
         self.mode: int = 0
         self.stop: int = 0
-        self.joints: dict[JointId, JointRpdo] = {
-            jid: JointRpdo() for jid in controlled_joints
-        }
+        self.joints: dict[JointId, JointRpdo] = {jid: JointRpdo() for jid in controlled_joints}
 
     def to_bytes(self) -> bytes:
         """Pack the RPDO into bytes according to the configured joint order.
@@ -275,6 +269,5 @@ class Rpdo:
                     joint.current,
                     joint.kp,
                     joint.kd,
-                )
-            )
+                ))
         return bytes(data)

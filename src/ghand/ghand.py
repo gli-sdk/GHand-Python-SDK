@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """High-level API for the GHand dexterous hand."""
 
 from __future__ import annotations
@@ -56,9 +55,7 @@ BaudRateConfig = RS485BaudRate | CANFDBitTiming
 class GHand:
     """High-level API for the GHand dexterous hand."""
 
-    def __init__(
-        self, product_type: ProductType, comm_type: CommType
-    ):
+    def __init__(self, product_type: ProductType, comm_type: CommType):
         """Initialize the GHand instance.
 
         Args:
@@ -70,8 +67,7 @@ class GHand:
         self._product_config = load_product_config(product_type)
         self._active_joints = self._product_config.active_joints.copy()
         self._passive_joints = set(self._product_config.all_joints) - set(
-            self._active_joints.keys()
-        )
+            self._active_joints.keys())
         self._has_tactile = self._product_config.has_tactile
         self._comm = self._create_comm(comm_type)
         self._tactile_opened = False
@@ -126,7 +122,9 @@ class GHand:
         if joint.angle != original_angle and mode == JointControlMode.POSITION and mode == JointControlMode.MIT:
             logger.warning(
                 "[Joint] ID: %s angle %.1f adjusted to %.1f degrees",
-                JointId(joint.id).name, original_angle, joint.angle,
+                JointId(joint.id).name,
+                original_angle,
+                joint.angle,
             )
 
     @staticmethod
@@ -184,7 +182,11 @@ class GHand:
         if (joint.kp, joint.kd) != (original_kp, original_kd):
             logger.warning(
                 "[Joint] ID: %s MIT gains adjusted from kp=%s, kd=%s to kp=%s, kd=%s",
-                JointId(joint.id).name, original_kp, original_kd, joint.kp, joint.kd,
+                JointId(joint.id).name,
+                original_kp,
+                original_kd,
+                joint.kp,
+                joint.kd,
             )
 
     def search_adapters(self) -> list[str]:
@@ -231,7 +233,7 @@ class GHand:
         elif self._comm_type == CommType.CANFD:
             if baudrate is not None and not isinstance(baudrate, CANFDBitTiming):
                 raise TypeError("CANFD communication requires CANFDBitTiming")
-        else:            
+        else:
             baudrate = None
             logger.warning("Unsupported communication type; ignoring baud rate")
         return baudrate
@@ -274,9 +276,7 @@ class GHand:
             adapters = [id]
 
         for adapter in adapters:
-            if not self._comm.connect(
-                adapter, slave_id=slave_id, baudrate=baudrate
-            ):
+            if not self._comm.connect(adapter, slave_id=slave_id, baudrate=baudrate):
                 continue
             if not self._resolve_product_type():
                 self.close()
@@ -295,7 +295,7 @@ class GHand:
 
         Returns:
             True if the device accepted the new ID.
-        """        
+        """
         if not 0 < slave_id <= 0x3F:
             raise ValueError("slave_id must be in range 1..63")
         result = self._comm.set_slave_id(slave_id)
@@ -531,7 +531,9 @@ class GHand:
             return HandType.RIGHT_HAND
         return HandType.NONE
 
-    def move_joints(self, joints: list[JointCommand], hand_control_mode: HandControlMode = HandControlMode.POSITION) -> bool:
+    def move_joints(self,
+                    joints: list[JointCommand],
+                    hand_control_mode: HandControlMode = HandControlMode.POSITION) -> bool:
         """Send joint control commands.
 
         Communication exceptions propagate to the caller.
@@ -551,12 +553,9 @@ class GHand:
                 continue
             # Create a copy so the caller's original object is not mutated.
             joint_cmd = JointCommand(
-                id=int(joint.id),
-                control_mode=(
-                    joint.control_mode
-                    if hand_control_mode == HandControlMode.CUSTOM
-                    else JointControlMode(hand_control_mode.value)
-                ),
+                id=joint.id,
+                control_mode=(joint.control_mode if hand_control_mode == HandControlMode.CUSTOM else
+                              JointControlMode(hand_control_mode.value)),
                 loop_type=joint.loop_type,
                 control_state=joint.control_state,
                 angle=joint.angle,
@@ -569,9 +568,8 @@ class GHand:
             if joint_cmd.control_mode != JointControlMode.CURRENT:
                 self._check_velocity_limit(joint_cmd, joint_cmd.control_mode)
             if joint_cmd.control_mode in (JointControlMode.POSITION, JointControlMode.MIT):
-                self._check_joint_limit(
-                    joint_cmd, self._active_joints[joint.id], joint_cmd.control_mode
-                )
+                self._check_joint_limit(joint_cmd, self._active_joints[joint.id],
+                                        joint_cmd.control_mode)
             if joint_cmd.control_mode == JointControlMode.MIT:
                 self._check_mit_gains(joint_cmd)
             active_joints.append(joint_cmd)
@@ -692,12 +690,10 @@ class GHand:
                 target_angles[int(joint.id)] = float(joint.angle)
 
         collision_angles = np.asarray(
-            [target_angles[int(joint_id)] for joint_id in COLLISION_JOINT_ORDER]
-        )
+            [target_angles[int(joint_id)] for joint_id in COLLISION_JOINT_ORDER])
 
-        result = collision_checker.collision_check(
-            target_angles=collision_angles, safety_margin=self._safety_margin
-        )
+        result = collision_checker.collision_check(target_angles=collision_angles,
+                                                   safety_margin=self._safety_margin)
 
         if result.has_collision:
             if result.safe_angles is None:
@@ -712,9 +708,8 @@ class GHand:
         return result
 
     @staticmethod
-    def _joints_to_angles(
-        joints: list[JointCommand], current_joints: list[JointData] | None = None
-    ) -> Any:
+    def _joints_to_angles(joints: list[JointCommand],
+                          current_joints: list[JointData] | None = None) -> Any:
         """Convert a list of Joints to a numpy array.
 
         Args:
@@ -728,9 +723,9 @@ class GHand:
         return joints_to_nparray(joints, current_joints)
 
     @staticmethod
-    def _angles_to_joints(
-        angles: Any, velocity: int = 100, current: int = 100
-    ) -> list[JointCommand]:
+    def _angles_to_joints(angles: Any,
+                          velocity: int = 100,
+                          current: int = 100) -> list[JointCommand]:
         """Convert a numpy array to a list of JointCommand objects.
 
         Args:

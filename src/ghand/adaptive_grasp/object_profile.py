@@ -175,7 +175,8 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
 )
 
 OBJECT_PROFILES: dict[str, ObjectProfile] = {
-    profile.name: profile for profile in DEFAULT_OBJECT_PROFILES
+    profile.name: profile
+    for profile in DEFAULT_OBJECT_PROFILES
 }
 
 

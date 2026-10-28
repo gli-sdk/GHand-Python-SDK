@@ -6,7 +6,7 @@ the next power-up. After power cycling the device, pass the new baudrate value
 to open().
 """
 
-import logging,time
+import logging, time
 
 from ghand import (
     CANFDBitTiming,

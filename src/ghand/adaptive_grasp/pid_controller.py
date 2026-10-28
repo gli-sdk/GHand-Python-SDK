@@ -5,9 +5,11 @@ from typing import Optional
 
 
 class LowPassFilter:
+
     def __init__(self, alpha: float):
         self.alpha = alpha
-        self.filtered_value: Optional[float]=None
+        self.filtered_value: Optional[float] = None
+
     def reset(self) -> None:
         self.filtered_value = None
 

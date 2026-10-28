@@ -31,6 +31,7 @@ def read_sensor_frame(sensor: "SensorFrameSource") -> SensorFrame:
 
 @runtime_checkable
 class HandCommandPort(Protocol):
+
     def move_joints(self, joints: list[JointCommand], mode: HandControlMode) -> bool:
         ...
 
@@ -40,6 +41,7 @@ class HandCommandPort(Protocol):
 
 @runtime_checkable
 class SubscriptionPeriodConfigurator(Protocol):
+
     def configure_subscription_periods(
         self,
         *,
@@ -51,6 +53,7 @@ class SubscriptionPeriodConfigurator(Protocol):
 
 @runtime_checkable
 class SensorFrameSource(Protocol):
+
     def start(self) -> None:
         ...
 

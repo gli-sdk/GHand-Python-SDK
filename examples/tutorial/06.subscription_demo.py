@@ -19,18 +19,14 @@ def data_callback(data):
     print("Received device data:")
     print(f"  Hand state: {data.hand}")
     for joint in data.joints:
-        print(
-            f"  {JointId(joint.id).name}: angle={joint.angle:.1f}deg, "
-            f"velocity={joint.velocity}, current={joint.current}, "
-            f"state={joint.state}, error={joint.error}"
-        )
+        print(f"  {JointId(joint.id).name}: angle={joint.angle:.1f}deg, "
+              f"velocity={joint.velocity}, current={joint.current}, "
+              f"state={joint.state}, error={joint.error}")
     if data.tactile:
         for sensor_id, tactile in data.tactile.items():
-            print(
-                f"  Tactile {sensor_id.name}: state={tactile.state}, "
-                f"resultant_force={tactile.resultant_force}, "
-                f"distributed_force={tactile.distributed_force}"
-            )
+            print(f"  Tactile {sensor_id.name}: state={tactile.state}, "
+                  f"resultant_force={tactile.resultant_force}, "
+                  f"distributed_force={tactile.distributed_force}")
     # Process received data here
 
 

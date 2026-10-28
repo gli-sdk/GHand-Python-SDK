@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Shared ModBus register codec for CANFD and RS485.
 
 Pure functions that convert between raw register bytes/lists and structured
@@ -144,7 +143,8 @@ def build_modbus_profile_from_config(config) -> ModbusRegisterProfile:
         Dynamically generated Modbus register profile.
     """
     joint_input_addresses = {
-        joint_id: 0x105F + joint_id.value * 5 for joint_id in config.all_joints
+        joint_id: 0x105F + joint_id.value * 5
+        for joint_id in config.all_joints
     }
 
     joint_control_addresses = build_controllable_joint_addresses(
@@ -175,9 +175,7 @@ def get_modbus_profile(config_or_name=None) -> ModbusRegisterProfile:
         Dynamically generated Modbus register profile from config file.
     """
     # If passed a ProductConfig, use it directly
-    if hasattr(config_or_name, "all_joints") and hasattr(
-        config_or_name, "active_joints"
-    ):
+    if hasattr(config_or_name, "all_joints") and hasattr(config_or_name, "active_joints"):
         return build_modbus_profile_from_config(config_or_name)
 
     # If passed a ProductType, load config first then generate
@@ -191,13 +189,11 @@ def get_modbus_profile(config_or_name=None) -> ModbusRegisterProfile:
     return build_modbus_profile_from_config(config)
 
 
-def get_joint_input_span(
-    all_joints: list[JointId], profile: ModbusRegisterProfile
-) -> tuple[int, int]:
+def get_joint_input_span(all_joints: list[JointId],
+                         profile: ModbusRegisterProfile) -> tuple[int, int]:
     """Return the smallest contiguous input-register span covering all joints."""
     addresses = [
-        profile.joint_input_addresses[joint_id]
-        for joint_id in all_joints
+        profile.joint_input_addresses[joint_id] for joint_id in all_joints
         if joint_id in profile.joint_input_addresses
     ]
     if not addresses:
@@ -256,17 +252,9 @@ def parse_hand_info(raw: list[int]) -> HandData:
              raw[13] = signed int16 temperature in degrees Celsius.
     """
     state = raw[0] & 0xFFFF
-    error_warn = (
-        _registers_to_bytes_low_high(raw[1:4]) if len(raw) >= 4 else b"\x00" * 6
-    )
-    error_fault = (
-        _registers_to_bytes_low_high(raw[4:10]) if len(raw) >= 10 else b"\x00" * 12
-    )
-    error_critical = (
-        _registers_to_bytes_low_high(raw[10:13])
-        if len(raw) >= 13
-        else b"\x00" * 6
-    )
+    error_warn = (_registers_to_bytes_low_high(raw[1:4]) if len(raw) >= 4 else b"\x00" * 6)
+    error_fault = (_registers_to_bytes_low_high(raw[4:10]) if len(raw) >= 10 else b"\x00" * 12)
+    error_critical = (_registers_to_bytes_low_high(raw[10:13]) if len(raw) >= 13 else b"\x00" * 6)
     temperature = raw[13] if len(raw) >= 14 else 0
     if temperature >= 32768:
         temperature -= 65536
@@ -427,10 +415,10 @@ def resolve_joint_mode(joint, mode: HandControlMode, default_mode: int = 0) -> i
         joint_mode = default_mode if mode == HandControlMode.CUSTOM else mode
     mode_value = joint_mode.value if isinstance(joint_mode, HandControlMode) else int(joint_mode)
     if (mode_value & 0x0F) not in (
-        HandControlMode.POSITION.value,
-        HandControlMode.VELOCITY.value,
-        HandControlMode.CURRENT.value,
-        HandControlMode.MIT.value,
+            HandControlMode.POSITION.value,
+            HandControlMode.VELOCITY.value,
+            HandControlMode.CURRENT.value,
+            HandControlMode.MIT.value,
     ):
         raise ValueError(f"Invalid per-joint control mode: {mode_value}")
     loop_type = JointLoopType(joint.closed_loop_type)
@@ -447,9 +435,9 @@ def parse_hand_state_machine(raw: list[int]) -> HandRuntimeState | int:
     return parse_device_value(HandRuntimeState, raw[0] & 0xFF)
 
 
-def encode_joint_command(
-    joint, mode: HandControlMode, default_mode: int = HandControlMode.POSITION.value
-) -> list[int]:
+def encode_joint_command(joint,
+                         mode: HandControlMode,
+                         default_mode: int = HandControlMode.POSITION.value) -> list[int]:
     """Encode a JointCommand into six holding-register values.
 
     Layout:
@@ -489,15 +477,12 @@ def encode_hand_command_frame(
         joint_id = JointId(joint.id)
         if joint_id not in profile.joint_control_addresses:
             continue
-        registers = encode_joint_command(
-            joint, mode, joint_modes.get(joint_id, HandControlMode.POSITION.value)
-        )
+        registers = encode_joint_command(joint, mode,
+                                         joint_modes.get(joint_id, HandControlMode.POSITION.value))
         commands[joint_id] = registers
         updated_modes[joint_id] = registers[0] & 0xFF
 
-    ordered_joints = sorted(
-        profile.joint_control_addresses.items(), key=lambda item: item[1]
-    )
+    ordered_joints = sorted(profile.joint_control_addresses.items(), key=lambda item: item[1])
     if profile.mode_register is not None:
         start_address = profile.mode_register
         registers = [encode_hand_control(mode, True)]
@@ -526,8 +511,7 @@ def encode_hand_command_frame(
                     0,
                     0,
                 ],
-            )
-        )
+            ))
 
     return start_address, registers, updated_modes
 

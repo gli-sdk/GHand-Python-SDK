@@ -39,22 +39,48 @@ class Plane:
     aabb_max: np.ndarray = None
     aabb_vertices: np.ndarray = None
 
+
 JOINT_NAMES = [
-    'LF_MCP', 'LF_PIP', 'LF_DIP',
-    'RF_MCP', 'RF_PIP', 'RF_DIP',
-    'MF_MCP', 'MF_PIP', 'MF_DIP',
-    'FF_MCP_AA', 'FF_MCP', 'FF_PIP', 'FF_DIP',
-    'Thumb_TMC_PS', 'Thumb_TMC_AA', 'Thumb_TMC_FE', 'Thumb_MCP', 'Thumb_IP',
+    'LF_MCP',
+    'LF_PIP',
+    'LF_DIP',
+    'RF_MCP',
+    'RF_PIP',
+    'RF_DIP',
+    'MF_MCP',
+    'MF_PIP',
+    'MF_DIP',
+    'FF_MCP_AA',
+    'FF_MCP',
+    'FF_PIP',
+    'FF_DIP',
+    'Thumb_TMC_PS',
+    'Thumb_TMC_AA',
+    'Thumb_TMC_FE',
+    'Thumb_MCP',
+    'Thumb_IP',
 ]
 
 LINK_NAMES = [
     'base_link',
-    'LF_MCP_link', 'LF_PIP_link', 'LF_DIP_link',
-    'RF_MCP_link', 'RF_PIP_link', 'RF_DIP_link',
-    'MF_MCP_link', 'MF_PIP_link', 'MF_DIP_link',
-    'FF_MCP_AA_link', 'FF_MCP_link', 'FF_PIP_link', 'FF_DIP_link',
-    'Thumb_TMC_PS_link', 'Thumb_TMC_AA_link', 'Thumb_TMC_FE_link',
-    'Thumb_MCP_link', 'Thumb_IP_link',
+    'LF_MCP_link',
+    'LF_PIP_link',
+    'LF_DIP_link',
+    'RF_MCP_link',
+    'RF_PIP_link',
+    'RF_DIP_link',
+    'MF_MCP_link',
+    'MF_PIP_link',
+    'MF_DIP_link',
+    'FF_MCP_AA_link',
+    'FF_MCP_link',
+    'FF_PIP_link',
+    'FF_DIP_link',
+    'Thumb_TMC_PS_link',
+    'Thumb_TMC_AA_link',
+    'Thumb_TMC_FE_link',
+    'Thumb_MCP_link',
+    'Thumb_IP_link',
 ]
 
 ANGLE_MAP = {

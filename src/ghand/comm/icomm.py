@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Communication protocol abstraction interface.
 
 Error handling contract:
@@ -94,9 +93,7 @@ class IComm(ABC):
         Raises:
             NotImplementedError: If the protocol does not support setting slave IDs.
         """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support set_slave_id"
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support set_slave_id")
 
     def set_baudrate(self, baudrate: int) -> bool:
         """Configure the RS485/CANFD baud rate gear (Flash, effective on reboot).
@@ -108,9 +105,7 @@ class IComm(ABC):
         Returns:
             True if the command succeeds, False otherwise.
         """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support set_baudrate"
-        )
+        raise NotImplementedError(f"{type(self).__name__} does not support set_baudrate")
 
     # ===== Joint control =====
 

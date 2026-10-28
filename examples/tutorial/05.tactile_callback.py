@@ -137,7 +137,6 @@ class TactileDisplay:
 
             time.sleep(0.015)  # Refresh every 15 ms
 
-
     def stop_display(self):
         self.running = False
         if self.display_thread:

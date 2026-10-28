@@ -54,9 +54,9 @@ class JointConverter:
         return angles
 
     @staticmethod
-    def nparray_to_joints(
-        angles: np.ndarray, velocity: int = 100, current: int = 100
-    ) -> list[JointCommand]:
+    def nparray_to_joints(angles: np.ndarray,
+                          velocity: int = 100,
+                          current: int = 100) -> list[JointCommand]:
         """Convert an 18-dimensional numpy array back to a list of JointCommand objects.
 
         The returned list uses ids 0-17, matching the ``ghand.JointId``
@@ -76,8 +76,7 @@ class JointConverter:
                 angle=float(angles[i]),
                 velocity=velocity,
                 current=current,
-            )
-            for i in range(18)
+            ) for i in range(18)
         ]
 
 

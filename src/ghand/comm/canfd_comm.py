@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """CANFD communication implementation.
 
 Wraps CanfdTransport and handles CANFD-specific connection state machine
@@ -251,11 +250,7 @@ class CanfdComm(IComm):
             if self._transport is None:
                 self._transport = self._create_transport(device_name)
 
-            gear = (
-                baudrate
-                if baudrate is not None
-                else self._DEFAULT_BAUDRATE_GEAR
-            )
+            gear = (baudrate if baudrate is not None else self._DEFAULT_BAUDRATE_GEAR)
             pair = CANFD_BAUDRATE_GEAR_MAP.get(gear)
             if pair is None:
                 logger.error("Invalid CANFD baudrate gear: %s", baudrate)
@@ -272,10 +267,10 @@ class CanfdComm(IComm):
                 dbit_sample,
             )
             if not self._transport.open(
-                abit_baud=abit_baud,
-                dbit_baud=dbit_baud,
-                abit_sample=abit_sample,
-                dbit_sample=dbit_sample,
+                    abit_baud=abit_baud,
+                    dbit_baud=dbit_baud,
+                    abit_sample=abit_sample,
+                    dbit_sample=dbit_sample,
             ):
                 logger.error("Failed to open CANFD transport at gear=0x%02X", gear)
                 self._cleanup_failed_connect()
@@ -350,9 +345,9 @@ class CanfdComm(IComm):
         """Start the keep-alive thread if it is not already running."""
         if self._keepalive_thread is None or not self._keepalive_thread.is_alive():
             stop_event = threading.Event()
-            keepalive_thread = threading.Thread(
-                target=self._keepalive_loop, args=(stop_event,), daemon=True
-            )
+            keepalive_thread = threading.Thread(target=self._keepalive_loop,
+                                                args=(stop_event, ),
+                                                daemon=True)
             self._keepalive_stop = stop_event
             self._keepalive_thread = keepalive_thread
             keepalive_thread.start()
@@ -400,15 +395,12 @@ class CanfdComm(IComm):
                 continue
             resp_id, _ = result
             arb = unpack_arbitration(resp_id)
-            if (
-                arb["ack"] == 0
-                and arb["func_code"] == 0x44
-                and arb["src_id"] == arb["dst_id"]
-                and arb["src_id"] in candidates
-            ):
+            if (arb["ack"] == 0 and arb["func_code"] == 0x44 and arb["src_id"] == arb["dst_id"]
+                    and arb["src_id"] in candidates):
                 if self._write_connection_control(
-                    arb["src_id"], 1,
-                    connection_timer_ms=self._connection_watchdog_ms,
+                        arb["src_id"],
+                        1,
+                        connection_timer_ms=self._connection_watchdog_ms,
                 ):
                     return self._verify_connection()
                 return False
@@ -417,8 +409,14 @@ class CanfdComm(IComm):
         # probe allowed node IDs with FC44.
         for slave_id in candidates:
             can_id = pack_arbitration(
-                self._src_id, slave_id, ack=0, func_code=0x44,
-                start=1, end=1, toggle=0, seg_num=0,
+                self._src_id,
+                slave_id,
+                ack=0,
+                func_code=0x44,
+                start=1,
+                end=1,
+                toggle=0,
+                seg_num=0,
             )
             # firmware answers FC44 only when PDU[4] equals its own node ID.
             probe = struct.pack(">HH", 0x0000, 1) + bytes([slave_id, 0, 0, 0])
@@ -438,8 +436,9 @@ class CanfdComm(IComm):
                         break  # Exception: try next dst_id
                     if arb["func_code"] == 0x44:
                         if self._write_connection_control(
-                            slave_id, 1,
-                            connection_timer_ms=self._connection_watchdog_ms,
+                                slave_id,
+                                1,
+                                connection_timer_ms=self._connection_watchdog_ms,
                         ):
                             return self._verify_connection()
                         break
@@ -455,18 +454,18 @@ class CanfdComm(IComm):
         """Read one input register; None when the device does not answer."""
         target_id = self._slave_id if device_id is None else device_id
         try:
-            raw = self._transport.read_registers(
-                self._src_id, target_id, address, 1, func_code=0x04
-            )
+            raw = self._transport.read_registers(self._src_id,
+                                                 target_id,
+                                                 address,
+                                                 1,
+                                                 func_code=0x04)
         except Exception:
             return None
         if len(raw) < 2:
             return None
         return struct.unpack(">H", raw[:2])[0]
 
-    def _wait_connection_state(
-        self, timeout_sec: float = 2.0, interval_sec: float = 0.05
-    ) -> bool:
+    def _wait_connection_state(self, timeout_sec: float = 2.0, interval_sec: float = 0.05) -> bool:
         """Poll the host connection state until the device reports connected."""
         deadline = time.time() + timeout_sec
         while time.time() < deadline:
@@ -517,11 +516,11 @@ class CanfdComm(IComm):
                 connection_timer_ms & 0xFFFF,
             )
         if not self._ensure_transport().write_registers(
-            self._src_id,
-            slave_id,
-            REG_CONNECTION_CONTROL,
-            payload,
-            timeout_ms=timeout_ms,
+                self._src_id,
+                slave_id,
+                REG_CONNECTION_CONTROL,
+                payload,
+                timeout_ms=timeout_ms,
         ):
             return False
         self._slave_id = slave_id
@@ -608,9 +607,8 @@ class CanfdComm(IComm):
             logger.error("Cannot move joints: CANFD device is not connected")
             return False
 
-        address, registers, updated_modes = encode_hand_command_frame(
-            joints, mode, self._profile, self._joint_modes
-        )
+        address, registers, updated_modes = encode_hand_command_frame(joints, mode, self._profile,
+                                                                      self._joint_modes)
         logger.debug(
             "CANFD write whole-hand command addr=0x%04X count=%d",
             address,
@@ -675,11 +673,13 @@ class CanfdComm(IComm):
         start, count = get_joint_input_span(self._config.all_joints, self._profile)
         if count == 0:
             return []
-        raw_bytes = self._ensure_transport().read_registers(
-            self._src_id, self._slave_id, start, count, func_code=0x04
-        )
+        raw_bytes = self._ensure_transport().read_registers(self._src_id,
+                                                            self._slave_id,
+                                                            start,
+                                                            count,
+                                                            func_code=0x04)
         # Convert bytes back to uint16 register list for the shared codec.
-        raw = list(struct.unpack(f">{count}H", raw_bytes[: count * 2]))
+        raw = list(struct.unpack(f">{count}H", raw_bytes[:count * 2]))
         return parse_joints(raw, self._config.all_joints, self._profile, start)
 
     def get_hand_info(self) -> HandData:
@@ -719,14 +719,12 @@ class CanfdComm(IComm):
             func_code=0x04,
         )
         count = self._profile.tactile_resultant_register_count
-        raw = list(struct.unpack(f">{count}H", raw_bytes[: count * 2]))
+        raw = list(struct.unpack(f">{count}H", raw_bytes[:count * 2]))
         tactile_state, _ = parse_tactile_state_error(raw)
 
         result = {}
-        current_addr = (
-            self._profile.tactile_state_address
-            + self._profile.tactile_resultant_register_count
-        )
+        current_addr = (self._profile.tactile_state_address +
+                        self._profile.tactile_resultant_register_count)
 
         for region in self._config.tactile_regions:
             idx = region.id.value
@@ -735,15 +733,15 @@ class CanfdComm(IComm):
 
             # Read distributed force for this region
             dist_regs = (region.count * 3 + 1) // 2
-            dist_bytes = self._ensure_transport().read_registers(
-                self._src_id, self._slave_id, current_addr, dist_regs, func_code=0x04
-            )
+            dist_bytes = self._ensure_transport().read_registers(self._src_id,
+                                                                 self._slave_id,
+                                                                 current_addr,
+                                                                 dist_regs,
+                                                                 func_code=0x04)
             distributed = parse_tactile_distributed(dist_bytes, region.count)
             current_addr += dist_regs
 
-            result[region.id] = build_tactile_info(
-                state_bit, resultant, distributed
-            )
+            result[region.id] = build_tactile_info(state_bit, resultant, distributed)
         return result
 
     # ------------------------------------------------------------------
@@ -752,9 +750,11 @@ class CanfdComm(IComm):
 
     def _read_input_bytes(self, addr: int, count: int) -> bytes:
         """Helper to read input registers and return raw bytes."""
-        return self._ensure_transport().read_registers(
-            self._src_id, self._slave_id, addr, count, func_code=0x04
-        )
+        return self._ensure_transport().read_registers(self._src_id,
+                                                       self._slave_id,
+                                                       addr,
+                                                       count,
+                                                       func_code=0x04)
 
     def _get_string_info(self, addr: int, count: int, parse) -> str:
         try:
@@ -836,10 +836,10 @@ class CanfdComm(IComm):
         """
         baseline = self._read_input_word(REG_TACTILE_CTRL_STATUS)
         if not self._ensure_transport().write_registers(
-            self._src_id,
-            self._slave_id,
-            self._profile.tactile_control_address,
-            struct.pack(">H", command),
+                self._src_id,
+                self._slave_id,
+                self._profile.tactile_control_address,
+                struct.pack(">H", command),
         ):
             return False
         state = self._wait_mailbox_terminal(REG_TACTILE_CTRL_STATUS, baseline)
@@ -889,10 +889,8 @@ class CanfdComm(IComm):
     def clear_fault(self) -> bool:
         """Clear device faults via the mailbox (writing full value 1)."""
         baseline = self._read_input_word(REG_FAULT_CLEAR_STATUS)
-        if not self._ensure_transport().write_registers(
-            self._src_id, self._slave_id, REG_CLEAR_FAULT, struct.pack(
-                ">H", 0x0001)
-        ):
+        if not self._ensure_transport().write_registers(self._src_id, self._slave_id,
+                                                        REG_CLEAR_FAULT, struct.pack(">H", 0x0001)):
             return False
         state = self._wait_mailbox_terminal(REG_FAULT_CLEAR_STATUS, baseline)
         if state != MAILBOX_OK:
@@ -921,9 +919,7 @@ class CanfdComm(IComm):
             raise RuntimeError("Device is not connected")
 
         with self._lock:
-            interval_sec = (
-                interval_ms / 1000.0 if interval_ms is not None else None
-            )
+            interval_sec = (interval_ms / 1000.0 if interval_ms is not None else None)
             sub_id = self._next_sub_id
             self._next_sub_id += 1
             self._callbacks[sub_id] = (callback, args, kwargs, interval_sec)
@@ -944,9 +940,7 @@ class CanfdComm(IComm):
     def _ensure_poll_started_locked(self) -> None:
         if self._poll_thread is None or not self._poll_thread.is_alive():
             stop_event = threading.Event()
-            poll_thread = threading.Thread(
-                target=self._poll_loop, args=(stop_event,), daemon=True
-            )
+            poll_thread = threading.Thread(target=self._poll_loop, args=(stop_event, ), daemon=True)
             self._poll_stop = stop_event
             self._poll_thread = poll_thread
             poll_thread.start()
@@ -964,20 +958,13 @@ class CanfdComm(IComm):
 
     @staticmethod
     def _join_poll_thread(poll_thread) -> None:
-        if (
-            poll_thread
-            and poll_thread.is_alive()
-            and poll_thread is not threading.current_thread()
-        ):
+        if (poll_thread and poll_thread.is_alive()
+                and poll_thread is not threading.current_thread()):
             poll_thread.join(timeout=0.5)
 
     def _recompute_poll_interval_locked(self) -> None:
-        intervals = [
-            item[3] for item in self._callbacks.values() if item[3] is not None
-        ]
-        self._poll_interval_sec = (
-            min(intervals) if intervals else self._DEFAULT_POLL_INTERVAL_SEC
-        )
+        intervals = [item[3] for item in self._callbacks.values() if item[3] is not None]
+        self._poll_interval_sec = (min(intervals) if intervals else self._DEFAULT_POLL_INTERVAL_SEC)
 
     def _poll_loop(self, stop_event: threading.Event) -> None:
         while not stop_event.is_set():
@@ -989,9 +976,8 @@ class CanfdComm(IComm):
                     time.sleep(self._poll_interval_sec)
                     continue
 
-                joint_start, joint_count = get_joint_input_span(
-                    self._config.all_joints, self._profile
-                )
+                joint_start, joint_count = get_joint_input_span(self._config.all_joints,
+                                                                self._profile)
                 if joint_count == 0:
                     time.sleep(self._poll_interval_sec)
                     continue
@@ -1001,10 +987,12 @@ class CanfdComm(IComm):
                     joint_start + joint_count - 1,
                 )
                 count = end - start + 1
-                raw_bytes = self._transport.read_registers(
-                    self._src_id, self._slave_id, start, count, func_code=0x04
-                )
-                raw = list(struct.unpack(f">{count}H", raw_bytes[: count * 2]))
+                raw_bytes = self._transport.read_registers(self._src_id,
+                                                           self._slave_id,
+                                                           start,
+                                                           count,
+                                                           func_code=0x04)
+                raw = list(struct.unpack(f">{count}H", raw_bytes[:count * 2]))
                 hand_offset = self._profile.hand_info_address - start
                 hand_state = parse_hand_info(raw[hand_offset:hand_offset + 14])
                 joints = parse_joints(

@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """RS485 communication implementation using Modbus RTU."""
 
 from __future__ import annotations
@@ -117,9 +116,7 @@ class Rs485Comm(IComm):
 
     _DEFAULT_POLL_INTERVAL_SEC = 0.1
     _DEFAULT_BAUDRATE_GEAR = RS485_DEFAULT_BAUDRATE_GEAR
-    SUPPORTED_BAUDRATE_GEARS = tuple(
-        sorted(RS485_BAUDRATE_GEAR_MAP.keys(), reverse=True)
-    )
+    SUPPORTED_BAUDRATE_GEARS = tuple(sorted(RS485_BAUDRATE_GEAR_MAP.keys(), reverse=True))
     _LINUX_PORT_PATTERNS = (
         "/dev/serial/by-id/*",
         "/dev/ttyUSB*",
@@ -163,27 +160,19 @@ class Rs485Comm(IComm):
             raise RuntimeError("Device is not connected")
         return self._client
 
-    def _read_input_registers(
-        self, address: int, count: int, device_id: int | None = None
-    ):
+    def _read_input_registers(self, address: int, count: int, device_id: int | None = None):
         """Read input registers as one serialized Modbus transaction."""
         client = self._ensure_client()
         target_id = self._slave_id if device_id is None else device_id
         with self._io_lock:
-            return client.read_input_registers(
-                address, count=count, device_id=target_id
-            )
+            return client.read_input_registers(address, count=count, device_id=target_id)
 
-    def _read_holding_registers(
-        self, address: int, count: int, device_id: int | None = None
-    ):
+    def _read_holding_registers(self, address: int, count: int, device_id: int | None = None):
         """Read holding registers as one serialized Modbus transaction."""
         client = self._ensure_client()
         target_id = self._slave_id if device_id is None else device_id
         with self._io_lock:
-            return client.read_holding_registers(
-                address, count=count, device_id=target_id
-            )
+            return client.read_holding_registers(address, count=count, device_id=target_id)
 
     def _write_register(self, address: int, value: int):
         """Write one holding register as one serialized Modbus transaction."""
@@ -288,9 +277,7 @@ class Rs485Comm(IComm):
             return False
 
         if baudrate is None:
-            baudrate = int(
-                os.environ.get("GHAND_RS485_BAUDRATE_GEAR", self._DEFAULT_BAUDRATE_GEAR)
-            )
+            baudrate = int(os.environ.get("GHAND_RS485_BAUDRATE_GEAR", self._DEFAULT_BAUDRATE_GEAR))
 
         serial_baudrate = RS485_BAUDRATE_GEAR_MAP.get(baudrate)
         if serial_baudrate is None:
@@ -308,9 +295,7 @@ class Rs485Comm(IComm):
             return True
         return False
 
-    def _connect_with_baudrate(
-        self, device_name: str, slave_id: int | None, baudrate: int
-    ) -> bool:
+    def _connect_with_baudrate(self, device_name: str, slave_id: int | None, baudrate: int) -> bool:
         """Attempt a single RS485 connection with the given baud rate."""
         try:
             self._client = ModbusSerialClient(
@@ -331,9 +316,9 @@ class Rs485Comm(IComm):
                 if target_slave_id is None:
                     continue
                 try:
-                    result = self._read_holding_registers(
-                        REG_SLAVE_ID, count=1, device_id=target_slave_id
-                    )
+                    result = self._read_holding_registers(REG_SLAVE_ID,
+                                                          count=1,
+                                                          device_id=target_slave_id)
                 except ModbusException:
                     logger.debug("No response from RS485 slave 0x%02X", target_slave_id)
                     continue
@@ -348,9 +333,7 @@ class Rs485Comm(IComm):
             if not self._establish_connection():
                 self._client.close()
                 self._client = None
-                logger.error(
-                    "Failed to establish RS485 connection on %s", device_name
-                )
+                logger.error("Failed to establish RS485 connection on %s", device_name)
                 return False
             self._connected = True
             return True
@@ -386,9 +369,7 @@ class Rs485Comm(IComm):
             return None
         return result.registers[0]
 
-    def _wait_connection_state(
-        self, timeout_sec: float = 2.0, interval_sec: float = 0.05
-    ) -> bool:
+    def _wait_connection_state(self, timeout_sec: float = 2.0, interval_sec: float = 0.05) -> bool:
         """Poll the host connection state until the device reports connected."""
         deadline = time.time() + timeout_sec
         while time.time() < deadline:
@@ -490,9 +471,7 @@ class Rs485Comm(IComm):
             logger.error("Invalid RS485 baudrate gear: %s", gear)
             return False
         try:
-            result = self._write_register(
-                BAUDRATE_CONFIG_REGISTER, (gear << 8) | 0x01
-            )
+            result = self._write_register(BAUDRATE_CONFIG_REGISTER, (gear << 8) | 0x01)
         except Exception as exc:
             logger.error("Failed to set RS485 baudrate config to gear 0x%02X: %s", gear, exc)
             return False
@@ -512,9 +491,8 @@ class Rs485Comm(IComm):
         Returns:
             True if the command is sent successfully.
         """
-        address, registers, updated_modes = encode_hand_command_frame(
-            joints, mode, self._profile, self._joint_modes
-        )
+        address, registers, updated_modes = encode_hand_command_frame(joints, mode, self._profile,
+                                                                      self._joint_modes)
         result = self._write_registers(address, registers)
         if result is None or result.isError():
             raise RuntimeError("Failed to write whole-hand joint command")
@@ -620,10 +598,8 @@ class Rs485Comm(IComm):
         result = {}
         tactile_state, _ = parse_tactile_state_error(data)
 
-        current_addr = (
-            self._profile.tactile_state_address
-            + self._profile.tactile_resultant_register_count
-        )
+        current_addr = (self._profile.tactile_state_address +
+                        self._profile.tactile_resultant_register_count)
 
         for region in self._config.tactile_regions:
             idx = region.id.value
@@ -640,9 +616,7 @@ class Rs485Comm(IComm):
 
             current_addr += dist_regs
 
-            result[region.id] = build_tactile_info(
-                state_bit, resultant, distributed
-            )
+            result[region.id] = build_tactile_info(state_bit, resultant, distributed)
         return result
 
     # ===== Device info reading =====
@@ -651,9 +625,7 @@ class Rs485Comm(IComm):
         """Read input registers and convert to bytes."""
         result = self._read_input_registers(address, count=count)
         if result is None or result.isError():
-            raise RuntimeError(
-                f"Failed to read input registers at {address:#x}"
-            )
+            raise RuntimeError(f"Failed to read input registers at {address:#x}")
         return registers_to_bytes(result.registers)
 
     def get_device_name(self) -> str:
@@ -675,9 +647,8 @@ class Rs485Comm(IComm):
     def get_serial_number(self) -> str:
         """Retrieve the product serial number."""
         try:
-            return parse_ascii_serial_number(
-                self._read_input_registers_bytes(REG_SERIAL_NUMBER, 10)
-            )
+            return parse_ascii_serial_number(self._read_input_registers_bytes(
+                REG_SERIAL_NUMBER, 10))
         except Exception:
             if not self.is_connected():
                 raise
@@ -752,8 +723,7 @@ class Rs485Comm(IComm):
             command: low-byte command value (1=enable, 2=disable, 4=zero).
         """
         baseline = self._read_input_word(REG_TACTILE_CTRL_STATUS)
-        result = self._write_register(
-            self._profile.tactile_control_address, command)
+        result = self._write_register(self._profile.tactile_control_address, command)
         if result is None or result.isError():
             return False
         state = self._wait_mailbox_terminal(REG_TACTILE_CTRL_STATUS, baseline)
@@ -829,9 +799,7 @@ class Rs485Comm(IComm):
             raise RuntimeError("Device is not connected")
 
         with self._lock:
-            interval_sec = (
-                interval_ms / 1000.0 if interval_ms is not None else None
-            )
+            interval_sec = (interval_ms / 1000.0 if interval_ms is not None else None)
             sub_id = self._next_sub_id
             self._next_sub_id += 1
             self._callbacks[sub_id] = (callback, args, kwargs, interval_sec)
@@ -861,9 +829,7 @@ class Rs485Comm(IComm):
         """Start the polling thread if not already running."""
         if self._poll_thread is None or not self._poll_thread.is_alive():
             stop_event = threading.Event()
-            poll_thread = threading.Thread(
-                target=self._poll_loop, args=(stop_event,), daemon=True
-            )
+            poll_thread = threading.Thread(target=self._poll_loop, args=(stop_event, ), daemon=True)
             self._poll_stop = stop_event
             self._poll_thread = poll_thread
             poll_thread.start()
@@ -882,20 +848,13 @@ class Rs485Comm(IComm):
 
     @staticmethod
     def _join_poll_thread(poll_thread) -> None:
-        if (
-            poll_thread
-            and poll_thread.is_alive()
-            and poll_thread is not threading.current_thread()
-        ):
+        if (poll_thread and poll_thread.is_alive()
+                and poll_thread is not threading.current_thread()):
             poll_thread.join(timeout=0.5)
 
     def _recompute_poll_interval_locked(self) -> None:
-        intervals = [
-            item[3] for item in self._callbacks.values() if item[3] is not None
-        ]
-        self._poll_interval_sec = (
-            min(intervals) if intervals else self._DEFAULT_POLL_INTERVAL_SEC
-        )
+        intervals = [item[3] for item in self._callbacks.values() if item[3] is not None]
+        self._poll_interval_sec = (min(intervals) if intervals else self._DEFAULT_POLL_INTERVAL_SEC)
 
     def _poll_loop(self, stop_event: threading.Event) -> None:
         """Poll device state every 10ms and dispatch to callbacks."""
@@ -909,9 +868,8 @@ class Rs485Comm(IComm):
                     time.sleep(self._poll_interval_sec)
                     continue
 
-                joint_start, joint_count = get_joint_input_span(
-                    self._config.all_joints, self._profile
-                )
+                joint_start, joint_count = get_joint_input_span(self._config.all_joints,
+                                                                self._profile)
                 if joint_count == 0:
                     time.sleep(self._poll_interval_sec)
                     continue

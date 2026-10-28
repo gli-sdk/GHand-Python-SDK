@@ -91,8 +91,7 @@ def load_trajectory_angles(csv_path: str = 'Trajectory_Collision_Angles.csv') ->
 
 
 def load_static_collision_data(
-    csv_path: str = 'Static_Collision_Angles.csv',
-) -> Tuple[np.ndarray, List[str]]:
+    csv_path: str = 'Static_Collision_Angles.csv', ) -> Tuple[np.ndarray, List[str]]:
     dataframe = _read_csv_with_fallback_encodings(csv_path, 'static collision CSV')
     collision_pairs = dataframe['Collision-pair'].astype(str).tolist()
     drop_columns = ['Collision-pair']
@@ -132,18 +131,32 @@ def read_urdf_xml(xml_path: Optional[str] = None) -> List[Dict[str, Any]]:
             if attr is None:
                 return np.array([0.0, 0.0, 0.0], dtype=float)
             parts = attr.strip().split()
-            return np.array([float(parts[0]), float(parts[1]), float(parts[2])], dtype=float) if len(parts) >= 3 else np.array([0.0, 0.0, 0.0], dtype=float)
+            return np.array([float(parts[0]), float(parts[1]),
+                             float(parts[2])], dtype=float) if len(parts) >= 3 else np.array(
+                                 [0.0, 0.0, 0.0], dtype=float)
 
         joints.append({
-            'name': name,
-            'type': str(joint.get('type', '')).strip(),
-            'origin': _parse_xyz(origin.get('xyz')) if origin is not None else np.array([0.0, 0.0, 0.0], dtype=float),
-            'rpy': _parse_xyz(origin.get('rpy')) if origin is not None else np.array([0.0, 0.0, 0.0], dtype=float),
-            'parent': str(parent.get('link', '')).strip() if parent is not None else '',
-            'child': str(child.get('link', '')).strip() if child is not None else f"{name}_link",
-            'axis': _parse_xyz(axis.get('xyz')) if axis is not None else np.array([0.0, 0.0, 0.0], dtype=float),
-            'limitLower': _to_float(limit.get('lower')) if limit is not None else 0.0,
-            'limitUpper': _to_float(limit.get('upper')) if limit is not None else 0.0,
+            'name':
+            name,
+            'type':
+            str(joint.get('type', '')).strip(),
+            'origin':
+            _parse_xyz(origin.get('xyz')) if origin is not None else np.array([0.0, 0.0, 0.0],
+                                                                              dtype=float),
+            'rpy':
+            _parse_xyz(origin.get('rpy')) if origin is not None else np.array([0.0, 0.0, 0.0],
+                                                                              dtype=float),
+            'parent':
+            str(parent.get('link', '')).strip() if parent is not None else '',
+            'child':
+            str(child.get('link', '')).strip() if child is not None else f"{name}_link",
+            'axis':
+            _parse_xyz(axis.get('xyz')) if axis is not None else np.array([0.0, 0.0, 0.0],
+                                                                          dtype=float),
+            'limitLower':
+            _to_float(limit.get('lower')) if limit is not None else 0.0,
+            'limitUpper':
+            _to_float(limit.get('upper')) if limit is not None else 0.0,
         })
 
     return joints
@@ -167,10 +180,8 @@ def load_stl_data(path: Optional[str] = None) -> Dict[str, STLData]:
         try:
             raw_mesh = mesh.Mesh.from_file(str(stl_path))
         except Exception as exc:
-            raise FileNotFoundError(
-                f'Failed to load STL file: {stl_path}\n'
-                f'Underlying error: {exc}'
-            ) from exc
+            raise FileNotFoundError(f'Failed to load STL file: {stl_path}\n'
+                                    f'Underlying error: {exc}') from exc
         stl_data[link_name] = STLData(raw_data=raw_mesh)
 
     return stl_data
@@ -195,7 +206,8 @@ def _default_link_vertices(link_name: str) -> np.ndarray:
         [x_max, y_min, z_max],
         [x_max, y_max, z_max],
         [x_min, y_max, z_max],
-    ], dtype=float)
+    ],
+                        dtype=float)
     return np.vstack([vertices.T, np.ones((1, vertices.shape[0]))])
 
 
@@ -212,4 +224,3 @@ def load_capsule_from_json(json_path: Optional[str] = None) -> Dict[str, Dict[st
         joint_name: _normalize_capsule_params(params)
         for joint_name, params in capsule_data.items()
     }
-

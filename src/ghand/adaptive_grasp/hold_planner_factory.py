@@ -17,9 +17,9 @@ def create_hold_planners(
     profile: Optional[ObjectProfile],
     contact_snapshot: Optional[ContactSnapshot],
 ) -> tuple[
-    Optional[ForceReferencePlanner],
-    Optional[PositionHoldPlanner],
-    Optional[IncrementalPositionHoldPlanner],
+        Optional[ForceReferencePlanner],
+        Optional[PositionHoldPlanner],
+        Optional[IncrementalPositionHoldPlanner],
 ]:
     if contact_snapshot is None:
         return None, None, None
@@ -35,8 +35,7 @@ def create_hold_planners(
     if config.hold_command_mode is HoldCommandMode.STIFF_POSITION:
         active_joint_ids = {
             joint_id
-            for joint_id, finger in JOINT_TO_FINGER.items()
-            if finger in config.active_fingers
+            for joint_id, finger in JOINT_TO_FINGER.items() if finger in config.active_fingers
         }
         return (
             force_reference_planner,
@@ -47,25 +46,18 @@ def create_hold_planners(
                 active_fingers=set(config.active_fingers),
                 active_joint_ids=active_joint_ids,
                 contact_joint_angles=contact_snapshot.joint_angles,
-                hold_velocity=(
-                    profile.stiff_position_hold_velocity
-                    if profile is not None and profile.stiff_position_hold_velocity is not None
-                    else config.stiff_position_hold_velocity
-                ),
-                hold_current=(
-                    profile.stiff_position_hold_current
-                    if profile is not None and profile.stiff_position_hold_current is not None
-                    else config.stiff_position_hold_current
-                ),
-                default_target_force_n=(
-                    None
-                    if profile is None
-                    else profile.stiff_position_hold_target_force or profile.safe_force_min
-                ),
+                hold_velocity=(profile.stiff_position_hold_velocity if profile is not None
+                               and profile.stiff_position_hold_velocity is not None else
+                               config.stiff_position_hold_velocity),
+                hold_current=(profile.stiff_position_hold_current if profile is not None
+                              and profile.stiff_position_hold_current is not None else
+                              config.stiff_position_hold_current),
+                default_target_force_n=(None if profile is None else
+                                        profile.stiff_position_hold_target_force
+                                        or profile.safe_force_min),
                 stiff_position_force_drop_ratio=config.stiff_position_force_drop_ratio,
             ),
         )
 
-    raise ValueError(
-        "hold_command_mode must be HoldCommandMode.POSITION "
-        "or HoldCommandMode.STIFF_POSITION")
+    raise ValueError("hold_command_mode must be HoldCommandMode.POSITION "
+                     "or HoldCommandMode.STIFF_POSITION")

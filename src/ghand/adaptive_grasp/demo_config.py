@@ -84,9 +84,8 @@ def build_demo_runtime_config(
             "HOLD_TIME_S should be > 1 for a stable demo hold duration. "
             "Edit HOLD_TIME_S in adaptive_grasp.demo_config.", )
     if interrupt_release_wait_s <= 0:
-        raise ValueError(
-            f"_INTERRUPT_RELEASE_WAIT_S must be > 0. "
-            "Edit _INTERRUPT_RELEASE_WAIT_S in adaptive_grasp.demo_config.")
+        raise ValueError(f"_INTERRUPT_RELEASE_WAIT_S must be > 0. "
+                         "Edit _INTERRUPT_RELEASE_WAIT_S in adaptive_grasp.demo_config.")
     if interrupt_release_wait_s < 3:
         _logger.warning(
             "_INTERRUPT_RELEASE_WAIT_S should be >= 3 "

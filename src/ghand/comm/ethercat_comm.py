@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """EtherCAT communication implementation.
 
 Wraps EthercatClient and handles PDO encoding/decoding.
@@ -28,10 +27,9 @@ from .._subscription import SubscriptionManager
 from .._product_config import ProductConfig, TactileRegionConfig
 from .._device_value import parse_device_value
 from ..types import (
-    CANFDBitTiming,
-    RS485BaudRate,
     JointId,
     HandControlMode,
+    JointControlMode,
     JointLoopType,
     JointControlState,
     JointState,
@@ -59,23 +57,6 @@ from .icomm import IComm
 logger = logging.getLogger("ghand.ethercat_comm")
 
 
-_STALL_TOLERANCE_JOINT_ORDER = (
-    JointId.THUMB_MCP,
-    JointId.THUMB_TMC_FE,
-    JointId.THUMB_TMC_AA,
-    JointId.THUMB_TMC_PS,
-    JointId.FF_PIP,
-    JointId.FF_MCP,
-    JointId.FF_MCP_AA,
-    JointId.MF_PIP,
-    JointId.MF_MCP,
-    JointId.RF_PIP,
-    JointId.RF_MCP,
-    JointId.LF_PIP,
-    JointId.LF_MCP,
-)
-
-
 class EthercatComm(IComm):
     """IComm implementation for EtherCAT."""
 
@@ -94,9 +75,8 @@ class EthercatComm(IComm):
         """Return the active product config selected for the mapped PDO layout."""
         return self._config
 
-    def _clone_config_with_tactile_counts(
-        self, config: ProductConfig, tactile_counts: list[int]
-    ) -> ProductConfig:
+    def _clone_config_with_tactile_counts(self, config: ProductConfig,
+                                          tactile_counts: list[int]) -> ProductConfig:
         """Clone product config while replacing tactile region sample counts."""
         tactile_regions = [
             TactileRegionConfig(id=region.id, count=count)
@@ -119,10 +99,9 @@ class EthercatComm(IComm):
     def _build_tpdo_layouts(self, config: ProductConfig) -> dict[int, ProductConfig]:
         """Build supported TPDO layouts keyed by mapped input size."""
         tactile_counts = [r.count for r in config.tactile_regions] if config.has_tactile else None
-        layouts = {
-            compute_tpdo_size(len(config.all_joints), tactile_counts): config
-        }
-        if config.has_tactile and tactile_counts and tactile_counts[0] > self._COMPAT_THUMB_TACTILE_COUNT:
+        layouts = {compute_tpdo_size(len(config.all_joints), tactile_counts): config}
+        if config.has_tactile and tactile_counts and tactile_counts[
+                0] > self._COMPAT_THUMB_TACTILE_COUNT:
             compat_counts = list(tactile_counts)
             compat_counts[0] = self._COMPAT_THUMB_TACTILE_COUNT
             compat_config = self._clone_config_with_tactile_counts(config, compat_counts)
@@ -153,9 +132,7 @@ class EthercatComm(IComm):
             [r.count for r in config.tactile_regions] if config.has_tactile else None,
         )
         self._tpdo_size_selected = False
-        self._controlled_joints = [
-            j for j in config.all_joints if j in config.active_joints
-        ]
+        self._controlled_joints = [j for j in config.all_joints if j in config.active_joints]
         self._rpdo = Rpdo(self._controlled_joints)
         self._expected_rpdo_size = self._expected_rpdo_bytes(config)
 
@@ -173,7 +150,7 @@ class EthercatComm(IComm):
         self,
         device_name: str,
         slave_id: int | None = None,
-        baudrate: RS485BaudRate | CANFDBitTiming | None = None,
+        baudrate: int | None = None,
     ) -> bool:
         """Connect to the specified EtherCAT device.
 
@@ -221,23 +198,9 @@ class EthercatComm(IComm):
         self._rpdo.stop = 1
 
         for joint in joints:
-            joint_id = JointId(joint.id)
-            if joint_id not in self._rpdo.joints:
-                raise ValueError(f"Joint {joint_id.name} is not controllable")
-            target = self._rpdo.joints[joint_id]
-            joint_mode = joint.mode
-            if joint_mode is None and mode != HandControlMode.CUSTOM:
-                joint_mode = mode
-            if joint_mode is not None:
-                if joint_mode == HandControlMode.CUSTOM:
-                    raise ValueError("Per-joint mode cannot be CUSTOM")
-                target.mode = (
-                    joint_mode.value
-                    if isinstance(joint_mode, HandControlMode)
-                    else int(joint_mode)
-                )
-            target.stop = JointControlState(joint.stop).value
-            target.mode = (target.mode & 0x0F) | (JointLoopType(joint.closed_loop_type).value << 4)
+            target = self._rpdo.joints[joint.id]
+            target.mode = (joint.control_mode.value & 0x0F) | (joint.loop_type.value << 4)
+            target.stop = joint.control_state.value
             target.angle = joint.angle
             target.velocity = joint.velocity
             target.current = joint.current
@@ -265,16 +228,11 @@ class EthercatComm(IComm):
 
     def _validate_tpdo_data(self, data: bytes) -> bytes:
         """Validate a TPDO frame before any protocol fields are decoded."""
-        expected_sizes = (
-            (self._expected_tpdo_size,)
-            if self._tpdo_size_selected
-            else self._expected_tpdo_sizes
-        )
+        expected_sizes = ((self._expected_tpdo_size, )
+                          if self._tpdo_size_selected else self._expected_tpdo_sizes)
         if len(data) not in expected_sizes:
-            raise RuntimeError(
-                "Invalid EtherCAT TPDO length: "
-                f"expected one of {expected_sizes}, got {len(data)}"
-            )
+            raise RuntimeError("Invalid EtherCAT TPDO length: "
+                               f"expected one of {expected_sizes}, got {len(data)}")
         return data
 
     def _recv_tpdo_data(self) -> bytes:
@@ -299,28 +257,15 @@ class EthercatComm(IComm):
             joints.append(
                 JointData(
                     id=joint_id,
-                    state=self._parse_joint_state(joint_tpdo.state),
-                    error=self._parse_joint_error_code(joint_tpdo.error),
-                    mode=joint_tpdo.mode,
-                    stop=joint_tpdo.stop,
+                    state=parse_device_value(JointState, joint_tpdo.state),
+                    error=parse_device_value(JointErrorCode, joint_tpdo.error),
+                    control_mode=parse_device_value(JointControlMode, joint_tpdo.mode & 0x0F),
+                    loop_type=parse_device_value(JointLoopType, joint_tpdo.mode >> 4),
                     angle=angle,
                     velocity=joint_tpdo.velocity,
                     current=joint_tpdo.current,
-                )
-            )
+                ))
         return joints
-
-    @staticmethod
-    def _parse_state(value: int) -> HandControlState | int:
-        return parse_device_value(HandControlState, value)
-
-    @staticmethod
-    def _parse_joint_state(value: int) -> JointState | int:
-        return parse_device_value(JointState, value)
-
-    @staticmethod
-    def _parse_joint_error_code(value: int) -> JointErrorCode | int:
-        return parse_device_value(JointErrorCode, value)
 
     def get_hand_info(self) -> HandData:
         """Retrieve high-level hand status from TPDO.
@@ -332,7 +277,7 @@ class EthercatComm(IComm):
 
         hand_tpdo = HandTpdo.from_bytes(data)
         return HandData(
-            joints_state=self._parse_state(hand_tpdo.state),
+            joints_state=parse_device_value(HandControlState, hand_tpdo.state),
             error_warn=HandWarning(int.from_bytes(hand_tpdo.error_warn, "little")),
             error_fault=HandFault(int.from_bytes(hand_tpdo.error_fault, "little")),
             error_critical=HandCriticalError(int.from_bytes(hand_tpdo.error_critical, "little")),
@@ -440,12 +385,8 @@ class EthercatComm(IComm):
 
     def _read_string_sdo(self, index: int, subindex: int) -> str:
         try:
-            return (
-                self._client.sdo_read(index, subindex)
-                .decode("utf-8", errors="ignore")
-                .strip("\x00")
-                or "N/A"
-            )
+            return (self._client.sdo_read(index, subindex).decode(
+                "utf-8", errors="ignore").strip("\x00") or "N/A")
         except Exception:
             if not self.is_connected():
                 raise
@@ -477,8 +418,7 @@ class EthercatComm(IComm):
         expected_size = struct.calcsize(f"<{count}{item_format}")
         if len(raw) != expected_size:
             raise RuntimeError(
-                f"invalid SDO parameter size: expected {expected_size}, got {len(raw)}"
-            )
+                f"invalid SDO parameter size: expected {expected_size}, got {len(raw)}")
         return list(struct.unpack(f"<{count}{item_format}", raw))
 
     def _write_sdo_parameters(self, index: int, payload: bytes) -> bool:
@@ -497,20 +437,21 @@ class EthercatComm(IComm):
     def get_stall_tolerances(self) -> dict[JointId, int]:
         """Read the 13 per-joint stall tolerances from SDO 0x2003:01."""
         if not self._execute_sdo_command(
-            0x2003, 0xA2,
-            command_subindex=0x02, state_subindex=0x03, result_subindex=0x04,
+                0x2003,
+                0xA2,
+                command_subindex=0x02,
+                state_subindex=0x03,
+                result_subindex=0x04,
         ):
             raise RuntimeError("Failed to refresh stall tolerances")
-        values = self._unpack_uint_array(
-            self._client.sdo_read(0x2003, 0x01), 13, "B"
-        )
-        return dict(zip(_STALL_TOLERANCE_JOINT_ORDER, values))
+        values = self._unpack_uint_array(self._client.sdo_read(0x2003, 0x01), 13, "B")
+        return dict(zip(self._controlled_joints, values))
 
     def set_stall_tolerances(self, tolerances: dict[JointId, int]) -> bool:
         """Write all 13 per-joint stall tolerances through SDO 0x2003."""
-        if set(tolerances) != set(_STALL_TOLERANCE_JOINT_ORDER):
+        if set(tolerances) != set(self._controlled_joints):
             raise ValueError("stall tolerances must contain all 13 active JointId keys")
-        values = [tolerances[joint_id] for joint_id in _STALL_TOLERANCE_JOINT_ORDER]
+        values = [tolerances[joint_id] for joint_id in self._controlled_joints]
         return self._write_sdo_parameters(
             0x2003,
             self._pack_uint_array(values, 13, "B"),
@@ -519,13 +460,14 @@ class EthercatComm(IComm):
     def get_pid_parameters(self) -> list[int]:
         """Read the raw 39-value uint16 PID array from SDO 0x2008:01."""
         if not self._execute_sdo_command(
-            0x2008, 0xA2,
-            command_subindex=0x02, state_subindex=0x03, result_subindex=0x04,
+                0x2008,
+                0xA2,
+                command_subindex=0x02,
+                state_subindex=0x03,
+                result_subindex=0x04,
         ):
             raise RuntimeError("Failed to refresh PID parameters")
-        return self._unpack_uint_array(
-            self._client.sdo_read(0x2008, 0x01), 39, "H"
-        )
+        return self._unpack_uint_array(self._client.sdo_read(0x2008, 0x01), 39, "H")
 
     def set_pid_parameters(self, parameters: list[int]) -> bool:
         """Write the raw 39-value uint16 PID array through SDO 0x2008."""
@@ -538,9 +480,7 @@ class EthercatComm(IComm):
         """Read the whole-hand runtime state from SDO 0x200A:00."""
         raw = self._client.sdo_read(0x200A, 0x00)
         if len(raw) != 1:
-            raise RuntimeError(
-                f"invalid hand state machine size: expected 1, got {len(raw)}"
-            )
+            raise RuntimeError(f"invalid hand state machine size: expected 1, got {len(raw)}")
         return parse_device_value(HandRuntimeState, raw[0])
 
     def _read_packed_firmware_version(self, subindex: int) -> str:
@@ -597,9 +537,7 @@ class EthercatComm(IComm):
             0 for unknown, 1 for left hand, 2 for right hand.
         """
         try:
-            return int.from_bytes(
-                self._client.sdo_read(0x2001, 0x00), byteorder="little"
-            )
+            return int.from_bytes(self._client.sdo_read(0x2001, 0x00), byteorder="little")
         except Exception:
             if not self.is_connected():
                 raise
@@ -636,24 +574,24 @@ class EthercatComm(IComm):
         def adapter(data_bytes, *args, **kwargs):
             tpdo = Tpdo.from_bytes(data_bytes, self._config)
             hand = HandData(
-                joints_state=self._parse_state(tpdo.hand.state),
+                joints_state=parse_device_value(HandControlState, tpdo.hand.state),
                 error_warn=HandWarning(int.from_bytes(tpdo.hand.error_warn, "little")),
                 error_fault=HandFault(int.from_bytes(tpdo.hand.error_fault, "little")),
-                error_critical=HandCriticalError(int.from_bytes(tpdo.hand.error_critical, "little")),
+                error_critical=HandCriticalError(int.from_bytes(tpdo.hand.error_critical,
+                                                                "little")),
                 temperature=tpdo.hand.temperature,
             )
             joints = [
                 JointData(
-                    id=jid.value,
-                    state=self._parse_joint_state(jtpdo.state),
-                    error=self._parse_joint_error_code(jtpdo.error),
-                    mode=jtpdo.mode,
-                    stop=jtpdo.stop,
+                    id=jid,
+                    state=parse_device_value(JointState, jtpdo.state),
+                    error=parse_device_value(JointErrorCode, jtpdo.error),
+                    control_mode=parse_device_value(JointControlMode, jtpdo.mode & 0x0F),
+                    loop_type=parse_device_value(JointLoopType, jtpdo.mode >> 4),
                     angle=jtpdo.angle,
                     velocity=jtpdo.velocity,
                     current=jtpdo.current,
-                )
-                for jid, jtpdo in tpdo.joints.items()
+                ) for jid, jtpdo in tpdo.joints.items()
             ]
             tactile = None
             if self._config.has_tactile:

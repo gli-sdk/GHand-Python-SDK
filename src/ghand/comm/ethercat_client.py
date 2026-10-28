@@ -31,7 +31,6 @@ try:
 except ImportError:
     psutil = None
 
-
 logger = logging.getLogger("ghand.ethercat_client")
 
 
@@ -237,11 +236,7 @@ class EthercatClient:
             try:
                 lock_path = self._lock_file_path
                 self._lock_file.close()
-                if (
-                    platform.system() == "Windows"
-                    and lock_path
-                    and os.path.exists(lock_path)
-                ):
+                if (platform.system() == "Windows" and lock_path and os.path.exists(lock_path)):
                     try:
                         os.remove(lock_path)
                     except (OSError, IOError):
@@ -259,17 +254,11 @@ class EthercatClient:
         thread_join_timeout = 5.0
         current = threading.current_thread()
 
-        if (
-            hasattr(self, 'proc_thread')
-            and self.proc_thread.is_alive()
-            and self.proc_thread is not current
-        ):
+        if (hasattr(self, 'proc_thread') and self.proc_thread.is_alive()
+                and self.proc_thread is not current):
             self.proc_thread.join(timeout=thread_join_timeout)
-        if (
-            hasattr(self, 'check_thread')
-            and self.check_thread.is_alive()
-            and self.check_thread is not current
-        ):
+        if (hasattr(self, 'check_thread') and self.check_thread.is_alive()
+                and self.check_thread is not current):
             self.check_thread.join(timeout=thread_join_timeout)
 
     def _cleanup_connection(self, switch_to_init: bool = True) -> None:
@@ -353,9 +342,7 @@ class EthercatClient:
         self._master.read_state()
         for i, slave in enumerate(self._master.slaves):
             if slave.state != pysoem.OP_STATE:
-                self._clear_pdo_ready(
-                    f"check-slave-state(slave={i},state={slave.state})"
-                )
+                self._clear_pdo_ready(f"check-slave-state(slave={i},state={slave.state})")
                 self._master.do_check_state = True
                 self._check_slave(slave)
 
@@ -383,10 +370,8 @@ class EthercatClient:
                         if self._slave is not None:
                             self._last_valid_tpdo_snapshot = bytes(self._slave.input)
                     else:
-                        self._clear_pdo_ready(
-                            f"pd-invalid-cycle(WKC={self._actual_wkc},"
-                            f"expected={self._expected_wkc})"
-                        )
+                        self._clear_pdo_ready(f"pd-invalid-cycle(WKC={self._actual_wkc},"
+                                              f"expected={self._expected_wkc})")
                         self._master.do_check_state = True
                         self._consecutive_wkc_errors += 1
                 if not valid:
@@ -418,8 +403,8 @@ class EthercatClient:
                             len(self._wkc_validity_window),
                         )
                     if self._master.in_op and self._wkc_is_unhealthy(
-                        self._consecutive_wkc_errors,
-                        self._wkc_validity_window,
+                            self._consecutive_wkc_errors,
+                            self._wkc_validity_window,
                     ):
                         logger.error(
                             "Unhealthy EtherCAT process data: consecutive_wkc_errors=%s, "
@@ -446,11 +431,8 @@ class EthercatClient:
             try:
                 need_check = False
                 with self._data_lock:
-                    if self._master.in_op and (
-                        self._actual_wkc < self._expected_wkc
-                        or self._actual_wkc < 1
-                        or self._master.do_check_state
-                    ):
+                    if self._master.in_op and (self._actual_wkc < self._expected_wkc or
+                                               self._actual_wkc < 1 or self._master.do_check_state):
                         self._master.do_check_state = False
                         need_check = True
 
@@ -480,14 +462,11 @@ class EthercatClient:
             if self._connection_lost:
                 raise RuntimeError("Device is not connected")
             if not self._has_valid_process_data or self._last_valid_tpdo_snapshot is None:
-                raise RuntimeError(
-                    f"No valid EtherCAT process data yet (WKC={self._actual_wkc})"
-                )
+                raise RuntimeError(f"No valid EtherCAT process data yet (WKC={self._actual_wkc})")
             age = time.monotonic() - (self._last_valid_process_time or 0.0)
             if age > self._PROCESS_DATA_TIMEOUT_SEC:
                 raise RuntimeError(
-                    f"EtherCAT process data timeout: last valid frame {age * 1000:.1f} ms old"
-                )
+                    f"EtherCAT process data timeout: last valid frame {age * 1000:.1f} ms old")
             return self._last_valid_tpdo_snapshot
 
     def send_data(self, data: bytes):
@@ -503,21 +482,15 @@ class EthercatClient:
             if self._connection_lost:
                 raise RuntimeError("Device is not connected")
             if not self._has_valid_process_data:
-                raise RuntimeError(
-                    f"Cannot send command without valid EtherCAT process data "
-                    f"(WKC={self._actual_wkc})"
-                )
-            if (
-                not self._pdo_ready
-                or self._actual_wkc < self._expected_wkc
-                or self._actual_wkc < 1
-            ):
+                raise RuntimeError(f"Cannot send command without valid EtherCAT process data "
+                                   f"(WKC={self._actual_wkc})")
+            if (not self._pdo_ready or self._actual_wkc < self._expected_wkc
+                    or self._actual_wkc < 1):
                 raise RuntimeError(
                     "Cannot send command while EtherCAT PDO is not operational "
                     f"(WKC={self._actual_wkc}, expected={self._expected_wkc}, "
                     f"cleared_by={self._pdo_ready_cleared}, "
-                    f"cleared={time.monotonic() - self._pdo_ready_cleared_at:.3f}s ago)"
-                )
+                    f"cleared={time.monotonic() - self._pdo_ready_cleared_at:.3f}s ago)")
             if self._slave is not None:
                 hex_str = ' '.join(f'{b:02x}' for b in data)
                 logger.debug("Sending %d bytes:\n%s", len(data), hex_str)

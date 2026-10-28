@@ -27,6 +27,7 @@ class _ReleaseOperation:
 
 
 class ReleaseController:
+
     def __init__(
         self,
         hand: HandCommandPort,

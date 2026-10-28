@@ -14,12 +14,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Internal helpers for parsing and displaying device enum values."""
 
 import enum
 from typing import TypeVar
-
 
 _DeviceValue = TypeVar("_DeviceValue", bound=enum.IntEnum)
 
@@ -36,5 +34,3 @@ def format_device_value(value: enum.IntEnum | int) -> str:
     """Display a device value with its enum name or undefined."""
     name = value.name if isinstance(value, enum.IntEnum) else "undefined"
     return f"{int(value)}({name})"
-
-

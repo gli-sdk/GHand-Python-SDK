@@ -167,7 +167,8 @@ class TactileVisualizer:
             "close_fds": False,
         }
         if os.name == "nt":
-            kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+            kwargs[
+                "creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
         subprocess.Popen(command, **kwargs)
 
     def update(
@@ -187,8 +188,7 @@ class TactileVisualizer:
                 if info is not None and per is not None:
                     self._data[finger]["fz"].append(per.fz)
                     self._data[finger]["fz_ref"].append(
-                        force_refs.get(finger) if force_refs is not None else None
-                    )
+                        force_refs.get(finger) if force_refs is not None else None)
                     self._data[finger]["ft"].append(per.ft)
                     self._data[finger]["s_k"].append(per.s_k)
                     self._data[finger]["d_k"].append(per.d_k)
@@ -202,11 +202,9 @@ class TactileVisualizer:
                     mcp_angle = joint_angles.get(mcp_id)
                     pip_angle = joint_angles.get(pip_id)
                     self._data[finger]["mcp_deg"].append(
-                        mcp_angle if mcp_angle is not None else None
-                    )
+                        mcp_angle if mcp_angle is not None else None)
                     self._data[finger]["pip_deg"].append(
-                        pip_angle if pip_angle is not None else None
-                    )
+                        pip_angle if pip_angle is not None else None)
                 else:
                     self._data[finger]["mcp_deg"].append(None)
                     self._data[finger]["pip_deg"].append(None)
@@ -215,9 +213,7 @@ class TactileVisualizer:
         plt.ion()
         n = len(self._active_fingers)
         try:
-            self._fig, self._axes = plt.subplots(
-                n, 7, figsize=self._figsize, sharex="col"
-            )
+            self._fig, self._axes = plt.subplots(n, 7, figsize=self._figsize, sharex="col")
         except Exception:
             _logger.exception("Visualizer backend failed during startup")
             self._running = False
@@ -229,16 +225,18 @@ class TactileVisualizer:
             self._axes[0, j].set_title(title, fontsize=10)
 
         for i, finger in enumerate(self._active_fingers):
-            self._axes[i, 0].set_ylabel(
-                str(finger.value), rotation=0, ha="right", va="center", fontsize=9
-            )
+            self._axes[i, 0].set_ylabel(str(finger.value),
+                                        rotation=0,
+                                        ha="right",
+                                        va="center",
+                                        fontsize=9)
             self._lines[finger] = {}
             for j, key in enumerate(_PLOT_KEYS):
                 ax = self._axes[i, j]
-                (line,) = ax.plot([], [], linewidth=1.2)
+                (line, ) = ax.plot([], [], linewidth=1.2)
                 self._lines[finger][key] = line
                 if key == "fz":
-                    (ref_line,) = ax.plot([], [], "r-.", linewidth=1.0)
+                    (ref_line, ) = ax.plot([], [], "r-.", linewidth=1.0)
                     self._lines[finger]["fz_ref"] = ref_line
                 ax.grid(True, alpha=0.3)
 
@@ -254,9 +252,7 @@ class TactileVisualizer:
                 n = len(self._active_fingers)
                 for finger in self._active_fingers:
                     for key in self._plot_keys:
-                        self._lines[finger][key].set_data(
-                            t_list, list(self._data[finger][key])
-                        )
+                        self._lines[finger][key].set_data(t_list, list(self._data[finger][key]))
                     self._lines[finger]["fz_ref"].set_data(
                         t_list,
                         list(self._data[finger]["fz_ref"]),

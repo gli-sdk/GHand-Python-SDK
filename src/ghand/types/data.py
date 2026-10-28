@@ -14,14 +14,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Command and feedback dataclasses."""
 
 from dataclasses import dataclass
 
 from .enums import (
-    JointControlMode, JointLoopType, JointControlState, JointId, JointState,
-    HandControlState, TactileSensorId,
+    JointControlMode,
+    JointLoopType,
+    JointControlState,
+    JointId,
+    JointState,
+    HandControlState,
+    TactileSensorId,
 )
 from .errors import HandCriticalError, HandFault, HandWarning, JointErrorCode
 
@@ -30,7 +34,7 @@ from .errors import HandCriticalError, HandFault, HandWarning, JointErrorCode
 class JointCommand:
     """Single joint command sent to the device."""
 
-    id: int = JointId.THUMB_IP  # Target joint ID; see JointId.
+    id: JointId = JointId.THUMB_IP  # Target joint ID; see JointId.
     control_mode: JointControlMode = JointControlMode.POSITION  # Joint control mode.
     loop_type: JointLoopType = JointLoopType.CLOSED_LOOP  # Only effective in hand CUSTOM mode.
     control_state: JointControlState = JointControlState.DISABLED  # Disable, run, or stop and hold the joint.
@@ -56,7 +60,7 @@ class HandData:
 class JointData:
     """Single joint state received from the device."""
 
-    id: int = JointId.THUMB_IP  # Joint ID; see JointId.
+    id: JointId = JointId.THUMB_IP  # Joint ID; see JointId.
     state: JointState = JointState.DISABLED  # Reported joint operating state; see JointState.
     error: JointErrorCode = JointErrorCode.NORMAL  # Reported joint error code; see JointErrorCode.
     control_mode: JointControlMode = JointControlMode.POSITION  # Reported joint control mode.
@@ -86,5 +90,7 @@ class DeviceData:
 
     hand: HandData  # Overall hand status, including errors and temperature.
     joints: list[JointData]  # Joint feedback entries; each entry identifies its joint by ID.
-    tactile: dict[TactileSensorId, TactileData] | None = None  # Tactile readings keyed by sensor ID; None if unavailable or not included.
+    tactile: dict[
+        TactileSensorId,
+        TactileData] | None = None  # Tactile readings keyed by sensor ID; None if unavailable or not included.
     timestamp: float | None = None  # Timestamp associated with this update; None if not provided.

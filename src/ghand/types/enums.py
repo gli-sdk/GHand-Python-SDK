@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Product, communication, control, and feedback state enums."""
 
 import enum
@@ -97,6 +96,7 @@ class HandType(enum.Enum):
     LEFT_HAND = "left_hand"  # Left hand.
     RIGHT_HAND = "right_hand"  # Right hand.
 
+
 class GestureType(enum.Enum):
     OPEN_HAND = "open_hand"  # Open palm gesture.
     FIST = "fist"  # Closed fist gesture.
@@ -109,6 +109,7 @@ class ProductType(enum.Enum):
     GHand5 = "GHand5"  # GHand5 dexterous hand model.
     GHandLite1 = "GHandLite1"  # GHandLite1 dexterous hand model.
 
+
 class HandRuntimeState(enum.IntEnum):
     """Whole-hand runtime state reported by EtherCAT SDO 0x200A."""
 
@@ -119,12 +120,16 @@ class HandRuntimeState(enum.IntEnum):
     FAULT = 4  # Fault state.
     LOW_POWER = 5  # Low-power state.
     FIRMWARE_UPGRADE = 6  # Firmware upgrade state.
+
+
 class HandControlMode(enum.Enum):
     POSITION = 0  # Position control using the target joint position.
     VELOCITY = 1  # Velocity control using the target joint velocity.
     CURRENT = 2  # Current control using the target motor current.
     MIT = 3  # MIT control combining target position, target velocity, control gains, and other parameters.
     CUSTOM = 0x0F  # Custom control with semi-closed-loop or closed-loop selection via JointControlMode.
+
+
 class HandControlState(enum.IntEnum):
     DISABLED = 0  # Disabled; the exact meaning depends on the interface using this enum.
     ENABLED = 1  # Enabled; the exact meaning depends on the interface using this enum.
@@ -137,12 +142,15 @@ class JointControlMode(enum.IntEnum):
     VELOCITY = 1  # Velocity control using the target joint velocity (%).
     CURRENT = 2  # Current (torque) control using the target motor current (%).
     MIT = 3  # MIT control combining target angle, velocity, current, and kp/kd gains.
+
+
 class JointLoopType(enum.IntEnum):
     """Feedback loop type encoded in the high nibble of TPDO joint mode."""
     # Only effective when CtrlMode is CUSTOM; other modes default to CLOSED_LOOP.
 
     SEMI_CLOSED_LOOP = 0  # Semi-closed-loop control.
     CLOSED_LOOP = 1  # Closed-loop control.
+
 
 class JointControlState(enum.IntEnum):
     """Per-joint control state sent to the device."""
@@ -151,9 +159,9 @@ class JointControlState(enum.IntEnum):
     RUNNING = 1  # Request the joint to enter the running state.
     STOPPED = 2  # Request the joint to stop moving and hold its current position.
 
+
 class JointState(enum.IntEnum):
     DISABLED = 0  # Joint is disabled, with drive force released.
     RUNNING = 1  # Joint is in the running state.
     STOPPED = 2  # Joint has stopped moving and holds its current position.
     FAULT = 3  # Joint is in the fault state.
-

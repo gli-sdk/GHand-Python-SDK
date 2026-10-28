@@ -10,7 +10,7 @@ configure_logging(level=logging.INFO)
 
 def main():
     hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
-    
+
     connected = hand.open("auto")
 
     try:
@@ -33,8 +33,10 @@ def main():
             # Configure joint angles for gesture 1
             joints = []
             joints.append(JointCommand(id=JointId.THUMB_MCP, angle=30, velocity=100, current=100))
-            joints.append(JointCommand(id=JointId.THUMB_TMC_FE, angle=30, velocity=100, current=100))
-            joints.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=30, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.THUMB_TMC_FE, angle=30, velocity=100,
+                                       current=100))
+            joints.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=30, velocity=100,
+                                       current=100))
             joints.append(JointCommand(id=JointId.THUMB_TMC_PS, angle=0, velocity=100, current=100))
             joints.append(JointCommand(id=JointId.FF_PIP, angle=30, velocity=100, current=100))
             joints.append(JointCommand(id=JointId.FF_MCP, angle=30, velocity=100, current=100))
@@ -62,7 +64,8 @@ def main():
             joints = []
             joints.append(JointCommand(id=JointId.THUMB_MCP, angle=0, velocity=100, current=100))
             joints.append(JointCommand(id=JointId.THUMB_TMC_FE, angle=0, velocity=100, current=100))
-            joints.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=20, velocity=100, current=100))
+            joints.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=20, velocity=100,
+                                       current=100))
             joints.append(JointCommand(id=JointId.THUMB_TMC_PS, angle=0, velocity=100, current=100))
             joints.append(JointCommand(id=JointId.FF_PIP, angle=0, velocity=100, current=100))
             joints.append(JointCommand(id=JointId.FF_MCP, angle=0, velocity=100, current=100))

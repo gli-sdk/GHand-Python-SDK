@@ -32,10 +32,7 @@ def normalize_joint_id(joint_id: Any) -> JointId:
 
 
 def normalize_joint_angles(angles: dict[Any, float]) -> dict[JointId, float]:
-    return {
-        normalize_joint_id(joint_id): angle
-        for joint_id, angle in angles.items()
-    }
+    return {normalize_joint_id(joint_id): angle for joint_id, angle in angles.items()}
 
 
 def tactile_force_xyz(info) -> tuple[float, float, float]:
@@ -61,8 +58,7 @@ def normal_force_z(info) -> float:
 def active_finger_normal_forces(tactile_data, active_fingers) -> dict[Any, float]:
     return {
         finger: normal_force_z(tactile_data[finger])
-        for finger in active_fingers
-        if finger in tactile_data
+        for finger in active_fingers if finger in tactile_data
     }
 
 

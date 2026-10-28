@@ -58,7 +58,7 @@ def build_adaptive_grasp_components(
         get_monotonic_time=get_monotonic_time,
     ))
     current_joints = tuple(joint_id for joint_id in CURRENT_CONTROL_JOINTS
-                          if JOINT_TO_FINGER[joint_id] in active_fingers)
+                           if JOINT_TO_FINGER[joint_id] in active_fingers)
     if config.enable_visualization:
         from .visualization import TactileVisualizer
         visualizer: Optional["TactileVisualizer"] = TactileVisualizer(
@@ -213,11 +213,9 @@ class AdaptiveGrasper:
         if poll_period_s <= 0:
             raise ValueError("poll_period_s must be > 0")
 
-        while self.get_state() in (GraspState.ADAPTIVE_HOLD,
-                                   GraspState.RELEASE):
+        while self.get_state() in (GraspState.ADAPTIVE_HOLD, GraspState.RELEASE):
             self.poll_visualizer()
-            if self.get_state() not in (GraspState.ADAPTIVE_HOLD,
-                                        GraspState.RELEASE):
+            if self.get_state() not in (GraspState.ADAPTIVE_HOLD, GraspState.RELEASE):
                 break
             time.sleep(poll_period_s)
 
@@ -226,8 +224,7 @@ class AdaptiveGrasper:
 
     def emergency_release(self, wait_s: float = 2.0) -> bool:
         """Open the hand immediately without waiting for the control thread."""
-        return self._perform_release(wait_control_thread=False,
-                                     release_wait_s=wait_s)
+        return self._perform_release(wait_control_thread=False, release_wait_s=wait_s)
 
     def shutdown(self) -> None:
         """Stop control, sensors, visualization, and hand transport without opening."""
@@ -263,8 +260,7 @@ class AdaptiveGrasper:
         return self._runtime.last_safety_report
 
     @property
-    def last_force_decisions(
-            self) -> Optional[dict[TactileSensorId, ForceDecision]]:
+    def last_force_decisions(self) -> Optional[dict[TactileSensorId, ForceDecision]]:
         return self._runtime.last_force_decisions
 
     @property
@@ -283,9 +279,7 @@ class AdaptiveGrasper:
     def last_contact_snapshot(self) -> Optional[ContactSnapshot]:
         return self._runtime.last_contact_snapshot
 
-    def _build_hold_controller(
-            self,
-            contact_snapshot: Optional[ContactSnapshot]) -> HoldController:
+    def _build_hold_controller(self, contact_snapshot: Optional[ContactSnapshot]) -> HoldController:
         (
             force_reference_planner,
             position_hold_planner,
@@ -320,14 +314,12 @@ class AdaptiveGrasper:
         if self._visualizer is not None:
             self._visualizer.start()
 
-    def _prepare_grasp_runtime(
-            self, object_profile: Optional[ObjectProfile]) -> None:
+    def _prepare_grasp_runtime(self, object_profile: Optional[ObjectProfile]) -> None:
         self._runtime.reset_for_grasp()
         self._reset_runtime_components()
         self._control_thread_override = _NO_CONTROL_THREAD_OVERRIDE
         self._runtime.object_profile = (object_profile
-                                        or get_object_profile(
-                                            self.config.default_object))
+                                        or get_object_profile(self.config.default_object))
         self._tactile.set_friction_coeff(self._runtime_friction_coeff())
         self._start_sensor_subscription()
 
@@ -393,8 +385,7 @@ class AdaptiveGrasper:
         self._hold_runner.hold_controller = None
 
     def _configure_subscription_periods(self) -> None:
-        configure_periods = getattr(self._hand_port,
-                                    "configure_subscription_periods", None)
+        configure_periods = getattr(self._hand_port, "configure_subscription_periods", None)
         if configure_periods is None:
             return
         configure_periods(

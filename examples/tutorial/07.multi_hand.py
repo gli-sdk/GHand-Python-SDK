@@ -49,10 +49,8 @@ def main():
 
     # Step 3: Get device info
     for i, hand in enumerate(hands):
-        print(
-            f"  hand_{i}: {hand.get_device_name()} "
-            f"({hand.get_hand_type().value}, SN: {hand.get_serial_number()})"
-        )
+        print(f"  hand_{i}: {hand.get_device_name()} "
+              f"({hand.get_hand_type().value}, SN: {hand.get_serial_number()})")
 
     # Step 4: Control each hand individually
     print("\n=== Individual control ===")
@@ -91,11 +89,9 @@ def main():
         joints = hand.get_joints()
         print(f"\nhand_{i}: {len(joints)} joints")
         for joint in joints:
-            print(
-                f"  {JointId(joint.id).name:<15}"
-                f"angle: {joint.angle:.2f} deg, "
-                f"velocity: {joint.velocity}, current: {joint.current}"
-            )
+            print(f"  {JointId(joint.id).name:<15}"
+                  f"angle: {joint.angle:.2f} deg, "
+                  f"velocity: {joint.velocity}, current: {joint.current}")
 
     # Step 7: Close all connections
     print("\nClosing all connections...")

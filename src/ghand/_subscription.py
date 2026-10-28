@@ -52,12 +52,10 @@ class SubscriptionManager:
         if self._running:
             return
         stop_event = threading.Event()
-        producer = threading.Thread(
-            target=self._data_producer, args=(stop_event,), daemon=True
-        )
-        dispatcher = threading.Thread(
-            target=self._data_dispatcher, args=(stop_event,), daemon=True
-        )
+        producer = threading.Thread(target=self._data_producer, args=(stop_event, ), daemon=True)
+        dispatcher = threading.Thread(target=self._data_dispatcher,
+                                      args=(stop_event, ),
+                                      daemon=True)
         self._stop_event = stop_event
         self._thread = producer
         self._dispatcher_thread = dispatcher
@@ -103,9 +101,7 @@ class SubscriptionManager:
                 self._running = False
 
     def _recompute_interval_locked(self) -> None:
-        intervals = [
-            item[3] for item in self._subscribers.values() if item[3] is not None
-        ]
+        intervals = [item[3] for item in self._subscribers.values() if item[3] is not None]
         self._interval_sec = min(intervals) if intervals else self._DEFAULT_INTERVAL_SEC
 
     def _data_producer(self, stop_event: threading.Event):
@@ -175,9 +171,7 @@ class SubscriptionManager:
             raise RuntimeError("Device is not connected")
 
         with self._lock:
-            interval_sec = (
-                interval_ms / 1000.0 if interval_ms is not None else None
-            )
+            interval_sec = (interval_ms / 1000.0 if interval_ms is not None else None)
             self._sub_id_counter += 1
             sub_id = self._sub_id_counter
             self._subscribers[sub_id] = (callback, args, kwargs, interval_sec)
