@@ -57,7 +57,7 @@ class HoldStepResult:
 class PositionHoldCommand:
     angles: JointAngles
     current: int
-    speed: int
+    velocity: int
     decisions: ForceDecisions
     force_refs: Optional[dict[TactileSensorId, float]] = None
 
@@ -263,7 +263,7 @@ class HoldController:
         return PositionHoldCommand(
             angles=current_angles,
             current=self._current_current,
-            speed=0,
+            velocity=0,
             decisions={},
         )
 
@@ -290,7 +290,7 @@ class HoldController:
         return PositionHoldCommand(
             angles=self._merge_target_angles(current_angles, decisions),
             current=self._next_current(decisions),
-            speed=self._next_speed(decisions),
+            velocity=self._next_velocity(decisions),
             decisions=decisions,
             force_refs=None,
         )
@@ -312,7 +312,7 @@ class HoldController:
         return PositionHoldCommand(
             angles=self._merge_target_angles(current_angles, decisions),
             current=self._next_current(decisions),
-            speed=self._next_speed(decisions),
+            velocity=self._next_velocity(decisions),
             decisions=decisions,
             force_refs=force_reference.force_refs,
         )
@@ -330,17 +330,17 @@ class HoldController:
     def _next_current(self, decisions: ForceDecisions) -> int:
         if not decisions:
             return self._current_current
-        # Position hold applies one shared current/speed to all active fingers;
+        # Position hold applies one shared current/velocity to all active fingers;
         # individual ForceDecision values are expected to carry the same command.
         return next(iter(decisions.values())).next_current
 
-    def _next_speed(self, decisions: ForceDecisions) -> int:
+    def _next_velocity(self, decisions: ForceDecisions) -> int:
         if not decisions:
             return 0
-        # Position hold applies one shared current/speed to all active fingers;
+        # Position hold applies one shared current/velocity to all active fingers;
         # individual ForceDecision values are expected to carry the same command.
-        next_speed = next(iter(decisions.values())).next_speed
-        return 0 if next_speed is None else next_speed
+        next_velocity = next(iter(decisions.values())).next_velocity
+        return 0 if next_velocity is None else next_velocity
 
     def _execute_hold_command(
         self,
@@ -378,7 +378,7 @@ class HoldController:
         joints = self._joint_builder.hold_position_command(
             command.current,
             angles,
-            speed=command.speed,
+            velocity=command.velocity,
         )
         self._append_position_hold_thumb_aux_commands(joints)
         return joints, HandControlMode.POSITION, command.current

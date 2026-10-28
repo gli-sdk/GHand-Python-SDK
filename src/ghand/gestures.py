@@ -113,14 +113,14 @@ GESTURE_DEFINITIONS: Dict[GestureType, Dict[JointId, float]] = {
 
 
 def execute_gesture(
-    hand: GHand, gesture: GestureType, speed: int = 100, current: int = 100, wait: bool = True
+    hand: GHand, gesture: GestureType, velocity: int = 100, current: int = 100, wait: bool = True
 ) -> bool:
     """Execute a predefined gesture.
 
     Args:
         hand: GHand instance.
         gesture: Gesture type to execute.
-        speed: Speed percentage (0-100). Defaults to 100.
+        velocity: Velocity percentage (0-100). Defaults to 100.
         current: Current percentage (0-100). Defaults to 100.
         wait: Whether to block until the motion completes. Defaults to True.
 
@@ -133,7 +133,7 @@ def execute_gesture(
 
     angles = GESTURE_DEFINITIONS[gesture]
     joints = [
-        JointCommand(id=joint_id, angle=angle, velocity=speed, current=current)
+        JointCommand(id=joint_id, angle=angle, velocity=velocity, current=current)
         for joint_id, angle in angles.items()
     ]
 

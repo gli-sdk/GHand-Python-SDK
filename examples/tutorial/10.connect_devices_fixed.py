@@ -96,7 +96,7 @@ def main():
         if current_joints:
             joint = current_joints[2]
             print(
-                f"  {JointId(joint.id).name:<15}- Angle: {joint.angle:.2f} deg,\tSpeed: {joint.velocity},\tCurrent: {joint.current}"
+                f"  {JointId(joint.id).name:<15}- Angle: {joint.angle:.2f} deg,\tVelocity: {joint.velocity},\tCurrent: {joint.current}"
             )
 
     joints1.append(JointCommand(id=JointId.THUMB_MCP, angle=0, velocity=100,
@@ -120,7 +120,7 @@ def main():
         if current_joints2:
             joint = current_joints2[7]
             print(
-                f"  {JointId(joint.id).name:<15}- Angle: {joint.angle:.2f} deg,\tSpeed: {joint.velocity},\tCurrent: {joint.current}"
+                f"  {JointId(joint.id).name:<15}- Angle: {joint.angle:.2f} deg,\tVelocity: {joint.velocity},\tCurrent: {joint.current}"
             )
 
     # Close connections when program ends

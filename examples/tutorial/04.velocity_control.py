@@ -17,11 +17,11 @@ def main():
             print("Connection failed")
             return
 
-        print("\n=== Speed Control Mode Demo ===")
-        print("This demo controls finger joints using speed mode")
-        print("Speed values control the continuous velocity of each joint\n")
+        print("\n=== velocity Control Mode Demo ===")
+        print("This demo controls finger joints using velocity mode")
+        print("velocity values control the continuous velocity of each joint\n")
 
-        # Speed control cycle
+        # velocity control cycle
         cycle_count = 0
         max_cycles = 0  # Set to 0 for infinite loop
 
@@ -30,10 +30,10 @@ def main():
             if max_cycles > 0 and cycle_count > max_cycles:
                 break
 
-            print(f"\n--- Cycle {cycle_count}: Speed control started ---")
+            print(f"\n--- Cycle {cycle_count}: velocity control started ---")
 
-            # Step 1: Move fingers at specified speed
-            print("\nStep 1: Closing fingers (speed=100)")
+            # Step 1: Move fingers at specified velocity
+            print("\nStep 1: Closing fingers (velocity=100)")
             joints = []
             for joint_id in [
                     JointId.THUMB_MCP,
@@ -59,13 +59,13 @@ def main():
                         print(f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\t"
                               f"error:{joint.error:<30},\t"
                               f"angle: {joint.angle:.2f}deg,\t"
-                              f"speed: {joint.velocity},\tcurrent: {joint.current}")
+                              f"velocity: {joint.velocity},\tcurrent: {joint.current}")
             else:
-                print("Failed to send speed command")
+                print("Failed to send velocity command")
                 break
 
-            # Step 2: Stop movement (zero speed)
-            print("\nStep 2: Opening fingers (speed=-100)")
+            # Step 2: Stop movement (zero velocity)
+            print("\nStep 2: Opening fingers (velocity=-100)")
             joints = []
             for joint_id in [
                     JointId.THUMB_MCP,
@@ -91,12 +91,12 @@ def main():
                         print(f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\t"
                               f"error:{joint.error:<30},\t"
                               f"angle: {joint.angle:.2f}deg,\t"
-                              f"speed: {joint.velocity},\tcurrent: {joint.current}")
+                              f"velocity: {joint.velocity},\tcurrent: {joint.current}")
             else:
-                print("Failed to send speed command")
+                print("Failed to send velocity command")
                 break
 
-            print(f"\n--- Cycle {cycle_count}: Speed control completed ---")
+            print(f"\n--- Cycle {cycle_count}: velocity control completed ---")
             if max_cycles == 0:
                 print("Press Ctrl+C to stop the demo and exit\n")
     except KeyboardInterrupt:

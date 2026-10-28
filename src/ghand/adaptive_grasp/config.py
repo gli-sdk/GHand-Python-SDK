@@ -53,9 +53,9 @@ class AdaptiveGraspConfig:
         default_factory=set
     )  # Fingers used for contact, tactile analysis, and hold control.
     # Open, pre-grasp, and closing-to-contact phases.
-    open_speed: int = 100  # Speed command used when opening the hand.
+    open_velocity: int = 100  # Velocity command used when opening the hand.
     open_current: int = 100  # current limit used when opening the hand.
-    pre_grasp_speed: int = 80  # Speed command used when moving to the pre-grasp pose.
+    pre_grasp_velocity: int = 80  # Velocity command used when moving to the pre-grasp pose.
     pre_grasp_current: int = 80  # current limit used when moving to the pre-grasp pose.
     closing_total_contact_threshold_n: float = 0.2  # Total normal force threshold for ending the closing phase.
     finger_touch_threshold_n: float = 0.1  # Per-finger normal force threshold for considering a finger in contact.
@@ -115,7 +115,7 @@ class AdaptiveGraspConfig:
     position_hold_normal_force_release_gain: float = 0.1  # Release gain used when normal force exceeds the per-finger limit.
 
     # Stiff position hold mode
-    stiff_position_hold_speed: int = 90  # Default speed command for stiff_position hold mode.
+    stiff_position_hold_velocity: int = 90  # Default velocity command for stiff_position hold mode.
     stiff_position_hold_current: int = 90  # Default current command for stiff_position hold mode.
     stiff_position_step_deg: float = 0.2  # Default incremental angle step in degrees for stiff_position hold mode.
     stiff_position_max_delta_deg: float = 5.0  # Default max angle delta from contact in degrees for stiff_position hold mode.
@@ -123,7 +123,7 @@ class AdaptiveGraspConfig:
 
     # Release phase.
     release_hold_time_s: float = 20.0  # Duration to keep adaptive hold before automatic release in the demo sequence.
-    release_open_speed: int = 80  # Speed command used during release opening.
+    release_open_velocity: int = 80  # Velocity command used during release opening.
     release_open_current: int = 80  # current limit used during release opening.
     release_timeout_s: float = 5.0  # Timeout for the release phase.
 
@@ -174,8 +174,8 @@ class AdaptiveGraspConfig:
 
     def _validate_motion_params(self) -> None:
         _validate_range(
-            "open_speed",
-            self.open_speed,
+            "open_velocity",
+            self.open_velocity,
             greater_than_or_equal_to=0,
             less_than_or_equal_to=100,
         )
@@ -186,8 +186,8 @@ class AdaptiveGraspConfig:
             less_than_or_equal_to=100,
         )
         _validate_range(
-            "pre_grasp_speed",
-            self.pre_grasp_speed,
+            "pre_grasp_velocity",
+            self.pre_grasp_velocity,
             greater_than_or_equal_to=0,
             less_than_or_equal_to=100,
         )
@@ -478,8 +478,8 @@ class AdaptiveGraspConfig:
 
     def _validate_stiff_position_hold_params(self) -> None:
         _validate_range(
-            "stiff_position_hold_speed",
-            self.stiff_position_hold_speed,
+            "stiff_position_hold_velocity",
+            self.stiff_position_hold_velocity,
             greater_than_or_equal_to=0,
             less_than_or_equal_to=100,
         )
@@ -513,8 +513,8 @@ class AdaptiveGraspConfig:
             greater_than=0,
         )
         _validate_range(
-            "release_open_speed",
-            self.release_open_speed,
+            "release_open_velocity",
+            self.release_open_velocity,
             greater_than_or_equal_to=0,
             less_than_or_equal_to=100,
         )

@@ -302,7 +302,7 @@ def parse_joint_data(raw: list[int], offset: int, joint_id: int) -> JointData:
         Register N:   [error uint8][state uint8]
         Register N+1: [stop uint8][mode uint8]
         Register N+2: angle int16, unit 0.1 deg
-        Register N+3: speed int16, unit 1%
+        Register N+3: velocity int16, unit 1%
         Register N+4: current int16, unit 1%
 
     Args:
@@ -319,9 +319,9 @@ def parse_joint_data(raw: list[int], offset: int, joint_id: int) -> JointData:
         angle_raw -= 65536
     angle = angle_raw / 10.0
 
-    speed = raw[offset + 3]
-    if speed >= 32768:
-        speed -= 65536
+    velocity = raw[offset + 3]
+    if velocity >= 32768:
+        velocity -= 65536
 
     current = raw[offset + 4]
     if current >= 32768:
@@ -334,7 +334,7 @@ def parse_joint_data(raw: list[int], offset: int, joint_id: int) -> JointData:
         mode=mode,
         stop=stop,
         angle=angle,
-        velocity=speed,
+        velocity=velocity,
         current=current,
     )
 
@@ -455,7 +455,7 @@ def encode_joint_command(
     Layout:
         Register N:   [stop uint8][mode uint8]
         Register N+1: angle int16, unit 0.1 deg
-        Register N+2: speed int16, unit 1%
+        Register N+2: velocity int16, unit 1%
         Register N+3: current int16, unit 1%
         Register N+4: kp int16
         Register N+5: kd int16
@@ -469,7 +469,7 @@ def encode_joint_command(
     return [
         mode_stop,
         angle_raw & 0xFFFF,
-        int(joint.speed) & 0xFFFF,
+        int(joint.velocity) & 0xFFFF,
         int(joint.current) & 0xFFFF,
         int(getattr(joint, "kp", 0)) & 0xFFFF,
         int(getattr(joint, "kd", 0)) & 0xFFFF,

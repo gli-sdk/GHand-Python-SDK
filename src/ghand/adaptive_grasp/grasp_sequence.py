@@ -152,12 +152,12 @@ class PhaseController:
         self,
         state: GraspState,
         pose: dict[JointId, float],
-        speed: int,
+        velocity: int,
         current: int,
         is_running: Callable[[], bool] = lambda: True,
     ) -> bool:
         self._set_state(state)
-        joints = self._joint_builder.position_command(pose, speed=speed, current=current)
+        joints = self._joint_builder.position_command(pose, velocity=velocity, current=current)
         ok = self.hand_port.move_joints(joints, mode=HandControlMode.POSITION)
         if not ok:
             return False
@@ -233,7 +233,7 @@ class PhaseController:
         return self._execute_position_phase(
             GraspState.OPEN,
             self._joint_builder.open_pose(),
-            speed=self.config.open_speed,
+            velocity=self.config.open_velocity,
             current=self.config.open_current,
             is_running=is_running,
         )
@@ -242,7 +242,7 @@ class PhaseController:
         return self._execute_position_phase(
             GraspState.PRE_GRASP,
             self.config.pre_grasp_pose,
-            speed=self.config.pre_grasp_speed,
+            velocity=self.config.pre_grasp_velocity,
             current=self.config.pre_grasp_current,
             is_running=is_running,
         )

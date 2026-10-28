@@ -24,8 +24,8 @@ from ghand import (
 # Configure logging
 configure_logging(level=logging.INFO)
 
-# Default speed and current
-DEFAULT_SPEED = 100
+# Default velocity and current
+DEFAULT_VELOCITY = 100
 DEFAULT_CURRENT = 100
 
 
@@ -54,31 +54,31 @@ def main():
             JointCommand(
                 id=JointId.THUMB_MCP,
                 angle=66,
-                velocity=DEFAULT_SPEED,
+                velocity=DEFAULT_VELOCITY,
                 current=DEFAULT_CURRENT,
             ),
             JointCommand(
                 id=JointId.THUMB_TMC_AA,
                 angle=52,
-                velocity=DEFAULT_SPEED,
+                velocity=DEFAULT_VELOCITY,
                 current=DEFAULT_CURRENT,
             ),
             JointCommand(
                 id=JointId.THUMB_TMC_PS,
                 angle=-10,
-                velocity=DEFAULT_SPEED,
+                velocity=DEFAULT_VELOCITY,
                 current=DEFAULT_CURRENT,
             ),
             JointCommand(
                 id=JointId.FF_PIP,
                 angle=70,
-                velocity=DEFAULT_SPEED,
+                velocity=DEFAULT_VELOCITY,
                 current=DEFAULT_CURRENT,
             ),
             JointCommand(
                 id=JointId.FF_MCP,
                 angle=70,
-                velocity=DEFAULT_SPEED,
+                velocity=DEFAULT_VELOCITY,
                 current=DEFAULT_CURRENT,
             ),
         ]
@@ -116,7 +116,7 @@ def main():
             # Step 2: Use safe angles for motion
             safe_joints = nparray_to_joints(
                 result.safe_angles,
-                speed=DEFAULT_SPEED,
+                velocity=DEFAULT_VELOCITY,
                 current=DEFAULT_CURRENT,
             )
             print("Executing motion with safe angles...")

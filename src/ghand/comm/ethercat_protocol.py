@@ -85,7 +85,7 @@ class JointTpdo:
     mode: int
     stop: int
     angle: float
-    speed: int
+    velocity: int
     current: int
 
     @classmethod
@@ -93,18 +93,18 @@ class JointTpdo:
         expected_size = struct.calcsize('<BBBBhhh')
         if len(data) < expected_size:
             return cls(0, 0, 0, 0, 0.0, 0, 0)
-        state, error, mode, stop, angle_raw, speed, current = struct.unpack_from(
+        state, error, mode, stop, angle_raw, velocity, current = struct.unpack_from(
             '<BBBBhhh', data, 0
         )
         angle = angle_raw * 0.1
-        return cls(state, error, mode, stop, angle, speed, current)
+        return cls(state, error, mode, stop, angle, velocity, current)
 
     def __str__(self):
         return (
             f"JointTpdo(state={format_device_value(parse_device_value(JointState, self.state))}, "
             f"error={format_device_value(parse_device_value(JointErrorCode, self.error))}, "
             f"mode={self.mode}, stop={self.stop}, angle={self.angle:.3f}, "
-            f"speed={self.speed}, current={self.current})"
+            f"velocity={self.velocity}, current={self.current})"
         )
 
 
@@ -235,7 +235,7 @@ class JointRpdo:
     mode: int = 0
     stop: int = 0
     angle: float = 0.0
-    speed: int = 0
+    velocity: int = 0
     current: int = 0
     kp: int = 0
     kd: int = 0
@@ -271,7 +271,7 @@ class Rpdo:
                     joint.mode,
                     joint.stop,
                     int(joint.angle * 10),
-                    joint.speed,
+                    joint.velocity,
                     joint.current,
                     joint.kp,
                     joint.kd,

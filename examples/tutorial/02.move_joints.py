@@ -53,7 +53,7 @@ def main():
                 current_joints = hand.get_joints()
                 for joint in current_joints:
                     print(
-                        f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\terror:{joint.error:<30},\tangle: {joint.angle:.2f}deg,\tspeed: {joint.velocity},\tcurrent: {joint.current}"
+                        f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\terror:{joint.error:<30},\tangle: {joint.angle:.2f}deg,\tvelocity: {joint.velocity},\tcurrent: {joint.current}"
                     )
             else:
                 break
@@ -83,7 +83,7 @@ def main():
                 current_joints = hand.get_joints()
                 for joint in current_joints:
                     print(
-                        f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\terror:{joint.error:<30},\tangle: {joint.angle:.2f}deg,\tspeed: {joint.velocity},\tcurrent: {joint.current}"
+                        f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\terror:{joint.error:<30},\tangle: {joint.angle:.2f}deg,\tvelocity: {joint.velocity},\tcurrent: {joint.current}"
                     )
             else:
                 break

@@ -47,10 +47,10 @@ def create_hold_planners(
                 active_fingers=set(config.active_fingers),
                 active_joint_ids=active_joint_ids,
                 contact_joint_angles=contact_snapshot.joint_angles,
-                hold_speed=(
-                    profile.stiff_position_hold_speed
-                    if profile is not None and profile.stiff_position_hold_speed is not None
-                    else config.stiff_position_hold_speed
+                hold_velocity=(
+                    profile.stiff_position_hold_velocity
+                    if profile is not None and profile.stiff_position_hold_velocity is not None
+                    else config.stiff_position_hold_velocity
                 ),
                 hold_current=(
                     profile.stiff_position_hold_current

@@ -17,9 +17,9 @@ class ObjectProfile:
     is_fragile: bool
     material: str
     position_hold_current: int
-    position_hold_speed: int
+    position_hold_velocity: int
     phase_closing_current: int = 30
-    stiff_position_hold_speed: Optional[int] = None
+    stiff_position_hold_velocity: Optional[int] = None
     stiff_position_hold_current: Optional[int] = None
     stiff_position_hold_target_force: Optional[float] = None
 
@@ -41,7 +41,7 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         is_fragile=False,
         material="metal",
         position_hold_current=30,
-        position_hold_speed=30,
+        position_hold_velocity=30,
     ),
     ObjectProfile(
         name="plastic",
@@ -52,7 +52,7 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         is_fragile=False,
         material="plastic",
         position_hold_current=15,
-        position_hold_speed=15,
+        position_hold_velocity=15,
     ),
     ObjectProfile(
         name="glass",
@@ -63,7 +63,7 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         is_fragile=True,
         material="glass",
         position_hold_current=15,
-        position_hold_speed=15,
+        position_hold_velocity=15,
     ),
     ObjectProfile(
         name="tofu",
@@ -74,7 +74,7 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         is_fragile=True,
         material="tofu",
         position_hold_current=10,
-        position_hold_speed=30,
+        position_hold_velocity=30,
     ),
     ObjectProfile(
         name="fruit",
@@ -85,7 +85,7 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         is_fragile=True,
         material="fruit",
         position_hold_current=15,
-        position_hold_speed=15,
+        position_hold_velocity=15,
     ),
     ObjectProfile(
         name="egg",
@@ -96,7 +96,7 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         is_fragile=True,
         material="egg",
         position_hold_current=5,
-        position_hold_speed=20,
+        position_hold_velocity=20,
     ),
     ObjectProfile(
         name="balloon",
@@ -107,7 +107,7 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         is_fragile=True,
         material="latex",
         position_hold_current=8,
-        position_hold_speed=8,
+        position_hold_velocity=8,
     ),
     ObjectProfile(
         name="paper_cup",
@@ -119,7 +119,7 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         material="paper",
         phase_closing_current=10,
         position_hold_current=20,
-        position_hold_speed=20,
+        position_hold_velocity=20,
     ),
     ObjectProfile(
         name="default",
@@ -131,7 +131,7 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         material="default",
         phase_closing_current=10,
         position_hold_current=30,
-        position_hold_speed=30,
+        position_hold_velocity=30,
     ),
     ObjectProfile(
         name="plastic_cup",
@@ -143,7 +143,7 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         material="plastic",
         phase_closing_current=10,
         position_hold_current=30,
-        position_hold_speed=30,
+        position_hold_velocity=30,
     ),
     ObjectProfile(
         name="mineral_water_bottle_500ml",
@@ -155,7 +155,7 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         material="plastic",
         phase_closing_current=10,
         position_hold_current=30,
-        position_hold_speed=30,
+        position_hold_velocity=30,
     ),
     ObjectProfile(
         name="cylinder_piece",
@@ -167,8 +167,8 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         material="metal",
         phase_closing_current=10,
         position_hold_current=90,
-        position_hold_speed=90,
-        stiff_position_hold_speed=90,
+        position_hold_velocity=90,
+        stiff_position_hold_velocity=90,
         stiff_position_hold_current=90,
         stiff_position_hold_target_force=15.0,
     ),

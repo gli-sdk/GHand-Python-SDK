@@ -304,7 +304,7 @@ CAN-FD 波特率档位：
 - `examples/tutorial/01.get_basic_info.py`：连接设备并读取基础信息
 - `examples/tutorial/02.move_joints.py`：位置控制
 - `examples/tutorial/03.current_control.py`：电流控制
-- `examples/tutorial/04.speed_control.py`：速度控制
+- `examples/tutorial/04.velocity_control.py`：速度控制
 - `examples/tutorial/05.tactile_callback.py`：触觉数据回调
 - `examples/tutorial/06.subscription_demo.py`：数据订阅
 - `examples/tutorial/07.multi_hand.py`：多手发现与连接

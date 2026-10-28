@@ -25,7 +25,7 @@ class ForceDecision:
     target_angles: JointAngles
     is_fragile_mode: bool
     near_limit: bool = False
-    next_speed: Optional[int] = None
+    next_velocity: Optional[int] = None
 
 
 ForceDecisions = dict[TactileSensorId, ForceDecision]
@@ -167,7 +167,7 @@ class PositionHoldPlanner:
             target_angles=target_angles,
             is_fragile_mode=self.is_fragile_mode,
             near_limit=near_limit,
-            next_speed=self._compute_next_speed(),
+            next_velocity=self._compute_next_velocity(),
         )
 
     def _joint_deltas(
@@ -222,11 +222,11 @@ class PositionHoldPlanner:
             next_current = int(next_current * self.config.fragile_current_reduction)
         return next_current
 
-    def _compute_next_speed(self) -> int:
-        if self.profile is None or self.profile.position_hold_speed is None:
-            raise ValueError("ObjectProfile.position_hold_speed is required for position hold mode")
-        next_speed = self.profile.position_hold_speed
-        return int(clip(next_speed, 0, 100))
+    def _compute_next_velocity(self) -> int:
+        if self.profile is None or self.profile.position_hold_velocity is None:
+            raise ValueError("ObjectProfile.position_hold_velocity is required for position hold mode")
+        next_velocity = self.profile.position_hold_velocity
+        return int(clip(next_velocity, 0, 100))
 
     @staticmethod
     def _offset_joint_angle(

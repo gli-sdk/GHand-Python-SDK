@@ -50,9 +50,9 @@ class JointCommandBuilder:
             for joint_id in self._current_joints
         }
 
-    def position_command(self, angles: dict[JointId, float], speed: int, current: int) -> list[JointCommand]:
+    def position_command(self, angles: dict[JointId, float], velocity: int, current: int) -> list[JointCommand]:
         return [
-            JointCommand(id=joint_id, angle=angle, velocity=speed, current=current)
+            JointCommand(id=joint_id, angle=angle, velocity=velocity, current=current)
             for joint_id, angle in angles.items()
         ]
 
@@ -75,16 +75,16 @@ class JointCommandBuilder:
         self,
         current: int,
         angles: Optional[Mapping[JointId, float]] = None,
-        speed: Optional[int] = None,
+        velocity: Optional[int] = None,
     ) -> list[JointCommand]:
         limited_current = int(clip(abs(current), 0.0, float(self._config.max_current)))
-        limited_speed = int(clip(0 if speed is None else speed, 0.0, 100.0))
+        limited_velocity = int(clip(0 if velocity is None else velocity, 0.0, 100.0))
         hold_angles = angles or self.init_hold_angles()
         return [
             JointCommand(
                 id=joint_id,
                 angle=hold_angles.get(joint_id, 0.0),
-                velocity=limited_speed,
+                velocity=limited_velocity,
                 current=limited_current,
             )
             for joint_id in self._current_joints

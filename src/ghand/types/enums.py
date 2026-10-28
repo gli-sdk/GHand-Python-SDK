@@ -123,7 +123,7 @@ class HandControlMode(enum.Enum):
     POSITION = 0  # Position control using the target joint position.
     VELOCITY = 1  # Velocity control using the target joint velocity.
     CURRENT = 2  # Current control using the target motor current.
-    MIT = 3  # MIT control combining target position, target speed, control gains, and other parameters.
+    MIT = 3  # MIT control combining target position, target velocity, control gains, and other parameters.
     CUSTOM = 0x0F  # Custom control with semi-closed-loop or closed-loop selection via JointControlMode.
 class HandControlState(enum.IntEnum):
     DISABLED = 0  # Disabled; the exact meaning depends on the interface using this enum.

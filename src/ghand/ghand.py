@@ -130,24 +130,24 @@ class GHand:
             )
 
     @staticmethod
-    def _check_speed_limit(joint: JointCommand, mode: JointControlMode):
-        """Validate and clamp joint speed based on the control mode.
+    def _check_velocity_limit(joint: JointCommand, mode: JointControlMode):
+        """Validate and clamp joint velocity based on the control mode.
 
         Args:
             joint: Joint to check and modify in place.
             mode: current control mode.
         """
-        original_speed = joint.velocity
+        original_velocity = joint.velocity
         if mode in (JointControlMode.VELOCITY, JointControlMode.MIT):
             joint.velocity = max(-100, min(100, joint.velocity))
         else:
             joint.velocity = min(100, abs(joint.velocity))
 
-        if joint.velocity != original_speed and mode != JointControlMode.CURRENT:
+        if joint.velocity != original_velocity and mode != JointControlMode.CURRENT:
             logger.warning(
-                "[Joint] ID: %s speed %s adjusted to %s in %s mode",
+                "[Joint] ID: %s velocity %s adjusted to %s in %s mode",
                 JointId(joint.id).name,
-                original_speed,
+                original_velocity,
                 joint.velocity,
                 mode.name,
             )
@@ -567,7 +567,7 @@ class GHand:
             )
             self._check_current_limit(joint_cmd, joint_cmd.control_mode)
             if joint_cmd.control_mode != JointControlMode.CURRENT:
-                self._check_speed_limit(joint_cmd, joint_cmd.control_mode)
+                self._check_velocity_limit(joint_cmd, joint_cmd.control_mode)
             if joint_cmd.control_mode in (JointControlMode.POSITION, JointControlMode.MIT):
                 self._check_joint_limit(
                     joint_cmd, self._active_joints[joint.id], joint_cmd.control_mode
@@ -729,17 +729,17 @@ class GHand:
 
     @staticmethod
     def _angles_to_joints(
-        angles: Any, speed: int = 100, current: int = 100
+        angles: Any, velocity: int = 100, current: int = 100
     ) -> list[JointCommand]:
         """Convert a numpy array to a list of JointCommand objects.
 
         Args:
             angles: 18-element numpy array of joint angles in degrees.
-            speed: Speed percentage applied to all joints. Defaults to 100.
+            velocity: Velocity percentage applied to all joints. Defaults to 100.
             current: Current percentage applied to all joints. Defaults to 100.
 
         Returns:
             List of 18 JointCommand objects.
         """
 
-        return nparray_to_joints(angles, speed, current)
+        return nparray_to_joints(angles, velocity, current)

@@ -120,7 +120,7 @@ class IComm(ABC):
 
         Args:
             joints: List of JointCommand objects.
-            mode: Control mode (position, speed, or current).
+            mode: Control mode (position, velocity, or current).
 
         Returns:
             True if the command is sent successfully.

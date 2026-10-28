@@ -279,20 +279,20 @@ def main():
             if left_hand:
                 joints = []
                 # Index finger joints
-                speed = 100
+                velocity = 100
                 current = 100
                 joints.append(
                     JointCommand(
                         id=JointId.THUMB_MCP,
                         angle=clip_angle_degrees(left_hand.thumb.pip_bend, 0, 75),
-                        velocity=speed,
+                        velocity=velocity,
                         current=current,
                     ))  # PIP bend: rotation around x-axis in MCP sensor coordinate system
                 joints.append(
                     JointCommand(
                         id=JointId.THUMB_TMC_FE,
                         angle=clip_angle_degrees(left_hand.thumb.mcp_bend - 40, 0, 55),
-                        velocity=speed,
+                        velocity=velocity,
                         current=current,
                     ))  # MCP bend: rotation around z-axis in back of hand sensor coordinate system
                 joints.append(
@@ -304,7 +304,7 @@ def main():
                             0,
                             90,
                         ),
-                        velocity=speed,
+                        velocity=velocity,
                         current=90,
                     )
                 )  # MCP abduction: in back of hand sensor coordinate system, DIP sensor rotates around y-axis
@@ -312,7 +312,7 @@ def main():
                     JointCommand(
                         id=JointId.THUMB_TMC_PS,
                         angle=clip_angle_degrees(-left_hand.thumb.dip_sway, -30, 60),
-                        velocity=speed,
+                        velocity=velocity,
                         current=90,
                     )
                 )  # MCP rotation: in MCP sensor coordinate system, DIP sensor rotates around z-axis
@@ -320,14 +320,14 @@ def main():
                     JointCommand(
                         id=JointId.FF_PIP,
                         angle=clip_angle_degrees(left_hand.index.pip_bend, 0, 75),
-                        velocity=speed,
+                        velocity=velocity,
                         current=current,
                     ))
                 joints.append(
                     JointCommand(
                         id=JointId.FF_MCP,
                         angle=clip_angle_degrees(left_hand.index.mcp_bend, 0, 70),
-                        velocity=speed,
+                        velocity=velocity,
                         current=current,
                     ))
                 joints.append(
@@ -335,49 +335,49 @@ def main():
                         id=JointId.FF_MCP_AA,
                         angle=clip_angle_degrees(
                             left_hand.index.mcp_sway + left_hand.index.pip_sway, -15, 15),
-                        velocity=speed,
+                        velocity=velocity,
                         current=current,
                     ))
                 joints.append(
                     JointCommand(
                         id=JointId.MF_PIP,
                         angle=clip_angle_degrees(left_hand.middle.pip_bend, 0, 75),
-                        velocity=speed,
+                        velocity=velocity,
                         current=current,
                     ))
                 joints.append(
                     JointCommand(
                         id=JointId.MF_MCP,
                         angle=clip_angle_degrees(left_hand.middle.mcp_bend, 0, 70),
-                        velocity=speed,
+                        velocity=velocity,
                         current=current,
                     ))
                 joints.append(
                     JointCommand(
                         id=JointId.RF_PIP,
                         angle=clip_angle_degrees(left_hand.ring.pip_bend, 0, 75),
-                        velocity=speed,
+                        velocity=velocity,
                         current=current,
                     ))
                 joints.append(
                     JointCommand(
                         id=JointId.RF_MCP,
                         angle=clip_angle_degrees(left_hand.ring.mcp_bend, 0, 70),
-                        velocity=speed,
+                        velocity=velocity,
                         current=current,
                     ))
                 joints.append(
                     JointCommand(
                         id=JointId.LF_PIP,
                         angle=clip_angle_degrees(left_hand.pinky.pip_bend, 0, 75),
-                        velocity=speed,
+                        velocity=velocity,
                         current=current,
                     ))
                 joints.append(
                     JointCommand(
                         id=JointId.LF_MCP,
                         angle=clip_angle_degrees(left_hand.pinky.mcp_bend, 0, 70),
-                        velocity=speed,
+                        velocity=velocity,
                         current=current,
                     ))
 

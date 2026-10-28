@@ -32,8 +32,8 @@ The official Python SDK for the GHand dexterous hand. It provides high-level API
   - Clear faults, initialize joints, stop motion, and run common device operations.
 
 - **Joint control**
-  - Command one or more joints by position, speed, or current.
-  - Read current joint angle, speed, current, state, and error feedback.
+  - Command one or more joints by position, velocity, or current.
+  - Read current joint angle, velocity, current, state, and error feedback.
   - Clamp active joint commands to product-specific limits.
 
 - **Tactile sensing**
@@ -302,7 +302,7 @@ CAN-FD baud-rate gears:
 - `examples/tutorial/01.get_basic_info.py`: connect and read device information
 - `examples/tutorial/02.move_joints.py`: position control
 - `examples/tutorial/03.current_control.py`: current control
-- `examples/tutorial/04.speed_control.py`: speed control
+- `examples/tutorial/04.velocity_control.py`: velocity control
 - `examples/tutorial/05.tactile_callback.py`: tactile data callback
 - `examples/tutorial/06.subscription_demo.py`: data subscription
 - `examples/tutorial/07.multi_hand.py`: multi-hand discovery and connection

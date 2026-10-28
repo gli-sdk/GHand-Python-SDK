@@ -212,7 +212,7 @@ class EthercatComm(IComm):
 
         Args:
             joints: List of JointCommand objects.
-            mode: Control mode (position, speed, or current).
+            mode: Control mode (position, velocity, or current).
 
         Returns:
             True if the command is sent successfully.
@@ -239,7 +239,7 @@ class EthercatComm(IComm):
             target.stop = JointControlState(joint.stop).value
             target.mode = (target.mode & 0x0F) | (JointLoopType(joint.closed_loop_type).value << 4)
             target.angle = joint.angle
-            target.speed = joint.velocity
+            target.velocity = joint.velocity
             target.current = joint.current
             target.kp = joint.kp
             target.kd = joint.kd
@@ -304,7 +304,7 @@ class EthercatComm(IComm):
                     mode=joint_tpdo.mode,
                     stop=joint_tpdo.stop,
                     angle=angle,
-                    velocity=joint_tpdo.speed,
+                    velocity=joint_tpdo.velocity,
                     current=joint_tpdo.current,
                 )
             )
@@ -650,7 +650,7 @@ class EthercatComm(IComm):
                     mode=jtpdo.mode,
                     stop=jtpdo.stop,
                     angle=jtpdo.angle,
-                    velocity=jtpdo.speed,
+                    velocity=jtpdo.velocity,
                     current=jtpdo.current,
                 )
                 for jid, jtpdo in tpdo.joints.items()

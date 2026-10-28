@@ -88,7 +88,7 @@ class ReleaseController:
 
             joints = self.joint_builder.position_command(
                 self.joint_builder.open_pose(),
-                speed=self.config.release_open_speed,
+                velocity=self.config.release_open_velocity,
                 current=self.config.release_open_current,
             )
             with self._command_lock:

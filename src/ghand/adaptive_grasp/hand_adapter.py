@@ -20,7 +20,7 @@ class GHandCommandPort:
             joint_command_cls(
                 id=joint.id,
                 angle=joint.angle,
-                speed=joint.velocity,
+                velocity=joint.velocity,
                 current=joint.current,
             )
             for joint in joints

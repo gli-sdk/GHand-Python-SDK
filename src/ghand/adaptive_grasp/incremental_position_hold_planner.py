@@ -27,7 +27,7 @@ class IncrementalPositionHoldPlanner:
         active_fingers: set[TactileSensorId],
         active_joint_ids: set[JointId],
         contact_joint_angles: Optional[JointAngles] = None,
-        hold_speed: int,
+        hold_velocity: int,
         hold_current: int,
         default_target_force_n: Optional[float] = None,
         stiff_position_force_drop_ratio: float,
@@ -38,7 +38,7 @@ class IncrementalPositionHoldPlanner:
         self._active_joint_ids = set(active_joint_ids)
         self.contact_joint_angles = normalize_joint_angles(
             contact_joint_angles or {})
-        self._hold_speed = hold_speed
+        self._hold_velocity = hold_velocity
         self._hold_current = hold_current
         self._default_target_force_n = default_target_force_n
         self._stiff_position_force_drop_ratio = stiff_position_force_drop_ratio
@@ -62,17 +62,17 @@ class IncrementalPositionHoldPlanner:
         try:
             if self._is_contact_lost(total_fz):
                 return self._hold_decisions(current_angles,
-                                            speed=100,
+                                            velocity=100,
                                             current=self._hold_current)
 
             if total_fz >= target_force:
                 return self._hold_decisions(current_angles,
-                                            speed=100,
+                                            velocity=100,
                                             current=self._hold_current)
 
             next_angles = self._increment_angles(current_angles)
             return self._hold_decisions(next_angles,
-                                        speed=self._hold_speed,
+                                        velocity=self._hold_velocity,
                                         current=self._hold_current)
         finally:
             self._previous_total_fz = total_fz
@@ -104,7 +104,7 @@ class IncrementalPositionHoldPlanner:
         self,
         angles: JointAngles,
         *,
-        speed: int,
+        velocity: int,
         current: int,
     ) -> ForceDecisions:
         angles = normalize_joint_angles(angles)
@@ -120,7 +120,7 @@ class IncrementalPositionHoldPlanner:
                 target_angles=target_angles,
                 is_fragile_mode=False,
                 near_limit=False,
-                next_speed=speed,
+                next_velocity=velocity,
             )
             for finger in self._active_fingers
         }
