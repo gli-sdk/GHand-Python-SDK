@@ -22,13 +22,14 @@ Wraps EthercatClient and handles PDO encoding/decoding.
 
 import logging
 import struct
-import threading
 import time
 
 from .._subscription import SubscriptionManager
 from .._product_config import ProductConfig, TactileRegionConfig
 from .._device_value import parse_device_value
 from ..types import (
+    CANFDBitTiming,
+    RS485BaudRate,
     JointId,
     HandControlMode,
     JointLoopType,
@@ -56,25 +57,6 @@ from .ethercat_protocol import (
 from .icomm import IComm
 
 logger = logging.getLogger("ghand.ethercat_comm")
-
-
-# EtherCAT SDO object dictionary indices
-SDO_DEVICE_NAME = 0x1008
-SDO_FIRMWARE_VERSION = 0x100A
-SDO_SERIAL_NUMBER_LEGACY = 0x1018
-SDO_HAND_TYPE = 0x2001
-SDO_FAULT_CLEAR = 0x2002
-SDO_STALL_TOLERANCE = 0x2003
-SDO_TACTILE_CONTROL = 0x2004
-SDO_FIRMWARE_INFO = 0x2007
-SDO_PID_PARAMETERS = 0x2008
-SDO_SERIAL_NUMBER = 0x2009
-SDO_HAND_STATE_MACHINE = 0x200A
-
-# SDO subindices
-SDO_SUB_COMMAND = 0x01
-SDO_SUB_STATE = 0x02
-SDO_SUB_RESULT = 0x03
 
 
 _STALL_TOLERANCE_JOINT_ORDER = (
@@ -105,23 +87,7 @@ class EthercatComm(IComm):
     def __init__(self, config: ProductConfig):
         self._client = EthercatClient()
         self._sub_manager = SubscriptionManager(self._client, self.is_connected)
-        self._static_sdo_cache = {}
-        self._static_sdo_cache_lock = threading.Lock()
         self.update_config(config)
-
-    def _clear_static_sdo_cache(self) -> None:
-        with self._static_sdo_cache_lock:
-            self._static_sdo_cache.clear()
-
-    def _read_static_sdo_once(self, key: str, reader):
-        """Cache one successful static SDO value for the current connection."""
-        with self._static_sdo_cache_lock:
-            if key in self._static_sdo_cache:
-                return self._static_sdo_cache[key]
-            value = reader()
-            if value not in (None, "", "N/A", 0):
-                self._static_sdo_cache[key] = value
-            return value
 
     @property
     def config(self) -> ProductConfig:
@@ -139,12 +105,11 @@ class EthercatComm(IComm):
         return ProductConfig(
             name=config.name,
             model=config.model,
-            valid_joints=list(config.valid_joints),
-            joint_limits=config.joint_limits.copy(),
+            all_joints=list(config.all_joints),
+            active_joints=config.active_joints.copy(),
             has_tactile=config.has_tactile,
             tactile_regions=tactile_regions,
             product_type=config.product_type,
-            slave_id=config.slave_id,
         )
 
     def _expected_rpdo_bytes(self, config: ProductConfig) -> int:
@@ -155,13 +120,13 @@ class EthercatComm(IComm):
         """Build supported TPDO layouts keyed by mapped input size."""
         tactile_counts = [r.count for r in config.tactile_regions] if config.has_tactile else None
         layouts = {
-            compute_tpdo_size(len(config.valid_joints), tactile_counts): config
+            compute_tpdo_size(len(config.all_joints), tactile_counts): config
         }
         if config.has_tactile and tactile_counts and tactile_counts[0] > self._COMPAT_THUMB_TACTILE_COUNT:
             compat_counts = list(tactile_counts)
             compat_counts[0] = self._COMPAT_THUMB_TACTILE_COUNT
             compat_config = self._clone_config_with_tactile_counts(config, compat_counts)
-            layouts[compute_tpdo_size(len(config.valid_joints), compat_counts)] = compat_config
+            layouts[compute_tpdo_size(len(config.all_joints), compat_counts)] = compat_config
         return layouts
 
     def _select_tpdo_layout(self, input_size: int) -> None:
@@ -184,11 +149,13 @@ class EthercatComm(IComm):
         self._tpdo_layouts = self._build_tpdo_layouts(config)
         self._expected_tpdo_sizes = tuple(sorted(self._tpdo_layouts))
         self._expected_tpdo_size = compute_tpdo_size(
-            len(config.valid_joints),
+            len(config.all_joints),
             [r.count for r in config.tactile_regions] if config.has_tactile else None,
         )
         self._tpdo_size_selected = False
-        self._controlled_joints = [j for j in config.valid_joints if j in config.joint_limits]
+        self._controlled_joints = [
+            j for j in config.all_joints if j in config.active_joints
+        ]
         self._rpdo = Rpdo(self._controlled_joints)
         self._expected_rpdo_size = self._expected_rpdo_bytes(config)
 
@@ -206,25 +173,21 @@ class EthercatComm(IComm):
         self,
         device_name: str,
         slave_id: int | None = None,
-        baudrate_gear: int | None = None,
-        quiet: bool = False,
+        baudrate: RS485BaudRate | CANFDBitTiming | None = None,
     ) -> bool:
         """Connect to the specified EtherCAT device.
 
         Args:
             device_name: Adapter ID to connect to.
             slave_id: Ignored for EtherCAT.
-            baudrate_gear: Ignored for EtherCAT.
-            quiet: Ignored for EtherCAT; errors are always logged.
+            baudrate: Ignored for EtherCAT.
 
         Returns:
             True if the connection and SOEM startup succeed.
         """
-        self._clear_static_sdo_cache()
         connected = self._client.connect(device_name)
         if connected and self._client.run(self._expected_tpdo_sizes, self._expected_rpdo_size):
             self._select_tpdo_layout(self._client.input_size)
-            logger.info("Device connected via EtherCAT (%s)", device_name)
             return True
 
         # logger.error("Failed to connect EtherCAT device %s", device_name)
@@ -233,7 +196,6 @@ class EthercatComm(IComm):
 
     def disconnect(self) -> bool:
         """Disconnect from the EtherCAT device and stop subscriptions."""
-        self._clear_static_sdo_cache()
         self._sub_manager.stop()
         self._client.disconnect()
         logger.info("Device disconnected")
@@ -408,9 +370,9 @@ class EthercatComm(IComm):
         self,
         index: int,
         command: int,
-        command_subindex: int = SDO_SUB_COMMAND,
-        state_subindex: int = SDO_SUB_STATE,
-        result_subindex: int = SDO_SUB_RESULT,
+        command_subindex: int = 0x01,
+        state_subindex: int = 0x02,
+        result_subindex: int = 0x03,
     ) -> bool:
         self._client.sdo_write(index, command_subindex, bytes([command]))
         time.sleep(self._SDO_WRITE_SETTLE_SEC)
@@ -437,7 +399,7 @@ class EthercatComm(IComm):
         Returns:
             True on success, False if the device rejected the command.
         """
-        return self._execute_sdo_command(SDO_TACTILE_CONTROL, 0x01)
+        return self._execute_sdo_command(0x2004, 0x01)
 
     def close_tactile(self) -> bool:
         """Disable the tactile sensors.
@@ -445,7 +407,7 @@ class EthercatComm(IComm):
         Returns:
             True on success, False if the device rejected the command.
         """
-        return self._execute_sdo_command(SDO_TACTILE_CONTROL, 0x02)
+        return self._execute_sdo_command(0x2004, 0x02)
 
     def zero_tactile(self) -> bool:
         """Zero-calibrate the tactile sensors.
@@ -453,7 +415,7 @@ class EthercatComm(IComm):
         Returns:
             True on success, False if the device rejected the command.
         """
-        return self._execute_sdo_command(SDO_TACTILE_CONTROL, 0x04)
+        return self._execute_sdo_command(0x2004, 0x04)
 
     # ===== Device operations =====
 
@@ -463,22 +425,18 @@ class EthercatComm(IComm):
         Returns:
             True on success, False if the device rejected the command.
         """
-        success = self._execute_sdo_command(SDO_FAULT_CLEAR, 0x01)
+        success = self._execute_sdo_command(0x2002, 0x01)
         if success:
             logger.info("Fault cleared")
         return success
 
     def get_device_name(self) -> str:
         """Retrieve the device name via SDO."""
-        return self._read_static_sdo_once(
-            "device_name", lambda: self._read_string_sdo(SDO_DEVICE_NAME, 0x00)
-        )
+        return self._read_string_sdo(0x1008, 0x00)
 
     def get_firmware_version(self) -> str:
         """Retrieve the firmware version via SDO."""
-        return self._read_static_sdo_once(
-            "firmware_version", lambda: self._read_packed_firmware_version(0x01)
-        )
+        return self._read_packed_firmware_version(0x01)
 
     def _read_string_sdo(self, index: int, subindex: int) -> str:
         try:
@@ -489,18 +447,19 @@ class EthercatComm(IComm):
                 or "N/A"
             )
         except Exception:
+            if not self.is_connected():
+                raise
             return "N/A"
 
     def get_serial_number(self) -> str:
         """Retrieve the 19-byte ASCII product serial number via SDO."""
-        def read_serial_number() -> str:
-            try:
-                raw = self._client.sdo_read(SDO_SERIAL_NUMBER, 0x00)
-                return raw[:19].decode("ascii", errors="ignore").strip("\x00")
-            except Exception:
-                return "N/A"
-
-        return self._read_static_sdo_once("serial_number", read_serial_number)
+        try:
+            raw = self._client.sdo_read(0x2009, 0x00)
+            return raw[:19].decode("ascii", errors="ignore").strip("\x00")
+        except Exception:
+            if not self.is_connected():
+                raise
+            return "N/A"
 
     @staticmethod
     def _pack_uint_array(values: list[int], count: int, item_format: str) -> bytes:
@@ -538,12 +497,12 @@ class EthercatComm(IComm):
     def get_stall_tolerances(self) -> dict[JointId, int]:
         """Read the 13 per-joint stall tolerances from SDO 0x2003:01."""
         if not self._execute_sdo_command(
-            SDO_STALL_TOLERANCE, 0xA2,
+            0x2003, 0xA2,
             command_subindex=0x02, state_subindex=0x03, result_subindex=0x04,
         ):
             raise RuntimeError("Failed to refresh stall tolerances")
         values = self._unpack_uint_array(
-            self._client.sdo_read(SDO_STALL_TOLERANCE, 0x01), 13, "B"
+            self._client.sdo_read(0x2003, 0x01), 13, "B"
         )
         return dict(zip(_STALL_TOLERANCE_JOINT_ORDER, values))
 
@@ -553,31 +512,31 @@ class EthercatComm(IComm):
             raise ValueError("stall tolerances must contain all 13 active JointId keys")
         values = [tolerances[joint_id] for joint_id in _STALL_TOLERANCE_JOINT_ORDER]
         return self._write_sdo_parameters(
-            SDO_STALL_TOLERANCE,
+            0x2003,
             self._pack_uint_array(values, 13, "B"),
         )
 
     def get_pid_parameters(self) -> list[int]:
         """Read the raw 39-value uint16 PID array from SDO 0x2008:01."""
         if not self._execute_sdo_command(
-            SDO_PID_PARAMETERS, 0xA2,
+            0x2008, 0xA2,
             command_subindex=0x02, state_subindex=0x03, result_subindex=0x04,
         ):
             raise RuntimeError("Failed to refresh PID parameters")
         return self._unpack_uint_array(
-            self._client.sdo_read(SDO_PID_PARAMETERS, 0x01), 39, "H"
+            self._client.sdo_read(0x2008, 0x01), 39, "H"
         )
 
     def set_pid_parameters(self, parameters: list[int]) -> bool:
         """Write the raw 39-value uint16 PID array through SDO 0x2008."""
         return self._write_sdo_parameters(
-            SDO_PID_PARAMETERS,
+            0x2008,
             self._pack_uint_array(parameters, 39, "H"),
         )
 
     def get_hand_state_machine(self) -> HandRuntimeState | int:
         """Read the whole-hand runtime state from SDO 0x200A:00."""
-        raw = self._client.sdo_read(SDO_HAND_STATE_MACHINE, 0x00)
+        raw = self._client.sdo_read(0x200A, 0x00)
         if len(raw) != 1:
             raise RuntimeError(
                 f"invalid hand state machine size: expected 1, got {len(raw)}"
@@ -587,8 +546,10 @@ class EthercatComm(IComm):
     def _read_packed_firmware_version(self, subindex: int) -> str:
         """Read a packed firmware version from SDO 0x2007."""
         try:
-            raw = self._client.sdo_read(SDO_FIRMWARE_INFO, subindex)
+            raw = self._client.sdo_read(0x2007, subindex)
         except Exception:
+            if not self.is_connected():
+                raise
             logger.info("Packed firmware version not available", exc_info=True)
             return "N/A"
 
@@ -604,42 +565,30 @@ class EthercatComm(IComm):
 
     def get_firmware_package_version(self) -> str:
         """Retrieve the firmware package version via SDO."""
-        return self._read_static_sdo_once(
-            "firmware_package_version", lambda: self._read_packed_firmware_version(0x05)
-        )
+        return self._read_packed_firmware_version(0x05)
 
     def get_position_sensor_version(self) -> str:
         """Retrieve the position sensor version via SDO."""
-        return self._read_static_sdo_once(
-            "position_sensor_version", lambda: self._read_packed_firmware_version(0x02)
-        )
+        return self._read_packed_firmware_version(0x02)
 
     def get_tactile_sensor_version(self) -> str:
         """Retrieve the tactile MCU version via SDO."""
-        return self._read_static_sdo_once(
-            "tactile_sensor_version", lambda: self._read_packed_firmware_version(0x03)
-        )
+        return self._read_packed_firmware_version(0x03)
 
     def get_motor_driver_version(self) -> str:
         """Retrieve the motor driver version via SDO.
 
         Returns "N/A" if the motor driver version is not available.
         """
-        return self._read_static_sdo_once(
-            "motor_driver_version", lambda: self._read_packed_firmware_version(0x04)
-        )
+        return self._read_packed_firmware_version(0x04)
 
     def get_thumb_tactile_sensor_version(self) -> str:
         """Retrieve the thumb tactile sensor version via SDO."""
-        return self._read_static_sdo_once(
-            "thumb_tactile_sensor_version", lambda: self._read_packed_firmware_version(0x06)
-        )
+        return self._read_packed_firmware_version(0x06)
 
     def get_finger_tactile_sensor_version(self) -> str:
         """Retrieve the four-finger tactile sensor version via SDO."""
-        return self._read_static_sdo_once(
-            "finger_tactile_sensor_version", lambda: self._read_packed_firmware_version(0x07)
-        )
+        return self._read_packed_firmware_version(0x07)
 
     def get_hand_type(self) -> int:
         """Retrieve the hand type via SDO.
@@ -647,15 +596,14 @@ class EthercatComm(IComm):
         Returns:
             0 for unknown, 1 for left hand, 2 for right hand.
         """
-        def read_hand_type() -> int:
-            try:
-                return int.from_bytes(
-                    self._client.sdo_read(SDO_HAND_TYPE, 0x00), byteorder="little"
-                )
-            except Exception:
-                return 0
-
-        return self._read_static_sdo_once("hand_type", read_hand_type)
+        try:
+            return int.from_bytes(
+                self._client.sdo_read(0x2001, 0x00), byteorder="little"
+            )
+        except Exception:
+            if not self.is_connected():
+                raise
+            return 0
 
     # ===== Subscription =====
 

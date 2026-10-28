@@ -201,7 +201,6 @@ class CanfdTransport:
         dbit_baud: int = 5_000_000,
         abit_sample: int = 75,
         dbit_sample: int = 75,
-        quiet: bool = False,
     ) -> bool:
         """Open the CANFD device and start the CAN channel."""
         return self._open_zqwl_serial(
@@ -209,7 +208,6 @@ class CanfdTransport:
             dbit_baud=dbit_baud,
             abit_sample=abit_sample,
             dbit_sample=dbit_sample,
-            quiet=quiet,
         )
 
     def _open_zqwl_serial(
@@ -218,7 +216,6 @@ class CanfdTransport:
         dbit_baud: int,
         abit_sample: int = 75,
         dbit_sample: int = 75,
-        quiet: bool = False,
     ) -> bool:
         """Open a ZQWL USBCANFD CDC serial adapter."""
         if self._serial is not None:
@@ -246,19 +243,17 @@ class CanfdTransport:
                 abit_sample=abit_sample,
                 dbit_sample=dbit_sample,
             )
-            if not quiet:
-                logger.info(
-                    "ZQWL CANFD serial channel opened (%s, abit=%s/%s%%, dbit=%s/%s%%)",
-                    self._channel,
-                    abit_baud,
-                    abit_sample,
-                    dbit_baud,
-                    dbit_sample,
-                )
+            logger.info(
+                "ZQWL CANFD serial channel opened (%s, abit=%s/%s%%, dbit=%s/%s%%)",
+                self._channel,
+                abit_baud,
+                abit_sample,
+                dbit_baud,
+                dbit_sample,
+            )
             return True
         except Exception as exc:
-            if not quiet:
-                logger.error("Failed to open ZQWL CANFD serial adapter %s: %s", self._channel, exc)
+            logger.error("Failed to open ZQWL CANFD serial adapter %s: %s", self._channel, exc)
             if self._serial is not None:
                 self._serial.close()
                 self._serial = None
@@ -367,22 +362,19 @@ class CanfdTransport:
         logger.debug("ZQWL 0x44 payload: %s", bytes(control).hex(" "))
         self._write_zqwl_config(0x44, True, bytes(control))
 
-    def close(self, quiet: bool = False) -> bool:
+    def close(self) -> bool:
         """Stop the channel and close the device."""
         if self._serial is not None:
             try:
                 self._set_zqwl_channel_enabled(False)
             except Exception as exc:
-                if not quiet:
-                    logger.warning("Failed to stop ZQWL CANFD channel before close: %s", exc)
+                logger.warning("Failed to stop ZQWL CANFD channel before close: %s", exc)
             finally:
                 self._serial.close()
                 self._serial = None
-            if not quiet:
-                logger.info("ZQWL CANFD serial channel closed")
+            logger.info("ZQWL CANFD serial channel closed")
             return True
-        if not quiet:
-            logger.info("CANFD channel closed")
+        logger.info("CANFD channel closed")
         return True
 
     # ------------------------------------------------------------------

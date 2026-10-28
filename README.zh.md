@@ -58,7 +58,6 @@ GHand 灵巧手官方 Python SDK，提供 EtherCAT、CAN-FD、RS-485 通信接�
 - [日志配置](docs/logging.md)
 - [错误处理](docs/error_handling.md)
 - [订阅与线程](docs/subscription_threading.md)
-- [诊断信息](docs/diagnostics.md)
 
 ## 系统要求
 
@@ -258,13 +257,13 @@ hand.close()
 ```python
 from ghand import RS485BaudRate
 
-hand.open("COM10", slave_id=0x31, baud_rate=RS485BaudRate.BAUD_1000000)
+hand.open("COM10", slave_id=0x31, baudrate=RS485BaudRate.BAUD_1000000)
 ```
 
 写入 RS-485 波特率配置：
 
 ```python
-ok = hand.set_baudrate_config(RS485BaudRate.BAUD_1000000)
+ok = hand.set_baudrate(RS485BaudRate.BAUD_1000000)
 ```
 
 CAN-FD 使用 bit timing 配置枚举，不使用 RS-485 波特率枚举：
@@ -272,8 +271,8 @@ CAN-FD 使用 bit timing 配置枚举，不使用 RS-485 波特率枚举：
 ```python
 from ghand import CANFDBitTiming
 
-hand.open("COM10", slave_id=0x31, baud_rate=CANFDBitTiming.TIMING_1M_5M)
-ok = hand.set_baudrate_config(CANFDBitTiming.TIMING_1M_5M)
+hand.open("COM10", slave_id=0x31, baudrate=CANFDBitTiming.TIMING_1M_5M)
+ok = hand.set_baudrate(CANFDBitTiming.TIMING_1M_5M)
 ```
 
 波特率/bit timing 配置由设备保存，并在下一次上电后生效。设备断电重启后，需要在 `open()` 中显式传入已配置的枚举值。

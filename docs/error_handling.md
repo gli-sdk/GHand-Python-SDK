@@ -16,9 +16,6 @@ if not result:
 Existing methods continue to raise
 `RuntimeError` where that was already part of the V2.2 behavior.
 
-`GHand.get_diagnostics()` exposes the latest SDK error in a broader
-machine-readable diagnostics structure.
-
 ## Device error bitfields
 
 `HandData.error_warn`, `HandData.error_fault`, and `HandData.error_critical`

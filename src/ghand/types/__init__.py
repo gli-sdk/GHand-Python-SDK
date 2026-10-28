@@ -46,8 +46,6 @@ from .errors import (
     HandFault,
     HandWarning,
     JointErrorCode,
-    OperationResult,
-    SdkError,
 )
 
 __all__ = [
@@ -70,10 +68,8 @@ __all__ = [
     "JointErrorCode",
     "JointId",
     "JointState",
-    "OperationResult",
     "ProductType",
     "RS485BaudRate",
-    "SdkError",
     "HandControlState",
     "TactileData",
     "TactileSensorId",

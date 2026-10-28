@@ -29,6 +29,8 @@ Error handling contract:
 
 from abc import ABC, abstractmethod
 
+from ..types import CANFDBitTiming, RS485BaudRate
+
 
 class IComm(ABC):
     """Abstract communication interface providing unified business-level APIs
@@ -42,8 +44,7 @@ class IComm(ABC):
         self,
         device_name: str,
         slave_id: int | None = None,
-        baudrate_gear: int | None = None,
-        quiet: bool = False,
+        baudrate: RS485BaudRate | CANFDBitTiming | None = None,
     ) -> bool:
         """Connect to the specified device.
 
@@ -51,12 +52,9 @@ class IComm(ABC):
             device_name: Identifier of the device to connect to.
             slave_id: Optional RS485/CANFD slave ID override for this connection.
                 Implementations that do not use slave IDs may ignore it.
-            baudrate_gear: Optional baud rate gear value. For RS485 this selects
+            baudrate: Optional baud rate gear value. For RS485 this selects
                 the serial baud rate; for CANFD it selects both the arbitration
                 and data phase bitrates. Other implementations may ignore it.
-            quiet: When True, suppress non-fatal failure logs. Useful for
-                auto-detection loops that are expected to try several ports
-                or baud rates before finding a device.
 
         Returns:
             True if the connection succeeds, False otherwise.
@@ -85,51 +83,34 @@ class IComm(ABC):
     def set_slave_id(self, slave_id: int) -> bool:
         """Set the device slave ID.
 
+        The default implementation reports that the protocol is unsupported.
+
         Args:
             slave_id: New slave ID to write to the device.
 
         Returns:
             True if the command succeeds, False otherwise.
+
+        Raises:
+            NotImplementedError: If the protocol does not support setting slave IDs.
         """
-        return False
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support set_slave_id"
+        )
 
-    def set_connection_watchdog(self, timeout_ms: int) -> bool:
-        """Set the connection watchdog timeout in milliseconds.
-
-        The device drops the connection when no frame from the master arrives
-        within ``timeout_ms``; 0 disables the check. The value is not saved to
-        Flash.
-
-        Args:
-            timeout_ms: Timeout in milliseconds (0..4294967295).
-
-        Returns:
-            True if the command succeeds, False otherwise.
-        """
-        return False
-
-    def set_baudrate_config(
-        self,
-        baudrate_gear: int | None = None,
-    ) -> bool:
+    def set_baudrate(self, baudrate: int) -> bool:
         """Configure the RS485/CANFD baud rate gear (Flash, effective on reboot).
 
         Args:
-            baudrate_gear: Protocol gear value written directly to holding
-                register 0x0004. When omitted the protocol default gear is used.
+            baudrate: Protocol gear value written directly to holding
+                register 0x0004.
 
         Returns:
             True if the command succeeds, False otherwise.
         """
-        return False
-
-    def get_default_baudrate_gear(self) -> int | None:
-        """Return the protocol default baud rate gear, if one exists."""
-        return None
-
-    def describe_baudrate_config(self, baudrate_gear: int | None = None) -> str:
-        """Return a human-readable baud rate configuration description."""
-        return "Baudrate config set (effective after reboot)"
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support set_baudrate"
+        )
 
     # ===== Joint control =====
 
@@ -271,10 +252,6 @@ class IComm(ABC):
 
         """
         ...
-
-    def set_serial_number(self, serial_number: str) -> bool:
-        """Set the product serial number when supported."""
-        raise NotImplementedError("serial number configuration is not supported")
 
     def get_stall_tolerances(self) -> dict:
         """Retrieve per-joint stall tolerances when supported."""

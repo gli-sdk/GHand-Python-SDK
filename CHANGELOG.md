@@ -8,10 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Removed the last-operation result query APIs, `OperationResult`, and `SdkError`; diagnostics no longer include cached error fields.
 - Aligned existing communication APIs with protocol V2.4: serial-number subindex, parameter refresh commands, and firmware version queries. EtherCAT tactile data is decoded as resultant force followed by distributed force for each finger.
 - CANFD and RS485 PID and stall-tolerance operations retain the base interface's unsupported behavior until device firmware implements them.
 - Standardized distributed tactile forces to Newtons on all transports (CANFD/RS485 values are now divided by 10).
 - Updated CANFD timing profiles to V2.4 gears 0x00–0x07, with default gear 0x07. Enum values changed; the unsupported 500K/5M profile was removed.
+
+### Removed
+- Removed `GHand.get_diagnostics()` and the `Diagnostics` data types. Firmware version and hand type are now read from the device on each call.
 
 ## [2.2.1] - 2026-08-24
 

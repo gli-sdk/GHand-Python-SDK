@@ -346,16 +346,16 @@ class AdaptiveGrasper:
             self._get_monotonic_time,
             on_state_change=self._set_state,
             object_profile=self._runtime.object_profile,
-            joint_limits=self._joint_limits(),
+            active_joints=self._active_joints(),
         )
         return self._grasp_sequence.run(lambda: self._runtime.running)
 
-    def _joint_limits(self) -> dict[JointId, tuple[float, float]]:
-        raw_limits = getattr(self._hand_port, "joint_limits", None)
+    def _active_joints(self) -> dict[JointId, tuple[float, float]]:
+        raw_limits = getattr(self._hand_port, "active_joints", None)
         if callable(raw_limits):
             raw_limits = raw_limits()
         if raw_limits is None:
-            raw_limits = getattr(self.hand, "_joint_limits", {})
+            raw_limits = getattr(self.hand, "_active_joints", {})
         return {
             JointId(joint_id): (float(limit[0]), float(limit[1]))
             for joint_id, limit in raw_limits.items()

@@ -71,7 +71,7 @@ class PhaseController:
         get_time: Callable[[], float],
         on_state_change: Callable[[GraspState], None],
         object_profile: Optional[ObjectProfile] = None,
-        joint_limits: Optional[Mapping[JointId, tuple[float, float]]] = None,
+        active_joints: Optional[Mapping[JointId, tuple[float, float]]] = None,
     ):
         # PhaseController only depends on the hand port abstraction; mock vs
         # hardware wrapping is handled before this controller is constructed.
@@ -83,18 +83,20 @@ class PhaseController:
         self._object_profile = object_profile
         self._get_monotonic_time = get_time
         self._on_state_change = on_state_change
-        self._joint_limits = self._normalize_joint_limits(joint_limits or {})
+        self._active_joint_limits = self._normalize_active_joint_limits(
+            active_joints or {}
+        )
         self.current_current = self._phase_closing_current()
         self._phase_should_release = False
         self._contact_snapshot: Optional[ContactSnapshot] = None
         self._safety_report: Optional[SafetyReport] = None
 
     @staticmethod
-    def _normalize_joint_limits(
-        joint_limits: Mapping[JointId, tuple[float, float]],
+    def _normalize_active_joint_limits(
+        active_joint_limits: Mapping[JointId, tuple[float, float]],
     ) -> dict[JointId, tuple[float, float]]:
         normalized_limits = {}
-        for raw_joint_id, limit in joint_limits.items():
+        for raw_joint_id, limit in active_joint_limits.items():
             joint_id = normalize_joint_id(raw_joint_id)
             lower, upper = float(limit[0]), float(limit[1])
             if lower > upper:
@@ -397,7 +399,7 @@ class PhaseController:
         joint_id: JointId,
         angle: float,
     ) -> float:
-        limit = self._joint_limits.get(joint_id)
+        limit = self._active_joint_limits.get(joint_id)
         if limit is None:
             return angle
 

@@ -30,13 +30,10 @@ from . import logging_config  # auto-initialize logging handlers
 from ._converter import JointConverter, joints_to_nparray, nparray_to_joints
 from .gestures import execute_gesture, get_all_gestures
 from .ghand import GHand
-from .diagnostics import Diagnostics
 from .types import (
     HandCriticalError,
     HandFault,
     HandWarning,
-    OperationResult,
-    SdkError,
     CommType,
     CANFDBitTiming,
     GestureType,
@@ -79,9 +76,6 @@ __all__ = [
     "HandControlMode",
     "JointControlMode",
     "JointControlState",
-    "SdkError",
-    "OperationResult",
-    "Diagnostics",
     # Enums
     "HandControlState",
     "HandCriticalError",

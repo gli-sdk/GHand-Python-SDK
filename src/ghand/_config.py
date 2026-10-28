@@ -112,10 +112,10 @@ def _parse_joints(
         json_array: List of joint definition dicts.
 
     Returns:
-        Tuple of (valid_joint_ids, joint_limits_dict).
+        Tuple of (all_joint_ids, active_joint_limits_dict).
     """
-    valid_joints = []
-    joint_limits = {}
+    all_joints = []
+    active_joint_limits = {}
 
     for item in json_array:
         name = item.get("id", "")
@@ -124,16 +124,16 @@ def _parse_joints(
             logger.warning("Unknown joint name in config: %s", name)
             continue
 
-        valid_joints.append(joint_id)
+        all_joints.append(joint_id)
 
         if "min" in item and "max" in item:
             mn = float(item["min"])
             mx = float(item["max"])
             if mn > mx:
                 mn, mx = mx, mn
-            joint_limits[joint_id] = (mn, mx)
+            active_joint_limits[joint_id] = (mn, mx)
 
-    return valid_joints, joint_limits
+    return all_joints, active_joint_limits
 
 
 def _parse_tactile_regions(json_array: list[dict]) -> list[TactileRegionConfig]:
@@ -179,7 +179,7 @@ def _parse_product_config(
     source: str = "",
 ) -> ProductConfig:
     """Convert product config JSON data into ProductConfig."""
-    valid_joints, joint_limits = _parse_joints(data.get("joints", []))
+    all_joints, active_joints = _parse_joints(data.get("joints", []))
 
     tactile_regions = _parse_tactile_regions(
         data.get("tactile_regions", [])
@@ -188,14 +188,14 @@ def _parse_product_config(
     config = ProductConfig(
         name=data.get("name", ""),
         model=data.get("model", ""),
-        valid_joints=valid_joints,
-        joint_limits=joint_limits,
+        all_joints=all_joints,
+        active_joints=active_joints,
         has_tactile=data.get("has_tactile", False),
         tactile_regions=tactile_regions,
         product_type=product_type,
     )
 
-    if not config.name or not config.valid_joints:
+    if not config.name or not config.all_joints:
         logger.error(
             "Product config in %s is missing required fields",
             source,

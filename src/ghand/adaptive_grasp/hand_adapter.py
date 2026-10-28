@@ -30,8 +30,8 @@ class GHandCommandPort:
     def stop(self) -> None:
         self.hand.stop()
 
-    def joint_limits(self) -> dict[JointId, tuple[float, float]]:
-        raw_limits = getattr(self.hand, "_joint_limits", {})
+    def active_joint_limits(self) -> dict[JointId, tuple[float, float]]:
+        raw_limits = getattr(self.hand, "_active_joint_limits", {})
         return {
             JointId(joint_id): (float(limit[0]), float(limit[1]))
             for joint_id, limit in raw_limits.items()

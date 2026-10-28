@@ -169,7 +169,7 @@ class Tpdo:
         self.joints: dict[JointId, JointTpdo] = {}
         self.tactile_state = TactileSensorState()
 
-        for jid in config.valid_joints:
+        for jid in config.all_joints:
             joint = JointTpdo(0, 0, 0, 0, 0.0, 0, 0)
             self.joints[jid] = joint
             setattr(self, jid.name.lower(), joint)
@@ -190,7 +190,7 @@ class Tpdo:
             Populated Tpdo instance.
         """
         expected_size = compute_tpdo_size(
-            len(config.valid_joints),
+            len(config.all_joints),
             [r.count for r in config.tactile_regions] if config.has_tactile else None,
         )
         instance = cls(config)
@@ -201,7 +201,7 @@ class Tpdo:
         instance.hand = HandTpdo.from_bytes(data[offset:offset + _HAND_TPDO_SIZE])
         offset += _HAND_TPDO_SIZE
 
-        for jid in config.valid_joints:
+        for jid in config.all_joints:
             joint = JointTpdo.from_bytes(data[offset:offset + _JOINT_TPDO_SIZE])
             instance.joints[jid] = joint
             setattr(instance, jid.name.lower(), joint)

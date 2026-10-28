@@ -39,6 +39,8 @@ except ImportError:
 
 from .._product_config import ProductConfig
 from ..types import (
+    CANFDBitTiming,
+    RS485BaudRate,
     JointId,
     HandControlMode,
     JointControlState,
@@ -60,7 +62,6 @@ from .modbus_codec import (
     REG_CLEAR_FAULT,
     REG_CONNECTION_CONTROL,
     REG_CONNECTION_STATUS,
-    REG_CONNECTION_TIMER,
     REG_DEVICE_NAME,
     REG_FAULT_CLEAR_STATUS,
     REG_FIRMWARE_VERSION,
@@ -220,63 +221,11 @@ class CanfdComm(IComm):
             return CanfdTransport(channel=device_name)
         return CanfdTransport()
 
-    def prepare_baudrate_listener(
-        self,
-        device_name: str,
-        baudrate_gear: int | None = None,
-        quiet: bool = False,
-    ) -> bool:
-        """Open the ZQWL adapter at a CANFD baud rate without handshaking."""
-        self._wait_for_reopen_window()
-        if self._transport is None:
-            self._transport = self._create_transport(device_name)
-
-        gear = (
-            baudrate_gear
-            if baudrate_gear is not None
-            else self._DEFAULT_BAUDRATE_GEAR
-        )
-        pair = CANFD_BAUDRATE_GEAR_MAP.get(gear)
-        if pair is None:
-            if quiet:
-                logger.debug("Invalid CANFD baudrate gear: %s", baudrate_gear)
-            else:
-                logger.error("Invalid CANFD baudrate gear: %s", baudrate_gear)
-            self._cleanup_failed_connect()
-            return False
-
-        (abit_baud, abit_sample), (dbit_baud, dbit_sample) = pair
-        if not self._transport.open(
-            abit_baud=abit_baud,
-            dbit_baud=dbit_baud,
-            abit_sample=abit_sample,
-            dbit_sample=dbit_sample,
-            quiet=quiet,
-        ):
-            if quiet:
-                logger.debug("Failed to open CANFD listener at gear=0x%02X", gear)
-            else:
-                logger.error("Failed to open CANFD listener at gear=0x%02X", gear)
-            self._cleanup_failed_connect()
-            return False
-
-        logger.info(
-            "CANFD adapter listening (%s, gear=0x%02X, abit=%s/%s%%, dbit=%s/%s%%)",
-            device_name,
-            gear,
-            abit_baud,
-            abit_sample,
-            dbit_baud,
-            dbit_sample,
-        )
-        return True
-
     def connect(
         self,
         device_name: str,
         slave_id: int | None = None,
-        baudrate_gear: int | None = None,
-        quiet: bool = False,
+        baudrate: RS485BaudRate | CANFDBitTiming | None = None,
     ) -> bool:
         """Connect to the specified CANFD device.
 
@@ -287,11 +236,9 @@ class CanfdComm(IComm):
             device_name: ZQWL CDC serial device name (e.g. "COM3" or "/dev/ttyACM0").
             slave_id: Optional target slave ID. If provided, only this ID is
                 used; otherwise the connection polls 0x31 and 0x32.
-            baudrate_gear: Baud rate gear value. The gear selects both the
+            baudrate: Baud rate gear value. The gear selects both the
                 arbitration and data phase bitrates. Defaults to gear 0x07
                 (1 Mbps arbitration, 5 Mbps data).
-            quiet: When True, suppress non-fatal failure logs. Useful when the
-                caller is scanning several gears.
 
         Returns:
             True if the connection and handshake succeed.
@@ -299,25 +246,19 @@ class CanfdComm(IComm):
         if self._connected:
             return True
 
-        def _log_error(msg: str, *args) -> None:
-            if quiet:
-                logger.debug(msg, *args)
-            else:
-                logger.error(msg, *args)
-
         try:
             self._wait_for_reopen_window()
             if self._transport is None:
                 self._transport = self._create_transport(device_name)
 
             gear = (
-                baudrate_gear
-                if baudrate_gear is not None
+                baudrate
+                if baudrate is not None
                 else self._DEFAULT_BAUDRATE_GEAR
             )
             pair = CANFD_BAUDRATE_GEAR_MAP.get(gear)
             if pair is None:
-                _log_error("Invalid CANFD baudrate gear: %s", baudrate_gear)
+                logger.error("Invalid CANFD baudrate gear: %s", baudrate)
                 self._cleanup_failed_connect()
                 return False
             (abit_baud, abit_sample), (dbit_baud, dbit_sample) = pair
@@ -335,15 +276,14 @@ class CanfdComm(IComm):
                 dbit_baud=dbit_baud,
                 abit_sample=abit_sample,
                 dbit_sample=dbit_sample,
-                quiet=quiet,
             ):
-                _log_error("Failed to open CANFD transport at gear=0x%02X", gear)
+                logger.error("Failed to open CANFD transport at gear=0x%02X", gear)
                 self._cleanup_failed_connect()
                 return False
 
             # Detect the node with FC44, then establish the connection via 0x0000.
             if not self._establish_connection(slave_id):
-                _log_error("Failed to establish CANFD connection at gear=0x%02X", gear)
+                logger.error("Failed to establish CANFD connection at gear=0x%02X", gear)
                 self._cleanup_failed_connect()
                 return False
 
@@ -362,7 +302,7 @@ class CanfdComm(IComm):
             )
             return True
         except Exception as exc:
-            _log_error("CANFD connect failed: %s", exc)
+            logger.error("CANFD connect failed: %s", exc)
             self._cleanup_failed_connect()
             return False
 
@@ -400,6 +340,11 @@ class CanfdComm(IComm):
     def is_connected(self) -> bool:
         """Return whether the CANFD device is connected."""
         return self._connected
+
+    def _ensure_transport(self) -> CanfdTransport:
+        if self._transport is None:
+            raise RuntimeError("Device is not connected")
+        return self._transport
 
     def _start_keepalive_locked(self) -> None:
         """Start the keep-alive thread if it is not already running."""
@@ -571,7 +516,7 @@ class CanfdComm(IComm):
                 (connection_timer_ms >> 16) & 0xFFFF,
                 connection_timer_ms & 0xFFFF,
             )
-        if not self._transport.write_registers(
+        if not self._ensure_transport().write_registers(
             self._src_id,
             slave_id,
             REG_CONNECTION_CONTROL,
@@ -592,65 +537,25 @@ class CanfdComm(IComm):
         The register carries the target ID in the high byte and the execute
         bit in the low byte; the new node ID answers as soon as it is applied.
         """
-        if not 0 < slave_id <= 0x3F:
-            raise ValueError("CANFD slave_id must be in range 1..63")
+        if not self.is_connected():
+            raise RuntimeError("Device is not connected")
         try:
-            self._transport.write_registers(
+            self._ensure_transport().write_registers(
                 self._src_id,
                 self._slave_id,
                 REG_SLAVE_ID,
                 struct.pack(">H", (slave_id << 8) | 0x01),
             )
+            if not self._wait_command_result(REG_MODIFY_ID_STATUS, device_id=slave_id):
+                logger.error("Device rejected CANFD node ID 0x%02X", slave_id)
+                return False
         except Exception as exc:
             logger.error("Failed to set CANFD slave ID to 0x%02X: %s", slave_id, exc)
-            return False
-        if not self._wait_command_result(REG_MODIFY_ID_STATUS, device_id=slave_id):
-            logger.error("Device rejected CANFD node ID 0x%02X", slave_id)
             return False
         self._slave_id = slave_id
         return True
 
-    def set_connection_watchdog(self, timeout_ms: int) -> bool:
-        """Write the connection watchdog to holding registers 0x0001~0x0002.
-
-        The 32-bit timeout is stored high word first and takes effect
-        immediately; 0 disables the connection check. The value is not saved
-        to Flash and is re-applied on the next connect.
-        """
-        if not 0 <= timeout_ms <= 0xFFFFFFFF:
-            raise ValueError("timeout_ms must be in range 0..4294967295")
-        try:
-            if not self._transport.write_registers(
-                self._src_id,
-                self._slave_id,
-                REG_CONNECTION_TIMER,
-                struct.pack(
-                    ">HH",
-                    (timeout_ms >> 16) & 0xFFFF,
-                    timeout_ms & 0xFFFF,
-                ),
-            ):
-                return False
-        except Exception as exc:
-            logger.error(
-                "Failed to set CANFD connection watchdog to %d ms: %s",
-                timeout_ms,
-                exc,
-            )
-            return False
-        self._connection_watchdog_ms = timeout_ms
-        if 0 < timeout_ms < self._KEEPALIVE_INTERVAL_SEC * 1000:
-            logger.warning(
-                "CANFD connection watchdog %d ms is below the %d ms keep-alive interval",
-                timeout_ms,
-                int(self._KEEPALIVE_INTERVAL_SEC * 1000),
-            )
-        return True
-
-    def set_baudrate_config(
-        self,
-        baudrate_gear: int | None = None,
-    ) -> bool:
+    def set_baudrate(self, baudrate: int) -> bool:
         """Write the baud rate gear to holding register 0x0004.
 
         The value is saved to Flash and takes effect after the next power-up.
@@ -658,8 +563,8 @@ class CanfdComm(IComm):
         bitrate and their sample points.
 
         Args:
-            baudrate_gear: Gear stored in the register's high byte; the low
-                byte is 0x01 to execute the configuration. Defaults to 0x07.
+            baudrate: Gear stored in the register's high byte; the low
+                byte is 0x01 to execute the configuration.
                 Each entry below lists arbitration bitrate/sample point,
                 followed by data bitrate/sample point:
                 0x00: 500 Kbit/s at 80%, 800 Kbit/s at 80%.
@@ -675,12 +580,14 @@ class CanfdComm(IComm):
         Returns:
             True if the device accepted the configuration.
         """
-        gear = baudrate_gear if baudrate_gear is not None else CANFD_DEFAULT_BAUDRATE_GEAR
+        if not self.is_connected():
+            raise RuntimeError("Device is not connected")
+        gear = baudrate
         if gear not in CANFD_BAUDRATE_GEAR_MAP:
             logger.error("Invalid CANFD baudrate gear: %s", gear)
             return False
         try:
-            self._transport.write_registers(
+            self._ensure_transport().write_registers(
                 self._src_id,
                 self._slave_id,
                 BAUDRATE_CONFIG_REGISTER,
@@ -690,22 +597,6 @@ class CanfdComm(IComm):
             logger.error("Failed to set CANFD baudrate config to gear 0x%02X: %s", gear, exc)
             return False
         return self._wait_command_result(REG_MODIFY_BAUD_STATUS)
-
-    def get_default_baudrate_gear(self) -> int | None:
-        """Return the CANFD default baud rate gear."""
-        return self._DEFAULT_BAUDRATE_GEAR
-
-    def describe_baudrate_config(self, baudrate_gear: int | None = None) -> str:
-        """Return a human-readable CANFD baud rate configuration description."""
-        gear = baudrate_gear if baudrate_gear is not None else self._DEFAULT_BAUDRATE_GEAR
-        (abit, abit_sample), (dbit, dbit_sample) = CANFD_BAUDRATE_GEAR_MAP.get(
-            gear, ((None, None), (None, None))
-        )
-        return (
-            f"Baudrate config set to gear 0x{gear:02X} "
-            f"(abit={abit}/{abit_sample}%, dbit={dbit}/{dbit_sample}%, "
-            "effective after reboot)"
-        )
 
     # ------------------------------------------------------------------
     # Joint control
@@ -726,7 +617,7 @@ class CanfdComm(IComm):
             len(registers),
         )
         try:
-            self._transport.write_registers(
+            self._ensure_transport().write_registers(
                 self._src_id,
                 self._slave_id,
                 address,
@@ -742,7 +633,7 @@ class CanfdComm(IComm):
     def _set_hand_enabled(self, enabled: bool) -> bool:
         if self._profile.mode_register is None:
             return False
-        self._transport.write_registers(
+        self._ensure_transport().write_registers(
             self._src_id,
             self._slave_id,
             self._profile.mode_register,
@@ -759,7 +650,7 @@ class CanfdComm(IComm):
         if not self._set_hand_enabled(True):
             return False
         for joint_id, base_addr in self._profile.joint_control_addresses.items():
-            self._transport.write_registers(
+            self._ensure_transport().write_registers(
                 self._src_id,
                 self._slave_id,
                 base_addr,
@@ -778,22 +669,22 @@ class CanfdComm(IComm):
     # ------------------------------------------------------------------
 
     def get_joints(self) -> list:
-        """Retrieve the current state of all valid joints."""
-        if not self._config.valid_joints:
+        """Retrieve the current state of all joints."""
+        if not self._config.all_joints:
             return []
-        start, count = get_joint_input_span(self._config.valid_joints, self._profile)
+        start, count = get_joint_input_span(self._config.all_joints, self._profile)
         if count == 0:
             return []
-        raw_bytes = self._transport.read_registers(
+        raw_bytes = self._ensure_transport().read_registers(
             self._src_id, self._slave_id, start, count, func_code=0x04
         )
         # Convert bytes back to uint16 register list for the shared codec.
         raw = list(struct.unpack(f">{count}H", raw_bytes[: count * 2]))
-        return parse_joints(raw, self._config.valid_joints, self._profile, start)
+        return parse_joints(raw, self._config.all_joints, self._profile, start)
 
     def get_hand_info(self) -> HandData:
         """Retrieve high-level hand status."""
-        raw_bytes = self._transport.read_registers(
+        raw_bytes = self._ensure_transport().read_registers(
             self._src_id,
             self._slave_id,
             self._profile.hand_info_address,
@@ -805,7 +696,7 @@ class CanfdComm(IComm):
 
     def get_hand_state_machine(self) -> HandRuntimeState | int:
         """Retrieve the Modbus whole-hand runtime state."""
-        raw_bytes = self._transport.read_registers(
+        raw_bytes = self._ensure_transport().read_registers(
             self._src_id,
             self._slave_id,
             REG_HAND_STATE_MACHINE,
@@ -820,7 +711,7 @@ class CanfdComm(IComm):
         if not self._config.has_tactile:
             return {}
         # Read state + resultant forces (16 registers from 0x1110)
-        raw_bytes = self._transport.read_registers(
+        raw_bytes = self._ensure_transport().read_registers(
             self._src_id,
             self._slave_id,
             self._profile.tactile_state_address,
@@ -844,7 +735,7 @@ class CanfdComm(IComm):
 
             # Read distributed force for this region
             dist_regs = (region.count * 3 + 1) // 2
-            dist_bytes = self._transport.read_registers(
+            dist_bytes = self._ensure_transport().read_registers(
                 self._src_id, self._slave_id, current_addr, dist_regs, func_code=0x04
             )
             distributed = parse_tactile_distributed(dist_bytes, region.count)
@@ -861,7 +752,7 @@ class CanfdComm(IComm):
 
     def _read_input_bytes(self, addr: int, count: int) -> bytes:
         """Helper to read input registers and return raw bytes."""
-        return self._transport.read_registers(
+        return self._ensure_transport().read_registers(
             self._src_id, self._slave_id, addr, count, func_code=0x04
         )
 
@@ -869,6 +760,8 @@ class CanfdComm(IComm):
         try:
             return parse(self._read_input_bytes(addr, count)) or "N/A"
         except Exception:
+            if not self.is_connected():
+                raise
             return "N/A"
 
     def get_device_name(self) -> str:
@@ -881,12 +774,16 @@ class CanfdComm(IComm):
         try:
             return parse_ascii_serial_number(self._read_input_bytes(REG_SERIAL_NUMBER, 10))
         except Exception:
+            if not self.is_connected():
+                raise
             return "N/A"
 
     def get_hand_type(self) -> int:
         try:
             return parse_hand_type(self._read_input_bytes(REG_HAND_TYPE, 1))
         except Exception:
+            if not self.is_connected():
+                raise
             return 0
 
     def _get_packed_version(self, register: int) -> str:
@@ -896,6 +793,8 @@ class CanfdComm(IComm):
                 return "N/A"
             return parse_packed_firmware_version(raw)
         except Exception:
+            if not self.is_connected():
+                raise
             return "N/A"
 
     def get_firmware_package_version(self) -> str:
@@ -936,7 +835,7 @@ class CanfdComm(IComm):
             command: low-byte command value (1=enable, 2=disable, 4=zero).
         """
         baseline = self._read_input_word(REG_TACTILE_CTRL_STATUS)
-        if not self._transport.write_registers(
+        if not self._ensure_transport().write_registers(
             self._src_id,
             self._slave_id,
             self._profile.tactile_control_address,
@@ -990,7 +889,7 @@ class CanfdComm(IComm):
     def clear_fault(self) -> bool:
         """Clear device faults via the mailbox (writing full value 1)."""
         baseline = self._read_input_word(REG_FAULT_CLEAR_STATUS)
-        if not self._transport.write_registers(
+        if not self._ensure_transport().write_registers(
             self._src_id, self._slave_id, REG_CLEAR_FAULT, struct.pack(
                 ">H", 0x0001)
         ):
@@ -1086,12 +985,12 @@ class CanfdComm(IComm):
                 if not self._connected:
                     break
 
-                if not self._config.valid_joints:
+                if not self._config.all_joints:
                     time.sleep(self._poll_interval_sec)
                     continue
 
                 joint_start, joint_count = get_joint_input_span(
-                    self._config.valid_joints, self._profile
+                    self._config.all_joints, self._profile
                 )
                 if joint_count == 0:
                     time.sleep(self._poll_interval_sec)
@@ -1110,7 +1009,7 @@ class CanfdComm(IComm):
                 hand_state = parse_hand_info(raw[hand_offset:hand_offset + 14])
                 joints = parse_joints(
                     raw,
-                    self._config.valid_joints,
+                    self._config.all_joints,
                     self._profile,
                     start,
                 )

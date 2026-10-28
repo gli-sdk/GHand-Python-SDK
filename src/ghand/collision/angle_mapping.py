@@ -11,12 +11,14 @@ from typing import Iterable, Sequence
 
 import numpy as np
 
+from ..types import JointId
 from .datatypes import JOINT_NAMES
 from .passive_dip_mapping import JOINT_ORDER
 from .read_data import read_urdf_xml
 
 
 SDK_JOINT_ORDER = JOINT_ORDER
+COLLISION_JOINT_ORDER = tuple(JointId[name.upper()] for name in SDK_JOINT_ORDER)
 EXTERNAL_JOINT_ORDER = SDK_JOINT_ORDER
 PASSIVE_JOINT_NAMES = frozenset({"LF_DIP", "RF_DIP", "MF_DIP", "FF_DIP", "Thumb_IP"})
 ACTIVE_JOINT_NAMES = tuple(n for n in JOINT_NAMES if n not in PASSIVE_JOINT_NAMES)
@@ -149,6 +151,7 @@ INTERNAL_TO_EXTERNAL_INDEX_MAP = tuple(range(len(SDK_JOINT_ORDER)))
 
 __all__ = [
     "SDK_JOINT_ORDER",
+    "COLLISION_JOINT_ORDER",
     "EXTERNAL_JOINT_ORDER",
     "ACTIVE_JOINT_NAMES",
     "DIP_JOINT_NAMES",

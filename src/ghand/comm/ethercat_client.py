@@ -478,7 +478,7 @@ class EthercatClient:
         """
         with self._data_lock:
             if self._connection_lost:
-                raise RuntimeError("Device disconnected")
+                raise RuntimeError("Device is not connected")
             if not self._has_valid_process_data or self._last_valid_tpdo_snapshot is None:
                 raise RuntimeError(
                     f"No valid EtherCAT process data yet (WKC={self._actual_wkc})"
@@ -501,7 +501,7 @@ class EthercatClient:
         """
         with self._data_lock:
             if self._connection_lost:
-                raise RuntimeError("Device disconnected")
+                raise RuntimeError("Device is not connected")
             if not self._has_valid_process_data:
                 raise RuntimeError(
                     f"Cannot send command without valid EtherCAT process data "
@@ -523,7 +523,7 @@ class EthercatClient:
                 logger.debug("Sending %d bytes:\n%s", len(data), hex_str)
                 self._slave.output = data
             else:
-                raise RuntimeError("Device disconnected")
+                raise RuntimeError("Device is not connected")
 
     def search(self) -> list[str]:
         """Discover available network interfaces.
@@ -757,7 +757,7 @@ class EthercatClient:
         """
         with self._data_lock:
             if self._slave is None:
-                raise RuntimeError("Device disconnected")
+                raise RuntimeError("Device is not connected")
             return self._slave.sdo_read(index, subindex)
 
     def sdo_write(self, index, subindex, value):
@@ -776,5 +776,5 @@ class EthercatClient:
         """
         with self._data_lock:
             if self._slave is None:
-                raise RuntimeError("Device disconnected")
+                raise RuntimeError("Device is not connected")
             return self._slave.sdo_write(index, subindex, value)

@@ -15,15 +15,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Device error codes, diagnostic results, and SDK errors."""
+"""Device error codes and diagnostic results."""
 
 from __future__ import annotations
 
 import enum
-from dataclasses import dataclass
-from enum import Enum
 
-from .enums import CommType
 
 
 class JointErrorCode(enum.IntEnum):
@@ -167,23 +164,3 @@ class HandCriticalError(enum.IntFlag):
     TEMPERATURE_TOO_HIGH = 1 << 6
     TEMPERATURE_TOO_LOW = 1 << 7
     ZEROING_GLOBAL_TIMEOUT = 1 << 8
-
-
-class SdkError(Enum):
-    OK = "ok"
-    NOT_CONNECTED = "not_connected"
-    INVALID_ARGUMENT = "invalid_argument"
-    NOT_SUPPORTED = "not_supported"
-    TIMEOUT = "timeout"
-    TRANSPORT_ERROR = "transport_error"
-    PROTOCOL_ERROR = "protocol_error"
-    CONFIG_ERROR = "config_error"
-    DEVICE_REJECTED = "device_rejected"
-    INTERNAL_ERROR = "internal_error"
-
-
-@dataclass(frozen=True)
-class OperationResult:
-    code: SdkError = SdkError.OK
-    message: str = ""
-    comm: CommType | None = None

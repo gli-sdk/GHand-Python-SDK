@@ -14,7 +14,7 @@
     { "id": "LF_PIP" },
     { "id": "LF_MCP",      "min": 0.0, "max": 100.0 }
   ],
-  "has_tactile": true,
+  "has_tactile": false,
   "tactile_regions": [
     { "id": "THUMB", "count": 80 },
     { "id": "FF",    "count": 80 },

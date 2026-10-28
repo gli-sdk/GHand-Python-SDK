@@ -2,7 +2,7 @@
 Example: Switch RS485/CANFD baud-rate configuration.
 
 The new baud-rate configuration is stored by the device and takes effect after
-the next power-up. After power cycling the device, pass the new baud_rate value
+the next power-up. After power cycling the device, pass the new baudrate value
 to open().
 """
 
@@ -40,12 +40,12 @@ def main():
     hand = GHand(product_type=ProductType.GHand5, comm_type=comm_type)
 
     print("Connecting with current baud-rate configuration...")
-    if not hand.open(device_id, slave_id=slave_id, baud_rate=current_baud_rate):
+    if not hand.open(device_id, slave_id=slave_id, baudrate=current_baud_rate):
         print("Connection failed")
         return
 
     print(f"Writing new baud-rate configuration: {target_baud_rate.name}")
-    if not hand.set_baudrate_config(target_baud_rate):
+    if not hand.set_baudrate(target_baud_rate):
         print("Failed to write baud-rate configuration")
         hand.close()
         return
@@ -53,13 +53,8 @@ def main():
     hand.close()
     print("Baud-rate configuration written successfully.")
 
-    print(f"Preparing CANFD adapter listener at {target_baud_rate.name}...")
-    if not hand.prepare_canfd_baudrate_listener(device_id, target_baud_rate):
-        print("Failed to prepare CANFD adapter listener")
-        return
-
     input("Power-cycle the device now, then press Enter to reconnect...")
-    if hand.open(device_id, slave_id=slave_id, baud_rate=target_baud_rate):
+    if hand.open(device_id, slave_id=slave_id, baudrate=target_baud_rate):
         print("Reconnected with the new baud-rate configuration.")
     else:
         print("Failed to reconnect with the new baud-rate configuration.")

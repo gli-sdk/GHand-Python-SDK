@@ -35,9 +35,8 @@ class ProductConfig:
 
     name: str = ""
     model: str = ""
-    valid_joints: list[JointId] = field(default_factory=list)
-    joint_limits: dict[JointId, tuple[float, float]] = field(default_factory=dict)
+    all_joints: list[JointId] = field(default_factory=list)
+    active_joints: dict[JointId, tuple[float, float]] = field(default_factory=dict)
     has_tactile: bool = False
     tactile_regions: list[TactileRegionConfig] = field(default_factory=list)
     product_type: ProductType | None = None
-    slave_id: int = 0x31

@@ -102,20 +102,21 @@ REG_HAND_STATE_MACHINE = 0x1048
 
 
 def build_controllable_joint_addresses(
-    valid_joints: list[JointId],
-    joint_limits: dict[JointId, tuple[float, float]],
+    all_joints: list[JointId],
+    active_joint_limits: dict[JointId, tuple[float, float]],
     base_address: int = 0x0261,
     stride: int = 6,
 ) -> dict[JointId, int]:
     """Build controllable joint register address mapping from config.
 
-    Only joints in joint_limits (active joints) are assigned control register
-    addresses. Addresses are allocated sequentially in the order joints appear
-    in valid_joints, starting from base_address with stride between each.
+    Only joints in active_joint_limits (active joints) are assigned control
+    register addresses. Addresses are allocated sequentially in the order
+    joints appear in all_joints, starting from base_address with stride
+    between each.
 
     Args:
-        valid_joints: All product joints (active + passive).
-        joint_limits: Active joint limits dict (only active joints have min/max).
+        all_joints: All product joints (active + passive).
+        active_joint_limits: Active joint limits dict (only active joints have min/max).
         base_address: Starting register address (default 0x0261).
         stride: Register stride between joints (default 6).
 
@@ -125,8 +126,8 @@ def build_controllable_joint_addresses(
     controllable_map = {}
     address_offset = 0
 
-    for joint_id in valid_joints:
-        if joint_id in joint_limits:
+    for joint_id in all_joints:
+        if joint_id in active_joint_limits:
             controllable_map[joint_id] = base_address + address_offset
             address_offset += stride
 
@@ -143,12 +144,12 @@ def build_modbus_profile_from_config(config) -> ModbusRegisterProfile:
         Dynamically generated Modbus register profile.
     """
     joint_input_addresses = {
-        joint_id: 0x105F + joint_id.value * 5 for joint_id in config.valid_joints
+        joint_id: 0x105F + joint_id.value * 5 for joint_id in config.all_joints
     }
 
     joint_control_addresses = build_controllable_joint_addresses(
-        valid_joints=config.valid_joints,
-        joint_limits=config.joint_limits,
+        all_joints=config.all_joints,
+        active_joint_limits=config.active_joints,
         base_address=0x0261,
         stride=6,
     )
@@ -174,8 +175,8 @@ def get_modbus_profile(config_or_name=None) -> ModbusRegisterProfile:
         Dynamically generated Modbus register profile from config file.
     """
     # If passed a ProductConfig, use it directly
-    if hasattr(config_or_name, "valid_joints") and hasattr(
-        config_or_name, "joint_limits"
+    if hasattr(config_or_name, "all_joints") and hasattr(
+        config_or_name, "active_joints"
     ):
         return build_modbus_profile_from_config(config_or_name)
 
@@ -191,12 +192,12 @@ def get_modbus_profile(config_or_name=None) -> ModbusRegisterProfile:
 
 
 def get_joint_input_span(
-    valid_joints: list[JointId], profile: ModbusRegisterProfile
+    all_joints: list[JointId], profile: ModbusRegisterProfile
 ) -> tuple[int, int]:
-    """Return the smallest contiguous input-register span covering valid joints."""
+    """Return the smallest contiguous input-register span covering all joints."""
     addresses = [
         profile.joint_input_addresses[joint_id]
-        for joint_id in valid_joints
+        for joint_id in all_joints
         if joint_id in profile.joint_input_addresses
     ]
     if not addresses:
@@ -340,18 +341,18 @@ def parse_joint_data(raw: list[int], offset: int, joint_id: int) -> JointData:
 
 def parse_joints(
     raw: list[int],
-    valid_joints: list[JointId],
+    all_joints: list[JointId],
     profile: ModbusRegisterProfile | None = None,
     start_address: int = 0x105F,
 ) -> list[JointData]:
-    """Parse joint data for all valid joints from a contiguous register block.
+    """Parse joint data for all joints from a contiguous register block.
 
     The block starts at ``start_address``.  Each product profile maps logical
     JointId values to its own register addresses.
     """
     profile = profile or get_modbus_profile(ProductType.GHand5)
     joints = []
-    for joint_id in valid_joints:
+    for joint_id in all_joints:
         address = profile.joint_input_addresses.get(joint_id)
         if address is None:
             continue
