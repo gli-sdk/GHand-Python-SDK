@@ -19,9 +19,9 @@ def data_callback(data):
     print("Received device data:")
     print(f"  Hand state: {data.hand}")
     for joint in data.joints:
-        print(f"  {JointId(joint.id).name}: angle={joint.angle:.1f}deg, "
-              f"velocity={joint.velocity}, current={joint.current}, "
-              f"state={joint.state}, error={joint.error}")
+        print(
+            f"{JointId(joint.id).name:<13}-\tangle: {joint.angle:<3.1f}(deg),\tvelocity: {joint.velocity:<3},\tcurrent: {joint.current:<3}, \tcontrol_mode:{joint.control_mode}({(joint.control_mode).name:<7}),\tloop_type:{joint.loop_type}({(joint.loop_type).name:<15}),\tstate:{joint.state}({(joint.state).name:<8}),\terror:{joint.error}({(joint.error).name}),"
+        )
     if data.tactile:
         for sensor_id, tactile in data.tactile.items():
             print(f"  Tactile {sensor_id.name}: state={tactile.state}, "

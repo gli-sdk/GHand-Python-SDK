@@ -37,7 +37,7 @@ class JointCommand:
     id: JointId = JointId.THUMB_IP  # Target joint ID; see JointId.
     control_mode: JointControlMode = JointControlMode.POSITION  # Joint control mode.
     loop_type: JointLoopType = JointLoopType.CLOSED_LOOP  # Only effective in hand CUSTOM mode.
-    control_state: JointControlState = JointControlState.DISABLED  # Disable, run, or stop and hold the joint.
+    control_state: JointControlState = JointControlState.RUNNING  # Disable, run, or stop and hold the joint.
     angle: float = 0.0  # Target angle in degrees; see the corresponding product JSON in src/ghand/config/ for joint limits.
     velocity: int = 0  # Target velocity (%), range: -100 to 100; recommended magnitude <= 5% in MIT mode.
     current: int = 0  # Target current (%), range: -100 to 100; recommended magnitude <= 20% in MIT mode.

@@ -60,7 +60,7 @@ def main():
                 JointCommand(id=JointId.MF_PIP, current=8),
             ]
 
-            result = hand.move_joints(current_joints, mode=HandControlMode.CURRENT)
+            result = hand.move_joints(current_joints, hand_control_mode=HandControlMode.CURRENT)
             if result:
                 while True:
                     time.sleep(2)
@@ -73,10 +73,9 @@ def main():
                                 JointId.FF_PIP,
                                 JointId.MF_PIP,
                         ]:
-                            print(f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\t"
-                                  f"error:{joint.error:<30},\t"
-                                  f"angle: {joint.angle:.2f}deg,\t"
-                                  f"velocity: {joint.velocity},\tcurrent: {joint.current}")
+                            print(
+                                f"{JointId(joint.id).name:<13}-\tangle: {joint.angle:<3.1f}(deg),\tvelocity: {joint.velocity:<3},\tcurrent: {joint.current:<3}, \tcontrol_mode:{joint.control_mode}({(joint.control_mode).name:<7}),\tloop_type:{joint.loop_type}({(joint.loop_type).name:<15}),\tstate:{joint.state}({(joint.state).name:<8}),\terror:{joint.error}({(joint.error).name}),"
+                            )
             else:
                 print("Failed to send current command")
                 break

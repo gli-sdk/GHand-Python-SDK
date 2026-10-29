@@ -96,7 +96,7 @@ def main():
         if current_joints:
             joint = current_joints[2]
             print(
-                f"  {JointId(joint.id).name:<15}- Angle: {joint.angle:.2f} deg,\tVelocity: {joint.velocity},\tCurrent: {joint.current}"
+                f"{JointId(joint.id).name:<13}-\tangle: {joint.angle:<3.1f}(deg),\tvelocity: {joint.velocity:<3},\tcurrent: {joint.current:<3}, \tcontrol_mode:{joint.control_mode}({(joint.control_mode).name:<7}),\tloop_type:{joint.loop_type}({(joint.loop_type).name:<15}),\tstate:{joint.state}({(joint.state).name:<8}),\terror:{joint.error}({(joint.error).name}),"
             )
 
     joints1.append(JointCommand(id=JointId.THUMB_MCP, angle=0, velocity=100,
@@ -120,7 +120,7 @@ def main():
         if current_joints2:
             joint = current_joints2[7]
             print(
-                f"  {JointId(joint.id).name:<15}- Angle: {joint.angle:.2f} deg,\tVelocity: {joint.velocity},\tCurrent: {joint.current}"
+                f"{JointId(joint.id).name:<13}-\tangle: {joint.angle:<3.1f}(deg),\tvelocity: {joint.velocity:<3},\tcurrent: {joint.current:<3}, \tcontrol_mode:{joint.control_mode}({(joint.control_mode).name:<7}),\tloop_type:{joint.loop_type}({(joint.loop_type).name:<15}),\tstate:{joint.state}({(joint.state).name:<8}),\terror:{joint.error}({(joint.error).name}),"
             )
 
     # Close connections when program ends

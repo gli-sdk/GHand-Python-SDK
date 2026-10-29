@@ -116,11 +116,6 @@ class EthercatComm(IComm):
         self._config = layout
         self._expected_tpdo_size = input_size
         self._tpdo_size_selected = True
-        logger.info(
-            "Selected EtherCAT TPDO layout: input=%s, tactile_counts=%s",
-            input_size,
-            [r.count for r in self._config.tactile_regions] if self._config.has_tactile else [],
-        )
 
     def update_config(self, config: ProductConfig) -> None:
         """Update the cached product configuration and derived constants."""

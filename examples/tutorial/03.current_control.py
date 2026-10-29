@@ -21,6 +21,19 @@ def main():
         print("This demo controls finger joints using current mode")
         print("Current values control the force applied by each joint\n")
 
+        current_joint_ids = (
+            JointId.THUMB_MCP,
+            JointId.THUMB_TMC_FE,
+            JointId.FF_PIP,
+            JointId.FF_MCP,
+            JointId.MF_PIP,
+            JointId.MF_MCP,
+            JointId.RF_PIP,
+            JointId.RF_MCP,
+            JointId.LF_PIP,
+            JointId.LF_MCP,
+        )
+
         # current control cycle
         cycle_count = 0
         max_cycles = 0  # Set to 0 for infinite loop
@@ -35,31 +48,19 @@ def main():
             # Step 1: Apply current to close fingers
             print("\nStep 1: Applying current to close fingers (current=10)")
             joints = []
-            for joint_id in [
-                    JointId.THUMB_MCP,
-                    JointId.THUMB_TMC_FE,
-                    JointId.FF_PIP,
-                    JointId.FF_MCP,
-                    JointId.MF_PIP,
-                    JointId.MF_MCP,
-                    JointId.RF_PIP,
-                    JointId.RF_MCP,
-                    JointId.LF_PIP,
-                    JointId.LF_MCP,
-            ]:
+            for joint_id in current_joint_ids:
                 joints.append(JointCommand(id=joint_id, current=10))
 
-            result = hand.move_joints(joints, mode=HandControlMode.CURRENT)
+            result = hand.move_joints(joints, hand_control_mode=HandControlMode.CURRENT)
             if result:
                 time.sleep(2)
                 current_joints = hand.get_joints()
                 print("Current joint states:")
                 for joint in current_joints:
                     if joint.id in [JointId.THUMB_MCP, JointId.FF_PIP, JointId.MF_PIP]:
-                        print(f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\t"
-                              f"error:{joint.error:<30},\t"
-                              f"angle: {joint.angle:.2f}deg,\t"
-                              f"velocity: {joint.velocity},\tcurrent: {joint.current}")
+                        print(
+                            f"{JointId(joint.id).name:<13}-\tangle: {joint.angle:<3.1f}(deg),\tvelocity: {joint.velocity:<3},\tcurrent: {joint.current:<3}, \tcontrol_mode:{joint.control_mode}({(joint.control_mode).name:<7}),\tloop_type:{joint.loop_type}({(joint.loop_type).name:<15}),\tstate:{joint.state}({(joint.state).name:<8}),\terror:{joint.error}({(joint.error).name}),"
+                        )
             else:
                 print("Failed to send current command")
                 break
@@ -67,31 +68,19 @@ def main():
             # Step 2: Release grip (zero current)
             print("\nStep 2: Opening fingers (current=-10)")
             joints = []
-            for joint_id in [
-                    JointId.THUMB_MCP,
-                    JointId.THUMB_TMC_FE,
-                    JointId.FF_PIP,
-                    JointId.FF_MCP,
-                    JointId.MF_PIP,
-                    JointId.MF_MCP,
-                    JointId.RF_PIP,
-                    JointId.RF_MCP,
-                    JointId.LF_PIP,
-                    JointId.LF_MCP,
-            ]:
+            for joint_id in current_joint_ids:
                 joints.append(JointCommand(id=joint_id, current=-10))
 
-            result = hand.move_joints(joints, mode=HandControlMode.CURRENT)
+            result = hand.move_joints(joints, hand_control_mode=HandControlMode.CURRENT)
             if result:
                 time.sleep(2)
                 current_joints = hand.get_joints()
                 print("Current joint states (released):")
                 for joint in current_joints:
                     if joint.id in [JointId.THUMB_MCP, JointId.FF_PIP, JointId.MF_PIP]:
-                        print(f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\t"
-                              f"error:{joint.error:<30},\t"
-                              f"angle: {joint.angle:.2f}deg,\t"
-                              f"velocity: {joint.velocity},\tcurrent: {joint.current}")
+                        print(
+                            f"{JointId(joint.id).name:<13}-\tangle: {joint.angle:<3.1f}(deg),\tvelocity: {joint.velocity:<3},\tcurrent: {joint.current:<3}, \tcontrol_mode:{joint.control_mode}({(joint.control_mode).name:<7}),\tloop_type:{joint.loop_type}({(joint.loop_type).name:<15}),\tstate:{joint.state}({(joint.state).name:<8}),\terror:{joint.error}({(joint.error).name}),"
+                        )
             else:
                 print("Failed to send current command")
                 break

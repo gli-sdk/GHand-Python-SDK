@@ -89,9 +89,9 @@ def main():
         joints = hand.get_joints()
         print(f"\nhand_{i}: {len(joints)} joints")
         for joint in joints:
-            print(f"  {JointId(joint.id).name:<15}"
-                  f"angle: {joint.angle:.2f} deg, "
-                  f"velocity: {joint.velocity}, current: {joint.current}")
+            print(
+                f"{JointId(joint.id).name:<13}-\tangle: {joint.angle:<3.1f}(deg),\tvelocity: {joint.velocity:<3},\tcurrent: {joint.current:<3}, \tcontrol_mode:{joint.control_mode}({(joint.control_mode).name:<7}),\tloop_type:{joint.loop_type}({(joint.loop_type).name:<15}),\tstate:{joint.state}({(joint.state).name:<8}),\terror:{joint.error}({(joint.error).name}),"
+            )
 
     # Step 7: Close all connections
     print("\nClosing all connections...")

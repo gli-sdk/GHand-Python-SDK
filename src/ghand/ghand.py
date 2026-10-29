@@ -330,7 +330,6 @@ class GHand:
         """
         try:
             self._comm.disconnect()
-            logger.info("Disconnected from device")
         finally:
             self._tactile_opened = False
         return True
