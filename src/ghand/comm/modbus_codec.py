@@ -29,6 +29,7 @@ from ..types import (
     ProductType,
     TactileSensorId,
     HandControlMode,
+    JointControlMode,
     JointLoopType,
     JointControlState,
     JointState,
@@ -288,7 +289,7 @@ def parse_joint_data(raw: list[int], offset: int, joint_id: int) -> JointData:
 
     Layout:
         Register N:   [error uint8][state uint8]
-        Register N+1: [stop uint8][mode uint8]
+        Register N+1: [reserved uint8][loop type uint4][control mode uint4]
         Register N+2: angle int16, unit 0.1 deg
         Register N+3: velocity int16, unit 1%
         Register N+4: current int16, unit 1%
@@ -301,7 +302,6 @@ def parse_joint_data(raw: list[int], offset: int, joint_id: int) -> JointData:
     status_byte = raw[offset] & 0xFF
     error_byte = (raw[offset] >> 8) & 0xFF
     mode = raw[offset + 1] & 0xFF
-    stop = (raw[offset + 1] >> 8) & 0xFF
     angle_raw = raw[offset + 2]
     if angle_raw >= 32768:
         angle_raw -= 65536
@@ -319,8 +319,8 @@ def parse_joint_data(raw: list[int], offset: int, joint_id: int) -> JointData:
         id=joint_id,
         state=_parse_joint_state(status_byte),
         error=_parse_joint_error_code(error_byte),
-        mode=mode,
-        stop=stop,
+        control_mode=parse_device_value(JointControlMode, mode & 0x0F),
+        loop_type=parse_device_value(JointLoopType, mode >> 4),
         angle=angle,
         velocity=velocity,
         current=current,
@@ -410,7 +410,7 @@ def encode_hand_control(mode: HandControlMode, enabled: bool) -> int:
 
 def resolve_joint_mode(joint, mode: HandControlMode, default_mode: int = 0) -> int:
     """Resolve the mode encoded in a per-joint control register."""
-    joint_mode = getattr(joint, "mode", None)
+    joint_mode = joint.control_mode if mode == HandControlMode.CUSTOM else mode
     if joint_mode is None:
         joint_mode = default_mode if mode == HandControlMode.CUSTOM else mode
     mode_value = joint_mode.value if isinstance(joint_mode, HandControlMode) else int(joint_mode)
@@ -421,7 +421,8 @@ def resolve_joint_mode(joint, mode: HandControlMode, default_mode: int = 0) -> i
             HandControlMode.MIT.value,
     ):
         raise ValueError(f"Invalid per-joint control mode: {mode_value}")
-    loop_type = JointLoopType(joint.closed_loop_type)
+    loop_type = (JointLoopType(joint.loop_type) if mode == HandControlMode.CUSTOM else
+                 JointLoopType.CLOSED_LOOP)
     return (mode_value & 0x0F) | (loop_type.value << 4)
 
 
@@ -453,7 +454,7 @@ def encode_joint_command(joint,
     """
     angle_raw = int(joint.angle * 10)
     mode_value = resolve_joint_mode(joint, mode, default_mode)
-    mode_stop = encode_joint_mode_stop(mode_value, joint.stop)
+    mode_stop = encode_joint_mode_stop(mode_value, joint.control_state)
     return [
         mode_stop,
         angle_raw & 0xFFFF,

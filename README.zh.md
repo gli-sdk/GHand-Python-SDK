@@ -1,6 +1,6 @@
 ﻿# GHand Python SDK
 
-[![Version](https://img.shields.io/badge/version-v3.0.0-blue.svg)](src/ghand/version.py)
+[![Version](https://img.shields.io/badge/version-v3.1.0-blue.svg)](src/ghand/version.py)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 
@@ -310,7 +310,7 @@ CAN-FD 波特率档位：
 - `examples/tutorial/05.tactile_callback.py`：触觉数据回调
 - `examples/tutorial/06.subscription_demo.py`：数据订阅
 - `examples/tutorial/07.multi_hand.py`：多手发现与连接
-- `examples/tutorial/13.tactile_display.py`：触觉显示，包含设备连接、订阅和退出清理
+- `examples/tutorial/15.tactile_display.py`：触觉显示，包含设备连接、订阅和退出清理
 - `examples/demo/`：动作和手势演示脚本
 - `examples/extension/`：碰撞检测和自适应抓取示例
 
@@ -318,17 +318,14 @@ CAN-FD 波特率档位：
 
 ```bash
 python -m pip install ".[tactile-display]"
-python examples/tutorial/13.tactile_display.py
+python examples/tutorial/15.tactile_display.py
 ```
 
-当前实机示例支持 GHand5 + EtherCAT。包内的
-`ghand.tactile_display.window.TactileWindow` 仅负责显示；已有 Qt 程序可创建窗口，
-捕获 `window.data_generation`，在订阅回调中调用
-`window.update_tactile(frame.tactile, generation)`。调用方管理设备和订阅，
-并通过 `set_connected()`、`set_command_result()` 更新按钮状态；
-`open_requested`、`close_requested`、`zero_requested` 只发出操作请求。
-调用 `clear()` 或 `invalidate()` 后，旧 generation 的回调会被拒绝，重新订阅时应捕获新值。
-关闭显示窗口不会取消调用方的订阅或关闭设备。
+示例通过 EtherCAT 连接 GHand5，将已连接的设备传入
+`ghand.tactile_display.display.TactileDisplay(hand)`。
+显示模块统一管理触觉开关、调零、订阅、工作线程和窗口关闭时的清理。
+调用方负责设备连接，在显示结束后断开连接。
+自定义数据源仍可使用纯显示组件 `ghand.tactile_display.window.TactileWindow`。
 
 ## 项目结构
 

@@ -22,6 +22,8 @@ def main():
     position_sensor_ver = hand.get_position_sensor_version()
     tactile_sensor_ver = hand.get_tactile_sensor_version()
     motor_ver = hand.get_motor_driver_version()
+    thumb_tactile_sensor_ver = hand.get_thumb_tactile_sensor_version()
+    finger_tactile_sensor_ver = hand.get_finger_tactile_sensor_version()
 
     # Output device information
     print(f"\tDevice Name: {hand_name}")
@@ -31,6 +33,8 @@ def main():
     print(f"\tPosition Sensor Version: {position_sensor_ver}")
     print(f"\tTactile Sensor Version: {tactile_sensor_ver}")
     print(f"\tMotor Driver Version: {motor_ver}")
+    print(f"\tThumb Tactile Sensor Version: {thumb_tactile_sensor_ver}")
+    print(f"\tFour-Finger Tactile Sensor Version: {finger_tactile_sensor_ver}")
     hand.close()
 
 

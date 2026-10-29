@@ -9,6 +9,12 @@
 #    loop_type only takes effect in CUSTOM.
 #    If a joint reports DISABLED, first check the enable state and error feedback; do not
 #    just increase velocity or current.
+# 4. FF_MCP (flexion/extension) and FF_MCP_AA (abduction/adduction) are coupled;
+#    both joint commands must be included for MCP movement. This example keeps
+#    FF_MCP_AA running with zero target velocity and the same current limit.
+#    JointCommand defaults to RUNNING only for commands actually supplied.
+#    Omitted EtherCAT joints retain their cached commands, initially DISABLED;
+#    omitting a joint is not equivalent to sending a zero-velocity RUNNING command.
 # move_joints() returning success only means the command was sent; confirm execution
 # with get_hand_info() and get_joints().
 # control_state: DISABLED (motor off), RUNNING, STOPPED (holding); whole-hand disabled
@@ -45,6 +51,7 @@ def main():
             JointId.THUMB_TMC_FE,
             JointId.FF_PIP,
             JointId.FF_MCP,
+            JointId.FF_MCP_AA,
             JointId.MF_PIP,
             JointId.MF_MCP,
             JointId.RF_PIP,
@@ -68,7 +75,10 @@ def main():
             print("\nStep 1: Closing fingers (velocity=100)")
             joints = []
             for joint_id in velocity_joint_ids:
-                joints.append(JointCommand(id=joint_id, velocity=100, current=100))
+                joints.append(
+                    JointCommand(id=joint_id,
+                                 velocity=0 if joint_id == JointId.FF_MCP_AA else 100,
+                                 current=100))
 
             result = hand.move_joints(joints, hand_control_mode=HandControlMode.VELOCITY)
             if result:
@@ -87,7 +97,10 @@ def main():
             print("\nStep 2: Opening fingers (velocity=-100)")
             joints = []
             for joint_id in velocity_joint_ids:
-                joints.append(JointCommand(id=joint_id, velocity=-100, current=100))
+                joints.append(
+                    JointCommand(id=joint_id,
+                                 velocity=0 if joint_id == JointId.FF_MCP_AA else -100,
+                                 current=100))
 
             result = hand.move_joints(joints, hand_control_mode=HandControlMode.VELOCITY)
             if result:

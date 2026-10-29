@@ -1,28 +1,20 @@
-"""MIT control: move the index MCP joint to two target angles."""
+"""MIT grasp demo: soft-close, hold after tactile contact, release after 5 s."""
 
 # Mode notes
-# 1. Whole-hand MIT (mode=3) parses every active joint in MIT mode and is not subject to
-#    the CUSTOM in-group mode consistency rule. Joint loop_type only takes effect in
-#    CUSTOM; other whole-hand modes use closed-loop by default.
-# 2. Even after the whole hand allows motion, each joint's control_state still decides
-#    execution: 0 disabled, 1 running, 2 stopped/holding.
-#    Whole-hand disabled takes priority over joint commands; a communication loss also
-#    leaves all joints idle.
-# MIT parameter conventions in the SDK: angle in degrees, velocity/current in %;
-# kp=10-2000, kd=0-50, and kp>kd; suggested |velocity|<=5%, |current|<=20%; tune the
-# gains for the actual load.
-# move_joints() returning success means the command was sent; judge actual execution
-# from the whole-hand and joint state feedback.
-
-# MIT velocity/current are target velocity/feedforward current, not limits; zero
-# feedforward does not mean the motor is disabled.
-# move_joints() returning success only means the command was sent; confirm execution
-# with get_hand_info() and get_joints().
-# control_state: DISABLED (motor off), RUNNING, STOPPED (holding); whole-hand disabled
-# takes priority.
-# close() only shuts down the communication link; it does not call stop() or
-# disable_hand(). To stop holding or release drive torque, explicitly send the
-# corresponding command and confirm the feedback before closing.
+# 1. Whole-hand MIT (mode=3) drives every active joint in MIT mode; the CUSTOM in-group
+#    mode consistency rule does not apply. Joint loop_type only takes effect in CUSTOM;
+#    other whole-hand modes default to closed loop.
+# 2. Within an enabled hand, each joint's control_state decides execution: 0 disabled,
+#    1 running, 2 stopped/holding. Whole-hand disabled takes priority, and a
+#    communication loss leaves all joints idle.
+# 3. MIT conventions: angle in degrees, velocity/current in %; kp=10-2000, kd=0-50,
+#    kp>kd; suggested |velocity|<=5%, |current|<=20%; tune the gains for the actual
+#    load. Velocity/current are targets (current is feed-forward), not limits; zero
+#    feed-forward does not disable the motor.
+# 4. move_joints() returning True only means the command was sent; check
+#    get_hand_info() and get_joints() for actual execution.
+# 5. close() only shuts down the communication link; it does not call stop() or
+#    disable_hand(). Stop or release the hand explicitly before closing.
 
 import logging
 import time
@@ -32,7 +24,6 @@ from ghand import (
     GHand,
     HandControlMode,
     JointCommand,
-    JointControlState,
     JointId,
     ProductType,
     configure_logging,
@@ -47,37 +38,70 @@ def main():
         if not hand.open("auto"):
             print("Connection failed")
             return
+        if not hand.tactile_open():
+            print("Failed to open tactile sensors")
+            return
 
-        # MIT combines target angle, velocity, feedforward current, and kp/kd.
-        # Angle: degrees; velocity/current: %. Tune gains for the actual load.
-        # Recommended MIT magnitudes: velocity <= 5%, current <= 20%.
-        # kp: 10-2000; kd: 0-50; kp must be greater than kd.
-        for angle, current in ((30.0, 5), (0.0, -10)):
-            command = JointCommand(
-                id=JointId.MF_MCP,
-                angle=angle,
-                # MIT velocity/current are targets, not motion limits.
-                # Zero feedforward lets position feedback drive both directions.
-                velocity=0,
-                current=current,
-                kp=10,
-                kd=0,
-            )
-            # Whole-hand MIT mode selects MIT for every commanded joint.
-            if not hand.move_joints([command], hand_control_mode=HandControlMode.MIT):
-                print("Failed to send MIT command")
-                return
-            time.sleep(2)
-            print(f"Hand status: {hand.get_hand_info()}")
-            for joint in hand.get_joints():
-                if joint.id == JointId.MF_MCP:
-                    print(
-                        f"{JointId(joint.id).name:<13}-\tangle: {joint.angle:<3.1f}(deg),\tvelocity: {joint.velocity:<3},\tcurrent: {joint.current:<3}, \tcontrol_mode:{joint.control_mode}({(joint.control_mode).name:<7}),\tloop_type:{joint.loop_type}({(joint.loop_type).name:<15}),\tstate:{joint.state}({(joint.state).name:<8}),\terror:{joint.error}({(joint.error).name}),"
-                    )
+        # Close with low kp/kd: the fingers stop on the object instead of crushing it.
+        grasp = [
+            JointCommand(id=JointId.THUMB_MCP, angle=66.0, velocity=5, current=0, kp=10, kd=0),
+            JointCommand(id=JointId.THUMB_TMC_FE, angle=50.0, velocity=5, current=0, kp=10, kd=0),
+            JointCommand(id=JointId.THUMB_TMC_AA, angle=90.0, velocity=5, current=0, kp=10, kd=0),
+            JointCommand(id=JointId.THUMB_TMC_PS, angle=0.0, velocity=5, current=0, kp=10, kd=0),
+            JointCommand(id=JointId.FF_PIP, angle=80.0, velocity=5, current=0, kp=10, kd=0),
+            JointCommand(id=JointId.FF_MCP, angle=90.0, velocity=5, current=0, kp=10, kd=0),
+            JointCommand(id=JointId.FF_MCP_AA, angle=0.0, velocity=5, current=0, kp=10, kd=0),
+            JointCommand(id=JointId.MF_PIP, angle=90.0, velocity=7, current=0, kp=10, kd=0),
+            JointCommand(id=JointId.MF_MCP, angle=90.0, velocity=7, current=0, kp=10, kd=0),
+            JointCommand(id=JointId.RF_PIP, angle=90.0, velocity=5, current=0, kp=10, kd=0),
+            JointCommand(id=JointId.RF_MCP, angle=90.0, velocity=5, current=0, kp=10, kd=0),
+            JointCommand(id=JointId.LF_PIP, angle=74.0, velocity=5, current=0, kp=10, kd=0),
+            JointCommand(id=JointId.LF_MCP, angle=90.0, velocity=5, current=0, kp=10, kd=0),
+        ]
+        if not hand.move_joints(grasp, hand_control_mode=HandControlMode.MIT):
+            print("Failed to send MIT command")
+            return
+
+        # Watch tactile normal force; three touching fingers mean contact (up to 5 s).
+        forces = {}
+        for _ in range(100):
+            forces = {
+                finger: info.resultant_force[2] if info.resultant_force else 0.0
+                for finger, info in hand.get_tactile_data().items()
+            }
+            if sum(fz >= 0.8 for fz in forces.values()) >= 3:
+                break
+            time.sleep(0.1)
+        else:
+            print("No contact detected, opening hand")
+            hand.tactile_close()
+            hand.disable_hand()
+            return
+
+        # Grasp: raise kp/kd a little and add feed-forward current for grip force.
+        print(f"Contact detected: {forces}")
+        for joint in grasp:
+            joint.kp = 25
+            joint.kd = 2
+            joint.current = 5
+        if not hand.move_joints(grasp, hand_control_mode=HandControlMode.MIT):
+            print("Failed to send MIT command")
+            return
+
+        # Hold for 5 s, then release by driving the joints back to zero.
+        time.sleep(5)
+        for joint in grasp:
+            joint.angle = 0.0
+            joint.kp = 10
+            joint.kd = 0
+            joint.current = 0
+        hand.move_joints(grasp, hand_control_mode=HandControlMode.MIT)
+        time.sleep(2)
     except KeyboardInterrupt:
         print("Demo interrupted")
     finally:
         if hand.is_connected():
+            hand.tactile_close()
             hand.disable_hand()
         hand.close()
         print("\n=== Demo ended, disconnected ===")

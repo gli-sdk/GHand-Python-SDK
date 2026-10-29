@@ -4,8 +4,12 @@
 #    end of the delay must not be treated as reaching the target.
 # 2. Whole-hand CURRENT mode uses current control with closed-loop for all joints;
 #    loop_type only takes effect in CUSTOM.
-# 3. FF_MCP is index finger flexion/extension and FF_MCP_AA is abduction; this example
-#    does not control the abduction joint.
+# 3. FF_MCP (flexion/extension) and FF_MCP_AA (abduction/adduction) are coupled;
+#    both joint commands must be included for MCP movement. This example keeps
+#    FF_MCP_AA running with zero target current.
+#    JointCommand defaults to RUNNING only for commands actually supplied.
+#    Omitted EtherCAT joints retain their cached commands, initially DISABLED;
+#    omitting a joint is not equivalent to sending a zero-current RUNNING command.
 #    If feedback shows DISABLED with current at 0, first check the enable state,
 #    whole-hand state, and firmware version; being able to move in position mode does
 #    not mean current mode is enabled, and this symptom alone does not indicate
@@ -46,6 +50,7 @@ def main():
             JointId.THUMB_TMC_FE,
             JointId.FF_PIP,
             JointId.FF_MCP,
+            JointId.FF_MCP_AA,
             JointId.MF_PIP,
             JointId.MF_MCP,
             JointId.RF_PIP,
@@ -69,7 +74,7 @@ def main():
             print("\nStep 1: Applying current to close fingers (current=10)")
             joints = []
             for joint_id in current_joint_ids:
-                joints.append(JointCommand(id=joint_id, current=10))
+                joints.append(JointCommand(id=joint_id, current=0 if joint_id == JointId.FF_MCP_AA else -10))
 
             result = hand.move_joints(joints, hand_control_mode=HandControlMode.CURRENT)
             if result:
@@ -88,7 +93,7 @@ def main():
             print("\nStep 2: Opening fingers (current=-10)")
             joints = []
             for joint_id in current_joint_ids:
-                joints.append(JointCommand(id=joint_id, current=-10))
+                joints.append(JointCommand(id=joint_id, current=0 if joint_id == JointId.FF_MCP_AA else 10))
 
             result = hand.move_joints(joints, hand_control_mode=HandControlMode.CURRENT)
             if result:

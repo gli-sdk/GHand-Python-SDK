@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0]
+
 ### Changed
 - Removed the last-operation result query APIs, `OperationResult`, and `SdkError`; diagnostics no longer include cached error fields.
 - Aligned existing communication APIs with protocol V2.4: serial-number subindex, parameter refresh commands, and firmware version queries. EtherCAT tactile data is decoded as resultant force followed by distributed force for each finger.

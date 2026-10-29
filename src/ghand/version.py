@@ -17,7 +17,7 @@
 """GHand SDK version information."""
 
 SDK_VERSION_MAJOR = 3
-SDK_VERSION_MINOR = 0
+SDK_VERSION_MINOR = 1
 SDK_VERSION_REVISION = 0
 
-__version__ = "3.0.0"
+__version__ = "3.1.0"
