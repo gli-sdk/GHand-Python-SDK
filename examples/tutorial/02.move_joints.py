@@ -1,4 +1,20 @@
-﻿import logging
+﻿# Mode notes
+# 1. angle is in degrees; velocity/current are velocity/current limits (%) — not target
+#    velocity/current. Motion and holding commands must provide non-zero limits;
+#    setting both to 0 disables the motor, so the position is no longer held.
+# 2. Whole-hand POSITION mode uses position control with closed-loop for all joints;
+#    loop_type only takes effect in CUSTOM.
+# 3. sleep(2) is only a delay, not a guarantee the motion finished; judge the result
+#    from the angle, state, and error feedback.
+# move_joints() returning success only means the command was sent; confirm execution
+# with get_hand_info() and get_joints().
+# control_state: DISABLED (motor off), RUNNING, STOPPED (holding); whole-hand disabled
+# takes priority.
+# close() only shuts down the communication link; it does not call stop() or
+# disable_hand(). To stop holding or release drive torque, explicitly send the
+# corresponding command and confirm the feedback before closing.
+
+import logging
 import time
 
 from ghand import ProductType, configure_logging

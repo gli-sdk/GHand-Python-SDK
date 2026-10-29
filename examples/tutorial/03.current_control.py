@@ -1,4 +1,24 @@
-﻿import logging
+﻿# Mode notes
+# 1. current is the signed target current (%, -100..100), not the current limit used in
+#    position mode. This example uses ±10%; current control has no target angle, so the
+#    end of the delay must not be treated as reaching the target.
+# 2. Whole-hand CURRENT mode uses current control with closed-loop for all joints;
+#    loop_type only takes effect in CUSTOM.
+# 3. FF_MCP is index finger flexion/extension and FF_MCP_AA is abduction; this example
+#    does not control the abduction joint.
+#    If feedback shows DISABLED with current at 0, first check the enable state,
+#    whole-hand state, and firmware version; being able to move in position mode does
+#    not mean current mode is enabled, and this symptom alone does not indicate
+#    insufficient current or a firmware limitation.
+# move_joints() returning success only means the command was sent; confirm execution
+# with get_hand_info() and get_joints().
+# control_state: DISABLED (motor off), RUNNING, STOPPED (holding); whole-hand disabled
+# takes priority.
+# close() only shuts down the communication link; it does not call stop() or
+# disable_hand(). To stop holding or release drive torque, explicitly send the
+# corresponding command and confirm the feedback before closing.
+
+import logging
 import time
 
 from ghand import ProductType, configure_logging
@@ -57,10 +77,9 @@ def main():
                 current_joints = hand.get_joints()
                 print("Current joint states:")
                 for joint in current_joints:
-                    if joint.id in [JointId.THUMB_MCP, JointId.FF_PIP, JointId.MF_PIP]:
-                        print(
-                            f"{JointId(joint.id).name:<13}-\tangle: {joint.angle:<3.1f}(deg),\tvelocity: {joint.velocity:<3},\tcurrent: {joint.current:<3}, \tcontrol_mode:{joint.control_mode}({(joint.control_mode).name:<7}),\tloop_type:{joint.loop_type}({(joint.loop_type).name:<15}),\tstate:{joint.state}({(joint.state).name:<8}),\terror:{joint.error}({(joint.error).name}),"
-                        )
+                    print(
+                        f"{JointId(joint.id).name:<13}-\tangle: {joint.angle:<3.1f}(deg),\tvelocity: {joint.velocity:<3},\tcurrent: {joint.current:<3}, \tcontrol_mode:{joint.control_mode}({(joint.control_mode).name:<7}),\tloop_type:{joint.loop_type}({(joint.loop_type).name:<15}),\tstate:{joint.state}({(joint.state).name:<8}),\terror:{joint.error}({(joint.error).name}),"
+                    )
             else:
                 print("Failed to send current command")
                 break
@@ -77,10 +96,9 @@ def main():
                 current_joints = hand.get_joints()
                 print("Current joint states (released):")
                 for joint in current_joints:
-                    if joint.id in [JointId.THUMB_MCP, JointId.FF_PIP, JointId.MF_PIP]:
-                        print(
-                            f"{JointId(joint.id).name:<13}-\tangle: {joint.angle:<3.1f}(deg),\tvelocity: {joint.velocity:<3},\tcurrent: {joint.current:<3}, \tcontrol_mode:{joint.control_mode}({(joint.control_mode).name:<7}),\tloop_type:{joint.loop_type}({(joint.loop_type).name:<15}),\tstate:{joint.state}({(joint.state).name:<8}),\terror:{joint.error}({(joint.error).name}),"
-                        )
+                    print(
+                        f"{JointId(joint.id).name:<13}-\tangle: {joint.angle:<3.1f}(deg),\tvelocity: {joint.velocity:<3},\tcurrent: {joint.current:<3}, \tcontrol_mode:{joint.control_mode}({(joint.control_mode).name:<7}),\tloop_type:{joint.loop_type}({(joint.loop_type).name:<15}),\tstate:{joint.state}({(joint.state).name:<8}),\terror:{joint.error}({(joint.error).name}),"
+                    )
             else:
                 print("Failed to send current command")
                 break
