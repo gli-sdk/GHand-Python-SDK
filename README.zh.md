@@ -296,8 +296,10 @@ CAN-FD 波特率档位：
 | `0x01` | 500,000 bps, 80% 采样点 | 2,000,000 bps, 80% 采样点 |
 | `0x02` | 500,000 bps, 80% 采样点 | 4,000,000 bps, 80% 采样点 |
 | `0x03` | 500,000 bps, 80% 采样点 | 5,000,000 bps, 75% 采样点 |
-| `0x04` | 1,000,000 bps, 75% 采样点 | 4,000,000 bps, 80% 采样点 |
-| `0x05` | 1,000,000 bps, 75% 采样点 | 5,000,000 bps, 75% 采样点（默认） |
+| `0x04` | 1,000,000 bps, 75% 采样点 | 1,000,000 bps, 75% 采样点 |
+| `0x05` | 1,000,000 bps, 75% 采样点 | 2,000,000 bps, 80% 采样点 |
+| `0x06` | 1,000,000 bps, 75% 采样点 | 4,000,000 bps, 80% 采样点 |
+| `0x07` | 1,000,000 bps, 75% 采样点 | 5,000,000 bps, 75% 采样点（默认） |
 
 ## 示例
 
@@ -308,8 +310,25 @@ CAN-FD 波特率档位：
 - `examples/tutorial/05.tactile_callback.py`：触觉数据回调
 - `examples/tutorial/06.subscription_demo.py`：数据订阅
 - `examples/tutorial/07.multi_hand.py`：多手发现与连接
+- `examples/tutorial/13.tactile_display.py`：触觉显示，包含设备连接、订阅和退出清理
 - `examples/demo/`：动作和手势演示脚本
 - `examples/extension/`：碰撞检测和自适应抓取示例
+
+触觉显示依赖可单独安装，通过示例启动：
+
+```bash
+python -m pip install ".[tactile-display]"
+python examples/tutorial/13.tactile_display.py
+```
+
+当前实机示例支持 GHand5 + EtherCAT。包内的
+`ghand.tactile_display.window.TactileWindow` 仅负责显示；已有 Qt 程序可创建窗口，
+捕获 `window.data_generation`，在订阅回调中调用
+`window.update_tactile(frame.tactile, generation)`。调用方管理设备和订阅，
+并通过 `set_connected()`、`set_command_result()` 更新按钮状态；
+`open_requested`、`close_requested`、`zero_requested` 只发出操作请求。
+调用 `clear()` 或 `invalidate()` 后，旧 generation 的回调会被拒绝，重新订阅时应捕获新值。
+关闭显示窗口不会取消调用方的订阅或关闭设备。
 
 ## 项目结构
 
