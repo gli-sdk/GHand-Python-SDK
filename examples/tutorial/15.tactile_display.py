@@ -30,7 +30,7 @@ from ghand.tactile_display.display import TactileDisplay
 
 def main() -> int:
     app = QApplication([sys.argv[0]])
-    with GHand(ProductType.GHand5, CommType.ETHERCAT) as hand:
+    with GHand(ProductType.GHand5, CommType.CANFD) as hand:
         if not hand.open("auto"):
             print("Device connection failed", file=sys.stderr)
             return 1

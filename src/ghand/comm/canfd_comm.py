@@ -95,6 +95,7 @@ from .modbus_codec import (
     parse_tactile_resultant,
     parse_tactile_state_error,
     registers_to_bytes,
+    registers_to_bytes_low_high,
 )
 # CANFD baud rate gear map per protocol documentation.
 # Writing a gear value to BAUDRATE_CONFIG_REGISTER selects both the arbitration
@@ -738,7 +739,9 @@ class CanfdComm(IComm):
                                                                  current_addr,
                                                                  dist_regs,
                                                                  func_code=0x04)
-            distributed = parse_tactile_distributed(dist_bytes, region.count)
+            dist_words = struct.unpack(f">{dist_regs}H", dist_bytes[:dist_regs * 2])
+            distributed = parse_tactile_distributed(
+                registers_to_bytes_low_high(list(dist_words)), region.count)
             current_addr += dist_regs
 
             result[region.id] = build_tactile_info(state_bit, resultant, distributed)

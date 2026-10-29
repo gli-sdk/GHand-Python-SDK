@@ -94,6 +94,7 @@ from .modbus_codec import (
     parse_tactile_resultant,
     parse_tactile_state_error,
     registers_to_bytes,
+    registers_to_bytes_low_high,
 )
 # RS485 baud rate gear map per protocol documentation.
 # Writing a gear value to BAUDRATE_CONFIG_REGISTER selects the serial baud rate;
@@ -611,7 +612,7 @@ class Rs485Comm(IComm):
             dist_result = self._read_input_registers(current_addr, count=dist_regs)
             distributed = None
             if dist_result is not None and not dist_result.isError():
-                dist_bytes = registers_to_bytes(dist_result.registers)
+                dist_bytes = registers_to_bytes_low_high(dist_result.registers)
                 distributed = parse_tactile_distributed(dist_bytes, region.count)
 
             current_addr += dist_regs

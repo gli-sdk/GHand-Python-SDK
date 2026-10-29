@@ -253,9 +253,9 @@ def parse_hand_info(raw: list[int]) -> HandData:
              raw[13] = signed int16 temperature in degrees Celsius.
     """
     state = raw[0] & 0xFFFF
-    error_warn = (_registers_to_bytes_low_high(raw[1:4]) if len(raw) >= 4 else b"\x00" * 6)
-    error_fault = (_registers_to_bytes_low_high(raw[4:10]) if len(raw) >= 10 else b"\x00" * 12)
-    error_critical = (_registers_to_bytes_low_high(raw[10:13]) if len(raw) >= 13 else b"\x00" * 6)
+    error_warn = (registers_to_bytes_low_high(raw[1:4]) if len(raw) >= 4 else b"\x00" * 6)
+    error_fault = (registers_to_bytes_low_high(raw[4:10]) if len(raw) >= 10 else b"\x00" * 12)
+    error_critical = (registers_to_bytes_low_high(raw[10:13]) if len(raw) >= 13 else b"\x00" * 6)
     temperature = raw[13] if len(raw) >= 14 else 0
     if temperature >= 32768:
         temperature -= 65536
@@ -268,8 +268,14 @@ def parse_hand_info(raw: list[int]) -> HandData:
     )
 
 
-def _registers_to_bytes_low_high(raw: list[int]) -> bytes:
-    return bytes(byte for reg in raw for byte in (reg & 0xFF, (reg >> 8) & 0xFF))
+def registers_to_bytes_low_high(registers: list[int]) -> bytes:
+    """Pack registers into a byte stream with each register's low byte first.
+
+    Modbus int16 fields are big-endian on the wire, but byte arrays such as
+    the hand error bitmaps and the tactile distributed-force map are stored
+    low byte first inside each register.
+    """
+    return bytes(byte for reg in registers for byte in (reg & 0xFF, (reg >> 8) & 0xFF))
 
 
 def _parse_state(value: int) -> HandControlState | int:
@@ -381,7 +387,8 @@ def parse_tactile_distributed(data_bytes: bytes, count: int) -> list[float]:
     """Parse distributed force data from raw bytes.
 
     Args:
-        data_bytes: Raw bytes read from the distributed-force registers.
+        data_bytes: Byte stream unpacked from the distributed-force registers;
+            Modbus transports must restore the low-byte-first register order.
         count: Number of tactile points for this region.
 
     Returns:
