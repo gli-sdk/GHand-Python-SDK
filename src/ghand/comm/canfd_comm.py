@@ -117,7 +117,7 @@ CANFD_DEFAULT_BAUDRATE_GEAR = 0x07
 logger = logging.getLogger("ghand.canfd_comm")
 
 
-class CanfdComm(IComm):
+class CANFDComm(IComm):
     """IComm implementation for CANFD."""
 
     _DELETE_CONNECTION_SETTLE_SEC = 0.1

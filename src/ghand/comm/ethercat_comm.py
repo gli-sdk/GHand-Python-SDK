@@ -57,7 +57,7 @@ from .icomm import IComm
 logger = logging.getLogger("ghand.ethercat_comm")
 
 
-class EthercatComm(IComm):
+class EtherCATComm(IComm):
     """IComm implementation for EtherCAT."""
 
     _COMPAT_THUMB_TACTILE_COUNT = 28

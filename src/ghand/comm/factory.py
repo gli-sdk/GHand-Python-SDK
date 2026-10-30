@@ -35,13 +35,13 @@ def create_comm(comm_type: CommType, config: ProductConfig) -> IComm:
         ValueError: If comm_type is not supported.
     """
     if comm_type == CommType.ETHERCAT:
-        from .ethercat_comm import EthercatComm
-        return EthercatComm(config)
+        from .ethercat_comm import EtherCATComm
+        return EtherCATComm(config)
     elif comm_type == CommType.CANFD:
-        from .canfd_comm import CanfdComm
-        return CanfdComm(config)
+        from .canfd_comm import CANFDComm
+        return CANFDComm(config)
     elif comm_type == CommType.RS485:
-        from .rs485_comm import Rs485Comm
-        return Rs485Comm(config)
+        from .rs485_comm import RS485Comm
+        return RS485Comm(config)
     else:
         raise ValueError(f"Unsupported communication type: {comm_type}")

@@ -112,7 +112,7 @@ RS485_DEFAULT_BAUDRATE_GEAR = 0x05
 logger = logging.getLogger("ghand.rs485_comm")
 
 
-class Rs485Comm(IComm):
+class RS485Comm(IComm):
     """IComm implementation for RS485/Modbus RTU."""
 
     _DEFAULT_POLL_INTERVAL_SEC = 0.1
