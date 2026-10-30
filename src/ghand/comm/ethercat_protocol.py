@@ -144,9 +144,10 @@ class TactileData:
         if len(data) < expected_size:
             return cls(count=count)
 
-        rf_x = struct.unpack_from('<h', data, 0)[0] / 10.0
-        rf_y = struct.unpack_from('<h', data, 2)[0] / 10.0
-        rf_z = struct.unpack_from('<h', data, 4)[0] / 10.0
+        rf_x = struct.unpack_from('<b', data, 0)[0] / 10.0
+        rf_y = struct.unpack_from('<b', data, 2)[0] / 10.0
+        # Fz uses the unsigned low byte of its 16-bit slot (0..255).
+        rf_z = data[4] / 10.0
         resultant_force = [rf_x, rf_y, rf_z]
 
         sample_force = []

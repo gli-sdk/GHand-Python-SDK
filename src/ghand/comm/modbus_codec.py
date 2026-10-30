@@ -209,6 +209,11 @@ def registers_to_bytes(registers: list[int]) -> bytes:
     return b"".join(struct.pack(">H", reg) for reg in registers)
 
 
+def _to_int8(value: int) -> int:
+    value &= 0xFF
+    return value - 0x100 if value & 0x80 else value
+
+
 def _to_int16(value: int) -> int:
     return value - 0x10000 if value & 0x8000 else value
 
@@ -380,7 +385,11 @@ def parse_tactile_resultant(raw: list[int], region_index: int) -> list[float]:
         [Fx, Fy, Fz] in Newtons (divided by 10).
     """
     base = 1 + region_index * 3
-    return [_to_int16(raw[base + i]) / 10.0 for i in range(3)]
+    return [
+        _to_int8(raw[base]) / 10.0,
+        _to_int8(raw[base + 1]) / 10.0,
+        (raw[base + 2] & 0xFF) / 10.0,  # Fz uses the unsigned low byte.
+    ]
 
 
 def parse_tactile_distributed(data_bytes: bytes, count: int) -> list[float]:
