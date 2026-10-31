@@ -11,6 +11,7 @@ GHand 灵巧手官方 Python SDK，提供 EtherCAT、CAN-FD、RS-485 通信接�
 ## 目录
 
 - [主要功能](#主要功能)
+  - [产品支持矩阵](#产品支持矩阵)
 - [文档](#文档)
 - [系统要求](#系统要求)
 - [安装](#安装)
@@ -25,6 +26,17 @@ GHand 灵巧手官方 Python SDK，提供 EtherCAT、CAN-FD、RS-485 通信接�
 - [许可证](#许可证)
 
 ## 主要功能
+
+### 产品支持矩阵
+
+以下功能适用于当前 V3.1.0 的 GHand5。**GHandLite1（L1）请使用 SDK 2.xx（2.x）**，并遵循对应版本的 README、API 和协议文档。
+
+| 产品 | SDK 版本 | 通信方式 | 控制与触觉能力 |
+| --- | --- | --- | --- |
+| GHand5 | 当前 V3.1.0 | EtherCAT、CAN-FD、RS-485 | 位置、速度、电流、MIT、CUSTOM；触觉反馈、回调、开关、调零和显示 |
+| GHandLite1（L1） | 使用 2.xx（2.x），如 [V2.2.2](https://github.com/gli-sdk/GHand-Python-SDK/tree/V2.2.2) | 参见对应 2.x 文档 | 参见对应 2.x 文档 |
+
+仓库保留的 GHandLite1 类型和配置文件不代表 V3.1.0 支持连接该产品。L1 用户请先切换至对应的 2.x 版本，再按该版本说明安装。
 
 - **设备控制**
   - 通过 EtherCAT、CAN-FD 或 RS-485 打开和关闭 GHand 设备。
@@ -116,19 +128,24 @@ python examples/tutorial/01.get_basic_info.py
 最小 EtherCAT 示例：
 
 ```python
-from ghand import CommType, GHand, ProductType
+import logging
+
+from ghand import CommType, GHand, ProductType, configure_logging
+
+configure_logging(level=logging.INFO)
 
 hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
 
-if hand.open("auto"):
+try:
+    if not hand.open("auto"):
+        raise RuntimeError("Connection failed")
     print("Firmware:", hand.get_firmware_version())
     print("Device:", hand.get_device_name())
+finally:
     hand.close()
-else:
-    print("Connection failed")
 ```
 
-更多设备版本 API 示例：
+以下版本查询代码应放在上例连接成功后、关闭连接之前：
 
 ```python
 print("Firmware package:", hand.get_firmware_package_version())
@@ -139,46 +156,70 @@ print("Thumb tactile sensor:", hand.get_thumb_tactile_sensor_version())
 print("Finger tactile sensor:", hand.get_finger_tactile_sensor_version())
 ```
 
-混合关节控制使用整手自定义模式，各关节通过 `mode` 和 `stop` 独立控制：
+整手 CUSTOM 模式通过各关节的 `control_mode`、`loop_type` 和 `control_state` 控制行为。以下代码应在连接成功后、关闭连接之前执行：
 
 ```python
-from ghand import CtrlMode, JointCommand, JointControlState, JointId
+from ghand import (
+    HandControlMode, JointCommand, JointControlMode,
+    JointControlState, JointId, JointLoopType,
+)
 
-hand.move_joints(
+ok = hand.move_joints(
     [
         JointCommand(
             id=JointId.THUMB_MCP,
-            mode=CtrlMode.POSITION,
-            stop=JointControlState.RUNNING,
+            control_mode=JointControlMode.POSITION,
+            control_state=JointControlState.RUNNING,
+            loop_type=JointLoopType.CLOSED_LOOP,
             angle=30,
-        ),
-        JointCommand(
-            id=JointId.FF_PIP,
-            mode=CtrlMode.CURRENT,
-            stop=JointControlState.STOPPED,
+            velocity=10,
+            current=20,
         ),
     ],
-    mode=CtrlMode.CUSTOM,
+    hand_control_mode=HandControlMode.CUSTOM,
 )
-hand.disable_hand()
+if not ok:
+    raise RuntimeError("Failed to send joint command")
 ```
+
+角度单位为度，速度和电流单位为百分比。位置模式中的速度和电流是限值，应提供非零值。同一手指仲裁组内的控制模式和反馈环路必须一致，详见 [CUSTOM 示例](examples/tutorial/14.custom_control.py)。
+
+`move_joints()` 返回成功表示命令已发送，实际执行状态需通过 `get_hand_info()` 和 `get_joints()` 确认。`close()` 关闭通信连接；需要停止保持或释放驱动力时，应先发送 `stop()` 或 `disable_hand()`，确认反馈后再关闭连接。
 
 最小 CAN-FD 示例：
 
 ```python
-from ghand import CommType, GHand, ProductType
+import logging
+
+from ghand import CommType, GHand, ProductType, configure_logging
+
+configure_logging(level=logging.INFO)
 
 hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.CANFD)
-hand.open("auto", slave_id=0x31)
+try:
+    if not hand.open("auto", slave_id=0x31):
+        raise RuntimeError("Connection failed")
+    print("Device:", hand.get_device_name())
+finally:
+    hand.close()
 ```
 
 最小 RS-485 示例：
 
 ```python
-from ghand import CommType, GHand, ProductType
+import logging
+
+from ghand import CommType, GHand, ProductType, configure_logging
+
+configure_logging(level=logging.INFO)
 
 hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.RS485)
-hand.open("auto", slave_id=0x31)
+try:
+    if not hand.open("auto", slave_id=0x31):
+        raise RuntimeError("Connection failed")
+    print("Device:", hand.get_device_name())
+finally:
+    hand.close()
 ```
 
 ## 通信说明
@@ -237,7 +278,7 @@ python3 -m serial.tools.list_ports
 
 ### RS-485/CAN-FD 从站 ID 与波特率
 
-RS-485 和 CAN-FD 设备使用保持寄存器 `0x0000` 作为从站 ID 寄存器。左手默认 ID 为 `0x31`，右手默认 ID 为 `0x32`。
+RS-485 和 CAN-FD 设备使用保持寄存器 `0x0003` 作为从站 ID 寄存器，`0x0000` 为连接控制寄存器。左手默认 ID 为 `0x31`，右手默认 ID 为 `0x32`。
 
 连接时覆盖从站 ID：
 
@@ -252,30 +293,60 @@ ok = hand.set_slave_id(0x32)
 hand.close()
 ```
 
-使用非默认 RS-485 波特率连接：
+默认波特率：
+
+- RS-485：1,000,000 bps，`RS485BaudRate.BAUD_1000000`（档位 `0x05`）。
+- CAN-FD：仲裁段 1 Mbps、数据段 5 Mbps，两者采样点均为 75%，`CANFDBitTiming.TIMING_1M_5M`（档位 `0x07`）。
+
+`open()` 的 `baudrate` 参数选择本次连接使用的波特率，不修改设备保存的配置；`set_baudrate()` 写入设备配置。**修改配置成功后，必须将灵巧手断电再上电，新波特率才会生效；仅关闭并重新打开 SDK 连接不能使其生效。**
+
+以下示例假定设备当前使用默认波特率，且已创建对应通信类型的 `hand`。如果设备已修改过波特率，首次连接时也应指定其当前配置值。
+
+RS-485：先以当前波特率连接，将设备配置改为 115,200 bps：
 
 ```python
 from ghand import RS485BaudRate
 
-hand.open("COM10", slave_id=0x31, baudrate=RS485BaudRate.BAUD_1000000)
+try:
+    if not hand.open("COM10", slave_id=0x31, baudrate=RS485BaudRate.BAUD_1000000):
+        raise RuntimeError("Connection failed")
+    if not hand.set_baudrate(RS485BaudRate.BAUD_115200):
+        raise RuntimeError("Failed to configure baud rate")
+finally:
+    hand.close()
 ```
 
-写入 RS-485 波特率配置：
+**现在将灵巧手断电再上电**，然后显式指定新波特率连接：
 
 ```python
-ok = hand.set_baudrate(RS485BaudRate.BAUD_1000000)
+if not hand.open("COM10", slave_id=0x31, baudrate=RS485BaudRate.BAUD_115200):
+    raise RuntimeError("Connection failed")
+# 在此执行设备操作，结束后调用 hand.close()。
 ```
 
-CAN-FD 使用 bit timing 配置枚举，不使用 RS-485 波特率枚举：
+CAN-FD：使用 `CANFDBitTiming` 枚举，先以当前配置连接，将设备配置改为仲裁段 1 Mbps、数据段 2 Mbps：
 
 ```python
 from ghand import CANFDBitTiming
 
-hand.open("COM10", slave_id=0x31, baudrate=CANFDBitTiming.TIMING_1M_5M)
-ok = hand.set_baudrate(CANFDBitTiming.TIMING_1M_5M)
+try:
+    if not hand.open("COM10", slave_id=0x31, baudrate=CANFDBitTiming.TIMING_1M_5M):
+        raise RuntimeError("Connection failed")
+    if not hand.set_baudrate(CANFDBitTiming.TIMING_1M_2M):
+        raise RuntimeError("Failed to configure bit timing")
+finally:
+    hand.close()
 ```
 
-波特率/bit timing 配置由设备保存，并在下一次上电后生效。设备断电重启后，需要在 `open()` 中显式传入已配置的枚举值。
+**现在将灵巧手断电再上电**，然后显式指定新 bit timing 连接：
+
+```python
+if not hand.open("COM10", slave_id=0x31, baudrate=CANFDBitTiming.TIMING_1M_2M):
+    raise RuntimeError("Connection failed")
+# 在此执行设备操作，结束后调用 hand.close()。
+```
+
+设备保存的新配置在后续上电时仍然有效。后续连接应继续显式传入对应的 `baudrate`，SDK 不会自动探测设备已保存的波特率。
 
 RS-485 波特率档位：
 
@@ -310,14 +381,19 @@ CAN-FD 波特率档位：
 - `examples/tutorial/05.tactile_callback.py`：触觉数据回调
 - `examples/tutorial/06.subscription_demo.py`：数据订阅
 - `examples/tutorial/07.multi_hand.py`：多手发现与连接
+- `examples/tutorial/12.switch_baud_rate.py`：切换波特率
+- `examples/tutorial/13.mit_control.py`：MIT 控制
+- `examples/tutorial/14.custom_control.py`：CUSTOM 控制
 - `examples/tutorial/15.tactile_display.py`：触觉显示，包含设备连接、订阅和退出清理
 - `examples/demo/`：动作和手势演示脚本
 - `examples/extension/`：碰撞检测和自适应抓取示例
 
-触觉显示依赖可单独安装，通过示例启动：
+自适应抓取需要可访问触觉传感器的硬件，配置与运行方法见 [自适应抓取使用说明](src/ghand/adaptive_grasp/README.zh.md)。
+
+触觉显示依赖随 SDK 一起安装，通过示例启动：
 
 ```bash
-python -m pip install ".[tactile-display]"
+python -m pip install .
 python examples/tutorial/15.tactile_display.py
 ```
 
@@ -334,14 +410,12 @@ GHand-Python-SDK/
 |-- src/
 |   |-- ghand/                  # SDK 包
 |   |   |-- ghand.py            # GHand 主类和公开 API
-|   |   |-- types/              # 类型枚举、数据对象和配置模型
+|   |   |-- types/              # 类型枚举与数据对象
 |   |   |   |-- __init__.py      # 统一导出公开类型
 |   |   |   |-- enums.py         # 产品、协议、关节和传感器枚举
-|   |   |   |-- states.py        # 状态与控制模式枚举
-|   |   |   |-- errors.py        # 错误码、诊断结果和异常类型
-|   |   |   |-- commands.py      # 命令数据类
-|   |   |   |-- data.py          # 设备反馈数据类
-|   |   |   `-- config.py        # 产品配置数据类
+|   |   |   |-- errors.py        # 设备错误与告警位域
+|   |   |   `-- data.py          # 命令与设备反馈数据类
+|   |   |-- _product_config.py  # 产品配置模型与加载
 |   |   |-- gestures.py         # 预定义手势工具
 |   |   |-- config/             # 内置产品 JSON 配置
 |   |   |   |-- ghand5.json

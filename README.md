@@ -11,6 +11,7 @@ The official Python SDK for the GHand dexterous hand. It provides high-level API
 ## Table of Contents
 
 - [Key Features](#key-features)
+  - [Product Support Matrix](#product-support-matrix)
 - [Documentation](#documentation)
 - [System Requirements](#system-requirements)
 - [Installation](#installation)
@@ -26,9 +27,20 @@ The official Python SDK for the GHand dexterous hand. It provides high-level API
 
 ## Key Features
 
+### Product Support Matrix
+
+The capabilities below apply to GHand5 with the current V3.1.0 release. **For GHandLite1 (L1), use SDK 2.xx (2.x)** and follow that version's README, API and protocol documentation.
+
+| Product | SDK version | Transports | Control and tactile capabilities |
+| --- | --- | --- | --- |
+| GHand5 | Current V3.1.0 | EtherCAT, CAN-FD, RS-485 | Position, velocity, current, MIT, CUSTOM; tactile feedback, callbacks, on/off, zeroing and display |
+| GHandLite1 (L1) | Use 2.xx (2.x), e.g. [V2.2.2](https://github.com/gli-sdk/GHand-Python-SDK/tree/V2.2.2) | See the corresponding 2.x documentation | See the corresponding 2.x documentation |
+
+The GHandLite1 types and configuration files retained in this repository do not indicate support for connecting that product with V3.1.0. L1 users should check out the corresponding 2.x version before following its installation instructions.
+
 - **Device control**
   - Open and close GHand devices over EtherCAT, CAN-FD, or RS-485.
-  - Read firmware, hardware, serial number, product name, hand type, and motor driver version.
+  - Read firmware, firmware package, serial number, product name, hand type, and component versions.
   - Clear faults, initialize joints, stop motion, and run common device operations.
 
 - **Joint control**
@@ -116,67 +128,99 @@ python examples/tutorial/01.get_basic_info.py
 Minimal EtherCAT example:
 
 ```python
-from ghand import CommType, GHand, ProductType
+import logging
+
+from ghand import CommType, GHand, ProductType, configure_logging
+
+configure_logging(level=logging.INFO)
 
 hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
 
-if hand.open("auto"):
+try:
+    if not hand.open("auto"):
+        raise RuntimeError("Connection failed")
     print("Firmware:", hand.get_firmware_version())
     print("Device:", hand.get_device_name())
+finally:
     hand.close()
-else:
-    print("Connection failed")
 ```
 
-Additional device version APIs:
+Place these additional version queries after connecting and before closing the device:
 
 ```python
+print("Firmware package:", hand.get_firmware_package_version())
 print("Position sensor:", hand.get_position_sensor_version())
 print("Tactile MCU:", hand.get_tactile_sensor_version())
 print("Motor driver:", hand.get_motor_driver_version())
+print("Thumb tactile sensor:", hand.get_thumb_tactile_sensor_version())
+print("Finger tactile sensor:", hand.get_finger_tactile_sensor_version())
 ```
 
-Use the hand-level custom mode to control each joint's `mode` and `stop`
-independently:
+Hand-level CUSTOM mode uses each joint's `control_mode`, `loop_type` and
+`control_state`. Run this code after connecting and before closing the device:
 
 ```python
-from ghand import CtrlMode, JointCommand, JointControlState, JointId
+from ghand import (
+    HandControlMode, JointCommand, JointControlMode,
+    JointControlState, JointId, JointLoopType,
+)
 
-hand.move_joints(
+ok = hand.move_joints(
     [
         JointCommand(
             id=JointId.THUMB_MCP,
-            mode=CtrlMode.POSITION,
-            stop=JointControlState.RUNNING,
+            control_mode=JointControlMode.POSITION,
+            control_state=JointControlState.RUNNING,
+            loop_type=JointLoopType.CLOSED_LOOP,
             angle=30,
-        ),
-        JointCommand(
-            id=JointId.FF_PIP,
-            mode=CtrlMode.CURRENT,
-            stop=JointControlState.STOPPED,
+            velocity=10,
+            current=20,
         ),
     ],
-    mode=CtrlMode.CUSTOM,
+    hand_control_mode=HandControlMode.CUSTOM,
 )
-hand.disable_hand()
+if not ok:
+    raise RuntimeError("Failed to send joint command")
 ```
+
+Angles are in degrees; velocity and current are percentages. In position mode, velocity and current are limits and should be nonzero. Control modes and feedback loops must match within each finger arbitration group; see the [CUSTOM example](examples/tutorial/14.custom_control.py).
+
+A successful `move_joints()` return means the command was sent; confirm execution with `get_hand_info()` and `get_joints()`. `close()` closes the communication link. To stop holding or release drive torque, send `stop()` or `disable_hand()` as appropriate and confirm feedback before closing.
 
 Minimal CAN-FD example:
 
 ```python
-from ghand import CommType, GHand, ProductType
+import logging
+
+from ghand import CommType, GHand, ProductType, configure_logging
+
+configure_logging(level=logging.INFO)
 
 hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.CANFD)
-hand.open("auto", slave_id=0x31)
+try:
+    if not hand.open("auto", slave_id=0x31):
+        raise RuntimeError("Connection failed")
+    print("Device:", hand.get_device_name())
+finally:
+    hand.close()
 ```
 
 Minimal RS-485 example:
 
 ```python
-from ghand import CommType, GHand, ProductType
+import logging
+
+from ghand import CommType, GHand, ProductType, configure_logging
+
+configure_logging(level=logging.INFO)
 
 hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.RS485)
-hand.open("auto", slave_id=0x31)
+try:
+    if not hand.open("auto", slave_id=0x31):
+        raise RuntimeError("Connection failed")
+    print("Device:", hand.get_device_name())
+finally:
+    hand.close()
 ```
 
 ## Communication Notes
@@ -235,7 +279,7 @@ If `lsusb -t` shows `Driver=cdc_acm`, the adapter is in CDC serial mode and can 
 
 ### RS-485/CAN-FD Slave ID and Baud Rate
 
-RS-485 and CAN-FD devices use holding register `0x0000` as the slave ID register. The left hand defaults to `0x31`, and the right hand defaults to `0x32`.
+RS-485 and CAN-FD devices use holding register `0x0003` as the slave ID register; `0x0000` is the connection-control register. The left hand defaults to `0x31`, and the right hand defaults to `0x32`.
 
 Override the slave ID for a connection:
 
@@ -250,30 +294,60 @@ ok = hand.set_slave_id(0x32)
 hand.close()
 ```
 
-Connect with a non-default RS-485 baud rate:
+Default baud rates:
+
+- RS-485: 1,000,000 bps, `RS485BaudRate.BAUD_1000000` (gear `0x05`).
+- CAN-FD: 1 Mbps arbitration and 5 Mbps data, both at a 75% sample point, `CANFDBitTiming.TIMING_1M_5M` (gear `0x07`).
+
+The `baudrate` argument to `open()` selects the rate for the connection; it does not change the device's saved configuration. `set_baudrate()` writes that configuration. **After a successful change, turn the hand's power off and back on for the new rate to take effect. Closing and reopening the SDK connection alone does not apply it.**
+
+The examples below assume the device currently uses the default rate and `hand` was created with the corresponding transport. If the device's rate was previously changed, specify its current rate for the initial connection too.
+
+RS-485: connect at the current rate and configure 115,200 bps:
 
 ```python
 from ghand import RS485BaudRate
 
-hand.open("COM10", slave_id=0x31, baudrate=RS485BaudRate.BAUD_1000000)
+try:
+    if not hand.open("COM10", slave_id=0x31, baudrate=RS485BaudRate.BAUD_1000000):
+        raise RuntimeError("Connection failed")
+    if not hand.set_baudrate(RS485BaudRate.BAUD_115200):
+        raise RuntimeError("Failed to configure baud rate")
+finally:
+    hand.close()
 ```
 
-Write the RS-485 baud-rate configuration to the device:
+**Now turn the hand's power off and back on**, then connect with the new rate explicitly:
 
 ```python
-ok = hand.set_baudrate(RS485BaudRate.BAUD_1000000)
+if not hand.open("COM10", slave_id=0x31, baudrate=RS485BaudRate.BAUD_115200):
+    raise RuntimeError("Connection failed")
+# Perform device operations here, then call hand.close().
 ```
 
-For CAN-FD, use a bit timing profile instead of an RS-485 baud-rate enum:
+CAN-FD: use `CANFDBitTiming`, connect with the current profile and configure 1 Mbps arbitration / 2 Mbps data:
 
 ```python
 from ghand import CANFDBitTiming
 
-hand.open("COM10", slave_id=0x31, baudrate=CANFDBitTiming.TIMING_1M_5M)
-ok = hand.set_baudrate(CANFDBitTiming.TIMING_1M_5M)
+try:
+    if not hand.open("COM10", slave_id=0x31, baudrate=CANFDBitTiming.TIMING_1M_5M):
+        raise RuntimeError("Connection failed")
+    if not hand.set_baudrate(CANFDBitTiming.TIMING_1M_2M):
+        raise RuntimeError("Failed to configure bit timing")
+finally:
+    hand.close()
 ```
 
-The baud-rate/timing configuration is stored by the device and takes effect after the next power-up. After the device is power-cycled, pass the configured enum explicitly to `open()`.
+**Now turn the hand's power off and back on**, then connect with the new profile explicitly:
+
+```python
+if not hand.open("COM10", slave_id=0x31, baudrate=CANFDBitTiming.TIMING_1M_2M):
+    raise RuntimeError("Connection failed")
+# Perform device operations here, then call hand.close().
+```
+
+The device retains the saved configuration across power cycles. Continue passing the corresponding `baudrate` explicitly on subsequent connections; the SDK does not automatically detect the device's saved rate.
 
 RS-485 baud-rate gears:
 
@@ -308,14 +382,19 @@ CAN-FD baud-rate gears:
 - `examples/tutorial/05.tactile_callback.py`: tactile data callback
 - `examples/tutorial/06.subscription_demo.py`: data subscription
 - `examples/tutorial/07.multi_hand.py`: multi-hand discovery and connection
+- `examples/tutorial/12.switch_baud_rate.py`: baud-rate configuration
+- `examples/tutorial/13.mit_control.py`: MIT control
+- `examples/tutorial/14.custom_control.py`: CUSTOM control
 - `examples/tutorial/15.tactile_display.py`: tactile display with device setup, subscription, and cleanup
 - `examples/demo/`: action and gesture demonstrations
 - `examples/extension/`: collision detection and adaptive grasp examples
 
-Install optional display dependencies and launch the example:
+Adaptive grasp requires hardware with accessible tactile sensors; see the [adaptive grasp guide](src/ghand/adaptive_grasp/README.md).
+
+Tactile display dependencies are included with the SDK. Install and launch the example:
 
 ```bash
-python -m pip install ".[tactile-display]"
+python -m pip install .
 python examples/tutorial/15.tactile_display.py
 ```
 
@@ -333,14 +412,12 @@ GHand-Python-SDK/
 |-- src/
 |   |-- ghand/                  # Core SDK package
 |   |   |-- ghand.py            # Main GHand class and public API
-|   |   |-- types/              # Typed enums, DTOs, and configuration models
+|   |   |-- types/              # Typed enums and data objects
 |   |   |   |-- __init__.py      # Public type exports
 |   |   |   |-- enums.py         # Product, protocol, joint, and sensor enums
-|   |   |   |-- states.py        # State and control-mode enums
-|   |   |   |-- errors.py        # Error codes, diagnostic results, and exceptions
-|   |   |   |-- commands.py      # Command dataclasses
-|   |   |   |-- data.py          # Device feedback dataclasses
-|   |   |   `-- config.py        # Product configuration dataclasses
+|   |   |   |-- errors.py        # Device errors and warning bitfields
+|   |   |   `-- data.py          # Command and feedback dataclasses
+|   |   |-- _product_config.py  # Product configuration models and loading
 |   |   |-- gestures.py         # Predefined gesture utilities
 |   |   |-- config/             # Bundled product JSON configurations
 |   |   |   |-- ghand5.json

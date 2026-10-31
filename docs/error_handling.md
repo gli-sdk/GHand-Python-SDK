@@ -1,20 +1,24 @@
 # Error Handling
 
-Most existing public APIs keep their V2.2-compatible return values. Methods
-that return `False` update `GHand.get_last_result()` with a machine-readable
-`SdkError` and message.
-
-Use:
+Check API return values and handle communication exceptions at the application
+boundary. For example, after connecting the device and building `joints`:
 
 ```python
-result = hand.move_joints(joints)
-if not result:
-    last = hand.get_last_result()
-    print(last.code, last.message)
+try:
+    if not hand.move_joints(joints):
+        print("Joint command was not sent")
+except RuntimeError as exc:
+    print(f"Device operation failed: {exc}")
 ```
 
-Existing methods continue to raise
-`RuntimeError` where that was already part of the V2.2 behavior.
+Communication exceptions from `move_joints()` propagate to the caller; depending
+on the transport, these can also include I/O or timeout exceptions. A successful
+return indicates command transmission, not completed motion. Read
+`get_hand_info()` and `get_joints()` to confirm device state.
+
+SDK 3.1.0 removed `get_last_result()`, `get_diagnostics()`, `OperationResult`,
+`SdkError`, and `Diagnostics`. Use API return values, exceptions, device feedback,
+and [SDK logging](logging.md) for diagnostics.
 
 ## Device error bitfields
 

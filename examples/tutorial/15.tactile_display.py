@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Tutorial 15: connect a device and launch the tactile display.
 
-Install GUI dependencies with pip install "ghand_python_sdk[tactile-display]".
+GUI dependencies are installed with ghand_python_sdk.
 Edit the connection settings in main() for your device.
 """
 
@@ -11,17 +11,6 @@ import sys
 
 from ghand import CommType, GHand, ProductType
 
-
-if __name__ == "__main__":
-    try:
-        import PySide6
-        import pyqtgraph
-    except ModuleNotFoundError as exc:
-        if exc.name not in {"PySide6", "pyqtgraph"}:
-            raise
-        print('Missing optional dependencies for tactile display. Run: python -m pip install "ghand_python_sdk[tactile-display]"',
-              file=sys.stderr)
-        raise SystemExit(1)
 
 from PySide6.QtWidgets import QApplication
 
