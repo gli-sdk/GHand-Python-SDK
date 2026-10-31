@@ -89,6 +89,22 @@ GHand 灵巧手官方 Python SDK，提供 EtherCAT、CAN-FD、RS-485 通信接�
 - **Linux**：构建原生依赖时需要 `build-essential` 和 `python3-dev`
 - **macOS**：CAN-FD 和 RS-485 无需额外依赖。EtherCAT 通过 pcap 访问原始套接字需要 `sudo` 权限(macOS 无 Linux `setcap` 的持久化能力等价物)。
 
+### Linux GUI 系统依赖
+
+`pip` 会自动安装 `PySide6` 和 `pyqtgraph`，但不会安装 Linux 系统库。
+Ubuntu 22.04/24.04 使用触觉显示的 X11/xcb 后端前，请先执行：
+
+```bash
+sudo apt update
+sudo apt install libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1
+```
+
+其他发行版请安装对应的系统包。GUI 需要可用的桌面显示会话；仅安装这些库不能为无桌面的服务器或容器提供显示服务。
+触觉显示示例会在创建窗口前检查 xcb 插件；加载失败时输出具体原因和安装命令。
+自定义 GUI 程序可在创建 `QApplication` 前调用
+`ghand.tactile_display.runtime.check_gui_dependencies()`，并处理其 `RuntimeError`。
+该检查不验证显示服务器连接；显式选择其他 Qt 后端或默认使用原生 Wayland 时会跳过。
+
 ### 从源码安装
 
 ```bash
@@ -390,7 +406,7 @@ CAN-FD 波特率档位：
 
 自适应抓取需要可访问触觉传感器的硬件，配置与运行方法见 [自适应抓取使用说明](src/ghand/adaptive_grasp/README.zh.md)。
 
-触觉显示依赖随 SDK 一起安装，通过示例启动：
+触觉显示的 Python 依赖随 SDK 一起安装；Linux 用户请先完成 [Linux GUI 系统依赖](#linux-gui-系统依赖) 安装，再通过示例启动：
 
 ```bash
 python -m pip install .

@@ -89,6 +89,28 @@ Additional local notes:
 - **Linux**: `build-essential` and `python3-dev` for building native dependencies
 - **macOS**: No additional prerequisites for CAN-FD or RS-485. For EtherCAT, raw socket access via pcap requires `sudo` (no persistent capability equivalent to Linux `setcap` on macOS).
 
+### Linux GUI dependencies
+
+`pip` installs `PySide6` and `pyqtgraph` automatically, but does not install Linux
+system libraries. Before using the tactile display with X11/xcb on Ubuntu
+22.04/24.04, run:
+
+```bash
+sudo apt update
+sudo apt install libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1
+```
+
+On other distributions, install the equivalent system packages. The GUI also
+requires a working desktop display session; these libraries do not provide a
+display server for a headless server or container.
+The tactile display example checks the xcb plugin before creating the window
+and reports loading errors with installation commands.
+Custom GUI applications can call
+`ghand.tactile_display.runtime.check_gui_dependencies()` before creating
+`QApplication` and handle its `RuntimeError`. This check does not validate the
+display server connection; explicit alternative Qt backends and default native
+Wayland sessions skip it.
+
 ### Install from Source
 
 ```bash
@@ -391,7 +413,9 @@ CAN-FD baud-rate gears:
 
 Adaptive grasp requires hardware with accessible tactile sensors; see the [adaptive grasp guide](src/ghand/adaptive_grasp/README.md).
 
-Tactile display dependencies are included with the SDK. Install and launch the example:
+Python dependencies for the tactile display are included with the SDK. Linux
+users should first install the [Linux GUI dependencies](#linux-gui-dependencies).
+Install and launch the example:
 
 ```bash
 python -m pip install .
