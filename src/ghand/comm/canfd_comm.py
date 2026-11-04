@@ -125,10 +125,6 @@ class CANFDComm(IComm):
     _DEFAULT_POLL_INTERVAL_SEC = 0.03
     _KEEPALIVE_INTERVAL_SEC = 0.2
     _KEEPALIVE_TIMEOUT_MS = 300
-    # Connection watchdog written at connect time. It must stay well above the
-    # transport request timeout so a single lost response cannot starve the
-    # keep-alive long enough for the device to drop the session.
-    _CONNECTION_WATCHDOG_MS = 3000
     _DEFAULT_BAUDRATE_GEAR = CANFD_DEFAULT_BAUDRATE_GEAR
     COMMON_BAUDRATE_GEARS = tuple(sorted(CANFD_BAUDRATE_GEAR_MAP.keys(), reverse=True))
 
@@ -143,7 +139,6 @@ class CANFDComm(IComm):
         self._transport: CanfdTransport | None = None
         self._src_id = 0x0A  # master node id
         self._slave_id = 0x00
-        self._connection_watchdog_ms = self._CONNECTION_WATCHDOG_MS
         self._connected = False
         self._poll_thread: threading.Thread | None = None
         self._poll_stop = threading.Event()
@@ -398,11 +393,7 @@ class CANFDComm(IComm):
             arb = unpack_arbitration(resp_id)
             if (arb["ack"] == 0 and arb["func_code"] == 0x44 and arb["src_id"] == arb["dst_id"]
                     and arb["src_id"] in candidates):
-                if self._write_connection_control(
-                        arb["src_id"],
-                        1,
-                        connection_timer_ms=self._connection_watchdog_ms,
-                ):
+                if self._write_connection_control(arb["src_id"], 1):
                     return self._verify_connection()
                 return False
 
@@ -436,11 +427,7 @@ class CANFDComm(IComm):
                     if arb["func_code"] == 0xC4:
                         break  # Exception: try next dst_id
                     if arb["func_code"] == 0x44:
-                        if self._write_connection_control(
-                                slave_id,
-                                1,
-                                connection_timer_ms=self._connection_watchdog_ms,
-                        ):
+                        if self._write_connection_control(slave_id, 1):
                             return self._verify_connection()
                         break
         return False
@@ -503,24 +490,12 @@ class CANFDComm(IComm):
         slave_id: int,
         value: int,
         timeout_ms: int = 5000,
-        connection_timer_ms: int | None = None,
     ) -> bool:
-        if connection_timer_ms is None:
-            payload = struct.pack(">H", value)
-        else:
-            # 0x0001 holds the high 16 bits and 0x0002 the low 16 bits; both are
-            # written with the connection control in one FC10 frame.
-            payload = struct.pack(
-                ">HHH",
-                value,
-                (connection_timer_ms >> 16) & 0xFFFF,
-                connection_timer_ms & 0xFFFF,
-            )
         if not self._ensure_transport().write_registers(
                 self._src_id,
                 slave_id,
                 REG_CONNECTION_CONTROL,
-                payload,
+                struct.pack(">H", value),
                 timeout_ms=timeout_ms,
         ):
             return False
