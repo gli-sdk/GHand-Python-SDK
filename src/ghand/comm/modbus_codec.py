@@ -59,6 +59,8 @@ class ModbusRegisterProfile:
     tactile_state_address: int = 0x111A
     tactile_control_address: int = 0x0020
     tactile_resultant_register_count: int = 16
+    joint_control_register_count: int = 6
+    hand_info_register_count: int = 14
 
 
 # Baud rate configuration register (REG_HOLD_BAUD_CONFIG).
@@ -143,16 +145,17 @@ def build_modbus_profile_from_config(config) -> ModbusRegisterProfile:
     Returns:
         Dynamically generated Modbus register profile.
     """
+    lite1 = config.product_type == ProductType.GHandLite1
     joint_input_addresses = {
-        joint_id: 0x105F + joint_id.value * 5
-        for joint_id in config.all_joints
+        joint_id: (0x105C + index * 5 if lite1 else 0x105F + joint_id.value * 5)
+        for index, joint_id in enumerate(config.all_joints)
     }
 
     joint_control_addresses = build_controllable_joint_addresses(
         all_joints=config.all_joints,
         active_joint_limits=config.active_joints,
         base_address=0x0261,
-        stride=6,
+        stride=4 if lite1 else 6,
     )
 
     return ModbusRegisterProfile(
@@ -160,6 +163,8 @@ def build_modbus_profile_from_config(config) -> ModbusRegisterProfile:
         joint_input_addresses=joint_input_addresses,
         joint_control_addresses=joint_control_addresses,
         control_layout="shared_mode_2reg",
+        joint_control_register_count=4 if lite1 else 6,
+        hand_info_register_count=11 if lite1 else 14,
         mode_register=0x0260,
         stop_register=0x0260,
         tactile_control_address=0x0020,
@@ -249,19 +254,26 @@ def parse_hand_type(raw_bytes: bytes) -> int:
     return int.from_bytes(raw_bytes, byteorder="big") & 0xFF
 
 
-def parse_hand_info(raw: list[int]) -> HandData:
-    """Parse 14 input registers (0x1051~0x105E) into HandData.
+def parse_hand_info(raw: list[int], profile: ModbusRegisterProfile | None = None) -> HandData:
+    """Parse GHand5 (14) or GHandLite1 (11) registers starting at 0x1051.
 
     Args:
         raw: raw[0] = uint16 hand state, raw[1:4] = warn bitfield,
              raw[4:10] = fault bitfield, raw[10:13] = critical bitfield,
              raw[13] = signed int16 temperature in degrees Celsius.
+        profile: L1 uses raw[4:7] for faults, raw[7:10] for critical errors,
+            and raw[10] for temperature. Omitted profiles use GHand5.
     """
-    state = raw[0] & 0xFFFF
+    lite1 = profile is not None and profile.product_type == ProductType.GHandLite1
+    fault_end = 7 if lite1 else 10
+    critical_end = fault_end + 3
+    state = int(bool(raw[0] & 0xFF)) if lite1 else raw[0] & 0xFFFF
     error_warn = (registers_to_bytes_low_high(raw[1:4]) if len(raw) >= 4 else b"\x00" * 6)
-    error_fault = (registers_to_bytes_low_high(raw[4:10]) if len(raw) >= 10 else b"\x00" * 12)
-    error_critical = (registers_to_bytes_low_high(raw[10:13]) if len(raw) >= 13 else b"\x00" * 6)
-    temperature = raw[13] if len(raw) >= 14 else 0
+    error_fault = (registers_to_bytes_low_high(raw[4:fault_end])
+                   if len(raw) >= fault_end else b"\x00" * 12)
+    error_critical = (registers_to_bytes_low_high(raw[fault_end:critical_end])
+                      if len(raw) >= critical_end else b"\x00" * 6)
+    temperature = raw[critical_end] if len(raw) > critical_end else 0
     if temperature >= 32768:
         temperature -= 65536
     return HandData(
@@ -496,6 +508,9 @@ def encode_hand_command_frame(
             continue
         registers = encode_joint_command(joint, mode,
                                          joint_modes.get(joint_id, HandControlMode.POSITION.value))
+        if profile.product_type == ProductType.GHandLite1:
+            registers[0] &= 0xFF0F
+        registers = registers[:profile.joint_control_register_count]
         commands[joint_id] = registers
         updated_modes[joint_id] = registers[0] & 0xFF
 
@@ -527,7 +542,7 @@ def encode_hand_command_frame(
                     0,
                     0,
                     0,
-                ],
+                ][:profile.joint_control_register_count],
             ))
 
     return start_address, registers, updated_modes
@@ -539,7 +554,10 @@ def encode_joint_command_registers(
     profile: ModbusRegisterProfile,
 ) -> list[int]:
     """Encode a joint command according to the product's control layout."""
-    return encode_joint_command(joint, mode)
+    registers = encode_joint_command(joint, mode)
+    if profile.product_type == ProductType.GHandLite1:
+        registers[0] &= 0xFF0F
+    return registers[:profile.joint_control_register_count]
 
 
 def build_tactile_info(

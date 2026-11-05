@@ -99,6 +99,8 @@ class GHand:
             config: New product configuration to apply.
         """
         self._product_config = config
+        if config.product_type is not None:
+            self._product_type = config.product_type
         self._active_joints = config.active_joints.copy()
         self._passive_joints = set(config.all_joints) - set(self._active_joints.keys())
         self._has_tactile = config.has_tactile
@@ -535,6 +537,7 @@ class GHand:
                     hand_control_mode: HandControlMode = HandControlMode.POSITION) -> bool:
         """Send joint control commands.
 
+        Passive joints and joints absent from the product configuration are ignored.
         Communication exceptions propagate to the caller.
 
         Args:
@@ -545,10 +548,22 @@ class GHand:
         Returns:
             True if the command is sent successfully.
         """
+        if getattr(self, "_product_type", None) == ProductType.GHandLite1:
+            if hand_control_mode == HandControlMode.MIT or any(
+                    joint.control_mode == JointControlMode.MIT or
+                    joint.loop_type != JointLoopType.CLOSED_LOOP or
+                    joint.kp != 0 or joint.kd != 0 for joint in joints):
+                raise NotImplementedError(
+                    "GHandLite1 supports closed-loop position, velocity and current control "
+                    "without MIT gains")
         active_joints = []
         for joint in joints:
             if joint.id in self._passive_joints:
                 logger.warning("Passive joint %s will be ignored", JointId(joint.id).name)
+                continue
+            if joint.id not in self._active_joints:
+                logger.warning("Joint %s is not supported by this product and will be ignored",
+                               JointId(joint.id).name)
                 continue
             # Create a copy so the caller's original object is not mutated.
             joint_cmd = JointCommand(
@@ -574,7 +589,7 @@ class GHand:
             active_joints.append(joint_cmd)
 
         if not active_joints:
-            logger.warning("No active joints to move after filtering passive joints")
+            logger.warning("No active joints to move after filtering passive and unsupported joints")
             return False
 
         return self._comm.move_joints(active_joints, hand_control_mode)

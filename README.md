@@ -38,6 +38,8 @@ The capabilities below apply to GHand5 with the current V3.1.0 release. **For GH
 
 The GHandLite1 types and configuration files retained in this repository do not indicate support for connecting that product with V3.1.0. L1 users should check out the corresponding 2.x version before following its installation instructions.
 
+Retained L1 configuration and protocol details are documented in [GHandLite1 compatibility notes](docs/ghandlite1_compatibility.md).
+
 - **Device control**
   - Open and close GHand devices over EtherCAT, CAN-FD, or RS-485.
   - Read firmware, firmware package, serial number, product name, hand type, and component versions.

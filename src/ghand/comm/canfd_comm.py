@@ -38,6 +38,7 @@ except ImportError:
 
 from .._product_config import ProductConfig
 from ..types import (
+    ProductType,
     CANFDBitTiming,
     RS485BaudRate,
     JointId,
@@ -425,6 +426,9 @@ class CANFDComm(IComm):
                 arb = unpack_arbitration(resp_id)
                 if arb["ack"] == 1 and arb["dst_id"] == self._src_id and arb["src_id"] == slave_id:
                     if arb["func_code"] == 0xC4:
+                        if self._profile.product_type == ProductType.GHandLite1:
+                            if self._write_connection_control(slave_id, 1):
+                                return self._verify_connection()
                         break  # Exception: try next dst_id
                     if arb["func_code"] == 0x44:
                         if self._write_connection_control(slave_id, 1):
@@ -664,11 +668,12 @@ class CANFDComm(IComm):
             self._src_id,
             self._slave_id,
             self._profile.hand_info_address,
-            14,
+            self._profile.hand_info_register_count,
             func_code=0x04,
         )
-        raw = list(struct.unpack(">14H", raw_bytes[:28]))
-        return parse_hand_info(raw)
+        count = self._profile.hand_info_register_count
+        raw = list(struct.unpack(f">{count}H", raw_bytes[:count * 2]))
+        return parse_hand_info(raw, self._profile)
 
     def get_hand_state_machine(self) -> HandRuntimeState | int:
         """Retrieve the Modbus whole-hand runtime state."""
@@ -779,6 +784,8 @@ class CANFDComm(IComm):
         return self._get_packed_version(REG_IN_FIRMWARE_PACKAGE_VER)
 
     def get_position_sensor_version(self) -> str:
+        if self._profile.product_type == ProductType.GHandLite1:
+            return "N/A"
         return self._get_packed_version(REG_IN_POSITION_SENSOR_VER)
 
     def get_tactile_sensor_version(self) -> str:
@@ -788,9 +795,13 @@ class CANFDComm(IComm):
         return self._get_packed_version(REG_IN_MOTOR_DRV_VER)
 
     def get_thumb_tactile_sensor_version(self) -> str:
+        if self._profile.product_type == ProductType.GHandLite1:
+            return "N/A"
         return self._get_packed_version(REG_IN_THUMB_TACTILE_VER)
 
     def get_finger_tactile_sensor_version(self) -> str:
+        if self._profile.product_type == ProductType.GHandLite1:
+            return "N/A"
         return self._get_packed_version(REG_IN_FINGER_TACTILE_VER)
 
     # ------------------------------------------------------------------
@@ -961,7 +972,7 @@ class CANFDComm(IComm):
                     continue
                 start = min(self._profile.hand_info_address, joint_start)
                 end = max(
-                    self._profile.hand_info_address + 13,
+                    self._profile.hand_info_address + self._profile.hand_info_register_count - 1,
                     joint_start + joint_count - 1,
                 )
                 count = end - start + 1
@@ -972,7 +983,9 @@ class CANFDComm(IComm):
                                                            func_code=0x04)
                 raw = list(struct.unpack(f">{count}H", raw_bytes[:count * 2]))
                 hand_offset = self._profile.hand_info_address - start
-                hand_state = parse_hand_info(raw[hand_offset:hand_offset + 14])
+                hand_state = parse_hand_info(
+                    raw[hand_offset:hand_offset + self._profile.hand_info_register_count],
+                    self._profile)
                 joints = parse_joints(
                     raw,
                     self._config.all_joints,

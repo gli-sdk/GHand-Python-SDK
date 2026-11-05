@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Aligned retained GHandLite1 configuration with the C++ SDK: TMC_AA limits of 30–60 degrees, tactile sensing enabled, and 38/31/31/31/31 tactile sample groups.
+- Added L1 Modbus joint addresses, four-register commands and eleven-register hand status, plus EtherCAT's 22-byte hand header, ten-byte joint feedback and eight-byte joint commands.
+- Reject unsupported L1 MIT control, nonzero MIT gains, semi-closed-loop commands and parameter access; return `N/A` for unavailable sensor component versions. The V3.1.0 product support policy remains unchanged; L1 users should use SDK 2.x.
+
 ## [3.1.0]
 
 ### Changed

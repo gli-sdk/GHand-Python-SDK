@@ -38,6 +38,8 @@ GHand 灵巧手官方 Python SDK，提供 EtherCAT、CAN-FD、RS-485 通信接�
 
 仓库保留的 GHandLite1 类型和配置文件不代表 V3.1.0 支持连接该产品。L1 用户请先切换至对应的 2.x 版本，再按该版本说明安装。
 
+仓库保留的 L1 配置与协议细节见 [GHandLite1 兼容说明](docs/ghandlite1_compatibility.md)。
+
 - **设备控制**
   - 通过 EtherCAT、CAN-FD 或 RS-485 打开和关闭 GHand 设备。
   - 读取固件、固件包、序列号、产品名称、左右手类型和组件版本。
