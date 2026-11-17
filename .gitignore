@@ -31,5 +31,12 @@ nul
 reviews/
 .codegraph/
 tests/*
+!tests/test_tactile_raw_status.py
+!tests/test_tactile_moments.py
+!tests/test_tactile_moment_display.py
+!tests/test_tactile_moment_filter.py
 docs/
 .tmp-format-tools/*
+
+!tests/test_recording_keys.py
+!tests/test_recording_probe.py

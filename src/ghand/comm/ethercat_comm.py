@@ -27,6 +27,7 @@ from .._subscription import SubscriptionManager
 from .._product_config import ProductConfig, TactileRegionConfig
 from .._device_value import parse_device_value
 from ..types import (
+    ProductType,
     JointId,
     HandControlMode,
     JointControlMode,
@@ -94,14 +95,17 @@ class EtherCATComm(IComm):
 
     def _expected_rpdo_bytes(self, config: ProductConfig) -> int:
         """Return the expected EtherCAT RPDO byte size for the product."""
-        return 2 + len(self._controlled_joints) * 12
+        joint_size = 8 if config.product_type == ProductType.GHandLite1 else 12
+        return 2 + len(self._controlled_joints) * joint_size
 
     def _build_tpdo_layouts(self, config: ProductConfig) -> dict[int, ProductConfig]:
         """Build supported TPDO layouts keyed by mapped input size."""
         tactile_counts = [r.count for r in config.tactile_regions] if config.has_tactile else None
-        layouts = {compute_tpdo_size(len(config.all_joints), tactile_counts): config}
-        if config.has_tactile and tactile_counts and tactile_counts[
-                0] > self._COMPAT_THUMB_TACTILE_COUNT:
+        layouts = {
+            compute_tpdo_size(len(config.all_joints), tactile_counts, config.product_type): config
+        }
+        if (config.product_type != ProductType.GHandLite1 and config.has_tactile and
+                tactile_counts and tactile_counts[0] > self._COMPAT_THUMB_TACTILE_COUNT):
             compat_counts = list(tactile_counts)
             compat_counts[0] = self._COMPAT_THUMB_TACTILE_COUNT
             compat_config = self._clone_config_with_tactile_counts(config, compat_counts)
@@ -125,10 +129,11 @@ class EtherCATComm(IComm):
         self._expected_tpdo_size = compute_tpdo_size(
             len(config.all_joints),
             [r.count for r in config.tactile_regions] if config.has_tactile else None,
+            config.product_type,
         )
         self._tpdo_size_selected = False
         self._controlled_joints = [j for j in config.all_joints if j in config.active_joints]
-        self._rpdo = Rpdo(self._controlled_joints)
+        self._rpdo = Rpdo(self._controlled_joints, config.product_type)
         self._expected_rpdo_size = self._expected_rpdo_bytes(config)
 
     # ===== Connection management =====
@@ -270,7 +275,7 @@ class EtherCATComm(IComm):
         """
         data = self._recv_tpdo_data()
 
-        hand_tpdo = HandTpdo.from_bytes(data)
+        hand_tpdo = HandTpdo.from_bytes(data, self._config.product_type)
         return HandData(
             joints_state=parse_device_value(HandControlState, hand_tpdo.state),
             error_warn=HandWarning(int.from_bytes(hand_tpdo.error_warn, "little")),
@@ -301,6 +306,8 @@ class EtherCATComm(IComm):
                 state=bool(tpdo.tactile_state.state & (1 << region.id.value)),
                 resultant_force=tactile.resultant_force,
                 distributed_force=tactile.sample_force,
+                raw_state=tpdo.tactile_state.state,
+                error=tpdo.tactile_state.error,
             )
         return result
 
@@ -429,8 +436,13 @@ class EtherCATComm(IComm):
             result_subindex=0x04,
         )
 
+    def _check_parameter_support(self) -> None:
+        if self._config.product_type == ProductType.GHandLite1:
+            raise NotImplementedError("Parameter access is not supported on GHandLite1")
+
     def get_stall_tolerances(self) -> dict[JointId, int]:
         """Read the 13 per-joint stall tolerances from SDO 0x2003:01."""
+        self._check_parameter_support()
         if not self._execute_sdo_command(
                 0x2003,
                 0xA2,
@@ -444,6 +456,7 @@ class EtherCATComm(IComm):
 
     def set_stall_tolerances(self, tolerances: dict[JointId, int]) -> bool:
         """Write all 13 per-joint stall tolerances through SDO 0x2003."""
+        self._check_parameter_support()
         if set(tolerances) != set(self._controlled_joints):
             raise ValueError("stall tolerances must contain all 13 active JointId keys")
         values = [tolerances[joint_id] for joint_id in self._controlled_joints]
@@ -454,6 +467,7 @@ class EtherCATComm(IComm):
 
     def get_pid_parameters(self) -> list[int]:
         """Read the raw 39-value uint16 PID array from SDO 0x2008:01."""
+        self._check_parameter_support()
         if not self._execute_sdo_command(
                 0x2008,
                 0xA2,
@@ -466,6 +480,7 @@ class EtherCATComm(IComm):
 
     def set_pid_parameters(self, parameters: list[int]) -> bool:
         """Write the raw 39-value uint16 PID array through SDO 0x2008."""
+        self._check_parameter_support()
         return self._write_sdo_parameters(
             0x2008,
             self._pack_uint_array(parameters, 39, "H"),
@@ -504,6 +519,8 @@ class EtherCATComm(IComm):
 
     def get_position_sensor_version(self) -> str:
         """Retrieve the position sensor version via SDO."""
+        if self._config.product_type == ProductType.GHandLite1:
+            return "N/A"
         return self._read_packed_firmware_version(0x02)
 
     def get_tactile_sensor_version(self) -> str:
@@ -519,10 +536,14 @@ class EtherCATComm(IComm):
 
     def get_thumb_tactile_sensor_version(self) -> str:
         """Retrieve the thumb tactile sensor version via SDO."""
+        if self._config.product_type == ProductType.GHandLite1:
+            return "N/A"
         return self._read_packed_firmware_version(0x06)
 
     def get_finger_tactile_sensor_version(self) -> str:
         """Retrieve the four-finger tactile sensor version via SDO."""
+        if self._config.product_type == ProductType.GHandLite1:
+            return "N/A"
         return self._read_packed_firmware_version(0x07)
 
     def get_hand_type(self) -> int:
@@ -599,6 +620,8 @@ class EtherCATComm(IComm):
                             state=bool(tpdo.tactile_state.state & (1 << region.id.value)),
                             resultant_force=tdata.resultant_force,
                             distributed_force=tdata.sample_force,
+                            raw_state=tpdo.tactile_state.state,
+                            error=tpdo.tactile_state.error,
                         )
             callback(DeviceData(hand=hand, joints=joints, tactile=tactile), *args, **kwargs)
 

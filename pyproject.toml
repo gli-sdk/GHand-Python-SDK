@@ -24,6 +24,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+recording = [
+    "pyarrow>=14.0.0",
+]
 collision = [
     "numpy-stl>=3.1.0",
     "pandas>=2.0.0",

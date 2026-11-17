@@ -38,6 +38,8 @@ The capabilities below apply to GHand5 with the current V3.1.0 release. **For GH
 
 The GHandLite1 types and configuration files retained in this repository do not indicate support for connecting that product with V3.1.0. L1 users should check out the corresponding 2.x version before following its installation instructions.
 
+Retained L1 configuration and protocol details are documented in [GHandLite1 compatibility notes](docs/ghandlite1_compatibility.md).
+
 - **Device control**
   - Open and close GHand devices over EtherCAT, CAN-FD, or RS-485.
   - Read firmware, firmware package, serial number, product name, hand type, and component versions.
@@ -429,6 +431,58 @@ The caller owns the device connection and closes it after the display exits.
 For custom data sources, `ghand.tactile_display.window.TactileWindow` remains
 available as a display-only component.
 
+### Computed tactile moments (GHand5)
+
+`hand.get_tactile_data()` and `hand.subscribe(...)` now include per-finger
+`resultant_moment = [Mx, My, Mz]` in **N·m**, with
+`moment_reference_point_m`, `distributed_force_sensor_frame` and
+`resultant_force_sensor_frame` (forces in N). Original transport force and
+status fields remain unchanged. `TactileMomentCalculator` is also available
+directly from `ghand` for offline readings.
+
+The supplied PX matrices map sensor CAD coordinates to each taxel's local
+coordinates: `F_local = R @ F_CAD`. Assuming the SDK point-force triples are
+taxel-local and follow vendor point numbering, calculation uses
+`F_CAD_i = R_i.T @ F_local_i`, then
+`M_O = sum(cross(p_i - O, F_CAD_i))`. Positions are converted from mm to m.
+The convention was supplied by the integrator; it has not been physically
+calibrated against an external torque sensor in this change.
+
+Default `O=(0,0,0)` is **each sensor's CAD origin**. It is not automatically a
+pad center, motor axis, or shared hand/world origin. To shift it, call
+`hand.configure_tactile_moments(reference_point_m=(x, y, z))`, in meters;
+this changes software calculation settings only. The same coordinate triple
+is applied independently in each finger's own CAD frame.
+
+Missing, malformed, nonfinite or unhealthy readings produce `None`, not zero.
+An explicit healthy tactile status (`state=True`, `error=0`) is required;
+CAN-FD/RS-485 currently omit the error byte, so their derived moments remain
+unavailable. GHandLite1 has no enabled moment geometry. Polling and callbacks
+return enriched copies, leaving communication caches untouched.
+
+The display adds a five-finger moment table (including O in mm) and a
+**Moment (N·m)** history tab. Force views retain the original readings.
+Live moments disappear after 0.5 s without updates; missing readings and
+reference changes break the curves. These are computed tactile moments, not
+joint motor torques. Sensor CAD wrenches cannot be added across fingers until
+their rotations and origins have been transformed to a shared frame.
+
+**Auto scale (5 s)** is on by default: each finger's force/moment Y limits fit
+the last five seconds, centered on zero with a margin and stable 1/2/5 steps.
+Minimum half ranges are 0.05 N and 0.00001 N·m. Older peaks remain in the
+60-second history but may fall outside the current Y range. Uncheck it to
+restore fixed force (-10..25 N) and moment (-0.05..0.05 N·m) ranges.
+Larger tactile dots and continuous arrows make sub-newton forces visible;
+point size uses one shared five-finger adaptive range shown below the table.
+Point colors always use an absolute logarithmic |F| scale, 0..25 N from pale
+yellow to deep red, so stronger force produces a deeper color independent of
+auto scaling. Measurement values, units and SDK wrench calculations are unchanged.
+
+The packaged `src/ghand/config/ghand5_tactile_geometry.json` contains 38 thumb
+and 31 other-finger points, matrices, and vendor file SHA-256 hashes. It does
+not depend on the original Excel/CAD files at runtime. Rebuild from supplied
+PX files with `python3 scripts/build_tactile_geometry.py /path/to/px`.
+
 ## Project Structure
 
 ```text
@@ -482,6 +536,14 @@ Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for gu
 
 - **Technical support**: For project-specific issues, open an issue in this repository.
 - **General inquiries**: [support@glitech.com](mailto:support@glitech.com)
+
+## Tactile-only data collection
+
+`examples/collection/record_tactile.py` passively records existing localhost hand
+teleoperation telemetry as Parquet episodes, without an arm, cameras, or another
+SDK device connection. It also prepares tactile-only T-Rex VQ-VAE datasets.
+Install the optional dependency with `pip install -e '.[recording]'` and see
+[collection instructions](docs/TACTILE_ONLY_COLLECTION.md).
 
 ## License
 

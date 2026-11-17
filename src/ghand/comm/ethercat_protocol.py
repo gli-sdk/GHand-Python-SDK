@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 
 from .._product_config import ProductConfig
 from .._device_value import format_device_value, parse_device_value
-from ..types import JointErrorCode, JointId, JointState, HandControlState
+from ..types import JointErrorCode, JointId, JointState, HandControlState, ProductType
 
 # TPDO component byte sizes
 _HAND_TPDO_SIZE = struct.calcsize('<H6s12s6sh')  # 28
@@ -30,18 +30,21 @@ _TACTILE_RESULTANT_SIZE = 6  # resultant xyz (int16[3], low byte valid)
 _TACTILE_SAMPLE_PER_GROUP = 3  # xyz per sample group
 
 
-def compute_tpdo_size(joint_count: int, tactile_region_counts: list[int] | None = None) -> int:
+def compute_tpdo_size(joint_count: int, tactile_region_counts: list[int] | None = None,
+                      product_type: ProductType = ProductType.GHand5) -> int:
     """Calculate the total TPDO byte size based on joint count and tactile sample groups.
 
     Args:
         joint_count: Total number of joints.
         tactile_region_counts: List of tactile region sample-group counts.
             If omitted, tactile data is excluded from the calculation.
+        product_type: Selects the 22-byte L1 or 28-byte GHand5 hand header.
 
     Returns:
         Expected TPDO size in bytes.
     """
-    total = _HAND_TPDO_SIZE + joint_count * _JOINT_TPDO_SIZE
+    hand_size = 22 if product_type == ProductType.GHandLite1 else _HAND_TPDO_SIZE
+    total = hand_size + joint_count * _JOINT_TPDO_SIZE
     if tactile_region_counts:
         total += _TACTILE_STATE_SIZE
         for count in tactile_region_counts:
@@ -60,12 +63,13 @@ class HandTpdo:
     temperature: int
 
     @classmethod
-    def from_bytes(cls, data: bytes):
-        expected_size = struct.calcsize('<H6s12s6sh')
+    def from_bytes(cls, data: bytes, product_type: ProductType = ProductType.GHand5):
+        layout = '<H6s6s6sh' if product_type == ProductType.GHandLite1 else '<H6s12s6sh'
+        expected_size = struct.calcsize(layout)
         if len(data) < expected_size:
             return cls(0, b"\x00" * 6, b"\x00" * 12, b"\x00" * 6, 0)
         state, error_warn, error_fault, error_critical, temperature = (struct.unpack_from(
-            '<H6s12s6sh', data, 0))
+            layout, data, 0))
         return cls(state, error_warn, error_fault, error_critical, temperature)
 
     def __str__(self):
@@ -190,14 +194,16 @@ class Tpdo:
         expected_size = compute_tpdo_size(
             len(config.all_joints),
             [r.count for r in config.tactile_regions] if config.has_tactile else None,
+            config.product_type,
         )
         instance = cls(config)
         if len(data) < expected_size:
             return instance
 
         offset = 0
-        instance.hand = HandTpdo.from_bytes(data[offset:offset + _HAND_TPDO_SIZE])
-        offset += _HAND_TPDO_SIZE
+        hand_size = 22 if config.product_type == ProductType.GHandLite1 else _HAND_TPDO_SIZE
+        instance.hand = HandTpdo.from_bytes(data[offset:offset + hand_size], config.product_type)
+        offset += hand_size
 
         for jid in config.all_joints:
             joint = JointTpdo.from_bytes(data[offset:offset + _JOINT_TPDO_SIZE])
@@ -245,7 +251,9 @@ class Rpdo:
     so the frame only contains joints declared by the product config.
     """
 
-    def __init__(self, controlled_joints: list[JointId]):
+    def __init__(self, controlled_joints: list[JointId],
+                 product_type: ProductType = ProductType.GHand5):
+        self.product_type = product_type
         self.mode: int = 0
         self.stop: int = 0
         self.joints: dict[JointId, JointRpdo] = {jid: JointRpdo() for jid in controlled_joints}
@@ -260,15 +268,15 @@ class Rpdo:
         data.extend(struct.pack('<B', self.mode))
         data.extend(struct.pack('<B', self.stop))
         for joint in self.joints.values():
+            lite1 = self.product_type == ProductType.GHandLite1
             data.extend(
                 struct.pack(
-                    '<BBhhhhh',
-                    joint.mode,
+                    '<BBhhh' if lite1 else '<BBhhhhh',
+                    joint.mode & 0x0F if lite1 else joint.mode,
                     joint.stop,
                     int(joint.angle * 10),
                     joint.velocity,
                     joint.current,
-                    joint.kp,
-                    joint.kd,
+                    *([] if lite1 else [joint.kp, joint.kd]),
                 ))
         return bytes(data)

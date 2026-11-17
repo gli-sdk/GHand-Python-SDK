@@ -38,6 +38,7 @@ except ImportError:
     ModbusException = Exception  # type: ignore[misc,assignment]
 from .._product_config import ProductConfig
 from ..types import (
+    ProductType,
     CANFDBitTiming,
     RS485BaudRate,
     HandControlMode,
@@ -316,6 +317,12 @@ class RS485Comm(IComm):
             for target_slave_id in dict.fromkeys(slave_ids):
                 if target_slave_id is None:
                     continue
+                if self._profile.product_type == ProductType.GHandLite1:
+                    hand_type = self._read_input_word(REG_HAND_TYPE, device_id=target_slave_id)
+                    if hand_type is not None and hand_type & 0xFF in (1, 2):
+                        self._slave_id = target_slave_id
+                        break
+                    continue
                 try:
                     result = self._read_holding_registers(REG_SLAVE_ID,
                                                           count=1,
@@ -331,7 +338,8 @@ class RS485Comm(IComm):
                 self._client = None
                 logger.error("No RS485 device responded on %s", device_name)
                 return False
-            if not self._establish_connection():
+            if (self._profile.product_type != ProductType.GHandLite1 and
+                    not self._establish_connection()):
                 self._client.close()
                 self._client = None
                 logger.error("Failed to establish RS485 connection on %s", device_name)
@@ -410,7 +418,7 @@ class RS485Comm(IComm):
             self._recompute_poll_interval_locked()
         self._join_poll_thread(poll_thread)
         if self._client:
-            if self._connected:
+            if self._connected and self._profile.product_type != ProductType.GHandLite1:
                 try:
                     self._write_register(REG_CONNECTION_CONTROL, 2)
                 except Exception:
@@ -562,12 +570,13 @@ class RS485Comm(IComm):
         Returns:
             HandData instance.
         """
-        result = self._read_input_registers(self._profile.hand_info_address, count=14)
+        result = self._read_input_registers(self._profile.hand_info_address,
+                                            count=self._profile.hand_info_register_count)
         if result is None or result.isError():
             raise RuntimeError("Failed to read hand info registers")
 
         raw = result.registers
-        return parse_hand_info(raw)
+        return parse_hand_info(raw, self._profile)
 
     def get_hand_state_machine(self) -> HandRuntimeState | int:
         """Retrieve the Modbus whole-hand runtime state."""
@@ -685,6 +694,8 @@ class RS485Comm(IComm):
 
     def get_position_sensor_version(self) -> str:
         """Retrieve the position sensor version."""
+        if self._profile.product_type == ProductType.GHandLite1:
+            return "N/A"
         return self._get_packed_version(REG_IN_POSITION_SENSOR_VER)
 
     def get_tactile_sensor_version(self) -> str:
@@ -697,10 +708,14 @@ class RS485Comm(IComm):
 
     def get_thumb_tactile_sensor_version(self) -> str:
         """Retrieve the thumb tactile sensor version."""
+        if self._profile.product_type == ProductType.GHandLite1:
+            return "N/A"
         return self._get_packed_version(REG_IN_THUMB_TACTILE_VER)
 
     def get_finger_tactile_sensor_version(self) -> str:
         """Retrieve the four-finger tactile sensor version."""
+        if self._profile.product_type == ProductType.GHandLite1:
+            return "N/A"
         return self._get_packed_version(REG_IN_FINGER_TACTILE_VER)
 
     # ===== Tactile sensor =====
@@ -876,7 +891,7 @@ class RS485Comm(IComm):
                     continue
                 start = min(self._profile.hand_info_address, joint_start)
                 end = max(
-                    self._profile.hand_info_address + 13,
+                    self._profile.hand_info_address + self._profile.hand_info_register_count - 1,
                     joint_start + joint_count - 1,
                 )
                 count = end - start + 1
@@ -886,7 +901,9 @@ class RS485Comm(IComm):
 
                 raw = list(result.registers)
                 hand_offset = self._profile.hand_info_address - start
-                hand_state = parse_hand_info(raw[hand_offset:hand_offset + 14])
+                hand_state = parse_hand_info(
+                    raw[hand_offset:hand_offset + self._profile.hand_info_register_count],
+                    self._profile)
                 joints = parse_joints(
                     raw,
                     self._config.all_joints,

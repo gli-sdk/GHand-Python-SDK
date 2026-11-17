@@ -20,7 +20,8 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any
+from dataclasses import replace
+from typing import Any, Sequence
 from ._config import load_product_config
 from .comm import IComm, create_comm
 import numpy as np
@@ -31,6 +32,7 @@ from .collision.angle_mapping import COLLISION_JOINT_ORDER
 from .collision.angle_mapping import internal_radians_to_sdk_degrees
 from .collision.angle_mapping import neutral_internal_radians
 from ._product_config import ProductConfig
+from .tactile_moments import TactileMomentCalculator
 from .types import (
     CANFDBitTiming,
     CommType,
@@ -73,6 +75,8 @@ class GHand:
         self._tactile_opened = False
         self._safety_margin = 0.0
         self._collision_checker = None
+        self._tactile_moments = (TactileMomentCalculator()
+                                if product_type == ProductType.GHand5 else None)
 
     def __enter__(self):
         return self
@@ -99,11 +103,15 @@ class GHand:
             config: New product configuration to apply.
         """
         self._product_config = config
+        if config.product_type is not None:
+            self._product_type = config.product_type
         self._active_joints = config.active_joints.copy()
         self._passive_joints = set(config.all_joints) - set(self._active_joints.keys())
         self._has_tactile = config.has_tactile
         self._tactile_opened = False
         self._comm.update_config(config)
+        self._tactile_moments = (TactileMomentCalculator()
+                                if self._product_type == ProductType.GHand5 else None)
 
     @staticmethod
     def _check_joint_limit(joint: JointCommand, limit, mode: JointControlMode):
@@ -357,8 +365,14 @@ class GHand:
         if not self.is_connected():
             raise RuntimeError("Device is not connected")
 
+        def on_data(data):
+            calculator = self._tactile_moments
+            if calculator is not None and data.tactile is not None:
+                data = replace(data, tactile=calculator.enrich(data.tactile))
+            callback(data)
+
         return self._comm.subscribe_device_data(
-            callback,
+            on_data,
             include_tactile=self._tactile_opened,
             interval_ms=interval_ms,
         )
@@ -535,6 +549,7 @@ class GHand:
                     hand_control_mode: HandControlMode = HandControlMode.POSITION) -> bool:
         """Send joint control commands.
 
+        Passive joints and joints absent from the product configuration are ignored.
         Communication exceptions propagate to the caller.
 
         Args:
@@ -545,10 +560,22 @@ class GHand:
         Returns:
             True if the command is sent successfully.
         """
+        if getattr(self, "_product_type", None) == ProductType.GHandLite1:
+            if hand_control_mode == HandControlMode.MIT or any(
+                    joint.control_mode == JointControlMode.MIT or
+                    joint.loop_type != JointLoopType.CLOSED_LOOP or
+                    joint.kp != 0 or joint.kd != 0 for joint in joints):
+                raise NotImplementedError(
+                    "GHandLite1 supports closed-loop position, velocity and current control "
+                    "without MIT gains")
         active_joints = []
         for joint in joints:
             if joint.id in self._passive_joints:
                 logger.warning("Passive joint %s will be ignored", JointId(joint.id).name)
+                continue
+            if joint.id not in self._active_joints:
+                logger.warning("Joint %s is not supported by this product and will be ignored",
+                               JointId(joint.id).name)
                 continue
             # Create a copy so the caller's original object is not mutated.
             joint_cmd = JointCommand(
@@ -574,7 +601,7 @@ class GHand:
             active_joints.append(joint_cmd)
 
         if not active_joints:
-            logger.warning("No active joints to move after filtering passive joints")
+            logger.warning("No active joints to move after filtering passive and unsupported joints")
             return False
 
         return self._comm.move_joints(active_joints, hand_control_mode)
@@ -614,7 +641,20 @@ class GHand:
         """
         if not self._tactile_opened:
             raise RuntimeError("Tactile sensors are not open")
-        return self._comm.get_tactile_data()
+        tactile = self._comm.get_tactile_data()
+        calculator = self._tactile_moments
+        return calculator.enrich(tactile) if calculator is not None else tactile
+
+    def configure_tactile_moments(self, reference_point_m: Sequence[float] = (0., 0., 0.)) -> None:
+        """Set the moment reference in meters in each GHand5 sensor CAD frame.
+
+        No device command is sent. The next poll/callback uses these settings.
+        Default (0, 0, 0) is each sensor's CAD origin, not a common hand origin.
+        Only healthy readings with all local point forces yield a moment.
+        """
+        if self._product_type != ProductType.GHand5:
+            raise ValueError("Tactile moment geometry is available only for GHand5")
+        self._tactile_moments = TactileMomentCalculator(reference_point_m=reference_point_m)
 
     def set_safety_margin(self, margin: float) -> None:
         """Set the collision detection safety margin.

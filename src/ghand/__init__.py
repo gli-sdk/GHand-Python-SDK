@@ -54,6 +54,7 @@ from .types import (
     TactileData,
 )
 from .version import __version__
+from .tactile_moments import TactileMomentCalculator
 
 __all__ = [
     # Core classes
@@ -70,6 +71,7 @@ __all__ = [
     "HandType",
     "TactileSensorId",
     "TactileData",
+    "TactileMomentCalculator",
     "CommType",
     "JointLoopType",
     "HandControlMode",
