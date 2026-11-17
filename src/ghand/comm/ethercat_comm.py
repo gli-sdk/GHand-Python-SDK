@@ -306,6 +306,8 @@ class EtherCATComm(IComm):
                 state=bool(tpdo.tactile_state.state & (1 << region.id.value)),
                 resultant_force=tactile.resultant_force,
                 distributed_force=tactile.sample_force,
+                raw_state=tpdo.tactile_state.state,
+                error=tpdo.tactile_state.error,
             )
         return result
 
@@ -618,6 +620,8 @@ class EtherCATComm(IComm):
                             state=bool(tpdo.tactile_state.state & (1 << region.id.value)),
                             resultant_force=tdata.resultant_force,
                             distributed_force=tdata.sample_force,
+                            raw_state=tpdo.tactile_state.state,
+                            error=tpdo.tactile_state.error,
                         )
             callback(DeviceData(hand=hand, joints=joints, tactile=tactile), *args, **kwargs)
 

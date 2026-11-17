@@ -20,7 +20,8 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any
+from dataclasses import replace
+from typing import Any, Sequence
 from ._config import load_product_config
 from .comm import IComm, create_comm
 import numpy as np
@@ -31,6 +32,7 @@ from .collision.angle_mapping import COLLISION_JOINT_ORDER
 from .collision.angle_mapping import internal_radians_to_sdk_degrees
 from .collision.angle_mapping import neutral_internal_radians
 from ._product_config import ProductConfig
+from .tactile_moments import TactileMomentCalculator
 from .types import (
     CANFDBitTiming,
     CommType,
@@ -73,6 +75,8 @@ class GHand:
         self._tactile_opened = False
         self._safety_margin = 0.0
         self._collision_checker = None
+        self._tactile_moments = (TactileMomentCalculator()
+                                if product_type == ProductType.GHand5 else None)
 
     def __enter__(self):
         return self
@@ -106,6 +110,8 @@ class GHand:
         self._has_tactile = config.has_tactile
         self._tactile_opened = False
         self._comm.update_config(config)
+        self._tactile_moments = (TactileMomentCalculator()
+                                if self._product_type == ProductType.GHand5 else None)
 
     @staticmethod
     def _check_joint_limit(joint: JointCommand, limit, mode: JointControlMode):
@@ -359,8 +365,14 @@ class GHand:
         if not self.is_connected():
             raise RuntimeError("Device is not connected")
 
+        def on_data(data):
+            calculator = self._tactile_moments
+            if calculator is not None and data.tactile is not None:
+                data = replace(data, tactile=calculator.enrich(data.tactile))
+            callback(data)
+
         return self._comm.subscribe_device_data(
-            callback,
+            on_data,
             include_tactile=self._tactile_opened,
             interval_ms=interval_ms,
         )
@@ -629,7 +641,20 @@ class GHand:
         """
         if not self._tactile_opened:
             raise RuntimeError("Tactile sensors are not open")
-        return self._comm.get_tactile_data()
+        tactile = self._comm.get_tactile_data()
+        calculator = self._tactile_moments
+        return calculator.enrich(tactile) if calculator is not None else tactile
+
+    def configure_tactile_moments(self, reference_point_m: Sequence[float] = (0., 0., 0.)) -> None:
+        """Set the moment reference in meters in each GHand5 sensor CAD frame.
+
+        No device command is sent. The next poll/callback uses these settings.
+        Default (0, 0, 0) is each sensor's CAD origin, not a common hand origin.
+        Only healthy readings with all local point forces yield a moment.
+        """
+        if self._product_type != ProductType.GHand5:
+            raise ValueError("Tactile moment geometry is available only for GHand5")
+        self._tactile_moments = TactileMomentCalculator(reference_point_m=reference_point_m)
 
     def set_safety_margin(self, margin: float) -> None:
         """Set the collision detection safety margin.

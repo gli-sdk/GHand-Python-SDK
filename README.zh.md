@@ -421,6 +421,56 @@ python examples/tutorial/15.tactile_display.py
 调用方负责设备连接，在显示结束后断开连接。
 自定义数据源仍可使用纯显示组件 `ghand.tactile_display.window.TactileWindow`。
 
+### 触觉合力矩（GHand5）
+
+`hand.get_tactile_data()` 和 `hand.subscribe(...)` 的每指 `TactileData` 新增：
+
+- `resultant_moment`：`[Mx, My, Mz]`，单位 **N·m**。
+- `moment_reference_point_m`：计算参考点，单位 m。
+- `distributed_force_sensor_frame`：转换到该指传感器 CAD 系的各点力，单位 N。
+- `resultant_force_sensor_frame`：上述各点力之和，单位 N。
+
+原始力和状态字段保持原样；也可从 `ghand` 导入 `TactileMomentCalculator` 离线计算。
+按本次确认的厂商矩阵方向，`F_local = R @ F_CAD`。以 SDK 分布力三元组是测点局部力、
+顺序与厂商编号一致为输入约定，计算使用 `F_CAD_i = R_i.T @ F_local_i`，再求
+`M_O = sum(cross(p_i - O, F_CAD_i))`。测点位置由 mm 换算为 m。
+本次按用户确认的坐标约定实现，尚未通过外部力矩传感器完成实物精度标定。
+
+默认参考点 `O=(0,0,0)` 是**每指各自传感器的 CAD 原点**，不自动等于指腹中心、
+电机轴或整手/世界原点。可用 `hand.configure_tactile_moments(reference_point_m=(x,y,z))`
+更改参考点，参数单位为 m；同一坐标三元组独立应用于五指各自的 CAD 系，配置不会发送设备指令。
+
+数据缺失、维度错误、非有限值、传感器无效或报错时，派生字段为 `None`，不填零。
+要求明确健康状态 `state=True` 且 `error=0`；目前 CAN-FD/RS-485 不提供触觉错误字节，
+因此暂不输出派生力矩。GHandLite1 不启用力矩几何。轮询与订阅均返回新快照，不修改通信缓存。
+
+触觉窗口新增五指 `Mx/My/Mz` 数值表（含参考点 O，单位 mm）和 **Moment (N·m)** 曲线页签，
+原始力视图保留。超过 0.5 秒未更新时清除实时力矩，缺失数据和参考点变化会断开曲线。
+这是触觉合力矩，不是关节电机力矩；五指尚未变换到公共坐标系和公共参考点，不能直接相加。
+
+默认开启 **Auto scale (5 s)**：每指力/力矩曲线按最近 5 秒有限数据调整纵轴，
+以零为中心并留余量，采用稳定的 1/2/5 档位；最小半量程为 0.05 N 和 0.00001 N·m。
+60 秒历史保留，更早的大峰值可能超出当前纵轴。取消勾选后恢复固定量程：
+力 −10～25 N、力矩 ±0.05 N·m。触觉点已放大，箭头连续显示小于 1 N 的切向力；
+五指触觉点共用自适应大小量程，表格下方显示当前量程。
+点颜色按绝对力幅值 `|F|` 的 0～25 N 对数量程从浅黄变为深红，力越大颜色越深，
+颜色不随自动缩放变化。实际读数、单位和 SDK 力矩计算保持不变。
+
+力矩曲线默认开启 **Moment despike (plot only)**，可随时取消以查看原始曲线。
+旁边阈值单位为 **µN·m**，默认 10（即 0.00001 N·m）：仅当中间样本是局部极值、
+前后样本接近（差值不超过偏离量的四分之一），且两侧跳变量都不超过阈值时，
+用前后均值替换该显示样本。超过 0.1 秒的间隔、无效数据或参考点断点不跨越滤波。
+正常连续段等待下一个历史样本确认，保留原时间戳；50 Hz 显示历史约增加 20 ms 等待，
+另有界面刷新延迟。无前文的首帧直接显示；持续变化和较大脉冲保留。
+真实的短暂小事件也可能被抑制，因此应通过开关对照，不以截图自动推定噪声阈值。
+**力矩表格始终显示原始值，SDK、原始历史和采集文件不变。该开关不对 TCN 或 T-Rex
+训练数据滤波**，训练与在线推理的输入处理需要另外统一配置。
+
+
+`src/ghand/config/ghand5_tactile_geometry.json` 已内置拇指 38 点、其余四指每指 31 点的位置、
+旋转矩阵与来源 SHA-256。运行无需原始 Excel/CAD 文件；可通过
+`python3 scripts/build_tactile_geometry.py /path/to/px` 从厂商资料重建。
+
 ## 项目结构
 
 ```text
@@ -461,6 +511,12 @@ GHand-Python-SDK/
 - **GLI 开源中心**：[GitHub](https://github.com/gli-sdk) / [Gitee](https://gitee.com/glitech)
 - **官方文档**：[GHand 灵巧手文档](https://fcnzogxju7xr.feishu.cn/docx/AhZ6ds2iCoguaAxIzBxciYHinNo)
 - **C++ SDK**：[GHand SDK C++](https://github.com/gli-sdk/GHand-Cpp-SDK)
+
+## 纯手触觉数据采集
+
+`examples/collection/record_tactile.py` 接收现有手套遥操的本机 UDP 反馈，记录原始触觉、F6 和手部反馈；不依赖机械臂或相机，也不另开机械手连接。支持 Parquet episode 保存与 T-Rex 纯触觉 VQ-VAE 数据导出。依赖可通过 `pip install -e '.[recording]'` 安装。
+
+启动命令、交互操作和数据字段见 [纯手采集说明](docs/TACTILE_ONLY_COLLECTION.md)。
 
 ## 更新日志
 

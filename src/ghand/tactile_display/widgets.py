@@ -46,10 +46,7 @@ FINGER_POINTS = (
 )
 
 
-_DOT_STOPS = ((0.1, "#0DFF00"), (6.25, "#EEFF00"), (12.5, "#FFB700"),
-              (18.75, "#FF8502"), (25.0, "#FF0004"))
-_ARROW_STOPS = ((0.0, "#0DFF00"), (2.5, "#EEFF00"), (5.0, "#FFB700"),
-                (7.5, "#FF8502"), (10.0, "#FF0004"))
+_DOT_STOPS = ((0., "#fff3c4"), (.35, "#ffc06e"), (.7, "#f16e3b"), (1., "#a60f1c"))
 
 
 def _interpolate_color(value: float, stops, default: QColor, absolute: bool = False) -> QColor:  # type: ignore[no-untyped-def]
@@ -68,57 +65,60 @@ def _interpolate_color(value: float, stops, default: QColor, absolute: bool = Fa
     return QColor("#FF0004")
 
 
-def _qround(value: float) -> int:
-    return math.floor(value + 0.5)
+def _display_range(peak: float, minimum: float) -> float:
+    """Round a padded peak up to a stable 1/2/5 range, in physical units."""
+    target = max(minimum, peak * 1.2)
+    decade = 10. ** math.floor(math.log10(target))
+    return next(factor * decade for factor in (1., 2., 5., 10.)
+                if factor * decade >= target * (1. - 1e-12))
+
+
+def _force_color(magnitude: float) -> QColor:
+    """Fixed absolute |F| scale: pale yellow -> deep red for 0..25 N."""
+    fraction = math.log1p(max(0., min(magnitude, 25.)) / .1) / math.log1p(250.)
+    return _interpolate_color(fraction, _DOT_STOPS, QColor(_DOT_STOPS[0][1]))
+
+
+def _marker_radius(magnitude: float, force_range: float, scale: float, *, overview: bool) -> float:
+    ratio = math.sqrt(max(0., min(magnitude / max(force_range, .1), 1.)))
+    if overview:
+        return max(4., 5. * scale) + ratio * max(6., 10. * scale)
+    idle = max(2., 3. * scale)
+    return idle if magnitude <= 1e-12 else min(7., idle + 1. + 2. * ratio)
 
 
 def _draw_marker(painter: QPainter, center: QPointF, force: tuple[float, float, float],
-                 scale: float, *, overview: bool, rotation: float = 0.0) -> None:
+                 scale: float, *, overview: bool, rotation: float = 0.0,
+                 force_range: float = 25.) -> None:
     fx, fy, fz = force
-    magnitude = min(math.hypot(fx, fy), 15.0)
-    rounded_magnitude = _qround(magnitude)
-    if rounded_magnitude > 0:
-        if overview:
-            arrow_size, circle_diameter = min(8 + (rounded_magnitude - 1) * 2, 44), 49
-        else:
-            arrow_size, circle_diameter = min(3 + rounded_magnitude - 1, 12), 27
-        radius = circle_diameter / 2
+    magnitude = math.hypot(fx, fy, fz)
+    if not math.isfinite(magnitude):
+        return
+    tangential = math.hypot(fx, fy)
+    radius = _marker_radius(magnitude, force_range, scale, overview=overview)
+    color = _force_color(magnitude) if magnitude > 1e-12 else QColor(205, 220, 235, 170)
+    if tangential > 1e-12:
+        ratio = math.sqrt(min(tangential / max(force_range, .1), 1.))
+        arrow_size = 2. + ratio * (12. if overview else 6.)
         angle = math.atan2(-fy, fx) + math.pi / 2 + math.radians(rotation)
         painter.save()
         painter.translate(center)
         painter.rotate(math.degrees(angle))
-        color = _interpolate_color(magnitude, _ARROW_STOPS, QColor("#0DFF00"), True)
         triangle = QPainterPath()
         polygon = QPolygonF([
-            QPointF(0, -(radius + arrow_size) * scale),
-            QPointF(radius * math.cos(math.radians(240)) * scale,
-                    radius * math.sin(math.radians(240)) * scale),
-            QPointF(radius * math.cos(math.radians(300)) * scale,
-                    radius * math.sin(math.radians(300)) * scale),
+            QPointF(0, -(radius + arrow_size)),
+            QPointF(radius * math.cos(math.radians(240)), radius * math.sin(math.radians(240))),
+            QPointF(radius * math.cos(math.radians(300)), radius * math.sin(math.radians(300))),
         ])
         triangle.addPolygon(polygon)
         circle = QPainterPath()
-        circle.addEllipse(QPointF(0, 0), radius * scale, radius * scale)
+        circle.addEllipse(QPointF(0, 0), radius, radius)
         painter.setBrush(color)
-        painter.setPen(QPen(color, max(scale, 1.0)))
+        painter.setPen(QPen(QColor("#ffdfac"), .8))
         painter.drawPath(triangle.subtracted(circle))
-        if overview:
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawEllipse(QPointF(0, 0), radius * scale, radius * scale)
         painter.restore()
-
-    value = max(0.0, min(fz, 25.0))
-    rounded = _qround(value)
-    if overview:
-        diameter = 0 if rounded <= 0 else min(7 + (rounded - 1) * 2, 41)
-        default = QColor(0, 255, 0)
-    else:
-        diameter = 2 if rounded <= 0 else min(4 + rounded - 1, 25)
-        default = QColor(255, 255, 255, 128)
-    if diameter <= 0:
+    if overview and magnitude <= 1e-12:
         return
-    color = _interpolate_color(value, _DOT_STOPS, default)
-    radius = diameter * scale / 2
     glow_radius = radius * 2
     gradient = QRadialGradient(center, glow_radius)
     gradient.setColorAt(0.5, QColor(color.red(), color.green(), color.blue(), 90))
@@ -128,6 +128,7 @@ def _draw_marker(painter: QPainter, center: QPointF, force: tuple[float, float, 
     painter.setBrush(gradient)
     painter.drawEllipse(center, glow_radius, glow_radius)
     painter.setBrush(color)
+    painter.setPen(QPen(QColor("#ffdfac"), .8) if magnitude > 1e-12 else Qt.PenStyle.NoPen)
     painter.drawEllipse(center, radius, radius)
 
 
@@ -141,12 +142,17 @@ class FingerMapWidget(QWidget):
         self.background = QPixmap(str(_ASSETS / f"{stem}.png"))
         self.overlay = QPixmap(str(_ASSETS / f"{stem}1.png"))
         self.forces: tuple[tuple[float, float, float], ...] = ()
+        self.force_range = 25.
         self.setMinimumSize(150, 220)
         self.setMouseTracking(True)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
     def set_forces(self, forces: tuple[tuple[float, float, float], ...]) -> None:
         self.forces = forces if len(forces) == len(self.points) else ()
+        self.update()
+
+    def set_force_range(self, value: float) -> None:
+        self.force_range = max(.1, value)
         self.update()
 
     def _mapped_points(self) -> list[QPointF]:
@@ -182,7 +188,7 @@ class FingerMapWidget(QWidget):
         mapped = self._mapped_points()
         for index, center in enumerate(mapped):
             force = self.forces[index] if index < len(self.forces) else (0.0, 0.0, 0.0)
-            _draw_marker(painter, center, force, scale, overview=False)
+            _draw_marker(painter, center, force, scale, overview=False, force_range=self.force_range)
 
     def mouseMoveEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         if not self.forces:
@@ -231,6 +237,7 @@ class HandOverviewWidget(QWidget):
         self.side = side
         self.hand = QPixmap(str(_ASSETS / f"{side}_hand_icon.png"))
         self.forces = {finger: (math.nan, math.nan, math.nan) for finger in FINGER_NAMES}
+        self.force_range = 25.
         self.setMinimumHeight(300)
 
     def set_side(self, side: str) -> None:
@@ -241,6 +248,10 @@ class HandOverviewWidget(QWidget):
 
     def set_forces(self, forces: dict[TactileSensorId, tuple[float, float, float]]) -> None:
         self.forces = forces
+        self.update()
+
+    def set_force_range(self, value: float) -> None:
+        self.force_range = max(.1, value)
         self.update()
 
     def paintEvent(self, event) -> None:  # type: ignore[no-untyped-def]
@@ -270,7 +281,7 @@ class HandOverviewWidget(QWidget):
             if not all(math.isfinite(value) for value in force):
                 continue
             _draw_marker(painter, center, force, scale, overview=True,
-                         rotation=rotations[finger])
+                         rotation=rotations[finger], force_range=self.force_range)
             self._paint_fz_bar(painter, finger, force[2], scene, scale)
 
     def _paint_fz_bar(self, painter: QPainter, finger: TactileSensorId, fz: float,
@@ -290,11 +301,11 @@ class HandOverviewWidget(QWidget):
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QColor("#D5D5D5"))
         painter.drawRoundedRect(bar, 4 * scale, 4 * scale)
-        ratio = max(0.0, min(fz, 25.0)) / 25.0
+        ratio = max(0., min(fz / self.force_range, 1.))
         if ratio > 0:
             filled = QRectF(bar.left(), bar.bottom() - bar.height() * ratio,
                             bar.width(), bar.height() * ratio)
-            painter.setBrush(_interpolate_color(fz, _DOT_STOPS, QColor("#0DFF00")))
+            painter.setBrush(_force_color(abs(fz)))
             painter.drawRoundedRect(filled, 4 * scale, 4 * scale)
         painter.setPen(QColor("#FFFFFF"))
         painter.drawText(QRectF(text_rect_x, top + 66 * scale, text_width, 18 * scale),
@@ -307,6 +318,10 @@ class _ForceAxis(pg.AxisItem):
 
     def __init__(self, orientation: str, **kwargs) -> None:  # type: ignore[no-untyped-def]
         super().__init__(orientation, **kwargs)
+        # pyqtgraph 0.14 also consults prefix ranges when auto scaling is off.
+        if hasattr(self, "setSIPrefixEnableRanges"):
+            self.setSIPrefixEnableRanges(())
+        self.enableAutoSIPrefix(False)
         self.label.setRotation(0)
         self.setWidth(80)
 
@@ -322,8 +337,12 @@ class ForcePlots(QWidget):
 
     COLORS = ("#e74c3c", "#27ae60", "#3498db")
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, *, quantity: str = "force") -> None:
         super().__init__(parent)
+        moment = quantity == "moment"
+        self.auto_scale = True
+        self._minimum_range = .00001 if moment else .05
+        self._fixed_range = (-.05, .05) if moment else (-10., 25.)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(3)
@@ -333,18 +352,32 @@ class ForcePlots(QWidget):
             plot = pg.PlotWidget(title=FINGER_NAMES[finger],
                                  axisItems={"left": _ForceAxis("left")})
             plot.setXRange(-60, 0, padding=0)
-            plot.setYRange(-10, 25, padding=0)
-            plot.setLabel("left", "F", units="N")
+            plot.enableAutoRange(axis="y", enable=False)
+            plot.setYRange(-self._minimum_range, self._minimum_range, padding=0)
+            plot.setLabel("left", "M" if moment else "F", units="N·m" if moment else "N")
             plot.showGrid(x=True, y=True, alpha=0.2)
             plot.addLegend(offset=(5, 5))
-            curves = tuple(plot.plot(name=axis, pen=pg.mkPen(color, width=1.5))
-                           for axis, color in zip(("Fx", "Fy", "Fz"), self.COLORS))
+            axes = ("Mx", "My", "Mz") if moment else ("Fx", "Fy", "Fz")
+            plot.getAxis("left").setWidth(110)
+            curves = tuple(plot.plot(name=axis, pen=pg.mkPen(color, width=1.5), connect="finite")
+                           for axis, color in zip(axes, self.COLORS))
             self.plots[finger] = plot
             self.curves[finger] = curves
             layout.addWidget(plot, 1)
+
+    def set_auto_scale(self, enabled: bool) -> None:
+        self.auto_scale = bool(enabled)
+        if not self.auto_scale:
+            for plot in self.plots.values():
+                plot.setYRange(*self._fixed_range, padding=0)
 
     def set_history(self, history, now: float) -> None:  # type: ignore[no-untyped-def]
         x = [timestamp - now for timestamp, _ in history]
         for finger, curves in self.curves.items():
             for axis, curve in enumerate(curves):
                 curve.setData(x, [forces[finger][axis] for _, forces in history])
+            if self.auto_scale:
+                recent = [abs(value) for timestamp, forces in history if now - 5. <= timestamp <= now
+                          for value in forces[finger] if math.isfinite(value)]
+                extent = _display_range(max(recent, default=0.), self._minimum_range)
+                self.plots[finger].setYRange(-extent, extent, padding=0)

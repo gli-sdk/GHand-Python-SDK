@@ -78,10 +78,24 @@ class TactileData:
     # Resultant [Fx, Fy, Fz] in sensor X/Y/Z directions, in Newtons; None if unavailable.
     # Protocol ranges: Fx/Fy -10 to 10 N; Fz 0 to 25 N; resolution 0.1 N.
     resultant_force: list[float] | None = None
-    # Per-point [Fx0, Fy0, Fz0, Fx1, Fy1, Fz1, ...] in sensor X/Y/Z directions, in Newtons.
+    # Original per-point [Fx0, Fy0, Fz0, Fx1, Fy1, Fz1, ...], in Newtons.
+    # GHand5 moment calculation treats each triple as taxel-local; derived fields
+    # below transform these triples to the common per-sensor CAD frame.
     # Per-point ranges: Fx/Fy -10 to 10 N; Fz 0 to 25 N; resolution 0.1 N.
     # Point counts: see tactile_regions[].count in the corresponding product JSON in src/ghand/config/.
     distributed_force: list[float] | None = None  # None if unavailable.
+    # Whole-hand tactile status/error bytes, shared by all regions in one TPDO.
+    # None means the transport did not provide these bytes; never assume healthy.
+    raw_state: int | None = None
+    error: int | None = None
+    # Computed CAD-frame point forces (N). Original distributed_force is unchanged.
+    distributed_force_sensor_frame: list[float] | None = None
+    # Sum of the CAD-frame point forces (N), distinct from device resultant_force.
+    resultant_force_sensor_frame: list[float] | None = None
+    # Sum((p_i - reference) x F_i), in this sensor's CAD frame, N m.
+    # None means unknown status, invalid data, or unsupported geometry.
+    resultant_moment: list[float] | None = None
+    moment_reference_point_m: list[float] | None = None  # Default: sensor CAD origin.
 
 
 @dataclass
