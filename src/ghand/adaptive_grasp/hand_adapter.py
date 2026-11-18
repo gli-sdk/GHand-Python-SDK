@@ -25,7 +25,7 @@ class GHandCommandPort:
                 current=joint.current,
             ) for joint in joints
         ]
-        return self.hand.move_joints(commands, mode=ctrl_mode)
+        return self.hand.move_joints(commands, hand_control_mode=ctrl_mode)
 
     def stop(self) -> None:
         self.hand.stop()
