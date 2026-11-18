@@ -40,3 +40,4 @@ docs/
 
 !tests/test_recording_keys.py
 !tests/test_recording_probe.py
+!tests/test_adaptive_grasp_hand_adapter.py
