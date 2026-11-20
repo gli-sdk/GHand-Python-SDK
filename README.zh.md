@@ -494,7 +494,6 @@ GHand-Python-SDK/
 |   |   `-- py.typed            # 类型提示标记
 |-- examples/                   # 教程、演示和扩展示例
 |-- docs/                       # Sphinx 文档源码
-|-- tests/                      # 测试套件
 |-- pyproject.toml              # 构建配置
 |-- setup.py                    # setuptools 版本加载
 |-- LICENSE                     # Apache License 2.0

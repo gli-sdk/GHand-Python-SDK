@@ -506,7 +506,6 @@ GHand-Python-SDK/
 |   |   `-- py.typed            # Type hint marker
 |-- examples/                   # Tutorial, demo, and extension examples
 |-- docs/                       # Sphinx documentation source
-|-- tests/                      # Test suite
 |-- pyproject.toml              # Build configuration
 |-- setup.py                    # Version loader for setuptools
 |-- LICENSE                     # Apache License 2.0
