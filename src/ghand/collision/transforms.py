@@ -12,24 +12,50 @@ FINGER_JOINT_MAP = {
     'ring': ['RF_MCP_link', 'RF_PIP_link', 'RF_DIP_link'],
     'middle': ['MF_MCP_link', 'MF_PIP_link', 'MF_DIP_link'],
     'index': ['FF_MCP_AA_link', 'FF_MCP_link', 'FF_PIP_link', 'FF_DIP_link'],
-    'thumb': ['Thumb_TMC_PS_link', 'Thumb_TMC_AA_link', 'Thumb_TMC_FE_link', 'Thumb_MCP_link', 'Thumb_IP_link'],
+    'thumb': [
+        'Thumb_TMC_PS_link', 'Thumb_TMC_AA_link', 'Thumb_TMC_FE_link', 'Thumb_MCP_link',
+        'Thumb_IP_link'
+    ],
 }
 
 CAPSULE_LINK_NAMES = [
-    'LF_MCP_link', 'LF_PIP_link', 'LF_DIP_link',
-    'RF_MCP_link', 'RF_PIP_link', 'RF_DIP_link',
-    'MF_MCP_link', 'MF_PIP_link', 'MF_DIP_link',
-    'FF_MCP_link', 'FF_PIP_link', 'FF_DIP_link',
-    'Thumb_TMC_FE_link', 'Thumb_MCP_link', 'Thumb_IP_link',
+    'LF_MCP_link',
+    'LF_PIP_link',
+    'LF_DIP_link',
+    'RF_MCP_link',
+    'RF_PIP_link',
+    'RF_DIP_link',
+    'MF_MCP_link',
+    'MF_PIP_link',
+    'MF_DIP_link',
+    'FF_MCP_link',
+    'FF_PIP_link',
+    'FF_DIP_link',
+    'Thumb_TMC_FE_link',
+    'Thumb_MCP_link',
+    'Thumb_IP_link',
 ]
 
 STL_TRANSFORM_LINK_NAMES = [
     'base_link',
-    'LF_MCP_link', 'LF_PIP_link', 'LF_DIP_link',
-    'RF_MCP_link', 'RF_PIP_link', 'RF_DIP_link',
-    'MF_MCP_link', 'MF_PIP_link', 'MF_DIP_link',
-    'FF_MCP_AA_link', 'FF_MCP_link', 'FF_PIP_link', 'FF_DIP_link',
-    'Thumb_TMC_PS_link', 'Thumb_TMC_AA_link', 'Thumb_TMC_FE_link', 'Thumb_MCP_link', 'Thumb_IP_link',
+    'LF_MCP_link',
+    'LF_PIP_link',
+    'LF_DIP_link',
+    'RF_MCP_link',
+    'RF_PIP_link',
+    'RF_DIP_link',
+    'MF_MCP_link',
+    'MF_PIP_link',
+    'MF_DIP_link',
+    'FF_MCP_AA_link',
+    'FF_MCP_link',
+    'FF_PIP_link',
+    'FF_DIP_link',
+    'Thumb_TMC_PS_link',
+    'Thumb_TMC_AA_link',
+    'Thumb_TMC_FE_link',
+    'Thumb_MCP_link',
+    'Thumb_IP_link',
 ]
 
 
@@ -92,7 +118,8 @@ def _capsule_local_points(data: JointData) -> np.ndarray:
     return np.column_stack([local_start, local_end])
 
 
-def build_joint_transform(xyz: np.ndarray, rpy: np.ndarray, joint_axis: np.ndarray, theta: float) -> np.ndarray:
+def build_joint_transform(xyz: np.ndarray, rpy: np.ndarray, joint_axis: np.ndarray,
+                          theta: float) -> np.ndarray:
     """
     Build the 4x4 homogeneous transform for a joint.
 
@@ -192,7 +219,8 @@ def cal_capsule_param(joints_info: Dict[str, JointData]) -> Dict[str, JointData]
     return joints_info
 
 
-def cal_stl_trans(joints_info: Dict[str, JointData], stl_data: Dict[str, STLData]) -> Dict[str, STLData]:
+def cal_stl_trans(joints_info: Dict[str, JointData], stl_data: Dict[str,
+                                                                    STLData]) -> Dict[str, STLData]:
     """
     Update STL vertices in homogeneous world coordinates for each supported link.
 

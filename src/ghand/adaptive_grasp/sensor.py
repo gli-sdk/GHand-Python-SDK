@@ -5,7 +5,8 @@ import logging
 import time
 from typing import Any, Optional
 
-from ..types import JointData, TactileInfo, TactileSensorId
+from ..types import TactileSensorId, JointData, TactileData
+from .ports import SensorFrame
 from .utils import active_finger_normal_forces, normal_force_z, normalize_joint_id
 
 _logger = logging.getLogger("ghand.sensor")
@@ -31,9 +32,7 @@ class SensorClient:
             TactileSensorId.RF,
             TactileSensorId.LF,
         }
-        self._latest_tactile_data: Optional[dict[TactileSensorId, Any]] = None
-        self._latest_joint_feedback: Optional[list[JointData]] = None
-        self._last_sample_time_s: Optional[float] = None
+        self._frame = self._make_frame(None, None, None)
         self._sub_id: Optional[int] = None
         self._get_monotonic_time = get_monotonic_time or time.monotonic
 
@@ -42,9 +41,8 @@ class SensorClient:
     # ------------------------------------------------------------------
     def start(self) -> None:
         """Start subscribing sensor data and clear stale caches."""
-        self._latest_tactile_data = None
-        self._latest_joint_feedback = None
-        self._sub_id = self._hand.subscribe(self._on_data,interval_ms = 20)
+        self._frame = self._make_frame(None, None, self._frame.sample_time_s)
+        self._sub_id = self._hand.subscribe(self._on_data)
 
     def stop(self, clear_joint_feedback: bool = False) -> None:
         """Stop subscription and optionally clear cached joint feedback."""
@@ -54,89 +52,89 @@ class SensorClient:
             except Exception:
                 _logger.exception("Failed to unsubscribe sensor data")
             self._sub_id = None
-        self._latest_tactile_data = None
-        if clear_joint_feedback:
-            self._latest_joint_feedback = None
+        joint_feedback = None if clear_joint_feedback else self._frame.joint_feedback
+        self._frame = self._make_frame(None, joint_feedback, self._frame.sample_time_s)
 
     def reset(self) -> None:
         """Clear cached sensor data and timestamps."""
-        self._latest_tactile_data = None
-        self._latest_joint_feedback = None
-        self._last_sample_time_s = None
+        self._frame = self._make_frame(None, None, None)
 
     # ------------------------------------------------------------------
     # Data access
     # ------------------------------------------------------------------
     @property
     def tactile_data(self) -> Optional[dict[TactileSensorId, Any]]:
-        return self._latest_tactile_data
+        return self._frame.tactile_data
 
     @property
     def joint_feedback(self) -> Optional[list[JointData]]:
-        return self._latest_joint_feedback
+        return self._frame.joint_feedback
 
     @property
     def sample_time_s(self) -> Optional[float]:
-        return self._last_sample_time_s
+        return self._frame.sample_time_s
+
+    def snapshot(self) -> SensorFrame:
+        return self._frame
 
     def data_age_s(self, current_time: float) -> Optional[float]:
-        if self._last_sample_time_s is None:
+        sample_time_s = self._frame.sample_time_s
+        if sample_time_s is None:
             return None
-        return current_time - self._last_sample_time_s
+        return current_time - sample_time_s
 
     def sum_active_finger_normal_force(self) -> float:
-        if self._latest_tactile_data is None:
-            return 0.0
-        normal_forces = active_finger_normal_forces(
-            self._latest_tactile_data,
-            self._active_fingers,
-        )
-        return sum(normal_forces.values())
+        return self._frame.total_normal_force
 
     def active_finger_touch_flag(self) -> dict[TactileSensorId, bool]:
-        # Check whether each active finger is in contact.
-        if self._latest_tactile_data is None:
-            return {finger: False for finger in self._active_fingers}
+        return dict(self._frame.touch_flags or {})
 
-        touch_flag: dict[TactileSensorId, bool] = {}
-        for finger in self._active_fingers:
-            info = self._latest_tactile_data.get(finger)
-            touch_flag[finger] = (
-                info is not None
-                and info.state
-                and normal_force_z(info) >= self._finger_touch_threshold_n
-            )
-        return touch_flag
+    def _make_frame(
+        self,
+        tactile_data: Optional[dict[TactileSensorId, Any]],
+        joint_feedback: Optional[list[JointData]],
+        sample_time_s: Optional[float],
+    ) -> SensorFrame:
+        normal_forces = active_finger_normal_forces(tactile_data or {}, self._active_fingers)
+        touch_flags = {
+            finger: ((info := (tactile_data or {}).get(finger)) is not None and info.state
+                     and normal_force_z(info) >= self._finger_touch_threshold_n)
+            for finger in self._active_fingers
+        }
+        return SensorFrame(
+            tactile_data=tactile_data,
+            joint_feedback=joint_feedback,
+            sample_time_s=sample_time_s,
+            total_normal_force=sum(normal_forces.values()),
+            touch_flags=touch_flags,
+        )
 
     # ------------------------------------------------------------------
     # Internal callback
     # ------------------------------------------------------------------
     def _on_data(self, data: Any) -> None:
         if not (hasattr(data, "tactile") and hasattr(data, "joints")):
-            raise TypeError(
-                "SensorClient subscription callback expects ghand.DeviceData; "
-                "legacy TPDO parsing is not supported."
-            )
+            raise TypeError("SensorClient subscription callback expects ghand.DeviceData; "
+                            "legacy TPDO parsing is not supported.")
 
         tactile = getattr(data, "tactile", None)
         if tactile is None:
-            self._latest_tactile_data = None
+            tactile_data = None
         else:
-            self._latest_tactile_data = {
+            tactile_data = {
                 TactileSensorId(finger): info
                 for finger, info in tactile.items()
                 if TactileSensorId(finger) in self._active_fingers
             }
-        self._last_sample_time_s = self._get_monotonic_time()
-
-        self._latest_joint_feedback = [
+        sample_time_s = self._get_monotonic_time()
+        joint_feedback = [
             JointData(
                 id=normalize_joint_id(joint_data.id),
                 state=joint_data.state,
                 error=joint_data.error,
                 angle=joint_data.angle,
-                speed=joint_data.speed,
-                torque=joint_data.torque,
-            )
-            for joint_data in getattr(data, "joints", ())
+                velocity=joint_data.velocity,
+                current=joint_data.current,
+            ) for joint_data in getattr(data, "joints", ())
         ]
+        self._frame = self._make_frame(tactile_data, joint_feedback, sample_time_s)

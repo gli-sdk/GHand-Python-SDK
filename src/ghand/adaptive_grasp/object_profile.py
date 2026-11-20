@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 from dataclasses import dataclass
@@ -7,46 +7,28 @@ from typing import Optional
 
 @dataclass
 class ObjectProfile:
-    """物体/材质参数，用于估算抓取力目标和安全力边界。"""
+    """Object/material parameters for adaptive grasp planning."""
 
     name: str
     weight_kg: float
-    safe_force_min: float  # 最小抓取力下限，保障能抓起物品的力（手指法向力的合力）
-    safe_force_max: float  # 最大抓取力上限，避免物体被抓坏（手指法向力的合力）
-    friction_coeff: float  # 摩擦系数
+    safe_force_min: float
+    safe_force_max: float
+    friction_coeff: float
     is_fragile: bool
     material: str
-    position_hold_torque: int  # 用于保持手指位置的电流，该值越大，提供的法向力越大
-    position_hold_speed: int  # 用于保持手指位置的角速度，与 position_hold_torque 一致即可
-    phase_closing_torque: int = 30
-    stiff_position_hold_speed: Optional[int] = None
-    stiff_position_hold_torque: Optional[int] = None
+    position_hold_current: int
+    position_hold_velocity: int
+    phase_closing_current: int = 30
+    stiff_position_hold_velocity: Optional[int] = None
+    stiff_position_hold_current: Optional[int] = None
     stiff_position_hold_target_force: Optional[float] = None
 
-    # 可选描述信息，预留给视觉识别、仿真或策略选择使用。
+    # Optional metadata reserved for perception, simulation, and strategy selection.
     color: Optional[list[float]] = None
     size: Optional[list[float]] = None
     pose: Optional[list[float]] = None
     roughness: Optional[float] = None
     shape: Optional[str] = None
-
-
-class ObjectProfileRegistry:
-    """简单的物体/材质参数注册表。"""
-
-    _profiles: dict[str, ObjectProfile] = {}
-
-    @classmethod
-    def register(cls, profile: ObjectProfile) -> None:
-        cls._profiles[profile.name] = profile
-
-    @classmethod
-    def get(cls, name: str) -> Optional[ObjectProfile]:
-        return cls._profiles.get(name)
-
-    @classmethod
-    def list_all(cls) -> list[str]:
-        return list(cls._profiles.keys())
 
 
 DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
@@ -58,8 +40,8 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         friction_coeff=0.5,
         is_fragile=False,
         material="metal",
-        position_hold_torque=30,
-        position_hold_speed=30,
+        position_hold_current=30,
+        position_hold_velocity=30,
     ),
     ObjectProfile(
         name="plastic",
@@ -69,8 +51,8 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         friction_coeff=0.9,
         is_fragile=False,
         material="plastic",
-        position_hold_torque=15,
-        position_hold_speed=15,
+        position_hold_current=15,
+        position_hold_velocity=15,
     ),
     ObjectProfile(
         name="glass",
@@ -80,8 +62,8 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         friction_coeff=0.5,
         is_fragile=True,
         material="glass",
-        position_hold_torque=15,
-        position_hold_speed=15,
+        position_hold_current=15,
+        position_hold_velocity=15,
     ),
     ObjectProfile(
         name="tofu",
@@ -91,8 +73,8 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         friction_coeff=0.9,
         is_fragile=True,
         material="tofu",
-        position_hold_torque=10,
-        position_hold_speed=30,
+        position_hold_current=10,
+        position_hold_velocity=30,
     ),
     ObjectProfile(
         name="fruit",
@@ -102,8 +84,8 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         friction_coeff=0.8,
         is_fragile=True,
         material="fruit",
-        position_hold_torque=15,
-        position_hold_speed=15,
+        position_hold_current=15,
+        position_hold_velocity=15,
     ),
     ObjectProfile(
         name="egg",
@@ -113,8 +95,8 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         friction_coeff=0.9,
         is_fragile=True,
         material="egg",
-        position_hold_torque=5,
-        position_hold_speed=20,
+        position_hold_current=5,
+        position_hold_velocity=20,
     ),
     ObjectProfile(
         name="balloon",
@@ -124,9 +106,8 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         friction_coeff=0.8,
         is_fragile=True,
         material="latex",
-        phase_closing_torque=9,
-        position_hold_torque=8,
-        position_hold_speed=8,
+        position_hold_current=8,
+        position_hold_velocity=8,
     ),
     ObjectProfile(
         name="paper_cup",
@@ -136,9 +117,9 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         friction_coeff=0.8,
         is_fragile=True,
         material="paper",
-        phase_closing_torque=10,
-        position_hold_torque=20,
-        position_hold_speed=20,
+        phase_closing_current=10,
+        position_hold_current=20,
+        position_hold_velocity=20,
     ),
     ObjectProfile(
         name="default",
@@ -148,9 +129,9 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         friction_coeff=0.9,
         is_fragile=False,
         material="default",
-        phase_closing_torque=10,
-        position_hold_torque=30,
-        position_hold_speed=30,
+        phase_closing_current=10,
+        position_hold_current=30,
+        position_hold_velocity=30,
     ),
     ObjectProfile(
         name="plastic_cup",
@@ -160,9 +141,9 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         friction_coeff=0.7,
         is_fragile=True,
         material="plastic",
-        phase_closing_torque=10,
-        position_hold_torque=30,
-        position_hold_speed=30,
+        phase_closing_current=10,
+        position_hold_current=30,
+        position_hold_velocity=30,
     ),
     ObjectProfile(
         name="mineral_water_bottle_500ml",
@@ -172,9 +153,9 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         friction_coeff=0.5,
         is_fragile=True,
         material="plastic",
-        phase_closing_torque=10,
-        position_hold_torque=30,
-        position_hold_speed=30,
+        phase_closing_current=10,
+        position_hold_current=30,
+        position_hold_velocity=30,
     ),
     ObjectProfile(
         name="cylinder_piece",
@@ -184,19 +165,24 @@ DEFAULT_OBJECT_PROFILES: tuple[ObjectProfile, ...] = (
         friction_coeff=0.5,
         is_fragile=False,
         material="metal",
-        phase_closing_torque=10,
-        position_hold_torque=90,
-        position_hold_speed=90,
-        stiff_position_hold_speed=90,
-        stiff_position_hold_torque=90,
+        phase_closing_current=10,
+        position_hold_current=90,
+        position_hold_velocity=90,
+        stiff_position_hold_velocity=90,
+        stiff_position_hold_current=90,
         stiff_position_hold_target_force=15.0,
     ),
 )
 
+OBJECT_PROFILES: dict[str, ObjectProfile] = {
+    profile.name: profile
+    for profile in DEFAULT_OBJECT_PROFILES
+}
 
-def _register_default_profiles() -> None:
-    for profile in DEFAULT_OBJECT_PROFILES:
-        ObjectProfileRegistry.register(profile)
+
+def get_object_profile(name: str) -> Optional[ObjectProfile]:
+    return OBJECT_PROFILES.get(name)
 
 
-_register_default_profiles()
+def list_object_profiles() -> list[str]:
+    return list(OBJECT_PROFILES)

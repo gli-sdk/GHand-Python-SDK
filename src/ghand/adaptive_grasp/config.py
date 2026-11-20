@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 import math
@@ -10,7 +10,7 @@ from .grasp_presets import (
     build_pre_grasp_pose_from_preset,
     resolve_active_fingers,
 )
-from .object_profile import ObjectProfileRegistry
+from .object_profile import get_object_profile, list_object_profiles
 from ..types import JointId, TactileSensorId
 
 
@@ -30,8 +30,7 @@ def _validate_range(
 ) -> None:
     if greater_than is not None and value <= greater_than:
         raise ValueError(f"{name} must be > {greater_than}")
-    if (greater_than_or_equal_to is not None
-            and value < greater_than_or_equal_to):
+    if (greater_than_or_equal_to is not None and value < greater_than_or_equal_to):
         raise ValueError(f"{name} must be >= {greater_than_or_equal_to}")
     if less_than is not None and value >= less_than:
         raise ValueError(f"{name} must be < {less_than}")
@@ -47,21 +46,19 @@ class AdaptiveGraspConfig:
     pre_grasp_preset: str  # Named pre-grasp pose preset; callers must provide it explicitly.
     default_object: str = "balloon"  # Object profile name used when no object is selected by the caller.
     pre_grasp_pose: dict[JointId, float] = field(
-        default_factory=dict
-    )  # JointCommand target pose in degrees before closing.
+        default_factory=dict)  # JointCommand target pose in degrees before closing.
     active_fingers: set[TactileSensorId] = field(
-        default_factory=set
-    )  # Fingers used for contact, tactile analysis, and hold control.
+        default_factory=set)  # Fingers used for contact, tactile analysis, and hold control.
     # Open, pre-grasp, and closing-to-contact phases.
-    open_speed: int = 100  # Speed command used when opening the hand.
-    open_torque: int = 100  # Torque/current limit used when opening the hand.
-    pre_grasp_speed: int = 80  # Speed command used when moving to the pre-grasp pose.
-    pre_grasp_torque: int = 80  # Torque/current limit used when moving to the pre-grasp pose.
+    open_velocity: int = 100  # Velocity command used when opening the hand.
+    open_current: int = 100  # current limit used when opening the hand.
+    pre_grasp_velocity: int = 80  # Velocity command used when moving to the pre-grasp pose.
+    pre_grasp_current: int = 80  # current limit used when moving to the pre-grasp pose.
     closing_total_contact_threshold_n: float = 0.2  # Total normal force threshold for ending the closing phase.
     finger_touch_threshold_n: float = 0.1  # Per-finger normal force threshold for considering a finger in contact.
 
-    max_torque: int = 80  # Maximum torque/current limit used during adaptive closing.
-    thumb_aux_torque: int = 3  # Auxiliary thumb torque/current offset used during closing.
+    max_current: int = 80  # Maximum current limit used during adaptive closing.
+    thumb_aux_current: int = 3  # Auxiliary thumb current offset used during closing.
     phase_timeout: float = 10.0  # Default timeout for high-level grasp phases.
     control_period_s: float = 0.02  # Main adaptive hold loop period.
     closing_period_s: float = 0.2  # Polling period during the closing-to-contact phase.
@@ -115,16 +112,16 @@ class AdaptiveGraspConfig:
     position_hold_normal_force_release_gain: float = 0.1  # Release gain used when normal force exceeds the per-finger limit.
 
     # Stiff position hold mode
-    stiff_position_hold_speed: int = 90  # Default speed command for stiff_position hold mode.
-    stiff_position_hold_torque: int = 90  # Default torque/current command for stiff_position hold mode.
+    stiff_position_hold_velocity: int = 90  # Default velocity command for stiff_position hold mode.
+    stiff_position_hold_current: int = 90  # Default current command for stiff_position hold mode.
     stiff_position_step_deg: float = 0.2  # Default incremental angle step in degrees for stiff_position hold mode.
     stiff_position_max_delta_deg: float = 5.0  # Default max angle delta from contact in degrees for stiff_position hold mode.
     stiff_position_force_drop_ratio: float = 0.5  # Ratio drop in total normal force that triggers contact-loss guard in stiff_position mode.
 
     # Release phase.
     release_hold_time_s: float = 20.0  # Duration to keep adaptive hold before automatic release in the demo sequence.
-    release_open_speed: int = 80  # Speed command used during release opening.
-    release_open_torque: int = 80  # Torque/current limit used during release opening.
+    release_open_velocity: int = 80  # Velocity command used during release opening.
+    release_open_current: int = 80  # current limit used during release opening.
     release_timeout_s: float = 5.0  # Timeout for the release phase.
 
     # Safety policy.
@@ -135,7 +132,7 @@ class AdaptiveGraspConfig:
     enable_fault_release_fallback: bool = True  # Releases the hand automatically when recoverable safety faults occur.
 
     # Fragile-object reductions.
-    fragile_torque_reduction: float = 0.8  # Torque scaling applied for fragile object profiles.
+    fragile_current_reduction: float = 0.8  # Current scaling applied for fragile object profiles.
     fragile_step_reduction: float = 0.5  # Position correction scaling applied for fragile object profiles.
 
     # Visualization.
@@ -174,34 +171,34 @@ class AdaptiveGraspConfig:
 
     def _validate_motion_params(self) -> None:
         _validate_range(
-            "open_speed",
-            self.open_speed,
+            "open_velocity",
+            self.open_velocity,
             greater_than_or_equal_to=0,
             less_than_or_equal_to=100,
         )
         _validate_range(
-            "open_torque",
-            self.open_torque,
+            "open_current",
+            self.open_current,
             greater_than_or_equal_to=0,
             less_than_or_equal_to=100,
         )
         _validate_range(
-            "pre_grasp_speed",
-            self.pre_grasp_speed,
+            "pre_grasp_velocity",
+            self.pre_grasp_velocity,
             greater_than_or_equal_to=0,
             less_than_or_equal_to=100,
         )
         _validate_range(
-            "pre_grasp_torque",
-            self.pre_grasp_torque,
+            "pre_grasp_current",
+            self.pre_grasp_current,
             greater_than_or_equal_to=0,
             less_than_or_equal_to=100,
         )
 
-        _validate_range("max_torque", self.max_torque, greater_than=0)
+        _validate_range("max_current", self.max_current, greater_than=0)
         _validate_range(
-            "thumb_aux_torque",
-            self.thumb_aux_torque,
+            "thumb_aux_current",
+            self.thumb_aux_current,
             greater_than_or_equal_to=-100,
             less_than_or_equal_to=100,
         )
@@ -272,8 +269,7 @@ class AdaptiveGraspConfig:
             greater_than_or_equal_to=0,
         )
         if self.slip_variance_baseline >= self.slip_variance_threshold:
-            raise ValueError(
-                "slip_variance_baseline must be < slip_variance_threshold")
+            raise ValueError("slip_variance_baseline must be < slip_variance_threshold")
         _validate_range(
             "slip_variance_weight",
             self.slip_variance_weight,
@@ -293,8 +289,7 @@ class AdaptiveGraspConfig:
             less_than_or_equal_to=1.0,
         )
         if not math.isclose(
-                self.slip_variance_weight + self.slip_direction_weight +
-                self.slip_friction_weight,
+                self.slip_variance_weight + self.slip_direction_weight + self.slip_friction_weight,
                 1.0,
                 abs_tol=1e-6,
         ):
@@ -320,15 +315,13 @@ class AdaptiveGraspConfig:
 
     def _validate_hold_command_mode(self) -> None:
         if not isinstance(self.hold_command_mode, HoldCommandMode):
-            raise ValueError(
-                "hold_command_mode must be HoldCommandMode.POSITION, "
-                "or HoldCommandMode.STIFF_POSITION"
-            )
+            raise ValueError("hold_command_mode must be HoldCommandMode.POSITION, "
+                             "or HoldCommandMode.STIFF_POSITION")
 
     def _validate_fragile_object_params(self) -> None:
         _validate_range(
-            "fragile_torque_reduction",
-            self.fragile_torque_reduction,
+            "fragile_current_reduction",
+            self.fragile_current_reduction,
             greater_than=0.0,
             less_than_or_equal_to=1.0,
         )
@@ -388,11 +381,9 @@ class AdaptiveGraspConfig:
             greater_than_or_equal_to=0.0,
             less_than_or_equal_to=1.0,
         )
-        if (self.force_reference_min_contact_ratio *
-                len(self.active_fingers) > 1.0):
+        if (self.force_reference_min_contact_ratio * len(self.active_fingers) > 1.0):
             raise ValueError(
-                "force_reference_min_contact_ratio * active_finger_count must be <= 1.0"
-            )
+                "force_reference_min_contact_ratio * active_finger_count must be <= 1.0")
 
     def _validate_position_hold_params(self) -> None:
         if not isinstance(self.enable_position_hold_force_control, bool):
@@ -461,8 +452,7 @@ class AdaptiveGraspConfig:
             greater_than_or_equal_to=0.0,
             less_than_or_equal_to=1.0,
         )
-        if (self.position_hold_slip_risk_deadband >=
-                self.position_hold_slip_risk_full):
+        if (self.position_hold_slip_risk_deadband >= self.position_hold_slip_risk_full):
             raise ValueError(
                 "position_hold_slip_risk_deadband must be < position_hold_slip_risk_full")
         _validate_range(
@@ -478,14 +468,14 @@ class AdaptiveGraspConfig:
 
     def _validate_stiff_position_hold_params(self) -> None:
         _validate_range(
-            "stiff_position_hold_speed",
-            self.stiff_position_hold_speed,
+            "stiff_position_hold_velocity",
+            self.stiff_position_hold_velocity,
             greater_than_or_equal_to=0,
             less_than_or_equal_to=100,
         )
         _validate_range(
-            "stiff_position_hold_torque",
-            self.stiff_position_hold_torque,
+            "stiff_position_hold_current",
+            self.stiff_position_hold_current,
             greater_than_or_equal_to=0,
             less_than_or_equal_to=100,
         )
@@ -513,14 +503,14 @@ class AdaptiveGraspConfig:
             greater_than=0,
         )
         _validate_range(
-            "release_open_speed",
-            self.release_open_speed,
+            "release_open_velocity",
+            self.release_open_velocity,
             greater_than_or_equal_to=0,
             less_than_or_equal_to=100,
         )
         _validate_range(
-            "release_open_torque",
-            self.release_open_torque,
+            "release_open_current",
+            self.release_open_current,
             greater_than_or_equal_to=0,
             less_than_or_equal_to=100,
         )
@@ -554,23 +544,17 @@ class AdaptiveGraspConfig:
 
     def _resolve_pre_grasp_pose(self, pre_grasp_preset: str) -> None:
         if self.pre_grasp_pose:
-            passive_joints = sorted(
-                joint_id.name
-                for joint_id in self.pre_grasp_pose
-                if joint_id in PASSIVE_DIP_JOINTS
-            )
+            passive_joints = sorted(joint_id.name for joint_id in self.pre_grasp_pose
+                                    if joint_id in PASSIVE_DIP_JOINTS)
             if passive_joints:
                 joints = ", ".join(passive_joints)
-                raise ValueError(
-                    f"pre_grasp_pose cannot include passive DIP joints: {joints}"
-                )
+                raise ValueError(f"pre_grasp_pose cannot include passive DIP joints: {joints}")
             return
 
-        self.pre_grasp_pose = build_pre_grasp_pose_from_preset(
-            pre_grasp_preset)
+        self.pre_grasp_pose = build_pre_grasp_pose_from_preset(pre_grasp_preset)
 
     def _validate_default_object(self) -> None:
-        if ObjectProfileRegistry.get(self.default_object) is not None:
+        if get_object_profile(self.default_object) is not None:
             return
-        supported = ", ".join(sorted(ObjectProfileRegistry.list_all()))
+        supported = ", ".join(sorted(list_object_profiles()))
         raise ValueError(f"default_object must be one of: {supported}")

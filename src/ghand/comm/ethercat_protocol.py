@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 # Copyright 2026 GLITech
@@ -15,31 +15,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import math
 import struct
 from dataclasses import dataclass, field
 
-from ..types import ErrorCode, JointId, ProductConfig, State
+from .._product_config import ProductConfig
+from .._device_value import format_device_value, parse_device_value
+from ..types import JointErrorCode, JointId, JointState, HandControlState, ProductType
 
 # TPDO component byte sizes
-_HAND_TPDO_SIZE = struct.calcsize('<BBh')  # 4
-_JOINT_TPDO_SIZE = struct.calcsize('<BBfbb')  # 8
+_HAND_TPDO_SIZE = struct.calcsize('<H6s12s6sh')  # 28
+_JOINT_TPDO_SIZE = struct.calcsize('<BBBBhhh')  # 10
 _TACTILE_STATE_SIZE = 2  # BB
 _TACTILE_RESULTANT_SIZE = 6  # resultant xyz (int16[3], low byte valid)
 _TACTILE_SAMPLE_PER_GROUP = 3  # xyz per sample group
 
-def compute_tpdo_size(joint_count: int, tactile_region_counts: list[int] | None = None) -> int:
+
+def compute_tpdo_size(joint_count: int, tactile_region_counts: list[int] | None = None,
+                      product_type: ProductType = ProductType.GHand5) -> int:
     """Calculate the total TPDO byte size based on joint count and tactile sample groups.
 
     Args:
         joint_count: Total number of joints.
         tactile_region_counts: List of tactile region sample-group counts.
             If omitted, tactile data is excluded from the calculation.
+        product_type: Selects the 22-byte L1 or 28-byte GHand5 hand header.
 
     Returns:
         Expected TPDO size in bytes.
     """
-    total = _HAND_TPDO_SIZE + joint_count * _JOINT_TPDO_SIZE
+    hand_size = 22 if product_type == ProductType.GHandLite1 else _HAND_TPDO_SIZE
+    total = hand_size + joint_count * _JOINT_TPDO_SIZE
     if tactile_region_counts:
         total += _TACTILE_STATE_SIZE
         for count in tactile_region_counts:
@@ -52,22 +57,26 @@ class HandTpdo:
     """Hand-level status fields within a TPDO frame."""
 
     state: int
-    error: int
+    error_warn: bytes
+    error_fault: bytes
+    error_critical: bytes
     temperature: int
 
     @classmethod
-    def from_bytes(cls, data: bytes):
-        expected_size = struct.calcsize('<BBh')
+    def from_bytes(cls, data: bytes, product_type: ProductType = ProductType.GHand5):
+        layout = '<H6s6s6sh' if product_type == ProductType.GHandLite1 else '<H6s12s6sh'
+        expected_size = struct.calcsize(layout)
         if len(data) < expected_size:
-            return cls(0, 0, 0)
-        state, error, temperature = struct.unpack_from('<BBh', data, 0)
-        return cls(state, error, temperature)
+            return cls(0, b"\x00" * 6, b"\x00" * 12, b"\x00" * 6, 0)
+        state, error_warn, error_fault, error_critical, temperature = (struct.unpack_from(
+            layout, data, 0))
+        return cls(state, error_warn, error_fault, error_critical, temperature)
 
     def __str__(self):
         return (
-            f"HandTpdo(state={State(self.state)}, error={ErrorCode(self.error)}, "
-            f"temperature={self.temperature})"
-        )
+            f"HandTpdo(state={format_device_value(parse_device_value(HandControlState, self.state))}, error_warn={self.error_warn!r}, "
+            f"error_fault={self.error_fault!r}, error_critical={self.error_critical!r}, "
+            f"temperature={self.temperature})")
 
 
 @dataclass
@@ -76,24 +85,28 @@ class JointTpdo:
 
     state: int
     error: int
+    mode: int
+    stop: int
     angle: float
-    speed: int
-    torque: int
+    velocity: int
+    current: int
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        expected_size = struct.calcsize('<BBfbb')
+        expected_size = struct.calcsize('<BBBBhhh')
         if len(data) < expected_size:
-            return cls(0, 0, 0.0, 0, 0)
-        state, error, angle, speed, torque = struct.unpack_from('<BBfbb', data, 0)
-        return cls(state, error, math.degrees(angle), speed, torque)
+            return cls(0, 0, 0, 0, 0.0, 0, 0)
+        state, error, mode, stop, angle_raw, velocity, current = struct.unpack_from(
+            '<BBBBhhh', data, 0)
+        angle = angle_raw * 0.1
+        return cls(state, error, mode, stop, angle, velocity, current)
 
     def __str__(self):
         return (
-            f"JointTpdo(state={State(self.state)}, error={ErrorCode(self.error)}, "
-            f"angle={self.angle:.3f}, speed={self.speed}, "
-            f"torque={self.torque})"
-        )
+            f"JointTpdo(state={format_device_value(parse_device_value(JointState, self.state))}, "
+            f"error={format_device_value(parse_device_value(JointErrorCode, self.error))}, "
+            f"mode={self.mode}, stop={self.stop}, angle={self.angle:.3f}, "
+            f"velocity={self.velocity}, current={self.current})")
 
 
 @dataclass
@@ -137,7 +150,8 @@ class TactileData:
 
         rf_x = struct.unpack_from('<b', data, 0)[0] / 10.0
         rf_y = struct.unpack_from('<b', data, 2)[0] / 10.0
-        rf_z = struct.unpack_from('<B', data, 4)[0] / 10.0
+        # Fz uses the unsigned low byte of its 16-bit slot (0..255).
+        rf_z = data[4] / 10.0
         resultant_force = [rf_x, rf_y, rf_z]
 
         sample_force = []
@@ -153,12 +167,12 @@ class Tpdo:
     """Full TPDO (Transmit Process Data Object) frame."""
 
     def __init__(self, config: ProductConfig):
-        self.hand = HandTpdo(0, 0, 0)
+        self.hand = HandTpdo(0, b"\x00" * 6, b"\x00" * 12, b"\x00" * 6, 0)
         self.joints: dict[JointId, JointTpdo] = {}
         self.tactile_state = TactileSensorState()
 
-        for jid in config.valid_joints:
-            joint = JointTpdo(0, 0, 0.0, 0, 0)
+        for jid in config.all_joints:
+            joint = JointTpdo(0, 0, 0, 0, 0.0, 0, 0)
             self.joints[jid] = joint
             setattr(self, jid.name.lower(), joint)
 
@@ -178,18 +192,20 @@ class Tpdo:
             Populated Tpdo instance.
         """
         expected_size = compute_tpdo_size(
-            len(config.valid_joints),
+            len(config.all_joints),
             [r.count for r in config.tactile_regions] if config.has_tactile else None,
+            config.product_type,
         )
         instance = cls(config)
         if len(data) < expected_size:
             return instance
 
         offset = 0
-        instance.hand = HandTpdo.from_bytes(data[offset:offset + _HAND_TPDO_SIZE])
-        offset += _HAND_TPDO_SIZE
+        hand_size = 22 if config.product_type == ProductType.GHandLite1 else _HAND_TPDO_SIZE
+        instance.hand = HandTpdo.from_bytes(data[offset:offset + hand_size], config.product_type)
+        offset += hand_size
 
-        for jid in config.valid_joints:
+        for jid in config.all_joints:
             joint = JointTpdo.from_bytes(data[offset:offset + _JOINT_TPDO_SIZE])
             instance.joints[jid] = joint
             setattr(instance, jid.name.lower(), joint)
@@ -198,9 +214,8 @@ class Tpdo:
         if not config.has_tactile:
             return instance
 
-        instance.tactile_state = TactileSensorState.from_bytes(
-            data[offset:offset + _TACTILE_STATE_SIZE]
-        )
+        instance.tactile_state = TactileSensorState.from_bytes(data[offset:offset +
+                                                                    _TACTILE_STATE_SIZE])
         offset += _TACTILE_STATE_SIZE
 
         for region in config.tactile_regions:
@@ -216,6 +231,19 @@ class Tpdo:
         return instance
 
 
+@dataclass
+class JointRpdo:
+    """Per-joint control fields within an RPDO frame."""
+
+    mode: int = 0
+    stop: int = 0
+    angle: float = 0.0
+    velocity: int = 0
+    current: int = 0
+    kp: int = 0
+    kd: int = 0
+
+
 class Rpdo:
     """Full RPDO (Receive Process Data Object) frame.
 
@@ -223,12 +251,12 @@ class Rpdo:
     so the frame only contains joints declared by the product config.
     """
 
-    def __init__(self, controlled_joints: list[JointId]):
+    def __init__(self, controlled_joints: list[JointId],
+                 product_type: ProductType = ProductType.GHand5):
+        self.product_type = product_type
         self.mode: int = 0
         self.stop: int = 0
-        self.joints: dict[JointId, tuple[float, int, int]] = {
-            jid: (0.0, 0, 0) for jid in controlled_joints
-        }
+        self.joints: dict[JointId, JointRpdo] = {jid: JointRpdo() for jid in controlled_joints}
 
     def to_bytes(self) -> bytes:
         """Pack the RPDO into bytes according to the configured joint order.
@@ -239,6 +267,16 @@ class Rpdo:
         data = bytearray()
         data.extend(struct.pack('<B', self.mode))
         data.extend(struct.pack('<B', self.stop))
-        for angle, speed, torque in self.joints.values():
-            data.extend(struct.pack('<fbb', angle, speed, torque))
+        for joint in self.joints.values():
+            lite1 = self.product_type == ProductType.GHandLite1
+            data.extend(
+                struct.pack(
+                    '<BBhhh' if lite1 else '<BBhhhhh',
+                    joint.mode & 0x0F if lite1 else joint.mode,
+                    joint.stop,
+                    int(joint.angle * 10),
+                    joint.velocity,
+                    joint.current,
+                    *([] if lite1 else [joint.kp, joint.kd]),
+                ))
         return bytes(data)

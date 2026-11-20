@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """GHand SDK public API.
 
 This package provides a high-level interface for controlling the GHand
@@ -30,33 +29,32 @@ from . import logging_config  # auto-initialize logging handlers
 from ._converter import JointConverter, joints_to_nparray, nparray_to_joints
 from .gestures import execute_gesture, get_all_gestures
 from .ghand import GHand
-from .errors import (
-    CommunicationError,
-    GHandError,
-    HandStateError,
-    OperationResult,
-    SdkError,
-)
-from .diagnostics import Diagnostics
 from .types import (
+    HandCriticalError,
+    HandFault,
+    HandWarning,
     CommType,
-    CtrlMode,
     CANFDBitTiming,
-    DeviceData,
-    ErrorCode,
     GestureType,
-    HandState,
-    HandType,
-    JointCommand,
-    JointData,
     JointId,
     ProductType,
     RS485BaudRate,
-    State,
-    TactileInfo,
     TactileSensorId,
+    JointLoopType,
+    HandControlMode,
+    JointControlMode,
+    HandRuntimeState,
+    HandType,
+    JointControlState,
+    HandControlState,
+    JointCommand,
+    DeviceData,
+    HandData,
+    JointData,
+    TactileData,
 )
 from .version import __version__
+from .tactile_moments import TactileMomentCalculator
 
 __all__ = [
     # Core classes
@@ -68,21 +66,22 @@ __all__ = [
     "ProductType",
     "RS485BaudRate",
     "CANFDBitTiming",
-    "HandState",
+    "HandData",
+    "HandRuntimeState",
     "HandType",
     "TactileSensorId",
-    "TactileInfo",
+    "TactileData",
+    "TactileMomentCalculator",
     "CommType",
-    "CtrlMode",
-    "SdkError",
-    "OperationResult",
-    "GHandError",
-    "CommunicationError",
-    "HandStateError",
-    "Diagnostics",
+    "JointLoopType",
+    "HandControlMode",
+    "JointControlMode",
+    "JointControlState",
     # Enums
-    "State",
-    "ErrorCode",
+    "HandControlState",
+    "HandCriticalError",
+    "HandFault",
+    "HandWarning",
     # Version
     "__version__",
     # Gestures

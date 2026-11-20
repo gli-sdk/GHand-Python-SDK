@@ -11,13 +11,12 @@ from .config import AdaptiveGraspConfig
 from .pid_controller import LowPassFilter
 from .utils import clip, tactile_distributed_force, tactile_force_xyz
 
+
 @dataclass(frozen=True)
 class TactileLayoutPoint:
     index: int
     x: float
     y: float
-
-
 
 
 @dataclass
@@ -47,7 +46,7 @@ class TactileAnalysis:
     finger_fz: dict[TactileSensorId, float]
     total_fz: float
     per_finger: dict[TactileSensorId, PerFingerAnalysis] = field(default_factory=dict)
-    
+
 
 @dataclass(frozen=True)
 class FingerTactileSample:
@@ -60,6 +59,7 @@ class FingerTactileSample:
 
 
 class OnlineWindowNormalizer:
+
     def __init__(self, window_size: int, eps: float = 1e-6):
         self.window: deque[float] = deque(maxlen=window_size)
         self.eps = eps
@@ -67,7 +67,7 @@ class OnlineWindowNormalizer:
     def update(self, x: float) -> float:
         self.window.append(float(x))
         mean = sum(self.window) / len(self.window)
-        variance = sum((value - mean) ** 2 for value in self.window) / len(self.window)
+        variance = sum((value - mean)**2 for value in self.window) / len(self.window)
         std = max(math.sqrt(variance), self.eps)
         return (x - mean) / std
 
@@ -76,6 +76,7 @@ class OnlineWindowNormalizer:
 
 
 class TactileAnalyzer:
+
     def __init__(self, config: AdaptiveGraspConfig):
         self.config = config
         self._friction_coeff = config.default_friction_coeff
@@ -84,7 +85,8 @@ class TactileAnalyzer:
             for finger in config.active_fingers
         }
         self._variance_normalizers: dict[TactileSensorId, OnlineWindowNormalizer] = {
-            finger: OnlineWindowNormalizer(
+            finger:
+            OnlineWindowNormalizer(
                 window_size=config.tactile_slip_window_size,
                 eps=config.numeric_epsilon,
             )
@@ -97,6 +99,7 @@ class TactileAnalyzer:
             finger: LowPassFilter(alpha=config.tactile_lowpass_alpha)
             for finger in config.active_fingers
         }
+
     def set_friction_coeff(self, value: float) -> None:
         if value <= 0:
             raise ValueError("friction_coeff must be > 0")
@@ -104,10 +107,7 @@ class TactileAnalyzer:
 
     def update(self, tactile_data: dict[TactileSensorId, Any]) -> TactileAnalysis:
         samples = self._collect_active_samples(tactile_data)
-        per_finger = {
-            sample.finger: self._analyze_finger(sample)
-            for sample in samples
-        }
+        per_finger = {sample.finger: self._analyze_finger(sample) for sample in samples}
         return self._build_analysis(samples, per_finger)
 
     def reset(self) -> None:
@@ -131,7 +131,7 @@ class TactileAnalyzer:
                 continue
             fx, fy, fz_raw = tactile_force_xyz(info)
             fz = abs(fz_raw)
-            ft = math.sqrt(fx ** 2 + fy ** 2)
+            ft = math.sqrt(fx**2 + fy**2)
             self._windows[finger].append(ft)
             samples.append(FingerTactileSample(finger, info, fx, fy, fz, ft))
         return samples
@@ -178,7 +178,7 @@ class TactileAnalyzer:
         if len(window) < 3:
             return 0.0
         mean = sum(window) / len(window)
-        return sum((x - mean) ** 2 for x in window) / len(window)
+        return sum((x - mean)**2 for x in window) / len(window)
 
     def _normalize_variance_with_window(
         self,
@@ -200,9 +200,8 @@ class TactileAnalyzer:
     def _fuse_slip_risk(self, s_k: float, d_k: float, r_k: float) -> float:
         cfg = self.config
         return clip(
-            cfg.slip_variance_weight * s_k
-            + cfg.slip_direction_weight * d_k
-            + cfg.slip_friction_weight * r_k,
+            cfg.slip_variance_weight * s_k + cfg.slip_direction_weight * d_k +
+            cfg.slip_friction_weight * r_k,
             0.0,
             1.0,
         )
@@ -216,9 +215,7 @@ class TactileAnalyzer:
         self._slip_count[finger] = count
         return count >= self.config.slip_detect_debounce_cycles
 
-    def _calculate_finger_direction_distance(
-        self, finger: TactileSensorId, info: Any
-    ) -> float:
+    def _calculate_finger_direction_distance(self, finger: TactileSensorId, info: Any) -> float:
         distributed = tactile_distributed_force(info)
         if len(distributed) < 3:
             return 0.0
@@ -234,7 +231,7 @@ class TactileAnalyzer:
 
         cos_x = self._cosine_similarity(fx_vec, prev_fx)
         cos_y = self._cosine_similarity(fy_vec, prev_fy)
-        d = math.sqrt((1.0 - cos_x) ** 2 + (1.0 - cos_y) ** 2) / math.sqrt(2.0)
+        d = math.sqrt((1.0 - cos_x)**2 + (1.0 - cos_y)**2) / math.sqrt(2.0)
         d = min(1.0, max(0.0, d))
 
         self._prev_fx[finger] = fx_vec

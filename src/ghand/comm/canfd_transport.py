@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """CANFD transport layer wrapping CANFD devices.
 
 Handles arbitration-field packing, segmented transfer, and register-level
@@ -74,7 +73,22 @@ ZQWL_COMMON_DBITRATE_CODES = {
     100_000: 0xA,
 }
 ZQWL_CANFD_PAYLOAD_LENGTHS = (
-    0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24, 32, 48, 64,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    12,
+    16,
+    20,
+    24,
+    32,
+    48,
+    64,
 )
 
 # ---------------------------------------------------------------------------
@@ -93,16 +107,14 @@ def pack_arbitration(
     seg_num: int = 0,
 ) -> int:
     """Pack CANFD extended-frame arbitration field (29 bits)."""
-    return (
-        (src_id & 0x3F) << 23
-        | (dst_id & 0x3F) << 17
-        | (ack & 0x01) << 16
-        | (func_code & 0xFF) << 8
-        | (start & 0x01) << 7
-        | (end & 0x01) << 6
-        | (toggle & 0x01) << 5
-        | (seg_num & 0x1F)
-    )
+    return ((src_id & 0x3F) << 23
+            | (dst_id & 0x3F) << 17
+            | (ack & 0x01) << 16
+            | (func_code & 0xFF) << 8
+            | (start & 0x01) << 7
+            | (end & 0x01) << 6
+            | (toggle & 0x01) << 5
+            | (seg_num & 0x1F))
 
 
 def unpack_arbitration(can_id: int) -> dict:
@@ -134,9 +146,8 @@ def _zqwl_length_to_dlc(length: int) -> int:
     return 64
 
 
-def _calculate_zqwl_canfd_timing(
-    bitrate: int, sample_point_percent: int
-) -> tuple[int, int, int, int]:
+def _calculate_zqwl_canfd_timing(bitrate: int,
+                                 sample_point_percent: int) -> tuple[int, int, int, int]:
     """Calculate ZQWL custom CANFD timing parameters.
 
     ZQWL clock is 60 MHz. Bit timing formula:
@@ -167,10 +178,8 @@ def _calculate_zqwl_canfd_timing(
                 if 60_000_000 // (total * brp) != bitrate:
                     continue
                 return sjw, tseg1, tseg2, brp
-    raise ValueError(
-        f"Cannot compute ZQWL CANFD timing for bitrate={bitrate}, "
-        f"sample_point={sample_point_percent}%"
-    )
+    raise ValueError(f"Cannot compute ZQWL CANFD timing for bitrate={bitrate}, "
+                     f"sample_point={sample_point_percent}%")
 
 
 # ---------------------------------------------------------------------------
@@ -201,7 +210,6 @@ class CanfdTransport:
         dbit_baud: int = 5_000_000,
         abit_sample: int = 75,
         dbit_sample: int = 75,
-        quiet: bool = False,
     ) -> bool:
         """Open the CANFD device and start the CAN channel."""
         return self._open_zqwl_serial(
@@ -209,7 +217,6 @@ class CanfdTransport:
             dbit_baud=dbit_baud,
             abit_sample=abit_sample,
             dbit_sample=dbit_sample,
-            quiet=quiet,
         )
 
     def _open_zqwl_serial(
@@ -218,7 +225,6 @@ class CanfdTransport:
         dbit_baud: int,
         abit_sample: int = 75,
         dbit_sample: int = 75,
-        quiet: bool = False,
     ) -> bool:
         """Open a ZQWL USBCANFD CDC serial adapter."""
         if self._serial is not None:
@@ -230,12 +236,13 @@ class CanfdTransport:
         try:
             ser = serial.Serial(
                 port=self._channel,
-                baudrate=int(os.environ.get("ZQWL_CANFD_SERIAL_BAUDRATE", ZQWL_DEFAULT_SERIAL_BAUDRATE)),
+                baudrate=int(
+                    os.environ.get("ZQWL_CANFD_SERIAL_BAUDRATE", ZQWL_DEFAULT_SERIAL_BAUDRATE)),
                 bytesize=8,
                 parity="N",
                 stopbits=1,
                 timeout=0.02,
-                write_timeout=1.0,
+                write_timeout=0.3,
             )
             self._serial = ser
             # Give the adapter a moment to settle after the CDC serial port opens.
@@ -246,19 +253,17 @@ class CanfdTransport:
                 abit_sample=abit_sample,
                 dbit_sample=dbit_sample,
             )
-            if not quiet:
-                logger.info(
-                    "ZQWL CANFD serial channel opened (%s, abit=%s/%s%%, dbit=%s/%s%%)",
-                    self._channel,
-                    abit_baud,
-                    abit_sample,
-                    dbit_baud,
-                    dbit_sample,
-                )
+            logger.info(
+                "ZQWL CANFD serial channel opened (%s, abit=%s/%s%%, dbit=%s/%s%%)",
+                self._channel,
+                abit_baud,
+                abit_sample,
+                dbit_baud,
+                dbit_sample,
+            )
             return True
         except Exception as exc:
-            if not quiet:
-                logger.error("Failed to open ZQWL CANFD serial adapter %s: %s", self._channel, exc)
+            logger.error("Failed to open ZQWL CANFD serial adapter %s: %s", self._channel, exc)
             if self._serial is not None:
                 self._serial.close()
                 self._serial = None
@@ -269,12 +274,8 @@ class CanfdTransport:
         if self._serial is None:
             raise RuntimeError("ZQWL serial adapter not open")
         payload = data[:16].ljust(16, b"\x00")
-        cmd = (
-            ZQWL_CONFIG_HEAD
-            + bytes([func_code & 0xFF, 0x57 if write else 0x52])
-            + payload
-            + ZQWL_CONFIG_TAIL
-        )
+        cmd = (ZQWL_CONFIG_HEAD + bytes([func_code & 0xFF, 0x57 if write else 0x52]) + payload +
+               ZQWL_CONFIG_TAIL)
         logger.debug("ZQWL send func=%#04x %s: %s", func_code, "W" if write else "R", cmd.hex(" "))
         self._serial.write(cmd)
         self._serial.flush()
@@ -320,12 +321,10 @@ class CanfdTransport:
             )
         else:
             data[1] = 0x01  # custom baud-rate flag
-            abit_sjw, abit_tseg1, abit_tseg2, abit_brp = (
-                _calculate_zqwl_canfd_timing(abit_baud, abit_sample)
-            )
-            dbit_sjw, dbit_tseg1, dbit_tseg2, dbit_brp = (
-                _calculate_zqwl_canfd_timing(dbit_baud, dbit_sample)
-            )
+            abit_sjw, abit_tseg1, abit_tseg2, abit_brp = (_calculate_zqwl_canfd_timing(
+                abit_baud, abit_sample))
+            dbit_sjw, dbit_tseg1, dbit_tseg2, dbit_brp = (_calculate_zqwl_canfd_timing(
+                dbit_baud, dbit_sample))
             # Arbitration phase timing
             data[2] = abit_sjw & 0xFF
             data[3] = abit_tseg1 & 0xFF
@@ -367,22 +366,19 @@ class CanfdTransport:
         logger.debug("ZQWL 0x44 payload: %s", bytes(control).hex(" "))
         self._write_zqwl_config(0x44, True, bytes(control))
 
-    def close(self, quiet: bool = False) -> bool:
+    def close(self) -> bool:
         """Stop the channel and close the device."""
         if self._serial is not None:
             try:
                 self._set_zqwl_channel_enabled(False)
             except Exception as exc:
-                if not quiet:
-                    logger.warning("Failed to stop ZQWL CANFD channel before close: %s", exc)
+                logger.warning("Failed to stop ZQWL CANFD channel before close: %s", exc)
             finally:
                 self._serial.close()
                 self._serial = None
-            if not quiet:
-                logger.info("ZQWL CANFD serial channel closed")
+            logger.info("ZQWL CANFD serial channel closed")
             return True
-        if not quiet:
-            logger.info("CANFD channel closed")
+        logger.info("CANFD channel closed")
         return True
 
     # ------------------------------------------------------------------
@@ -402,12 +398,8 @@ class CanfdTransport:
             info2 |= ((self._can_index >> 1) & 0x03) << 3
             info2 |= 0x04  # Extended frame
             frame_id = (can_id & 0x1FFFFFFF) | 0x80000000  # CANFD protocol flag
-            frame = (
-                bytes([ZQWL_CANFD_HEAD, info1, info2])
-                + frame_id.to_bytes(4, "big")
-                + payload
-                + bytes([ZQWL_CANFD_TAIL])
-            )
+            frame = (bytes([ZQWL_CANFD_HEAD, info1, info2]) + frame_id.to_bytes(4, "big") +
+                     payload + bytes([ZQWL_CANFD_TAIL]))
             try:
                 logger.debug(
                     "Sending ZQWL frame id=%#x info1=%#x info2=%#x data=%s",
@@ -515,7 +507,7 @@ class CanfdTransport:
         addr: int,
         count: int,
         func_code: int = 0x03,
-        timeout_ms: int = 5000,
+        timeout_ms: int = 1000,
     ) -> bytes:
         """Read *count* registers starting at *addr*.
 
@@ -564,19 +556,35 @@ class CanfdTransport:
                 # Single-frame response (strip Modbus byte-count prefix)
                 if arb["start"] == 1 and arb["end"] == 1:
                     payload = resp_data[1:] if resp_data else resp_data
-                    return payload[: count * 2]
+                    if len(payload) < count * 2:
+                        continue
+                    return payload[:count * 2]
 
                 # Multi-frame response: first segment carries byte-count prefix
                 seg_num = arb["seg_num"]
+                if arb["start"] == 1 and seg_num != 0:
+                    continue
+                if seg_num == 0 and arb["start"] != 1:
+                    continue
+                if arb["toggle"] != seg_num % 2:
+                    continue
+                if seg_num > 0 and (seg_num - 1) not in segments:
+                    continue
                 if seg_num == 0 and resp_data:
                     resp_data = resp_data[1:]
                 segments[seg_num] = resp_data
                 if arb["end"] == 1:
+                    expected = list(range(seg_num + 1))
+                    if sorted(segments) != expected:
+                        continue
+                    if sum(len(segment) for segment in segments.values()) < count * 2:
+                        segments.clear()
+                        continue
                     break
 
             # Reassemble
             assembled = b"".join(segments[i] for i in sorted(segments))
-            return assembled[: count * 2]
+            return assembled[:count * 2]
 
     def write_registers(
         self,
@@ -584,7 +592,7 @@ class CanfdTransport:
         dst_id: int,
         addr: int,
         data: bytes,
-        timeout_ms: int = 5000,
+        timeout_ms: int = 1000,
     ) -> bool:
         """Write register data starting at *addr*.
 
@@ -610,11 +618,17 @@ class CanfdTransport:
                 start = seg_idx == 0
                 end = seg_idx == num_segs - 1
                 toggle = seg_idx % 2
-                seg_data = payload[seg_idx * seg_size : (seg_idx + 1) * seg_size]
+                seg_data = payload[seg_idx * seg_size:(seg_idx + 1) * seg_size]
 
                 can_id = pack_arbitration(
-                    src_id, dst_id, ack=0, func_code=func_code,
-                    start=int(start), end=int(end), toggle=toggle, seg_num=seg_idx,
+                    src_id,
+                    dst_id,
+                    ack=0,
+                    func_code=func_code,
+                    start=int(start),
+                    end=int(end),
+                    toggle=toggle,
+                    seg_num=seg_idx,
                 )
                 if not self.send_frame(can_id, seg_data):
                     raise ConnectionError(f"Failed to send write segment {seg_idx}")

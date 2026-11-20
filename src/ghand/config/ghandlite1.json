@@ -4,22 +4,22 @@
   "joints": [
     { "id": "THUMB_MCP" },
     { "id": "THUMB_TMC_FE", "min": 0.0, "max": 50.0 },
-    { "id": "THUMB_TMC_AA", "min": 0.0, "max": 90.0 },
+    { "id": "THUMB_TMC_AA", "min": 30.0, "max": 60.0 },
     { "id": "FF_PIP" },
-    { "id": "FF_MCP",      "min": 0.0, "max": 90.0 },
+    { "id": "FF_MCP",      "min": 0.0, "max": 100.0 },
     { "id": "MF_PIP" },
-    { "id": "MF_MCP",      "min": 0.0, "max": 90.0 },
+    { "id": "MF_MCP",      "min": 0.0, "max": 100.0 },
     { "id": "RF_PIP" },
-    { "id": "RF_MCP",      "min": 0.0, "max": 90.0 },
+    { "id": "RF_MCP",      "min": 0.0, "max": 100.0 },
     { "id": "LF_PIP" },
-    { "id": "LF_MCP",      "min": 0.0, "max": 90.0 }
+    { "id": "LF_MCP",      "min": 0.0, "max": 100.0 }
   ],
   "has_tactile": true,
   "tactile_regions": [
-    { "id": "THUMB", "count": 80 },
-    { "id": "FF",    "count": 80 },
-    { "id": "MF",    "count": 80 },
-    { "id": "RF",    "count": 80 },
-    { "id": "LF",    "count": 80 }
+    { "id": "THUMB", "count": 38 },
+    { "id": "FF",    "count": 31 },
+    { "id": "MF",    "count": 31 },
+    { "id": "RF",    "count": 31 },
+    { "id": "LF",    "count": 31 }
   ]
 }

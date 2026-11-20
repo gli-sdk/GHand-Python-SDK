@@ -49,17 +49,15 @@ def main():
 
     # Step 3: Get device info
     for i, hand in enumerate(hands):
-        print(
-            f"  hand_{i}: {hand.get_device_name()} "
-            f"({hand.get_hand_type().value}, SN: {hand.get_serial_number()})"
-        )
+        print(f"  hand_{i}: {hand.get_device_name()} "
+              f"({hand.get_hand_type().value}, SN: {hand.get_serial_number()})")
 
     # Step 4: Control each hand individually
     print("\n=== Individual control ===")
     test_joints = [
-        JointCommand(id=JointId.THUMB_MCP, angle=30, speed=100, torque=100),
-        JointCommand(id=JointId.FF_PIP, angle=45, speed=100, torque=100),
-        JointCommand(id=JointId.FF_MCP, angle=30, speed=100, torque=100),
+        JointCommand(id=JointId.THUMB_MCP, angle=30, velocity=100, current=100),
+        JointCommand(id=JointId.FF_PIP, angle=45, velocity=100, current=100),
+        JointCommand(id=JointId.FF_MCP, angle=30, velocity=100, current=100),
     ]
 
     for i, hand in enumerate(hands):
@@ -75,9 +73,9 @@ def main():
     # Step 5: Control all hands simultaneously
     print("\n=== Simultaneous control ===")
     reset_joints = [
-        JointCommand(id=JointId.THUMB_MCP, angle=0, speed=100, torque=100),
-        JointCommand(id=JointId.FF_PIP, angle=0, speed=100, torque=100),
-        JointCommand(id=JointId.FF_MCP, angle=0, speed=100, torque=100),
+        JointCommand(id=JointId.THUMB_MCP, angle=0, velocity=100, current=100),
+        JointCommand(id=JointId.FF_PIP, angle=0, velocity=100, current=100),
+        JointCommand(id=JointId.FF_MCP, angle=0, velocity=100, current=100),
     ]
 
     for i, hand in enumerate(hands):
@@ -92,9 +90,7 @@ def main():
         print(f"\nhand_{i}: {len(joints)} joints")
         for joint in joints:
             print(
-                f"  {JointId(joint.id).name:<15}"
-                f"angle: {joint.angle:.2f} deg, "
-                f"speed: {joint.speed}, torque: {joint.torque}"
+                f"{JointId(joint.id).name:<13}-\tangle: {joint.angle:<3.1f}(deg),\tvelocity: {joint.velocity:<3},\tcurrent: {joint.current:<3}, \tcontrol_mode:{joint.control_mode}({(joint.control_mode).name:<7}),\tloop_type:{joint.loop_type}({(joint.loop_type).name:<15}),\tstate:{joint.state}({(joint.state).name:<8}),\terror:{joint.error}({(joint.error).name}),"
             )
 
     # Step 7: Close all connections

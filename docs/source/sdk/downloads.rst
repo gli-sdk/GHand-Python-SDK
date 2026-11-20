@@ -1,4 +1,4 @@
-.. _downloads:
+﻿.. _downloads:
 
 Resource Downloads
 ==================
@@ -13,25 +13,27 @@ You can obtain the GHand Python SDK in the following ways:
 .. code-block:: bash
 
    # Clone the repository
-   git clone -b v2.2.1 https://github.com/gli-sdk/GHand-Python-SDK
+   git clone -b v3.1.0 https://github.com/gli-sdk/GHand-Python-SDK
    cd GHand-Python-SDK
 
    # Install SDK
-   pip install -r requirements.txt
    pip install -e .
+
+   # Optional collision-detection dependencies
+   pip install -e ".[collision]"
 
 You can also install directly from Git:
 
 .. code-block:: bash
 
-   pip install "ghand_python_sdk @ git+https://github.com/gli-sdk/GHand-Python-SDK.git@v2.2.1"
+   pip install "ghand_python_sdk @ git+https://github.com/gli-sdk/GHand-Python-SDK.git@v3.1.0"
 
 **Current Version**
 
-- Latest version: v2.2.1
+- Latest version: v3.1.0
 - Python requirement: 3.10 or higher
 - Supported platforms: Windows 10/11, Linux Ubuntu 22.04/24.04 LTS (x86_64/aarch64), macOS 12+ (Intel/Apple Silicon)
-- RS485/CANFD default baud-rate gear: ``0x05``
+- Default baud-rate gear: RS485 ``0x05``; CANFD ``0x07``
 
 Example Code
 ------------
@@ -47,7 +49,7 @@ All example code is included in the ``examples/`` directory of the SDK repositor
 2. **Joint Control** - ``02.move_joints.py``
    - Control single joint motion
    - Control multiple joints simultaneously
-   - Set target angle, speed, and torque
+   - Set target angle, speed, and current
 
 3. **Preset Gestures** - ``01.preset_gesture.py``
    - Execute preset gesture actions
@@ -107,7 +109,6 @@ The SDK provides the following device version query APIs:
 .. code-block:: python
 
    hand.get_firmware_version()
-   hand.get_hardware_version()
    hand.get_firmware_package_version()
    hand.get_position_sensor_version()
    hand.get_tactile_sensor_version()
@@ -158,17 +159,21 @@ CANFD gear mapping:
 +--------+-------------------------------+-------------------------------+
 | Gear   | Arbitration phase             | Data phase                    |
 +========+===============================+===============================+
-| 0x00   | 500,000 bps, 80% sample point | 1,000,000 bps, 75% sample point |
+| 0x00   | 500,000 bps, 80% sample point | 800,000 bps, 80% sample point   |
 +--------+-------------------------------+-------------------------------+
-| 0x01   | 500,000 bps, 80% sample point | 2,000,000 bps, 80% sample point |
+| 0x01   | 500,000 bps, 80% sample point | 1,000,000 bps, 75% sample point |
 +--------+-------------------------------+-------------------------------+
-| 0x02   | 500,000 bps, 80% sample point | 4,000,000 bps, 80% sample point |
+| 0x02   | 500,000 bps, 80% sample point | 2,000,000 bps, 80% sample point |
 +--------+-------------------------------+-------------------------------+
-| 0x03   | 500,000 bps, 80% sample point | 5,000,000 bps, 75% sample point |
+| 0x03   | 500,000 bps, 80% sample point | 4,000,000 bps, 80% sample point |
 +--------+-------------------------------+-------------------------------+
-| 0x04   | 1,000,000 bps, 75% sample point | 4,000,000 bps, 80% sample point |
+| 0x04   | 1,000,000 bps, 75% sample point | 1,000,000 bps, 75% sample point |
 +--------+-------------------------------+-------------------------------+
-| 0x05   | 1,000,000 bps, 75% sample point | 5,000,000 bps, 75% sample point |
+| 0x05   | 1,000,000 bps, 75% sample point | 2,000,000 bps, 80% sample point |
++--------+-------------------------------+-------------------------------+
+| 0x06   | 1,000,000 bps, 75% sample point | 4,000,000 bps, 80% sample point |
++--------+-------------------------------+-------------------------------+
+| 0x07   | 1,000,000 bps, 75% sample point | 5,000,000 bps, 75% sample point |
 +--------+-------------------------------+-------------------------------+
 
 **Running Examples**

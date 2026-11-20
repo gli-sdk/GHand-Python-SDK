@@ -24,9 +24,9 @@ from ghand import (
 # Configure logging
 configure_logging(level=logging.INFO)
 
-# Default speed and torque
-DEFAULT_SPEED = 100
-DEFAULT_TORQUE = 100
+# Default velocity and current
+DEFAULT_VELOCITY = 100
+DEFAULT_CURRENT = 100
 
 
 def main():
@@ -54,32 +54,32 @@ def main():
             JointCommand(
                 id=JointId.THUMB_MCP,
                 angle=66,
-                speed=DEFAULT_SPEED,
-                torque=DEFAULT_TORQUE,
+                velocity=DEFAULT_VELOCITY,
+                current=DEFAULT_CURRENT,
             ),
             JointCommand(
                 id=JointId.THUMB_TMC_AA,
                 angle=52,
-                speed=DEFAULT_SPEED,
-                torque=DEFAULT_TORQUE,
+                velocity=DEFAULT_VELOCITY,
+                current=DEFAULT_CURRENT,
             ),
             JointCommand(
                 id=JointId.THUMB_TMC_PS,
                 angle=-10,
-                speed=DEFAULT_SPEED,
-                torque=DEFAULT_TORQUE,
+                velocity=DEFAULT_VELOCITY,
+                current=DEFAULT_CURRENT,
             ),
             JointCommand(
                 id=JointId.FF_PIP,
                 angle=70,
-                speed=DEFAULT_SPEED,
-                torque=DEFAULT_TORQUE,
+                velocity=DEFAULT_VELOCITY,
+                current=DEFAULT_CURRENT,
             ),
             JointCommand(
                 id=JointId.FF_MCP,
                 angle=70,
-                speed=DEFAULT_SPEED,
-                torque=DEFAULT_TORQUE,
+                velocity=DEFAULT_VELOCITY,
+                current=DEFAULT_CURRENT,
             ),
         ]
 
@@ -116,8 +116,8 @@ def main():
             # Step 2: Use safe angles for motion
             safe_joints = nparray_to_joints(
                 result.safe_angles,
-                speed=DEFAULT_SPEED,
-                torque=DEFAULT_TORQUE,
+                velocity=DEFAULT_VELOCITY,
+                current=DEFAULT_CURRENT,
             )
             print("Executing motion with safe angles...")
             success = hand.move_joints(safe_joints)
@@ -131,7 +131,9 @@ def main():
         # Get current joint states and print
         current_joints = hand.get_joints()
         print(f"Current angle: Thumb MCP={current_joints[JointId.THUMB_MCP.value].angle:.1f}deg")
-        print(f"Current angle: Thumb TMC A-A={current_joints[JointId.THUMB_TMC_AA.value].angle:.1f}deg")
+        print(
+            f"Current angle: Thumb TMC A-A={current_joints[JointId.THUMB_TMC_AA.value].angle:.1f}deg"
+        )
         print(
             f"Current angle: Thumb TMC P-S={current_joints[JointId.THUMB_TMC_PS.value].angle:.1f}deg"
         )
@@ -139,7 +141,6 @@ def main():
         print(f"Current angle: Index MCP={current_joints[JointId.FF_MCP.value].angle:.1f}deg")
 
         print("\n===== Demo complete =====")
-
 
     finally:
         hand.close()

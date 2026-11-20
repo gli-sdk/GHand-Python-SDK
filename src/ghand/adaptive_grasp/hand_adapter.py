@@ -4,34 +4,34 @@
 from typing import Any
 
 from ..gestures import _wait_for_completion
-from ..types import CtrlMode, JointCommand, JointId
+from ..types import JointId, HandControlMode, JointCommand
 
-from .ports import GraspSequenceHandPort
+from .ports import HandCommandPort
 
 
 class GHandCommandPort:
+
     def __init__(self, hand: Any):
         self.hand = hand
 
-    def move_joints(self, joints: list[JointCommand], mode: CtrlMode) -> bool:
+    def move_joints(self, joints: list[JointCommand], mode: HandControlMode) -> bool:
         joint_command_cls = _ghand_attr("JointCommand", self.hand)
         ctrl_mode = _map_ghand_ctrl_mode(mode, self.hand)
         commands = [
             joint_command_cls(
                 id=joint.id,
                 angle=joint.angle,
-                speed=joint.speed,
-                torque=joint.torque,
-            )
-            for joint in joints
+                velocity=joint.velocity,
+                current=joint.current,
+            ) for joint in joints
         ]
-        return self.hand.move_joints(commands, mode=ctrl_mode)
+        return self.hand.move_joints(commands, hand_control_mode=ctrl_mode)
 
     def stop(self) -> None:
         self.hand.stop()
 
-    def joint_limits(self) -> dict[JointId, tuple[float, float]]:
-        raw_limits = getattr(self.hand, "_joint_limits", {})
+    def active_joint_limits(self) -> dict[JointId, tuple[float, float]]:
+        raw_limits = getattr(self.hand, "_active_joint_limits", {})
         return {
             JointId(joint_id): (float(limit[0]), float(limit[1]))
             for joint_id, limit in raw_limits.items()
@@ -58,7 +58,7 @@ class GHandCommandPort:
         )
 
 
-def ensure_hand_command_port(hand: Any) -> GraspSequenceHandPort:
+def ensure_hand_command_port(hand: Any) -> HandCommandPort:
     if isinstance(hand, GHandCommandPort):
         return hand
 
@@ -70,21 +70,19 @@ def ensure_hand_command_port(hand: Any) -> GraspSequenceHandPort:
         return hand
     if is_ghand_like and has_command_methods:
         return GHandCommandPort(hand)
-    raise TypeError(
-        "hand port must provide move_joints()/stop() or be a GHand-like object"
-    )
+    raise TypeError("hand port must provide move_joints()/stop() or be a GHand-like object")
 
 
 def _ghand_attr(name: str, hand: Any | None = None) -> Any:
     if hand is not None and hasattr(hand, name):
         return getattr(hand, name)
     sdk_types = {
-        "CtrlMode": CtrlMode,
+        "CtrlMode": HandControlMode,
         "JointCommand": JointCommand,
     }
     return sdk_types[name]
 
 
-def _map_ghand_ctrl_mode(mode: CtrlMode, hand: Any | None = None) -> Any:
+def _map_ghand_ctrl_mode(mode: HandControlMode, hand: Any | None = None) -> Any:
     ghand_ctrl_mode = _ghand_attr("CtrlMode", hand)
     return ghand_ctrl_mode(mode.value)

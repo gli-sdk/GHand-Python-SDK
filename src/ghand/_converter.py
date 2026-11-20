@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 # Copyright 2026 GLITech
@@ -21,7 +21,7 @@ from typing import Optional
 
 import numpy as np
 
-from .types import JointCommand, JointData, JointId
+from .types import JointId, JointCommand, JointData
 
 
 class JointConverter:
@@ -54,9 +54,9 @@ class JointConverter:
         return angles
 
     @staticmethod
-    def nparray_to_joints(
-        angles: np.ndarray, speed: int = 100, torque: int = 100
-    ) -> list[JointCommand]:
+    def nparray_to_joints(angles: np.ndarray,
+                          velocity: int = 100,
+                          current: int = 100) -> list[JointCommand]:
         """Convert an 18-dimensional numpy array back to a list of JointCommand objects.
 
         The returned list uses ids 0-17, matching the ``ghand.JointId``
@@ -64,8 +64,8 @@ class JointConverter:
 
         Args:
             angles: 18-element numpy array of joint angles in degrees.
-            speed: Speed percentage (0-100) applied to all joints. Defaults to 100.
-            torque: Torque percentage (0-100) applied to all joints. Defaults to 100.
+            velocity: Velocity percentage (0-100) applied to all joints. Defaults to 100.
+            current: Current percentage (0-100) applied to all joints. Defaults to 100.
 
         Returns:
             List of 18 JointCommand objects.
@@ -74,10 +74,9 @@ class JointConverter:
             JointCommand(
                 id=int(JointId(i)),
                 angle=float(angles[i]),
-                speed=speed,
-                torque=torque,
-            )
-            for i in range(18)
+                velocity=velocity,
+                current=current,
+            ) for i in range(18)
         ]
 
 

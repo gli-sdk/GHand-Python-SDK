@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 # Copyright 2026 GLITech
@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Predefined gesture module.
 
 Provides joint-angle definitions and a unified execution interface for
@@ -26,10 +25,9 @@ import time
 from typing import Dict
 
 from .ghand import GHand
-from .types import ErrorCode, GestureType, JointCommand, JointId, State
+from .types import GestureType, JointId, JointState, JointCommand, HandControlState
 
 logger = logging.getLogger("ghand.gestures")
-
 
 # Gesture definitions: joint angles in degrees.
 # Key is GestureType, value is a dict of {JointId: angle(degrees)}.
@@ -112,16 +110,18 @@ GESTURE_DEFINITIONS: Dict[GestureType, Dict[JointId, float]] = {
 }
 
 
-def execute_gesture(
-    hand: GHand, gesture: GestureType, speed: int = 100, torque: int = 100, wait: bool = True
-) -> bool:
+def execute_gesture(hand: GHand,
+                    gesture: GestureType,
+                    velocity: int = 100,
+                    current: int = 100,
+                    wait: bool = True) -> bool:
     """Execute a predefined gesture.
 
     Args:
         hand: GHand instance.
         gesture: Gesture type to execute.
-        speed: Speed percentage (0-100). Defaults to 100.
-        torque: Torque percentage (0-100). Defaults to 100.
+        velocity: Velocity percentage (0-100). Defaults to 100.
+        current: Current percentage (0-100). Defaults to 100.
         wait: Whether to block until the motion completes. Defaults to True.
 
     Returns:
@@ -133,7 +133,7 @@ def execute_gesture(
 
     angles = GESTURE_DEFINITIONS[gesture]
     joints = [
-        JointCommand(id=joint_id, angle=angle, speed=speed, torque=torque)
+        JointCommand(id=joint_id, angle=angle, velocity=velocity, current=current)
         for joint_id, angle in angles.items()
     ]
 
@@ -154,7 +154,7 @@ def _wait_for_completion(
 ) -> bool:
     """Wait for the hand motion to complete and verify the final state.
 
-    A single ``get_hand_info()`` failure is tolerated: EtherCAT can briefly
+    A single state-read failure is tolerated: EtherCAT can briefly
     return no fresh TPDO frame during a bad cycle, and treating that as a
     fatal test error causes false negatives. We keep retrying until either
     we get a fresh reading, the transient-error grace period elapses, or
@@ -167,7 +167,7 @@ def _wait_for_completion(
         warmup_s: Grace period during which we allow the hand to not yet
             report RUNNING before we assume the command produced no motion.
         transient_error_grace_s: Contiguous duration for which
-            ``get_hand_info()`` may fail before we give up.
+            state reads may fail before we give up.
 
     Returns:
         True if the hand ends in a normal state, False otherwise.
@@ -176,41 +176,42 @@ def _wait_for_completion(
     start_time = time.monotonic()
     has_been_running = False
     hand_info = None
+    joints = []
     last_error = None
     first_error_time = None
 
     while True:
         try:
             hand_info = hand.get_hand_info()
+            joints = hand.get_joints()
             last_error = None
             first_error_time = None
         except Exception as exc:
             # Only fail if we've been unable to read state for a sustained
-            # window — a single WKC miss must not surface as a test error.
+            # window - a single WKC miss must not surface as a test error.
             now = time.monotonic()
             if first_error_time is None:
                 first_error_time = now
             last_error = exc
             if now - first_error_time >= transient_error_grace_s:
                 logger.error(
-                    "get_hand_info() failed for %.3fs while waiting for motion: %s",
+                    "State read failed for %.3fs while waiting for motion: %s",
                     now - first_error_time,
                     exc,
                 )
                 return False
             if now >= deadline:
-                logger.error(
-                    "Timed out waiting for motion; last error: %s", exc
-                )
+                logger.error("Timed out waiting for motion; last error: %s", exc)
                 return False
             time.sleep(poll_period_s)
             continue
 
-        if hand_info.state == State.RUNNING:
+        if any(joint.state == JointState.RUNNING for joint in joints):
             has_been_running = True
-        elif has_been_running and hand_info.state == State.STOPPED:
+        elif has_been_running:
             break
-        elif hand_info.state.is_abnormal:
+        elif any(joint.state not in (JointState.DISABLED, JointState.RUNNING, JointState.STOPPED)
+                 for joint in joints):
             break
         elif not has_been_running and time.monotonic() - start_time >= warmup_s:
             break
@@ -227,7 +228,10 @@ def _wait_for_completion(
             last_error,
         )
         return False
-    if hand_info.state.is_abnormal or hand_info.error != ErrorCode.NORMAL:
+    if hand_info.joints_state not in (HandControlState.DISABLED, HandControlState.ENABLED) or (
+            hand_info.error_warn or hand_info.error_fault or hand_info.error_critical) or any(
+                joint.state not in (JointState.DISABLED, JointState.RUNNING, JointState.STOPPED)
+                for joint in joints):
         logger.warning("Action completed with error state. Please clear fault and retry.")
         return False
     return True

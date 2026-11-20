@@ -47,10 +47,9 @@ def main():
     try:
         ver1 = hand1.get_firmware_version()
         name1 = hand1.get_device_name()
-        hw_ver1 = hand1.get_hardware_version()
         serial1 = hand1.get_serial_number()
         type1 = hand1.get_hand_type()
-        print(f"First hand - Name: {name1}, HW: {hw_ver1}, "
+        print(f"First hand - Name: {name1}, "
               f"FW: {ver1}, Type: {type1.value}, "
               f"SN: {serial1}")
     except Exception as e:
@@ -60,10 +59,9 @@ def main():
     try:
         ver2 = hand2.get_firmware_version()
         name2 = hand2.get_device_name()
-        hw_ver2 = hand2.get_hardware_version()
         serial2 = hand2.get_serial_number()
         type2 = hand2.get_hand_type()
-        print(f"Second hand - Name: {name2}, HW: {hw_ver2}, "
+        print(f"Second hand - Name: {name2}, "
               f"FW: {ver2}, Type: {type2.value}, "
               f"SN: {serial2}")
     except Exception as e:
@@ -77,18 +75,18 @@ def main():
     # hand2.move_joints([...])
     joints1 = []
 
-    joints1.append(JointCommand(id=JointId.THUMB_MCP, angle=0, speed=100,
-                                torque=100))  # Angle range: 0~75 (degrees)
-    joints1.append(JointCommand(id=JointId.THUMB_TMC_FE, angle=50, speed=100,
-                                torque=100))  # Angle range: 0~55 (degrees)
-    joints1.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=20, speed=100,
-                                torque=100))  # Angle range: 0~90 (degrees)
-    joints1.append(JointCommand(id=JointId.THUMB_TMC_PS, angle=0, speed=100,
-                                torque=100))  # Angle range: 0~90 (degrees)
-    joints1.append(JointCommand(id=JointId.FF_PIP, angle=0, speed=100,
-                                torque=100))  # Angle range: 0~75 (degrees)
-    joints1.append(JointCommand(id=JointId.FF_MCP, angle=0, speed=100,
-                                torque=100))  # Angle range: 0~70 (degrees)
+    joints1.append(JointCommand(id=JointId.THUMB_MCP, angle=0, velocity=100,
+                                current=100))  # Angle range: 0~75 (degrees)
+    joints1.append(JointCommand(id=JointId.THUMB_TMC_FE, angle=50, velocity=100,
+                                current=100))  # Angle range: 0~55 (degrees)
+    joints1.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=20, velocity=100,
+                                current=100))  # Angle range: 0~90 (degrees)
+    joints1.append(JointCommand(id=JointId.THUMB_TMC_PS, angle=0, velocity=100,
+                                current=100))  # Angle range: 0~90 (degrees)
+    joints1.append(JointCommand(id=JointId.FF_PIP, angle=0, velocity=100,
+                                current=100))  # Angle range: 0~75 (degrees)
+    joints1.append(JointCommand(id=JointId.FF_MCP, angle=0, velocity=100,
+                                current=100))  # Angle range: 0~70 (degrees)
 
     result = hand1.move_joints(joints1)
     if result:
@@ -98,21 +96,21 @@ def main():
         if current_joints:
             joint = current_joints[2]
             print(
-                f"  {JointId(joint.id).name:<15}- Angle: {joint.angle:.2f} deg,\tSpeed: {joint.speed},\tTorque: {joint.torque}"
+                f"{JointId(joint.id).name:<13}-\tangle: {joint.angle:<3.1f}(deg),\tvelocity: {joint.velocity:<3},\tcurrent: {joint.current:<3}, \tcontrol_mode:{joint.control_mode}({(joint.control_mode).name:<7}),\tloop_type:{joint.loop_type}({(joint.loop_type).name:<15}),\tstate:{joint.state}({(joint.state).name:<8}),\terror:{joint.error}({(joint.error).name}),"
             )
 
-    joints1.append(JointCommand(id=JointId.THUMB_MCP, angle=0, speed=100,
-                                torque=100))  # Angle range: 0~75 (degrees)
-    joints1.append(JointCommand(id=JointId.THUMB_TMC_FE, angle=0, speed=100,
-                                torque=100))  # Angle range: 0~55 (degrees)
-    joints1.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=20, speed=100,
-                                torque=100))  # Angle range: 0~90 (degrees)
-    joints1.append(JointCommand(id=JointId.THUMB_TMC_PS, angle=0, speed=100,
-                                torque=100))  # Angle range: 0~90 (degrees)
-    joints1.append(JointCommand(id=JointId.FF_PIP, angle=50, speed=100,
-                                torque=100))  # Angle range: 0~75 (degrees)
-    joints1.append(JointCommand(id=JointId.FF_MCP, angle=50, speed=100,
-                                torque=100))  # Angle range: 0~70 (degrees)
+    joints1.append(JointCommand(id=JointId.THUMB_MCP, angle=0, velocity=100,
+                                current=100))  # Angle range: 0~75 (degrees)
+    joints1.append(JointCommand(id=JointId.THUMB_TMC_FE, angle=0, velocity=100,
+                                current=100))  # Angle range: 0~55 (degrees)
+    joints1.append(JointCommand(id=JointId.THUMB_TMC_AA, angle=20, velocity=100,
+                                current=100))  # Angle range: 0~90 (degrees)
+    joints1.append(JointCommand(id=JointId.THUMB_TMC_PS, angle=0, velocity=100,
+                                current=100))  # Angle range: 0~90 (degrees)
+    joints1.append(JointCommand(id=JointId.FF_PIP, angle=50, velocity=100,
+                                current=100))  # Angle range: 0~75 (degrees)
+    joints1.append(JointCommand(id=JointId.FF_MCP, angle=50, velocity=100,
+                                current=100))  # Angle range: 0~70 (degrees)
 
     result = hand2.move_joints(joints1)
     if result:
@@ -122,7 +120,7 @@ def main():
         if current_joints2:
             joint = current_joints2[7]
             print(
-                f"  {JointId(joint.id).name:<15}- Angle: {joint.angle:.2f} deg,\tSpeed: {joint.speed},\tTorque: {joint.torque}"
+                f"{JointId(joint.id).name:<13}-\tangle: {joint.angle:<3.1f}(deg),\tvelocity: {joint.velocity:<3},\tcurrent: {joint.current:<3}, \tcontrol_mode:{joint.control_mode}({(joint.control_mode).name:<7}),\tloop_type:{joint.loop_type}({(joint.loop_type).name:<15}),\tstate:{joint.state}({(joint.state).name:<8}),\terror:{joint.error}({(joint.error).name}),"
             )
 
     # Close connections when program ends

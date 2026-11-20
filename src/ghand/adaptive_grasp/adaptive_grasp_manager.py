@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
@@ -14,9 +14,9 @@ from .adaptive_hold_runner import AdaptiveHoldRunner
 from .config import AdaptiveGraspConfig
 from .grasp_sequence import ContactSnapshot, PhaseController
 from .hand_adapter import ensure_hand_command_port
-from .hold_planner_factory import HoldPlannerFactory
-from .joint_builder import JointCommandBuilder, TORQUE_CONTROL_JOINTS
-from .object_profile import ObjectProfile, ObjectProfileRegistry
+from .hold_planner_factory import create_hold_planners
+from .joint_builder import JointCommandBuilder, CURRENT_CONTROL_JOINTS
+from .object_profile import ObjectProfile, get_object_profile
 from .ports import SensorFrameSource
 from .position_hold_planner import ForceDecision
 from .release_controller import ReleaseController
@@ -40,7 +40,6 @@ class AdaptiveGraspComponents:
     tactile: TactileAnalyzer
     safety: SafetyMonitor
     joint_builder: JointCommandBuilder
-    hold_planner_factory: HoldPlannerFactory
     visualizer: Optional["TactileVisualizer"]
 
 
@@ -58,8 +57,8 @@ def build_adaptive_grasp_components(
         finger_touch_threshold_n=config.finger_touch_threshold_n,
         get_monotonic_time=get_monotonic_time,
     ))
-    torque_joints = tuple(joint_id for joint_id in TORQUE_CONTROL_JOINTS
-                          if JOINT_TO_FINGER[joint_id] in active_fingers)
+    current_joints = tuple(joint_id for joint_id in CURRENT_CONTROL_JOINTS
+                           if JOINT_TO_FINGER[joint_id] in active_fingers)
     if config.enable_visualization:
         from .visualization import TactileVisualizer
         visualizer: Optional["TactileVisualizer"] = TactileVisualizer(
@@ -73,8 +72,7 @@ def build_adaptive_grasp_components(
         sensor=sensor_client,
         tactile=TactileAnalyzer(config),
         safety=SafetyMonitor(config),
-        joint_builder=JointCommandBuilder(config, torque_joints),
-        hold_planner_factory=HoldPlannerFactory(config),
+        joint_builder=JointCommandBuilder(config, current_joints),
         visualizer=visualizer,
     )
 
@@ -112,9 +110,8 @@ class AdaptiveGrasper:
         self._tactile = self._components.tactile
         self._safety = self._components.safety
         self._joint_builder = self._components.joint_builder
-        self._hold_planner_factory = self._components.hold_planner_factory
         self._visualizer = self._components.visualizer
-        self._torque_joints = self._joint_builder.torque_joints
+        self._current_joints = self._joint_builder.current_joints
 
         self._release_controller = ReleaseController(
             hand=self._hand_port,
@@ -154,7 +151,7 @@ class AdaptiveGrasper:
                 self._cleanup_grasp(state=GraspState.ERROR)
                 return False
 
-            self.current_torque = result.final_torque
+            self.current_current = result.final_current
             self._runtime.last_contact_snapshot = result.contact_snapshot
 
             self._start_adaptive_control()
@@ -176,12 +173,12 @@ class AdaptiveGrasper:
         self._runtime.running = value
 
     @property
-    def current_torque(self) -> int:
-        return self._runtime.current_torque
+    def current_current(self) -> int:
+        return self._runtime.current_current
 
-    @current_torque.setter
-    def current_torque(self, value: int) -> None:
-        self._runtime.current_torque = value
+    @current_current.setter
+    def current_current(self, value: int) -> None:
+        self._runtime.current_current = value
 
     @property
     def _control_thread(self):
@@ -216,11 +213,9 @@ class AdaptiveGrasper:
         if poll_period_s <= 0:
             raise ValueError("poll_period_s must be > 0")
 
-        while self.get_state() in (GraspState.ADAPTIVE_HOLD,
-                                   GraspState.RELEASE):
+        while self.get_state() in (GraspState.ADAPTIVE_HOLD, GraspState.RELEASE):
             self.poll_visualizer()
-            if self.get_state() not in (GraspState.ADAPTIVE_HOLD,
-                                        GraspState.RELEASE):
+            if self.get_state() not in (GraspState.ADAPTIVE_HOLD, GraspState.RELEASE):
                 break
             time.sleep(poll_period_s)
 
@@ -229,8 +224,7 @@ class AdaptiveGrasper:
 
     def emergency_release(self, wait_s: float = 2.0) -> bool:
         """Open the hand immediately without waiting for the control thread."""
-        return self._perform_release(wait_control_thread=False,
-                                     release_wait_s=wait_s)
+        return self._perform_release(wait_control_thread=False, release_wait_s=wait_s)
 
     def shutdown(self) -> None:
         """Stop control, sensors, visualization, and hand transport without opening."""
@@ -266,8 +260,7 @@ class AdaptiveGrasper:
         return self._runtime.last_safety_report
 
     @property
-    def last_force_decisions(
-            self) -> Optional[dict[TactileSensorId, ForceDecision]]:
+    def last_force_decisions(self) -> Optional[dict[TactileSensorId, ForceDecision]]:
         return self._runtime.last_force_decisions
 
     @property
@@ -286,10 +279,13 @@ class AdaptiveGrasper:
     def last_contact_snapshot(self) -> Optional[ContactSnapshot]:
         return self._runtime.last_contact_snapshot
 
-    def _build_hold_controller(
-            self,
-            contact_snapshot: Optional[ContactSnapshot]) -> HoldController:
-        planners = self._hold_planner_factory.create(
+    def _build_hold_controller(self, contact_snapshot: Optional[ContactSnapshot]) -> HoldController:
+        (
+            force_reference_planner,
+            position_hold_planner,
+            stiff_position_hold_planner,
+        ) = create_hold_planners(
+            self.config,
             self._runtime.object_profile,
             contact_snapshot,
         )
@@ -301,13 +297,14 @@ class AdaptiveGrasper:
             self._visualizer,
             self._joint_builder,
             self.config,
-            self.current_torque,
+            self.current_current,
             contact_joint_angles=(contact_snapshot.joint_angles
                                   if contact_snapshot is not None else None),
-            force_reference_planner=planners.force_reference_planner,
-            position_hold_planner=planners.position_hold_planner,
-            stiff_position_hold_planner=planners.stiff_position_hold_planner,
+            force_reference_planner=force_reference_planner,
+            position_hold_planner=position_hold_planner,
+            stiff_position_hold_planner=stiff_position_hold_planner,
             hold_target_force_n=self._hold_target_force_n,
+            move_joints=self._release_controller.move_hold_joints,
         )
 
     def _start_adaptive_control(self) -> None:
@@ -317,14 +314,12 @@ class AdaptiveGrasper:
         if self._visualizer is not None:
             self._visualizer.start()
 
-    def _prepare_grasp_runtime(
-            self, object_profile: Optional[ObjectProfile]) -> None:
+    def _prepare_grasp_runtime(self, object_profile: Optional[ObjectProfile]) -> None:
         self._runtime.reset_for_grasp()
         self._reset_runtime_components()
         self._control_thread_override = _NO_CONTROL_THREAD_OVERRIDE
         self._runtime.object_profile = (object_profile
-                                        or ObjectProfileRegistry.get(
-                                            self.config.default_object))
+                                        or get_object_profile(self.config.default_object))
         self._tactile.set_friction_coeff(self._runtime_friction_coeff())
         self._start_sensor_subscription()
 
@@ -343,16 +338,16 @@ class AdaptiveGrasper:
             self._get_monotonic_time,
             on_state_change=self._set_state,
             object_profile=self._runtime.object_profile,
-            joint_limits=self._joint_limits(),
+            active_joints=self._active_joints(),
         )
         return self._grasp_sequence.run(lambda: self._runtime.running)
 
-    def _joint_limits(self) -> dict[JointId, tuple[float, float]]:
-        raw_limits = getattr(self._hand_port, "joint_limits", None)
+    def _active_joints(self) -> dict[JointId, tuple[float, float]]:
+        raw_limits = getattr(self._hand_port, "active_joints", None)
         if callable(raw_limits):
             raw_limits = raw_limits()
         if raw_limits is None:
-            raw_limits = getattr(self.hand, "_joint_limits", {})
+            raw_limits = getattr(self.hand, "_active_joints", {})
         return {
             JointId(joint_id): (float(limit[0]), float(limit[1]))
             for joint_id, limit in raw_limits.items()
@@ -390,8 +385,7 @@ class AdaptiveGrasper:
         self._hold_runner.hold_controller = None
 
     def _configure_subscription_periods(self) -> None:
-        configure_periods = getattr(self._hand_port,
-                                    "configure_subscription_periods", None)
+        configure_periods = getattr(self._hand_port, "configure_subscription_periods", None)
         if configure_periods is None:
             return
         configure_periods(

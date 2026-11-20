@@ -14,11 +14,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """GHand SDK version information."""
 
-SDK_VERSION_MAJOR = 2
-SDK_VERSION_MINOR = 2
-SDK_VERSION_REVISION = 1
+SDK_VERSION_MAJOR = 3
+SDK_VERSION_MINOR = 1
+SDK_VERSION_REVISION = 0
 
-__version__ = "2.2.1"
+__version__ = "3.1.0"

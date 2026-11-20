@@ -1,6 +1,6 @@
-# GHand Python SDK
+﻿# GHand Python SDK
 
-[![Version](https://img.shields.io/badge/version-v2.2.1-blue.svg)](src/ghand/version.py)
+[![Version](https://img.shields.io/badge/version-v3.1.0-blue.svg)](src/ghand/version.py)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 
@@ -11,6 +11,7 @@ The official Python SDK for the GHand dexterous hand. It provides high-level API
 ## Table of Contents
 
 - [Key Features](#key-features)
+  - [Product Support Matrix](#product-support-matrix)
 - [Documentation](#documentation)
 - [System Requirements](#system-requirements)
 - [Installation](#installation)
@@ -26,14 +27,27 @@ The official Python SDK for the GHand dexterous hand. It provides high-level API
 
 ## Key Features
 
+### Product Support Matrix
+
+The capabilities below apply to GHand5 with the current V3.1.0 release. **For GHandLite1 (L1), use SDK 2.xx (2.x)** and follow that version's README, API and protocol documentation.
+
+| Product | SDK version | Transports | Control and tactile capabilities |
+| --- | --- | --- | --- |
+| GHand5 | Current V3.1.0 | EtherCAT, CAN-FD, RS-485 | Position, velocity, current, MIT, CUSTOM; tactile feedback, callbacks, on/off, zeroing and display |
+| GHandLite1 (L1) | Use 2.xx (2.x), e.g. [V2.2.2](https://github.com/gli-sdk/GHand-Python-SDK/tree/V2.2.2) | See the corresponding 2.x documentation | See the corresponding 2.x documentation |
+
+The GHandLite1 types and configuration files retained in this repository do not indicate support for connecting that product with V3.1.0. L1 users should check out the corresponding 2.x version before following its installation instructions.
+
+Retained L1 configuration and protocol details are documented in [GHandLite1 compatibility notes](docs/ghandlite1_compatibility.md).
+
 - **Device control**
   - Open and close GHand devices over EtherCAT, CAN-FD, or RS-485.
-  - Read firmware, hardware, serial number, product name, hand type, and motor driver version.
+  - Read firmware, firmware package, serial number, product name, hand type, and component versions.
   - Clear faults, initialize joints, stop motion, and run common device operations.
 
 - **Joint control**
-  - Command one or more joints by position, speed, or torque.
-  - Read current joint angle, speed, torque, state, and error feedback.
+  - Command one or more joints by position, velocity, or current.
+  - Read current joint angle, velocity, current, state, and error feedback.
   - Clamp active joint commands to product-specific limits.
 
 - **Tactile sensing**
@@ -58,7 +72,6 @@ Additional local notes:
 - [Logging](docs/logging.md)
 - [Error handling](docs/error_handling.md)
 - [Subscription and threading](docs/subscription_threading.md)
-- [Diagnostics](docs/diagnostics.md)
 
 ## System Requirements
 
@@ -78,13 +91,40 @@ Additional local notes:
 - **Linux**: `build-essential` and `python3-dev` for building native dependencies
 - **macOS**: No additional prerequisites for CAN-FD or RS-485. For EtherCAT, raw socket access via pcap requires `sudo` (no persistent capability equivalent to Linux `setcap` on macOS).
 
+### Linux GUI dependencies
+
+`pip` installs `PySide6` and `pyqtgraph` automatically, but does not install Linux
+system libraries. Before using the tactile display with X11/xcb on Ubuntu
+22.04/24.04, run:
+
+```bash
+sudo apt update
+sudo apt install libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1
+```
+
+On other distributions, install the equivalent system packages. The GUI also
+requires a working desktop display session; these libraries do not provide a
+display server for a headless server or container.
+The tactile display example checks the xcb plugin before creating the window
+and reports loading errors with installation commands.
+Custom GUI applications can call
+`ghand.tactile_display.runtime.check_gui_dependencies()` before creating
+`QApplication` and handle its `RuntimeError`. This check does not validate the
+display server connection; explicit alternative Qt backends and default native
+Wayland sessions skip it.
+
 ### Install from Source
 
 ```bash
 git clone https://github.com/gli-sdk/GHand-Python-SDK.git
 cd GHand-Python-SDK
-pip install -r requirements.txt
 pip install -e .
+```
+
+Install collision-detection dependencies only when needed:
+
+```bash
+pip install -e ".[collision]"
 ```
 
 Gitee mirror:
@@ -92,8 +132,13 @@ Gitee mirror:
 ```bash
 git clone https://gitee.com/glitech/GHand-Python-SDK.git
 cd GHand-Python-SDK
-pip install -r requirements.txt
 pip install -e .
+```
+
+Install collision-detection dependencies only when needed:
+
+```bash
+pip install -e ".[collision]"
 ```
 
 ## Quick Start
@@ -107,20 +152,24 @@ python examples/tutorial/01.get_basic_info.py
 Minimal EtherCAT example:
 
 ```python
-from ghand import CommType, GHand, ProductType
+import logging
+
+from ghand import CommType, GHand, ProductType, configure_logging
+
+configure_logging(level=logging.INFO)
 
 hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
 
-if hand.open("auto"):
+try:
+    if not hand.open("auto"):
+        raise RuntimeError("Connection failed")
     print("Firmware:", hand.get_firmware_version())
-    print("Hardware:", hand.get_hardware_version())
     print("Device:", hand.get_device_name())
+finally:
     hand.close()
-else:
-    print("Connection failed")
 ```
 
-Additional device version APIs:
+Place these additional version queries after connecting and before closing the device:
 
 ```python
 print("Firmware package:", hand.get_firmware_package_version())
@@ -131,22 +180,71 @@ print("Thumb tactile sensor:", hand.get_thumb_tactile_sensor_version())
 print("Finger tactile sensor:", hand.get_finger_tactile_sensor_version())
 ```
 
+Hand-level CUSTOM mode uses each joint's `control_mode`, `loop_type` and
+`control_state`. Run this code after connecting and before closing the device:
+
+```python
+from ghand import (
+    HandControlMode, JointCommand, JointControlMode,
+    JointControlState, JointId, JointLoopType,
+)
+
+ok = hand.move_joints(
+    [
+        JointCommand(
+            id=JointId.THUMB_MCP,
+            control_mode=JointControlMode.POSITION,
+            control_state=JointControlState.RUNNING,
+            loop_type=JointLoopType.CLOSED_LOOP,
+            angle=30,
+            velocity=10,
+            current=20,
+        ),
+    ],
+    hand_control_mode=HandControlMode.CUSTOM,
+)
+if not ok:
+    raise RuntimeError("Failed to send joint command")
+```
+
+Angles are in degrees; velocity and current are percentages. In position mode, velocity and current are limits and should be nonzero. Control modes and feedback loops must match within each finger arbitration group; see the [CUSTOM example](examples/tutorial/14.custom_control.py).
+
+A successful `move_joints()` return means the command was sent; confirm execution with `get_hand_info()` and `get_joints()`. `close()` closes the communication link. To stop holding or release drive torque, send `stop()` or `disable_hand()` as appropriate and confirm feedback before closing.
+
 Minimal CAN-FD example:
 
 ```python
-from ghand import CommType, GHand, ProductType
+import logging
+
+from ghand import CommType, GHand, ProductType, configure_logging
+
+configure_logging(level=logging.INFO)
 
 hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.CANFD)
-hand.open("auto", slave_id=0x31)
+try:
+    if not hand.open("auto", slave_id=0x31):
+        raise RuntimeError("Connection failed")
+    print("Device:", hand.get_device_name())
+finally:
+    hand.close()
 ```
 
 Minimal RS-485 example:
 
 ```python
-from ghand import CommType, GHand, ProductType
+import logging
+
+from ghand import CommType, GHand, ProductType, configure_logging
+
+configure_logging(level=logging.INFO)
 
 hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.RS485)
-hand.open("auto", slave_id=0x31)
+try:
+    if not hand.open("auto", slave_id=0x31):
+        raise RuntimeError("Connection failed")
+    print("Device:", hand.get_device_name())
+finally:
+    hand.close()
 ```
 
 ## Communication Notes
@@ -205,7 +303,7 @@ If `lsusb -t` shows `Driver=cdc_acm`, the adapter is in CDC serial mode and can 
 
 ### RS-485/CAN-FD Slave ID and Baud Rate
 
-RS-485 and CAN-FD devices use holding register `0x0000` as the slave ID register. The left hand defaults to `0x31`, and the right hand defaults to `0x32`.
+RS-485 and CAN-FD devices use holding register `0x0003` as the slave ID register; `0x0000` is the connection-control register. The left hand defaults to `0x31`, and the right hand defaults to `0x32`.
 
 Override the slave ID for a connection:
 
@@ -220,30 +318,60 @@ ok = hand.set_slave_id(0x32)
 hand.close()
 ```
 
-Connect with a non-default RS-485 baud rate:
+Default baud rates:
+
+- RS-485: 1,000,000 bps, `RS485BaudRate.BAUD_1000000` (gear `0x05`).
+- CAN-FD: 1 Mbps arbitration and 5 Mbps data, both at a 75% sample point, `CANFDBitTiming.TIMING_1M_5M` (gear `0x07`).
+
+The `baudrate` argument to `open()` selects the rate for the connection; it does not change the device's saved configuration. `set_baudrate()` writes that configuration. **After a successful change, turn the hand's power off and back on for the new rate to take effect. Closing and reopening the SDK connection alone does not apply it.**
+
+The examples below assume the device currently uses the default rate and `hand` was created with the corresponding transport. If the device's rate was previously changed, specify its current rate for the initial connection too.
+
+RS-485: connect at the current rate and configure 115,200 bps:
 
 ```python
 from ghand import RS485BaudRate
 
-hand.open("COM10", slave_id=0x31, baud_rate=RS485BaudRate.BAUD_1000000)
+try:
+    if not hand.open("COM10", slave_id=0x31, baudrate=RS485BaudRate.BAUD_1000000):
+        raise RuntimeError("Connection failed")
+    if not hand.set_baudrate(RS485BaudRate.BAUD_115200):
+        raise RuntimeError("Failed to configure baud rate")
+finally:
+    hand.close()
 ```
 
-Write the RS-485 baud-rate configuration to the device:
+**Now turn the hand's power off and back on**, then connect with the new rate explicitly:
 
 ```python
-ok = hand.set_baudrate_config(RS485BaudRate.BAUD_1000000)
+if not hand.open("COM10", slave_id=0x31, baudrate=RS485BaudRate.BAUD_115200):
+    raise RuntimeError("Connection failed")
+# Perform device operations here, then call hand.close().
 ```
 
-For CAN-FD, use a bit timing profile instead of an RS-485 baud-rate enum:
+CAN-FD: use `CANFDBitTiming`, connect with the current profile and configure 1 Mbps arbitration / 2 Mbps data:
 
 ```python
 from ghand import CANFDBitTiming
 
-hand.open("COM10", slave_id=0x31, baud_rate=CANFDBitTiming.TIMING_1M_5M)
-ok = hand.set_baudrate_config(CANFDBitTiming.TIMING_1M_5M)
+try:
+    if not hand.open("COM10", slave_id=0x31, baudrate=CANFDBitTiming.TIMING_1M_5M):
+        raise RuntimeError("Connection failed")
+    if not hand.set_baudrate(CANFDBitTiming.TIMING_1M_2M):
+        raise RuntimeError("Failed to configure bit timing")
+finally:
+    hand.close()
 ```
 
-The baud-rate/timing configuration is stored by the device and takes effect after the next power-up. After the device is power-cycled, pass the configured enum explicitly to `open()`.
+**Now turn the hand's power off and back on**, then connect with the new profile explicitly:
+
+```python
+if not hand.open("COM10", slave_id=0x31, baudrate=CANFDBitTiming.TIMING_1M_2M):
+    raise RuntimeError("Connection failed")
+# Perform device operations here, then call hand.close().
+```
+
+The device retains the saved configuration across power cycles. Continue passing the corresponding `baudrate` explicitly on subsequent connections; the SDK does not automatically detect the device's saved rate.
 
 RS-485 baud-rate gears:
 
@@ -264,20 +392,96 @@ CAN-FD baud-rate gears:
 | `0x01` | 500,000 bps, 80% sample point | 2,000,000 bps, 80% sample point |
 | `0x02` | 500,000 bps, 80% sample point | 4,000,000 bps, 80% sample point |
 | `0x03` | 500,000 bps, 80% sample point | 5,000,000 bps, 75% sample point |
-| `0x04` | 1,000,000 bps, 75% sample point | 4,000,000 bps, 80% sample point |
-| `0x05` | 1,000,000 bps, 75% sample point | 5,000,000 bps, 75% sample point (default) |
+| `0x04` | 1,000,000 bps, 75% sample point | 1,000,000 bps, 75% sample point |
+| `0x05` | 1,000,000 bps, 75% sample point | 2,000,000 bps, 80% sample point |
+| `0x06` | 1,000,000 bps, 75% sample point | 4,000,000 bps, 80% sample point |
+| `0x07` | 1,000,000 bps, 75% sample point | 5,000,000 bps, 75% sample point (default) |
 
 ## Examples
 
 - `examples/tutorial/01.get_basic_info.py`: connect and read device information
 - `examples/tutorial/02.move_joints.py`: position control
-- `examples/tutorial/03.torque_control.py`: torque control
-- `examples/tutorial/04.speed_control.py`: speed control
+- `examples/tutorial/03.current_control.py`: current control
+- `examples/tutorial/04.velocity_control.py`: velocity control
 - `examples/tutorial/05.tactile_callback.py`: tactile data callback
 - `examples/tutorial/06.subscription_demo.py`: data subscription
 - `examples/tutorial/07.multi_hand.py`: multi-hand discovery and connection
+- `examples/tutorial/12.switch_baud_rate.py`: baud-rate configuration
+- `examples/tutorial/13.mit_control.py`: MIT control
+- `examples/tutorial/14.custom_control.py`: CUSTOM control
+- `examples/tutorial/15.tactile_display.py`: tactile display with device setup, subscription, and cleanup
 - `examples/demo/`: action and gesture demonstrations
 - `examples/extension/`: collision detection and adaptive grasp examples
+
+Adaptive grasp requires hardware with accessible tactile sensors; see the [adaptive grasp guide](src/ghand/adaptive_grasp/README.md).
+
+Python dependencies for the tactile display are included with the SDK. Linux
+users should first install the [Linux GUI dependencies](#linux-gui-dependencies).
+Install and launch the example:
+
+```bash
+python -m pip install .
+python examples/tutorial/15.tactile_display.py
+```
+
+The example connects GHand5 via EtherCAT and passes the connected device to
+`ghand.tactile_display.display.TactileDisplay(hand)`. The display manages tactile
+commands, subscriptions, its worker thread, and cleanup when the window closes.
+The caller owns the device connection and closes it after the display exits.
+For custom data sources, `ghand.tactile_display.window.TactileWindow` remains
+available as a display-only component.
+
+### Computed tactile moments (GHand5)
+
+`hand.get_tactile_data()` and `hand.subscribe(...)` now include per-finger
+`resultant_moment = [Mx, My, Mz]` in **N·m**, with
+`moment_reference_point_m`, `distributed_force_sensor_frame` and
+`resultant_force_sensor_frame` (forces in N). Original transport force and
+status fields remain unchanged. `TactileMomentCalculator` is also available
+directly from `ghand` for offline readings.
+
+The supplied PX matrices map sensor CAD coordinates to each taxel's local
+coordinates: `F_local = R @ F_CAD`. Assuming the SDK point-force triples are
+taxel-local and follow vendor point numbering, calculation uses
+`F_CAD_i = R_i.T @ F_local_i`, then
+`M_O = sum(cross(p_i - O, F_CAD_i))`. Positions are converted from mm to m.
+The convention was supplied by the integrator; it has not been physically
+calibrated against an external torque sensor in this change.
+
+Default `O=(0,0,0)` is **each sensor's CAD origin**. It is not automatically a
+pad center, motor axis, or shared hand/world origin. To shift it, call
+`hand.configure_tactile_moments(reference_point_m=(x, y, z))`, in meters;
+this changes software calculation settings only. The same coordinate triple
+is applied independently in each finger's own CAD frame.
+
+Missing, malformed, nonfinite or unhealthy readings produce `None`, not zero.
+An explicit healthy tactile status (`state=True`, `error=0`) is required;
+CAN-FD/RS-485 currently omit the error byte, so their derived moments remain
+unavailable. GHandLite1 has no enabled moment geometry. Polling and callbacks
+return enriched copies, leaving communication caches untouched.
+
+The display adds a five-finger moment table (including O in mm) and a
+**Moment (N·m)** history tab. Force views retain the original readings.
+Live moments disappear after 0.5 s without updates; missing readings and
+reference changes break the curves. These are computed tactile moments, not
+joint motor torques. Sensor CAD wrenches cannot be added across fingers until
+their rotations and origins have been transformed to a shared frame.
+
+**Auto scale (5 s)** is on by default: each finger's force/moment Y limits fit
+the last five seconds, centered on zero with a margin and stable 1/2/5 steps.
+Minimum half ranges are 0.05 N and 0.00001 N·m. Older peaks remain in the
+60-second history but may fall outside the current Y range. Uncheck it to
+restore fixed force (-10..25 N) and moment (-0.05..0.05 N·m) ranges.
+Larger tactile dots and continuous arrows make sub-newton forces visible;
+point size uses one shared five-finger adaptive range shown below the table.
+Point colors always use an absolute logarithmic |F| scale, 0..25 N from pale
+yellow to deep red, so stronger force produces a deeper color independent of
+auto scaling. Measurement values, units and SDK wrench calculations are unchanged.
+
+The packaged `src/ghand/config/ghand5_tactile_geometry.json` contains 38 thumb
+and 31 other-finger points, matrices, and vendor file SHA-256 hashes. It does
+not depend on the original Excel/CAD files at runtime. Rebuild from supplied
+PX files with `python3 scripts/build_tactile_geometry.py /path/to/px`.
 
 ## Project Structure
 
@@ -286,7 +490,12 @@ GHand-Python-SDK/
 |-- src/
 |   |-- ghand/                  # Core SDK package
 |   |   |-- ghand.py            # Main GHand class and public API
-|   |   |-- types.py            # Data types, enums, and structures
+|   |   |-- types/              # Typed enums and data objects
+|   |   |   |-- __init__.py      # Public type exports
+|   |   |   |-- enums.py         # Product, protocol, joint, and sensor enums
+|   |   |   |-- errors.py        # Device errors and warning bitfields
+|   |   |   `-- data.py          # Command and feedback dataclasses
+|   |   |-- _product_config.py  # Product configuration models and loading
 |   |   |-- gestures.py         # Predefined gesture utilities
 |   |   |-- config/             # Bundled product JSON configurations
 |   |   |   |-- ghand5.json
@@ -298,9 +507,7 @@ GHand-Python-SDK/
 |-- examples/                   # Tutorial, demo, and extension examples
 |-- docs/                       # Sphinx documentation source
 |-- tests/                      # Test suite
-|-- requirements.txt            # Runtime dependencies
 |-- pyproject.toml              # Build configuration
-|-- setup.cfg                   # Packaging metadata
 |-- setup.py                    # Version loader for setuptools
 |-- LICENSE                     # Apache License 2.0
 |-- LICENSES/                   # Third-party license texts
@@ -329,6 +536,14 @@ Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for gu
 
 - **Technical support**: For project-specific issues, open an issue in this repository.
 - **General inquiries**: [support@glitech.com](mailto:support@glitech.com)
+
+## Tactile-only data collection
+
+`examples/collection/record_tactile.py` passively records existing localhost hand
+teleoperation telemetry as Parquet episodes, without an arm, cameras, or another
+SDK device connection. It also prepares tactile-only T-Rex VQ-VAE datasets.
+Install the optional dependency with `pip install -e '.[recording]'` and see
+[collection instructions](docs/TACTILE_ONLY_COLLECTION.md).
 
 ## License
 

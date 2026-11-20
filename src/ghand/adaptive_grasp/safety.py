@@ -30,6 +30,7 @@ class SafetyReport:
 
 
 class SafetyMonitor:
+
     def __init__(self, config: AdaptiveGraspConfig):
         self.config = config
         self._last_total_fz: float = 0.0
@@ -40,9 +41,7 @@ class SafetyMonitor:
         self._closing_baseline_angles: dict[Any, float] = {}
 
     def set_closing_baseline(self, joint_feedback: list) -> None:
-        self._closing_baseline_angles = {
-            normalize_joint_id(j.id): j.angle for j in joint_feedback
-        }
+        self._closing_baseline_angles = {normalize_joint_id(j.id): j.angle for j in joint_feedback}
 
     def check(
         self,
@@ -80,7 +79,8 @@ class SafetyMonitor:
             self._last_finger_count = len(active_finger_fz)
         return SafetyReport(SafetyStatus.OK)
 
-    def _check_object_drop(self, total_fz: float, active_finger_fz: dict[Any, float]) -> SafetyReport:
+    def _check_object_drop(self, total_fz: float, active_finger_fz: dict[Any,
+                                                                         float]) -> SafetyReport:
         drop_threshold = self._drop_threshold()
         if self._is_below_drop_threshold(total_fz):
             self._consecutive_drop_cycles += 1
@@ -94,7 +94,8 @@ class SafetyMonitor:
                     drop_threshold,
                     self._format_active_finger_fz(active_finger_fz),
                 )
-                return SafetyReport(SafetyStatus.FAULT, "object_dropped", "Contact lost in adaptive hold")
+                return SafetyReport(SafetyStatus.FAULT, "object_dropped",
+                                    "Contact lost in adaptive hold")
         else:
             self._consecutive_drop_cycles = 0
         return SafetyReport(SafetyStatus.OK)
@@ -105,6 +106,7 @@ class SafetyMonitor:
 
     def _is_below_drop_threshold(self, total_fz: float) -> bool:
         return total_fz < self._drop_threshold()
+
     def _get_active_finger_fz(self, tactile_data: dict) -> dict[Any, float]:
         return active_finger_normal_forces(
             tactile_data,
@@ -120,11 +122,9 @@ class SafetyMonitor:
     def _format_active_finger_fz(self, active_finger_fz: dict[Any, float]) -> str:
         parts = []
         for finger in self._ordered_active_fingers():
-            parts.append(
-                f"    {self._finger_label(finger)}: "
-                f"last_fz={self._last_active_finger_fz.get(finger, 0.0):.2f} "
-                f"current_fz={active_finger_fz.get(finger, 0.0):.2f}"
-            )
+            parts.append(f"    {self._finger_label(finger)}: "
+                         f"last_fz={self._last_active_finger_fz.get(finger, 0.0):.2f} "
+                         f"current_fz={active_finger_fz.get(finger, 0.0):.2f}")
         return "\n".join(parts)
 
     @staticmethod
@@ -140,7 +140,8 @@ class SafetyMonitor:
                 "MF": "middle_finger",
                 "RF": "ring_finger",
                 "LF": "little_finger",
-            }.get(str(name), str(name).lower())
+            }.get(str(name),
+                  str(name).lower())
         return str(finger)
 
     def is_grasp_empty(
@@ -157,22 +158,17 @@ class SafetyMonitor:
         exceeded_joints = []
         for joint in joint_feedback:
             joint_id = normalize_joint_id(joint.id)
-            delta = abs(joint.angle -
-                        self._closing_baseline_angles.get(joint_id, 0.0))
+            delta = abs(joint.angle - self._closing_baseline_angles.get(joint_id, 0.0))
             if delta > threshold:
-                exceeded_joints.append(
-                    {
-                        "joint": self._joint_label(joint_id),
-                        "delta_deg": delta,
-                        "threshold_deg": threshold,
-                    }
-                )
+                exceeded_joints.append({
+                    "joint": self._joint_label(joint_id),
+                    "delta_deg": delta,
+                    "threshold_deg": threshold,
+                })
 
         if exceeded_joints:
-            summary = ", ".join(
-                f"{item['joint']}={item['delta_deg']:.1f}deg"
-                for item in exceeded_joints
-            )
+            summary = ", ".join(f"{item['joint']}={item['delta_deg']:.1f}deg"
+                                for item in exceeded_joints)
             _logger.error(
                 "Empty grasp detected: measured angle > empty grasp threshold: %s > %.1f deg",
                 summary,

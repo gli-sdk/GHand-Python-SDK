@@ -14,10 +14,31 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Communication layer for the GHand SDK."""
 
-from .canfd_comm import CanfdComm
-from .ethercat_comm import EthercatComm
+from .factory import create_comm
 from .icomm import IComm
-from .rs485_comm import Rs485Comm
+
+__all__ = [
+    "IComm",
+    "create_comm",
+    "CANFDComm",
+    "EtherCATComm",
+    "RS485Comm",
+]
+
+
+def __getattr__(name: str):
+    if name == "CANFDComm":
+        from .canfd_comm import CANFDComm
+
+        return CANFDComm
+    if name == "EtherCATComm":
+        from .ethercat_comm import EtherCATComm
+
+        return EtherCATComm
+    if name == "RS485Comm":
+        from .rs485_comm import RS485Comm
+
+        return RS485Comm
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

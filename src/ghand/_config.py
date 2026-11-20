@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Product configuration loader and JSON search/parsing.
 
 External configuration directories override the configs bundled inside the
@@ -28,16 +27,10 @@ import logging
 import os
 from importlib.resources import files
 
-from .types import (
-    JointId,
-    ProductConfig,
-    ProductType,
-    TactileRegionConfig,
-    TactileSensorId,
-)
+from ._product_config import ProductConfig, TactileRegionConfig
+from .types import JointId, ProductType, TactileSensorId
 
 logger = logging.getLogger("ghand.config")
-
 
 _PRODUCT_TYPE_TO_FILE = {
     ProductType.GHand5: "ghand5.json",
@@ -76,13 +69,11 @@ def _get_config_search_paths() -> list[str]:
 
     paths.append(os.path.abspath(os.path.join(".", "config")))
 
-    paths.append(
-        os.path.join(
-            os.path.expanduser("~"),
-            ".ghand",
-            "config",
-        )
-    )
+    paths.append(os.path.join(
+        os.path.expanduser("~"),
+        ".ghand",
+        "config",
+    ))
 
     return paths
 
@@ -109,18 +100,17 @@ def _load_bundled_config_data(file_name: str) -> dict | None:
 
 
 def _parse_joints(
-    json_array: list[dict],
-) -> tuple[list[JointId], dict[JointId, tuple[float, float]]]:
+    json_array: list[dict], ) -> tuple[list[JointId], dict[JointId, tuple[float, float]]]:
     """Parse the ``joints`` section of a product config.
 
     Args:
         json_array: List of joint definition dicts.
 
     Returns:
-        Tuple of (valid_joint_ids, joint_limits_dict).
+        Tuple of (all_joint_ids, active_joint_limits_dict).
     """
-    valid_joints = []
-    joint_limits = {}
+    all_joints = []
+    active_joint_limits = {}
 
     for item in json_array:
         name = item.get("id", "")
@@ -129,16 +119,16 @@ def _parse_joints(
             logger.warning("Unknown joint name in config: %s", name)
             continue
 
-        valid_joints.append(joint_id)
+        all_joints.append(joint_id)
 
         if "min" in item and "max" in item:
             mn = float(item["min"])
             mx = float(item["max"])
             if mn > mx:
                 mn, mx = mx, mn
-            joint_limits[joint_id] = (mn, mx)
+            active_joint_limits[joint_id] = (mn, mx)
 
-    return valid_joints, joint_limits
+    return all_joints, active_joint_limits
 
 
 def _parse_tactile_regions(json_array: list[dict]) -> list[TactileRegionConfig]:
@@ -184,23 +174,21 @@ def _parse_product_config(
     source: str = "",
 ) -> ProductConfig:
     """Convert product config JSON data into ProductConfig."""
-    valid_joints, joint_limits = _parse_joints(data.get("joints", []))
+    all_joints, active_joints = _parse_joints(data.get("joints", []))
 
-    tactile_regions = _parse_tactile_regions(
-        data.get("tactile_regions", [])
-    )
+    tactile_regions = _parse_tactile_regions(data.get("tactile_regions", []))
 
     config = ProductConfig(
         name=data.get("name", ""),
         model=data.get("model", ""),
-        valid_joints=valid_joints,
-        joint_limits=joint_limits,
+        all_joints=all_joints,
+        active_joints=active_joints,
         has_tactile=data.get("has_tactile", False),
         tactile_regions=tactile_regions,
         product_type=product_type,
     )
 
-    if not config.name or not config.valid_joints:
+    if not config.name or not config.all_joints:
         logger.error(
             "Product config in %s is missing required fields",
             source,
@@ -287,9 +275,9 @@ def find_config_by_name(device_name: str) -> ProductConfig | None:
         for file_path in glob.glob(pattern):
             try:
                 with open(
-                    file_path,
-                    "r",
-                    encoding="utf-8",
+                        file_path,
+                        "r",
+                        encoding="utf-8",
                 ) as f:
                     data = json.load(f)
             except (json.JSONDecodeError, OSError):
@@ -297,19 +285,10 @@ def find_config_by_name(device_name: str) -> ProductConfig | None:
 
             names = [data.get("name", "")]
 
-            if any(
-                name.lower() == normalized_name
-                for name in names
-                if name
-            ):
+            if any(name.lower() == normalized_name for name in names if name):
                 product_type = next(
-                    (
-                        candidate
-                        for candidate, expected_file
-                        in _PRODUCT_TYPE_TO_FILE.items()
-                        if os.path.basename(file_path)
-                        == expected_file
-                    ),
+                    (candidate for candidate, expected_file in _PRODUCT_TYPE_TO_FILE.items()
+                     if os.path.basename(file_path) == expected_file),
                     None,
                 )
 
@@ -328,11 +307,7 @@ def find_config_by_name(device_name: str) -> ProductConfig | None:
 
         names = [data.get("name", "")]
 
-        if any(
-            name.lower() == normalized_name
-            for name in names
-            if name
-        ):
+        if any(name.lower() == normalized_name for name in names if name):
             return _parse_product_config(
                 data,
                 product_type=product_type,

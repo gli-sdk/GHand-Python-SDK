@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 from dataclasses import dataclass
@@ -13,7 +13,6 @@ from .pid_controller import LowPassFilter
 from .tactility import TactileAnalysis
 from .utils import FINGER_TO_MCP_PIP, JOINT_TO_FINGER, clip, normalize_joint_id
 
-
 JointAngles = dict[JointId, float]
 FingerForces = dict[TactileSensorId, float]
 
@@ -21,11 +20,11 @@ FingerForces = dict[TactileSensorId, float]
 @dataclass
 class ForceDecision:
     control_u: float
-    next_torque: int
+    next_current: int
     target_angles: JointAngles
     is_fragile_mode: bool
     near_limit: bool = False
-    next_speed: Optional[int] = None
+    next_velocity: Optional[int] = None
 
 
 ForceDecisions = dict[TactileSensorId, ForceDecision]
@@ -35,7 +34,7 @@ class PositionHoldPlanner:
     """Plans position-mode JointCommand corrections from shared force references.
 
     ``force_reference`` and ``dt`` are kept on ``compute`` so position and
-    torque planners can share the same call shape, even though the direct
+    Current planners can share the same call shape, even though the direct
     position-control strategy does not currently use them.
     """
 
@@ -101,7 +100,7 @@ class PositionHoldPlanner:
         u_boost = self._compute_confirmed_slip_boost_u(slip_confirmed)
         u_over = self._compute_overlimit_control_u(fz_filtered, fz_limit)
         u_ff = self._compute_feedforward_control_u(fz_filtered, finger_count)
-        
+
         control_u = u_slip + u_boost + u_over + u_ff
         if self.is_fragile_mode and fz >= fz_limit:
             control_u = min(control_u, 0.0)
@@ -125,7 +124,7 @@ class PositionHoldPlanner:
             0.0,
             1.0,
         )
-        return cfg.position_hold_max_step_deg * (normalized_risk ** cfg.position_hold_slip_risk_gamma)
+        return cfg.position_hold_max_step_deg * (normalized_risk**cfg.position_hold_slip_risk_gamma)
 
     def _compute_confirmed_slip_boost_u(self, slip_confirmed: bool) -> float:
         if not slip_confirmed:
@@ -163,11 +162,11 @@ class PositionHoldPlanner:
 
         return ForceDecision(
             control_u=control_u,
-            next_torque=self._compute_next_torque(),
+            next_current=self._compute_next_current(),
             target_angles=target_angles,
             is_fragile_mode=self.is_fragile_mode,
             near_limit=near_limit,
-            next_speed=self._compute_next_speed(),
+            next_velocity=self._compute_next_velocity(),
         )
 
     def _joint_deltas(
@@ -195,38 +194,35 @@ class PositionHoldPlanner:
 
     def _get_effective_contact_count(self, finger_fz: FingerForces) -> int:
         active_finger_count = max(len(self.config.active_fingers), 1)
-        contacting_fingers = sum(
-            1
-            for finger in self.config.active_fingers
-            if finger_fz.get(finger, 0.0) > self.config.numeric_epsilon
-        )
+        contacting_fingers = sum(1 for finger in self.config.active_fingers
+                                 if finger_fz.get(finger, 0.0) > self.config.numeric_epsilon)
         return contacting_fingers or active_finger_count
 
     def _is_near_limit(self, finger_fz: FingerForces, finger_count: int) -> bool:
-        threshold = self.config.position_hold_force_limit_slowdown_ratio * self._get_max_normal_force_per_finger(finger_count)
-        return any(
-            finger_fz.get(finger, 0.0) >= threshold
-            for finger in self.config.active_fingers
-        )
+        threshold = self.config.position_hold_force_limit_slowdown_ratio * self._get_max_normal_force_per_finger(
+            finger_count)
+        return any(finger_fz.get(finger, 0.0) >= threshold for finger in self.config.active_fingers)
 
     def _get_max_normal_force_per_finger(self, finger_count: int) -> float:
         if self.profile is not None:
             return self.profile.safe_force_max / finger_count
         return self.config.max_normal_force_per_finger_n
 
-    def _compute_next_torque(self) -> int:
-        if self.profile is None or self.profile.position_hold_torque is None:
-            raise ValueError("ObjectProfile.position_hold_torque is required for position hold mode")
-        next_torque = self.profile.position_hold_torque
+    def _compute_next_current(self) -> int:
+        if self.profile is None or self.profile.position_hold_current is None:
+            raise ValueError(
+                "ObjectProfile.position_hold_current is required for position hold mode")
+        next_current = self.profile.position_hold_current
         if self.is_fragile_mode:
-            next_torque = int(next_torque * self.config.fragile_torque_reduction)
-        return next_torque
+            next_current = int(next_current * self.config.fragile_current_reduction)
+        return next_current
 
-    def _compute_next_speed(self) -> int:
-        if self.profile is None or self.profile.position_hold_speed is None:
-            raise ValueError("ObjectProfile.position_hold_speed is required for position hold mode")
-        next_speed = self.profile.position_hold_speed
-        return int(clip(next_speed, 0, 100))
+    def _compute_next_velocity(self) -> int:
+        if self.profile is None or self.profile.position_hold_velocity is None:
+            raise ValueError(
+                "ObjectProfile.position_hold_velocity is required for position hold mode")
+        next_velocity = self.profile.position_hold_velocity
+        return int(clip(next_velocity, 0, 100))
 
     @staticmethod
     def _offset_joint_angle(

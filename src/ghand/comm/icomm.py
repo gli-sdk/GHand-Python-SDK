@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 # Copyright 2026 GLITech
@@ -14,13 +14,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Communication protocol abstraction interface.
 
 Error handling contract:
 - A. Connection management (connect/disconnect/search_adapters): return bool,
   do NOT raise on normal failure.
-- B. State-change operations (clear_fault/init_joint/tactile_*): return bool
+- B. State-change operations (clear_fault/tactile_*): return bool
   to indicate device confirmation; return False when the device rejects the
   command. Underlying exceptions bubble up naturally.
 - C. Critical control / data retrieval (move_joints/stop/get_*/get_joints):
@@ -28,6 +27,8 @@ Error handling contract:
 """
 
 from abc import ABC, abstractmethod
+
+from ..types import CANFDBitTiming, RS485BaudRate
 
 
 class IComm(ABC):
@@ -42,8 +43,7 @@ class IComm(ABC):
         self,
         device_name: str,
         slave_id: int | None = None,
-        baudrate_gear: int | None = None,
-        quiet: bool = False,
+        baudrate: RS485BaudRate | CANFDBitTiming | None = None,
     ) -> bool:
         """Connect to the specified device.
 
@@ -51,12 +51,9 @@ class IComm(ABC):
             device_name: Identifier of the device to connect to.
             slave_id: Optional RS485/CANFD slave ID override for this connection.
                 Implementations that do not use slave IDs may ignore it.
-            baudrate_gear: Optional baud rate gear value. For RS485 this selects
+            baudrate: Optional baud rate gear value. For RS485 this selects
                 the serial baud rate; for CANFD it selects both the arbitration
                 and data phase bitrates. Other implementations may ignore it.
-            quiet: When True, suppress non-fatal failure logs. Useful for
-                auto-detection loops that are expected to try several ports
-                or baud rates before finding a device.
 
         Returns:
             True if the connection succeeds, False otherwise.
@@ -85,28 +82,30 @@ class IComm(ABC):
     def set_slave_id(self, slave_id: int) -> bool:
         """Set the device slave ID.
 
+        The default implementation reports that the protocol is unsupported.
+
         Args:
             slave_id: New slave ID to write to the device.
 
         Returns:
             True if the command succeeds, False otherwise.
-        """
-        return False
 
-    def set_baudrate_config(
-        self,
-        baudrate_gear: int | None = None,
-    ) -> bool:
+        Raises:
+            NotImplementedError: If the protocol does not support setting slave IDs.
+        """
+        raise NotImplementedError(f"{type(self).__name__} does not support set_slave_id")
+
+    def set_baudrate(self, baudrate: int) -> bool:
         """Configure the RS485/CANFD baud rate gear (Flash, effective on reboot).
 
         Args:
-            baudrate_gear: Protocol gear value written directly to holding
-                register 0x002C. When omitted the protocol default gear is used.
+            baudrate: Protocol gear value written directly to holding
+                register 0x0004.
 
         Returns:
             True if the command succeeds, False otherwise.
         """
-        return False
+        raise NotImplementedError(f"{type(self).__name__} does not support set_baudrate")
 
     # ===== Joint control =====
 
@@ -116,7 +115,7 @@ class IComm(ABC):
 
         Args:
             joints: List of JointCommand objects.
-            mode: Control mode (position, speed, or torque).
+            mode: Control mode (position, velocity, or current).
 
         Returns:
             True if the command is sent successfully.
@@ -130,6 +129,11 @@ class IComm(ABC):
         Returns:
             List of JointData objects.
         """
+        ...
+
+    @abstractmethod
+    def disable_hand(self) -> bool:
+        """Disable all active joints at the hand-control level."""
         ...
 
     @abstractmethod
@@ -203,25 +207,8 @@ class IComm(ABC):
         ...
 
     @abstractmethod
-    def init_joint(self) -> bool:
-        """Initialize joint positions.
-
-        Returns:
-            True on success, False if the device rejected the command.
-
-        """
-        ...
-
-    @abstractmethod
     def get_device_name(self) -> str:
         """Retrieve the device name.
-
-        """
-        ...
-
-    @abstractmethod
-    def get_hardware_version(self) -> str:
-        """Retrieve the hardware version.
 
         """
         ...
@@ -261,6 +248,26 @@ class IComm(ABC):
         """
         ...
 
+    def get_stall_tolerances(self) -> dict:
+        """Retrieve per-joint stall tolerances when supported."""
+        raise NotImplementedError("stall tolerance configuration is not supported")
+
+    def set_stall_tolerances(self, tolerances: dict) -> bool:
+        """Set per-joint stall tolerances when supported."""
+        raise NotImplementedError("stall tolerance configuration is not supported")
+
+    def get_pid_parameters(self) -> list[int]:
+        """Retrieve the raw closed-loop PID parameter array when supported."""
+        raise NotImplementedError("PID parameter configuration is not supported")
+
+    def set_pid_parameters(self, parameters: list[int]) -> bool:
+        """Set the raw closed-loop PID parameter array when supported."""
+        raise NotImplementedError("PID parameter configuration is not supported")
+
+    def get_hand_state_machine(self):
+        """Retrieve the whole-hand runtime state machine value when supported."""
+        raise NotImplementedError("hand state machine query is not supported")
+
     @abstractmethod
     def get_motor_driver_version(self) -> str:
         """Retrieve the motor driver version.
@@ -292,30 +299,6 @@ class IComm(ABC):
         """
         ...
 
-    def get_self_test_error_info(self):
-        """Retrieve structured self-test error information.
-
-        Default implementation returns an empty ``SelfTestErrorInfo``. Backends
-        that support the self-test error query (object dictionary 0x2008)
-        should override this method.
-
-        Returns:
-            SelfTestErrorInfo instance.
-        """
-        from ..types import SelfTestErrorInfo
-
-        return SelfTestErrorInfo()
-
-    def get_self_test_status(self) -> int:
-        """Retrieve the self-test status byte.
-
-        Backends that expose a direct self-test status register should override
-        this method. Status values are: ``0`` idle, ``1`` processing,
-        ``2`` command processed successfully, ``3`` failed. The default ``0``
-        matches the idle/unknown status.
-        """
-        return 0
-
     # ===== Subscription =====
 
     @abstractmethod
@@ -330,6 +313,26 @@ class IComm(ABC):
             Subscription ID that can be used to unsubscribe.
         """
         ...
+
+    def subscribe_device_data(
+        self,
+        callback,
+        *,
+        include_tactile: bool = False,
+        interval_ms: int | None = None,
+    ) -> int:
+        """Subscribe to unified ``DeviceData`` updates."""
+        from ..types import DeviceData
+
+        def adapter(hand_state, joints, *args, **kwargs):
+            tactile = None
+            if include_tactile:
+                tactile = self.get_tactile_data()
+                if not tactile:
+                    tactile = None
+            callback(DeviceData(hand=hand_state, joints=joints, tactile=tactile), *args, **kwargs)
+
+        return self.subscribe(adapter, interval_ms=interval_ms)
 
     @abstractmethod
     def unsubscribe(self, sub_id) -> bool:

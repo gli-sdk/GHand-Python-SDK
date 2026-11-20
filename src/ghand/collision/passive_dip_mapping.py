@@ -6,17 +6,29 @@ from __future__ import annotations
 import math
 from typing import NamedTuple, Sequence
 
-
 PI = math.pi
 _EPS = 1e-12
 
 # Joint order for the 18-value collision-detection angle vector.
 JOINT_ORDER = (
-    'LF_MCP', 'LF_PIP', 'LF_DIP',
-    'RF_MCP', 'RF_PIP', 'RF_DIP',
-    'MF_MCP', 'MF_PIP', 'MF_DIP',
-    'FF_MCP_AA', 'FF_MCP', 'FF_PIP', 'FF_DIP',
-    'Thumb_TMC_PS', 'Thumb_TMC_AA', 'Thumb_TMC_FE', 'Thumb_MCP', 'Thumb_IP',
+    'LF_MCP',
+    'LF_PIP',
+    'LF_DIP',
+    'RF_MCP',
+    'RF_PIP',
+    'RF_DIP',
+    'MF_MCP',
+    'MF_PIP',
+    'MF_DIP',
+    'FF_MCP_AA',
+    'FF_MCP',
+    'FF_PIP',
+    'FF_DIP',
+    'Thumb_TMC_PS',
+    'Thumb_TMC_AA',
+    'Thumb_TMC_FE',
+    'Thumb_MCP',
+    'Thumb_IP',
 )
 
 # Mapping from each finger to its PIP and DIP indices in JOINT_ORDER.
@@ -37,28 +49,28 @@ class _Point2D(NamedTuple):
 
 class _FourBarCache(NamedTuple):
     """Precomputed four-bar linkage cache to avoid repeated work."""
-    l_de: float          # DE link length
-    l_dg: float          # DG link length
-    l_ef: float          # EF link length
-    l_fg: float          # FG link length
-    phi_pip_0: float     # PIP angle offset at the reference pose
-    angle_efg_0: float   # EFG angle at the reference pose
-    d_branch_sign: float # Branch-selection sign for point D
-    g_branch_sign: float # Branch-selection sign for point G
+    l_de: float  # DE link length
+    l_dg: float  # DG link length
+    l_ef: float  # EF link length
+    l_fg: float  # FG link length
+    phi_pip_0: float  # PIP angle offset at the reference pose
+    angle_efg_0: float  # EFG angle at the reference pose
+    d_branch_sign: float  # Branch-selection sign for point D
+    g_branch_sign: float  # Branch-selection sign for point G
 
 
 class _ThumbCache(NamedTuple):
     """Precomputed thumb-mechanism cache to avoid repeated work."""
-    l_ac: float          # AC link length
-    l_ab: float          # AB link length
-    l_db: float          # DB link length
-    l_cd: float          # CD link length
-    theta_ca_0: float    # CA vector angle at the reference pose
-    theta_cd: float      # Fixed CD vector angle
-    angle_cab_0: float   # CAB angle at the reference pose
-    b_branch_sign: float # Branch-selection sign for point B
-    p_c: _Point2D        # Fixed point C
-    p_d: _Point2D        # Fixed point D
+    l_ac: float  # AC link length
+    l_ab: float  # AB link length
+    l_db: float  # DB link length
+    l_cd: float  # CD link length
+    theta_ca_0: float  # CA vector angle at the reference pose
+    theta_cd: float  # Fixed CD vector angle
+    angle_cab_0: float  # CAB angle at the reference pose
+    b_branch_sign: float  # Branch-selection sign for point B
+    p_c: _Point2D  # Fixed point C
+    p_d: _Point2D  # Fixed point D
 
 
 GEO_STD = {
@@ -108,7 +120,8 @@ def _clamp(value: float, min_value: float, max_value: float) -> float:
 def _solve_triangle_angle(side_a: float, side_b: float, side_c_opposite: float) -> float:
     if side_a <= _EPS or side_b <= _EPS:
         return 0.0
-    cos_value = (side_a * side_a + side_b * side_b - side_c_opposite * side_c_opposite) / (2.0 * side_a * side_b)
+    cos_value = (side_a * side_a + side_b * side_b -
+                 side_c_opposite * side_c_opposite) / (2.0 * side_a * side_b)
     return math.acos(_clamp(cos_value, -1.0, 1.0))
 
 
@@ -168,7 +181,8 @@ def _solve_circle_intersections(
     if not _is_triangle_feasible(radius0, radius1, center_distance):
         raise ValueError('circles do not have valid intersection points')
 
-    axis_x = (radius0 * radius0 - radius1 * radius1 + center_distance * center_distance) / (2.0 * center_distance)
+    axis_x = (radius0 * radius0 - radius1 * radius1 +
+              center_distance * center_distance) / (2.0 * center_distance)
     height_sq = max(0.0, radius0 * radius0 - axis_x * axis_x)
     height = math.sqrt(height_sq)
 
@@ -250,7 +264,8 @@ def _precompute_thumb_cache(geo: dict[str, _Point2D]) -> _ThumbCache:
     theta_ca_0 = math.atan2(geo['P_A'].y - geo['P_C'].y, geo['P_A'].x - geo['P_C'].x)
     theta_cd = math.atan2(geo['P_D'].y - geo['P_C'].y, geo['P_D'].x - geo['P_C'].x)
     angle_cab_0 = _solve_triangle_angle(l_ac, l_ab, _dist(geo['P_C'], geo['P_B']))
-    b_branch_sign = _sign_or_default(_cross(_sub(geo['P_D'], geo['P_A']), _sub(geo['P_B'], geo['P_A'])), -1.0)
+    b_branch_sign = _sign_or_default(
+        _cross(_sub(geo['P_D'], geo['P_A']), _sub(geo['P_B'], geo['P_A'])), -1.0)
 
     return _ThumbCache(
         l_ac=l_ac,
@@ -270,7 +285,8 @@ def _solve_fourbar_dip_from_pip(cache: _FourBarCache, pip_rad: float) -> float:
     phi_curr = cache.phi_pip_0 - pip_rad
     point_e = _Point2D(0.0, 0.0)
     point_f = _Point2D(cache.l_ef, 0.0)
-    point_d = _Point2D(cache.l_de * math.cos(phi_curr), cache.d_branch_sign * cache.l_de * math.sin(phi_curr))
+    point_d = _Point2D(cache.l_de * math.cos(phi_curr),
+                       cache.d_branch_sign * cache.l_de * math.sin(phi_curr))
 
     point_g0, point_g1 = _solve_circle_intersections(point_d, cache.l_dg, point_f, cache.l_fg)
     point_g = _select_point_by_y_sign(point_g0, point_g1, cache.g_branch_sign)
@@ -288,7 +304,8 @@ def _solve_thumb_dip_from_pip(cache: _ThumbCache, pip_rad: float) -> float:
     )
 
     point_b0, point_b1 = _solve_circle_intersections(point_a, cache.l_ab, cache.p_d, cache.l_db)
-    point_b = _select_point_by_cross_sign(point_a, cache.p_d, point_b0, point_b1, cache.b_branch_sign)
+    point_b = _select_point_by_cross_sign(point_a, cache.p_d, point_b0, point_b1,
+                                          cache.b_branch_sign)
 
     l_cb = _dist(cache.p_c, point_b)
     angle_cab = _solve_triangle_angle(cache.l_ac, cache.l_ab, l_cb)
@@ -320,14 +337,14 @@ def _thumb_pip_range(cache: _ThumbCache) -> tuple[float, float]:
     return min(pip_min, pip_max), max(pip_min, pip_max)
 
 
-def _validate_pip_range(pip_rad: float, mechanism_name: str, pip_range: tuple[float, float]) -> None:
+def _validate_pip_range(pip_rad: float, mechanism_name: str, pip_range: tuple[float,
+                                                                              float]) -> None:
     if not math.isfinite(pip_rad):
         raise ValueError('PIP angle must be finite')
     if pip_rad < pip_range[0] - _EPS or pip_rad > pip_range[1] + _EPS:
         raise ValueError(
             f'{mechanism_name} PIP angle is out of the supported mapping range: {pip_rad:.6f}, '
-            f'expected [{pip_range[0]:.6f}, {pip_range[1]:.6f}]'
-        )
+            f'expected [{pip_range[0]:.6f}, {pip_range[1]:.6f}]')
 
 
 def _normalize_finger_identifier(finger: str) -> str:
@@ -480,4 +497,3 @@ __all__ = [
     'solve_finger_dip_from_pip',
     'apply_passive_dip_mapping',
 ]
-

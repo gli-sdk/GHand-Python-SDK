@@ -17,7 +17,7 @@ def build_joint_runtime(
     joint_data: List[Dict[str, Any]],
     capsule_map: Dict[str, Dict[str, Any]],
 ) -> Tuple[Dict[str, JointData], Dict[str, List[Callable[[float], np.ndarray]]]]:
-    
+
     joints_info: Dict[str, JointData] = {
         'base_link': JointData(trans_matrix=np.eye(4)),
     }
@@ -58,9 +58,7 @@ def build_joint_runtime(
     finger_funs: Dict[str, List[Callable[[float], np.ndarray]]] = {}
     for finger_name, link_names in FINGER_JOINT_MAP.items():
         finger_funs[finger_name] = [
-            joint_funs[link_name]
-            for link_name in link_names
-            if link_name in joint_funs
+            joint_funs[link_name] for link_name in link_names if link_name in joint_funs
         ]
 
     return joints_info, finger_funs

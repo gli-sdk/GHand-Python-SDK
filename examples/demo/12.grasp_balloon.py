@@ -4,7 +4,7 @@ import time
 from ghand import (
     ProductType,
     CommType,
-    CtrlMode,
+    HandControlMode,
     GestureType,
     GHand,
     JointCommand,
@@ -26,9 +26,9 @@ def main():
             print("Connection failed")
             return
 
-        print("\n=== Torque Control Mode Demo ===")
+        print("\n=== current control Mode Demo ===")
 
-        # Torque control cycle
+        # current control cycle
         cycle_count = 0
         max_cycles = 1  # Set to 0 for infinite loop
 
@@ -37,16 +37,16 @@ def main():
             if max_cycles > 0 and cycle_count > max_cycles:
                 break
 
-            # Step 1: Apply torque to close fingers
-            print("\nStep 1: Applying torque to close fingers (torque=10)")
-            torque_joints = [
-                JointCommand(id=JointId.THUMB_TMC_AA, torque=5),
-                JointCommand(id=JointId.THUMB_MCP, torque=8),
-                JointCommand(id=JointId.FF_PIP, torque=8),
-                JointCommand(id=JointId.MF_PIP, torque=8),
+            # Step 1: Apply current to close fingers
+            print("\nStep 1: Applying current to close fingers (current=10)")
+            current_joints = [
+                JointCommand(id=JointId.THUMB_TMC_AA, current=5),
+                JointCommand(id=JointId.THUMB_MCP, current=8),
+                JointCommand(id=JointId.FF_PIP, current=8),
+                JointCommand(id=JointId.MF_PIP, current=8),
             ]
 
-            result = hand.move_joints(torque_joints, mode=CtrlMode.TORQUE)
+            result = hand.move_joints(current_joints, hand_control_mode=HandControlMode.CURRENT)
             if result:
                 while True:
                     time.sleep(10)
@@ -60,12 +60,10 @@ def main():
                                 JointId.MF_PIP,
                         ]:
                             print(
-                                f"  {JointId(joint.id).name:<15}- state:{joint.state:<22},\t"
-                                f"error:{joint.error:<30},\t"
-                                f"angle: {joint.angle:.2f}deg,\t"
-                                f"speed: {joint.speed},\ttorque: {joint.torque}")
+                                f"{JointId(joint.id).name:<13}-\tangle: {joint.angle:<3.1f}(deg),\tvelocity: {joint.velocity:<3},\tcurrent: {joint.current:<3}, \tcontrol_mode:{joint.control_mode}({(joint.control_mode).name:<7}),\tloop_type:{joint.loop_type}({(joint.loop_type).name:<15}),\tstate:{joint.state}({(joint.state).name:<8}),\terror:{joint.error}({(joint.error).name}),"
+                            )
             else:
-                print("Failed to send torque command")
+                print("Failed to send current command")
                 break
 
     except KeyboardInterrupt:

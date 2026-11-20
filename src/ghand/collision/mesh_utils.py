@@ -98,13 +98,11 @@ def create_capsule_mesh(
         v = np.cross(z_axis, direction_unit)
         s = np.linalg.norm(v)
         c = np.dot(z_axis, direction_unit)
-        vx = np.array(
-            [
-                [0, -v[2], v[1]],
-                [v[2], 0, -v[0]],
-                [-v[1], v[0], 0],
-            ]
-        )
+        vx = np.array([
+            [0, -v[2], v[1]],
+            [v[2], 0, -v[0]],
+            [-v[1], v[0], 0],
+        ])
         rotation = np.eye(3) + vx + vx @ vx * ((1 - c) / (s**2))
 
     transform = np.eye(4)

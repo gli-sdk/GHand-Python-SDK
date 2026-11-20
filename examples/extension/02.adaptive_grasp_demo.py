@@ -10,13 +10,10 @@ if SRC_ROOT not in sys.path:
 
 from ghand.adaptive_grasp import AdaptiveGrasper
 from ghand.adaptive_grasp.demo_config import build_demo_runtime_config
-from ghand import (
-    CommType,
-    GHand,
-    ProductType,
-    configure_logging
-)
+from ghand import (CommType, GHand, ProductType, configure_logging)
+
 configure_logging(level=logging.ERROR)
+
 
 def main() -> None:
     hand = GHand(product_type=ProductType.GHand5, comm_type=CommType.ETHERCAT)
@@ -36,15 +33,13 @@ def main() -> None:
             print("Failed to open tactile sensors.")
             return
         time.sleep(0.5)
-        
+
         config = runtime_config.adaptive_config
         grasper = AdaptiveGrasper(hand=hand, config=config)
 
         print("Starting adaptive grasp...")
-        print(
-            f"release_hold_time_s={config.release_hold_time_s}, "
-            f"default_object={config.default_object}"
-        )
+        print(f"release_hold_time_s={config.release_hold_time_s}, "
+              f"default_object={config.default_object}")
 
         grasp_ok = grasper.grasp_core()
         if not grasp_ok:
@@ -66,7 +61,7 @@ def main() -> None:
     finally:
         hand.tactile_close()
         hand.close()
-        
+
 
 if __name__ == "__main__":
     main()

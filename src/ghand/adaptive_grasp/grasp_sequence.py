@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025-2026 GLITech
+﻿# SPDX-FileCopyrightText: 2025-2026 GLITech
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
@@ -6,9 +6,9 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Optional
 
-from ..types import CtrlMode, JointCommand, JointId, TactileSensorId
+from ..types import JointId, TactileSensorId, HandControlMode, JointCommand
 from .config import AdaptiveGraspConfig
-from .ports import GraspSequenceHandPort, SensorFrameSource
+from .ports import HandCommandPort, SensorFrameSource, read_sensor_frame
 from .runtime import GraspState
 from .safety import SafetyMonitor, SafetyReport, SafetyStatus
 from .joint_builder import JointCommandBuilder
@@ -31,7 +31,7 @@ class ContactSnapshot:
     joint_angles: dict[JointId, float]
     finger_fz: dict[TactileSensorId, float]
     total_fz: float
-    torque: int
+    current: int
     reason: str
     timestamp_s: float
 
@@ -45,25 +45,27 @@ class ClosingSensorFrame:
 
 
 class PhaseResult:
+
     def __init__(
         self,
         success: bool,
-        final_torque: int,
+        final_current: int,
         should_release: bool = False,
         contact_snapshot: Optional[ContactSnapshot] = None,
         safety_report: Optional[SafetyReport] = None,
     ):
         self.success = success
-        self.final_torque = final_torque
+        self.final_current = final_current
         self.should_release = should_release
         self.contact_snapshot = contact_snapshot
         self.safety_report = safety_report
 
 
 class PhaseController:
+
     def __init__(
         self,
-        hand_port: GraspSequenceHandPort,
+        hand_port: HandCommandPort,
         sensor: SensorFrameSource,
         safety: SafetyMonitor,
         joint_builder: JointCommandBuilder,
@@ -71,7 +73,7 @@ class PhaseController:
         get_time: Callable[[], float],
         on_state_change: Callable[[GraspState], None],
         object_profile: Optional[ObjectProfile] = None,
-        joint_limits: Optional[Mapping[JointId, tuple[float, float]]] = None,
+        active_joints: Optional[Mapping[JointId, tuple[float, float]]] = None,
     ):
         # PhaseController only depends on the hand port abstraction; mock vs
         # hardware wrapping is handled before this controller is constructed.
@@ -83,18 +85,18 @@ class PhaseController:
         self._object_profile = object_profile
         self._get_monotonic_time = get_time
         self._on_state_change = on_state_change
-        self._joint_limits = self._normalize_joint_limits(joint_limits or {})
-        self.current_torque = self._phase_closing_torque()
+        self._active_joint_limits = self._normalize_active_joint_limits(active_joints or {})
+        self.current_current = self._phase_closing_current()
         self._phase_should_release = False
         self._contact_snapshot: Optional[ContactSnapshot] = None
         self._safety_report: Optional[SafetyReport] = None
 
     @staticmethod
-    def _normalize_joint_limits(
-        joint_limits: Mapping[JointId, tuple[float, float]],
+    def _normalize_active_joint_limits(
+        active_joint_limits: Mapping[JointId, tuple[float, float]],
     ) -> dict[JointId, tuple[float, float]]:
         normalized_limits = {}
-        for raw_joint_id, limit in joint_limits.items():
+        for raw_joint_id, limit in active_joint_limits.items():
             joint_id = normalize_joint_id(raw_joint_id)
             lower, upper = float(limit[0]), float(limit[1])
             if lower > upper:
@@ -114,7 +116,7 @@ class PhaseController:
             if not is_running():
                 return PhaseResult(
                     success=False,
-                    final_torque=self.current_torque,
+                    final_current=self.current_current,
                     should_release=self._phase_should_release,
                     contact_snapshot=self._contact_snapshot,
                     safety_report=self._safety_report,
@@ -124,42 +126,39 @@ class PhaseController:
                 self._set_state(GraspState.ERROR)
                 return PhaseResult(
                     success=False,
-                    final_torque=self.current_torque,
+                    final_current=self.current_current,
                     should_release=self._phase_should_release,
                     contact_snapshot=self._contact_snapshot,
                     safety_report=self._safety_report,
                 )
         return PhaseResult(
             success=True,
-            final_torque=self.current_torque,
+            final_current=self.current_current,
             contact_snapshot=self._contact_snapshot,
         )
 
     def _set_state(self, state: GraspState) -> None:
         self._on_state_change(state)
 
-    def _phase_closing_torque(self) -> int:
-        torque = (
-            self._object_profile.phase_closing_torque
-            if self._object_profile is not None
-            else 30
-        )
-        return int(clip(torque, -100.0, self.config.max_torque))
+    def _phase_closing_current(self) -> int:
+        current = (self._object_profile.phase_closing_current
+                   if self._object_profile is not None else 30)
+        return int(clip(current, -100.0, self.config.max_current))
 
     def _execute_position_phase(
         self,
         state: GraspState,
         pose: dict[JointId, float],
-        speed: int,
-        torque: int,
+        velocity: int,
+        current: int,
         is_running: Callable[[], bool] = lambda: True,
     ) -> bool:
         self._set_state(state)
-        joints = self._joint_builder.position_command(pose, speed=speed, torque=torque)
-        ok = self.hand_port.move_joints(joints, mode=CtrlMode.POSITION)
+        joints = self._joint_builder.position_command(pose, velocity=velocity, current=current)
+        ok = self.hand_port.move_joints(joints, mode=HandControlMode.POSITION)
         if not ok:
             return False
-        
+
         return self._wait_until_position_reached(
             state,
             pose,
@@ -181,16 +180,12 @@ class PhaseController:
             feedback = self._sensor.joint_feedback
             if feedback:
                 latest_feedback = feedback
-                current_angles = {
-                    normalize_joint_id(joint.id): joint.angle
-                    for joint in feedback
-                }
+                current_angles = {normalize_joint_id(joint.id): joint.angle for joint in feedback}
                 reached = True
                 for joint_id, target_angle in pose.items():
                     current_angle = current_angles.get(joint_id)
-                    if current_angle is None or abs(
-                            current_angle - target_angle
-                    ) > _POSITION_REACHED_TOLERANCE_DEG:
+                    if current_angle is None or abs(current_angle -
+                                                    target_angle) > _POSITION_REACHED_TOLERANCE_DEG:
                         reached = False
                 if reached:
                     return True
@@ -231,8 +226,8 @@ class PhaseController:
         return self._execute_position_phase(
             GraspState.OPEN,
             self._joint_builder.open_pose(),
-            speed=self.config.open_speed,
-            torque=self.config.open_torque,
+            velocity=self.config.open_velocity,
+            current=self.config.open_current,
             is_running=is_running,
         )
 
@@ -240,15 +235,15 @@ class PhaseController:
         return self._execute_position_phase(
             GraspState.PRE_GRASP,
             self.config.pre_grasp_pose,
-            speed=self.config.pre_grasp_speed,
-            torque=self.config.pre_grasp_torque,
+            velocity=self.config.pre_grasp_velocity,
+            current=self.config.pre_grasp_current,
             is_running=is_running,
         )
 
     def _phase_closing(self, is_running: Callable[[], bool]) -> bool:
         self._set_state(GraspState.CLOSING_TO_CONTACT)
         start = self._get_monotonic_time()
-        self.current_torque = self._phase_closing_torque()
+        self.current_current = self._phase_closing_current()
 
         if joints_feedback := self._sensor.joint_feedback:
             self._safety.set_closing_baseline(joints_feedback)
@@ -261,7 +256,8 @@ class PhaseController:
                 _logger.error("CLOSING phase timeout")
                 return False
 
-            self.hand_port.move_joints(self._joint_builder.torque_command(self.current_torque), mode=CtrlMode.TORQUE)
+            self.hand_port.move_joints(self._joint_builder.current_command(self.current_current),
+                                       mode=HandControlMode.CURRENT)
             time.sleep(self.config.closing_period_s)
 
             frame = self._read_closing_sensor_frame()
@@ -274,10 +270,7 @@ class PhaseController:
             if self._try_confirm_force_contact(frame):
                 return True
 
-            current_angles = {
-                normalize_joint_id(j.id): j.angle
-                for j in frame.joint_feedback
-            }
+            current_angles = {normalize_joint_id(j.id): j.angle for j in frame.joint_feedback}
             if self._is_joints_stalled(prev_angles, current_angles):
                 stall_counter += 1
                 if self._try_confirm_stall_contact(stall_counter, frame):
@@ -289,8 +282,9 @@ class PhaseController:
         return False
 
     def _read_closing_sensor_frame(self) -> Optional[ClosingSensorFrame]:
-        tactile_data = self._sensor.tactile_data
-        joint_feedback = self._sensor.joint_feedback
+        sensor_frame = read_sensor_frame(self._sensor)
+        tactile_data = sensor_frame.tactile_data
+        joint_feedback = sensor_frame.joint_feedback
         if tactile_data is None or joint_feedback is None:
             _logger.error(
                 "CLOSING phase: failed to get %s",
@@ -300,8 +294,8 @@ class PhaseController:
         return ClosingSensorFrame(
             tactile_data=tactile_data,
             joint_feedback=joint_feedback,
-            total_fz=self._sensor.sum_active_finger_normal_force(),
-            touch_flags=self._sensor.active_finger_touch_flag(),
+            total_fz=sensor_frame.total_normal_force,
+            touch_flags=sensor_frame.touch_flags or {},
         )
 
     def _is_empty_grasp(self, joint_feedback: list[JointCommand]) -> bool:
@@ -346,12 +340,12 @@ class PhaseController:
         if stall_counter < self.config.closing_stall_cycles:
             return False
 
-        _logger.info("CLOSING: torque-stall contact confirmed")
+        _logger.info("CLOSING: current-stall contact confirmed")
         self._record_contact_snapshot(
             frame.joint_feedback,
             frame.tactile_data,
             frame.total_fz,
-            "torque_stall",
+            "current_stall",
         )
         time.sleep(self.config.control_period_s)
         return True
@@ -366,7 +360,7 @@ class PhaseController:
         joint_angles = {}
         for joint in joint_feedback:
             joint_id = normalize_joint_id(joint.id)
-            if (joint_id in self._joint_builder.torque_joints
+            if (joint_id in self._joint_builder.current_joints
                     or joint_id in _CONTACT_SNAPSHOT_THUMB_AUX_JOINTS):
                 joint_angles[joint_id] = self._clamp_snapshot_joint_angle(
                     joint_id,
@@ -380,7 +374,7 @@ class PhaseController:
             joint_angles=joint_angles,
             finger_fz=finger_fz,
             total_fz=total_fz,
-            torque=self.current_torque,
+            current=self.current_current,
             reason=reason,
             timestamp_s=self._get_monotonic_time(),
         )
@@ -396,7 +390,7 @@ class PhaseController:
         joint_id: JointId,
         angle: float,
     ) -> float:
-        limit = self._joint_limits.get(joint_id)
+        limit = self._active_joint_limits.get(joint_id)
         if limit is None:
             return angle
 
@@ -416,7 +410,7 @@ class PhaseController:
     def _is_joints_stalled(self, prev: dict[JointId, float], current: dict[JointId, float]) -> bool:
         if not prev or not current:
             return False
-        for joint_id in self._joint_builder.torque_joints:
+        for joint_id in self._joint_builder.current_joints:
             delta = abs(current.get(joint_id, 0.0) - prev.get(joint_id, 0.0))
             if delta > self.config.closing_stall_angle_threshold:
                 return False
